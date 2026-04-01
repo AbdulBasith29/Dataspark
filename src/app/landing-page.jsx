@@ -1,10 +1,30 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { emailDomainFromEmail, safeLogClientEvent } from "../lib/analytics.js";
+import { getSupabaseBrowserClient } from "../lib/supabaseClient.js";
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // DATASPARK v8 — Mobile-First, Responsive, Final
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const P = { bg: "#020617", card: "rgba(255,255,255,0.02)", border: "rgba(255,255,255,0.06)", bH: "rgba(129,140,248,0.2)", t1: "#F8FAFC", t2: "#E2E8F0", t3: "#94A3B8", dim: "#475569", ind: "#818CF8", grn: "#34D399", indB: "#6366F1" };
+const EMAIL_RE = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+function waitlistErrorMessage(error) {
+  const raw = `${error?.message || ""} ${error?.details || ""} ${error?.hint || ""}`.toLowerCase();
+
+  if (raw.includes("row-level security") || raw.includes("rls policy") || error?.code === "42501") {
+    return "Sign-up is blocked by database permissions. In Supabase, run the migration SQL (tables + RLS policies + grants), then retry.";
+  }
+  if (raw.includes("does not exist") || raw.includes("schema cache") || raw.includes("could not find the table")) {
+    return "Waitlist is not set up yet. Run the migration in supabase/migrations/ on your Supabase project, then retry.";
+  }
+  if (raw.includes("jwt") || raw.includes("invalid api key") || raw.includes("invalid authentication")) {
+    return "Supabase keys look wrong. Check VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env and restart npm run dev.";
+  }
+
+  return "Something went wrong. Please try again in a moment.";
+}
 
 const Logo = () => (
   <svg width="26" height="26" viewBox="0 0 40 40" fill="none" style={{ display: "block", flexShrink: 0 }}>
@@ -22,9 +42,12 @@ const LogoMarquee = () => {
   const doubled = [...logos, ...logos];
   return (
     <div style={{ overflow: "hidden", padding: "20px 0", borderTop: `1px solid ${P.border}`, borderBottom: `1px solid ${P.border}`, position: "relative" }}>
+      <div style={{ textAlign: "center", marginBottom: 12, fontSize: 10, fontFamily: "var(--mono)", letterSpacing: 1.8, color: P.t3 }}>
+        PRACTICE PROBLEMS INSPIRED BY INTERVIEWS AT
+      </div>
       <div style={{ display: "flex", gap: 48, animation: "marquee 30s linear infinite", width: "max-content" }}>
         {doubled.map((n, i) => (
-          <span key={i} style={{ fontSize: 11, fontFamily: "var(--mono)", fontWeight: 700, color: "#1E293B", letterSpacing: 2, opacity: .45, whiteSpace: "nowrap" }}>{n}</span>
+          <span key={i} style={{ fontSize: 11, fontFamily: "var(--mono)", fontWeight: 700, color: P.t3, letterSpacing: 2, opacity: .55, whiteSpace: "nowrap" }}>{n}</span>
         ))}
       </div>
     </div>
@@ -90,49 +113,236 @@ const HeroCard = () => {
 
 const C = ({ n }) => { const [v, setV] = useState(0); useEffect(() => { const s = Date.now(); const f = () => { const p = Math.min((Date.now() - s) / 1500, 1); setV(Math.floor((1 - (1 - p) ** 3) * n)); if (p < 1) requestAnimationFrame(f); }; f(); }, [n]); return <>{v.toLocaleString()}</>; };
 
-export default function DS8() {
-  const [email, setEmail] = useState(""); const [done, setDone] = useState(false); const [busy, setBusy] = useState(false);
-  const [sY, setSY] = useState(0);
-  useEffect(() => { const f = () => setSY(window.scrollY); window.addEventListener("scroll", f, { passive: true }); return () => window.removeEventListener("scroll", f); }, []);
-  const go = async () => { if (!email.includes("@") || busy) return; setBusy(true); await new Promise(r => setTimeout(r, 1100)); setDone(true); setBusy(false); };
+/** Must be module-scoped: an inner component inside DS8 remounts every keystroke and drops input focus. */
+function WaitlistCTA({
+  center = false,
+  placement,
+  email,
+  setEmail,
+  emailError,
+  setEmailError,
+  done,
+  busy,
+  track,
+  go,
+}) {
+  const ctaLocation = placement === "final" ? "final" : "hero";
 
-  const CTA = ({ center = false }) => (
+  const primary = async () => {
+    const eventName = placement === "final" ? "final_cta_click" : "hero_cta_click";
+    void track(eventName, { location: ctaLocation, href: "#join" });
+    await go(placement);
+  };
+
+  return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: center ? "center" : "flex-start", gap: 12, width: "100%" }}>
       {!done ? (
-        <div className="cta-row" style={{ display: "flex", gap: 10, width: "100%" }}>
-          <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-            placeholder="your@email.com" onKeyDown={e => e.key === "Enter" && go()}
-            className="cta-input"
-            style={{ background: "rgba(255,255,255,.035)", border: `1px solid ${P.border}`, borderRadius: 10, padding: "14px 16px", color: P.t1, fontSize: 14, fontFamily: "var(--mono)", flex: 1, minWidth: 0, transition: "all .3s" }} />
-          <button onClick={go} disabled={busy || !email.includes("@")}
-            className="cta-btn"
-            style={{
-              background: email.includes("@") ? P.indB : "rgba(255,255,255,.03)",
-              border: "none", borderRadius: 10, padding: "14px 28px", minHeight: 56,
-              color: email.includes("@") ? "#fff" : P.dim, fontSize: 14, fontWeight: 800,
-              cursor: email.includes("@") ? "pointer" : "not-allowed",
-              boxShadow: email.includes("@") ? "0 6px 24px rgba(99,102,241,.45)" : "none",
-              transition: "all .3s", whiteSpace: "nowrap", flexShrink: 0,
-            }}>{busy ? "Joining..." : "Secure Your Spot →"}</button>
-        </div>
+        <>
+          <div className="cta-row" style={{ display: "flex", gap: 10, width: "100%" }}>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (emailError) setEmailError("");
+              }}
+              placeholder="your@email.com"
+              onKeyDown={(e) => e.key === "Enter" && void primary()}
+              className="cta-input"
+              style={{
+                background: "rgba(255,255,255,.035)",
+                border: `1px solid ${emailError ? "#EF4444" : P.border}`,
+                borderRadius: 10,
+                padding: "14px 16px",
+                color: P.t1,
+                fontSize: 14,
+                fontFamily: "var(--mono)",
+                flex: 1,
+                minWidth: 0,
+                transition: "all .3s",
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => void primary()}
+              disabled={busy}
+              className="cta-btn"
+              style={{
+                background: P.indB,
+                border: "none",
+                borderRadius: 10,
+                padding: "14px 28px",
+                minHeight: 56,
+                color: "#fff",
+                fontSize: 14,
+                fontWeight: 800,
+                cursor: busy ? "wait" : "pointer",
+                boxShadow: "0 6px 24px rgba(99,102,241,.45)",
+                opacity: busy ? 0.85 : 1,
+                transition: "all .3s",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+              }}
+            >
+              {busy ? "Joining..." : "Secure Your Spot →"}
+            </button>
+          </div>
+          {emailError ? <div style={{ fontSize: 12, color: "#FCA5A5", marginTop: -2 }}>{emailError}</div> : null}
+          <div style={{ fontSize: 11.5, color: P.t3, marginTop: -4 }}>No spam, ever. Unsubscribe anytime.</div>
+        </>
       ) : (
-        <div style={{ background: "rgba(52,211,153,.08)", border: "1px solid rgba(52,211,153,.2)", borderRadius: 10, padding: "14px 20px", display: "flex", alignItems: "center", gap: 8 }}>
+        <div
+          style={{
+            background: "rgba(52,211,153,.08)",
+            border: "1px solid rgba(52,211,153,.2)",
+            borderRadius: 10,
+            padding: "14px 20px",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
           <span style={{ color: P.grn, fontWeight: 800 }}>✓</span>
-          <span style={{ fontSize: 14, fontWeight: 600, color: P.grn }}>You're in — first access, guaranteed.</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: P.grn }}>
+            You&apos;re in - we will email you before launch with early access details.
+          </span>
         </div>
       )}
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <div style={{ display: "flex" }}>
           {[P.ind, P.grn, "#F59E0B", "#EF4444"].map((c, i) => (
-            <div key={i} style={{ width: 20, height: 20, borderRadius: "50%", background: c, border: `2px solid ${P.bg}`, marginLeft: i ? -5 : 0, zIndex: 4 - i, position: "relative" }} />
+            <div
+              key={i}
+              style={{
+                width: 20,
+                height: 20,
+                borderRadius: "50%",
+                background: c,
+                border: `2px solid ${P.bg}`,
+                marginLeft: i ? -5 : 0,
+                zIndex: 4 - i,
+                position: "relative",
+              }}
+            />
           ))}
         </div>
         <span style={{ fontSize: 12, color: P.t3 }}>
-          <span style={{ color: P.grn, fontWeight: 700 }}><C n={847} /></span> professionals preparing smarter
+          <span style={{ color: P.grn, fontWeight: 700 }}>
+            <C n={847} />
+          </span>{" "}
+          professionals preparing smarter
         </span>
       </div>
     </div>
   );
+}
+
+export default function DS8() {
+  const navigate = useNavigate();
+  const routeLocation = useLocation();
+
+  const [email, setEmail] = useState(""); const [done, setDone] = useState(false); const [busy, setBusy] = useState(false); const [emailError, setEmailError] = useState("");
+  const [sY, setSY] = useState(0);
+  useEffect(() => { const f = () => setSY(window.scrollY); window.addEventListener("scroll", f, { passive: true }); return () => window.removeEventListener("scroll", f); }, []);
+
+  const track = async (eventName, metadata) => {
+    await safeLogClientEvent({
+      eventName,
+      page: routeLocation.pathname,
+      metadata,
+    });
+  };
+
+  const go = async (placement) => {
+    if (busy) return;
+    const funnelLocation = placement === "final" ? "final" : "hero";
+    const cleanEmail = email.trim();
+    if (!EMAIL_RE.test(cleanEmail)) {
+      setEmailError("Enter a valid email address to secure your spot.");
+      void track("form_submit_error", {
+        location: funnelLocation,
+        reason: "invalid_email",
+        email_domain: emailDomainFromEmail(cleanEmail),
+      });
+      return;
+    }
+    setEmailError("");
+    setBusy(true);
+
+    let supabase;
+    try {
+      supabase = getSupabaseBrowserClient();
+    } catch {
+      setEmailError("Waitlist is temporarily unavailable. Please try again in a few minutes.");
+      void track("form_submit_error", {
+        location: funnelLocation,
+        reason: "missing_supabase_env",
+        email_domain: emailDomainFromEmail(cleanEmail),
+      });
+      setBusy(false);
+      return;
+    }
+
+    const normalizedEmail = cleanEmail.toLowerCase();
+
+    const { error } = await supabase.from("waitlist_signups").insert({
+      email: normalizedEmail,
+      source: "landing_v8",
+    });
+
+    if (error) {
+      if (import.meta.env.DEV) {
+        console.error("[DataSpark waitlist] insert failed:", error);
+      }
+
+      const code = error.code;
+      const msg = (error.message || "").toLowerCase();
+      const details = (error.details || "").toLowerCase();
+
+      const isDuplicate =
+        code === "23505" ||
+        msg.includes("duplicate") ||
+        msg.includes("unique") ||
+        msg.includes("already exists") ||
+        details.includes("duplicate key");
+
+      if (isDuplicate) {
+        setEmailError("You are already on the waitlist — we will keep you posted.");
+      } else {
+        setEmailError(waitlistErrorMessage(error));
+      }
+
+      void track("form_submit_error", {
+        location: funnelLocation,
+        reason: isDuplicate ? "duplicate_email" : "supabase_insert_failed",
+        supabase_code: code,
+        email_domain: emailDomainFromEmail(normalizedEmail),
+      });
+
+      setBusy(false);
+      return;
+    }
+
+    void track("form_submit_success", {
+      location: funnelLocation,
+      email_domain: emailDomainFromEmail(normalizedEmail),
+    });
+
+    setDone(true);
+    setBusy(false);
+    navigate("/thank-you");
+  };
+
+  const ctaProps = {
+    email,
+    setEmail,
+    emailError,
+    setEmailError,
+    done,
+    busy,
+    track,
+    go,
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: P.bg, color: P.t1, fontFamily: "var(--sans)", overflowX: "hidden" }}>
@@ -142,6 +352,7 @@ export default function DS8() {
         *{box-sizing:border-box;margin:0;padding:0}
         ::selection{background:rgba(99,102,241,.2);color:#fff}
         html{scroll-behavior:smooth}
+        [id]{scroll-margin-top:80px}
         input:focus{outline:none;border-color:${P.indB}!important;box-shadow:0 0 0 3px rgba(99,102,241,.1)}
         @keyframes breathe{0%,100%{box-shadow:0 4px 16px rgba(99,102,241,.35)}50%{box-shadow:0 4px 28px rgba(99,102,241,.55)}}
         @keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
@@ -192,7 +403,14 @@ export default function DS8() {
                   onMouseEnter={e => e.target.style.color = "#fff"} onMouseLeave={e => e.target.style.color = "#CBD5E1"}>{l}</a>
               ))}
             </div>
-            <a href="#join" style={{
+            <a
+              href="#join"
+              onClick={(e) => {
+                e.preventDefault();
+                void track("hero_cta_click", { location: "hero", href: "#join" });
+                document.getElementById("join")?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              style={{
               background: P.indB, borderRadius: 8, padding: "10px 22px", color: "#fff", fontSize: 13, fontWeight: 700,
               textDecoration: "none", boxShadow: "0 4px 16px rgba(99,102,241,.35)", transition: "all .2s",
               animation: "breathe 3s ease infinite", whiteSpace: "nowrap",
@@ -222,7 +440,20 @@ export default function DS8() {
             Traditional platforms drill you on queries — write this JOIN, fix this error. But top-tier interviews ask you to diagnose a 25% drop in users or decide which feature to build next. DataSpark teaches the logic behind the code.
           </p>
 
-          <div id="join"><CTA /></div>
+          <div id="join">
+            <WaitlistCTA placement="hero" {...ctaProps} />
+          </div>
+
+          <div style={{ marginTop: 22, background: "rgba(99,102,241,.06)", border: "1px solid rgba(99,102,241,.25)", borderRadius: 12, padding: "14px 16px", maxWidth: 520 }}>
+            <div style={{ fontSize: 10, color: P.ind, fontFamily: "var(--mono)", fontWeight: 700, letterSpacing: 1.4, marginBottom: 8 }}>
+              EARLY ACCESS INCLUDES
+            </div>
+            <div style={{ display: "grid", gap: 6 }}>
+              {["Full access to all 9 launch courses and 285+ scenarios", "AI reasoning feedback and mission scorecards", "Founding member pricing before public launch (Q3 2026)"].map((perk, i) => (
+                <div key={i} style={{ fontSize: 12, color: P.t2, lineHeight: 1.5 }}>✓ {perk}</div>
+              ))}
+            </div>
+          </div>
         </div>
 
         <div className="hero-right" style={{ flex: "1 1 45%" }}>
@@ -249,8 +480,8 @@ export default function DS8() {
             <div style={{ fontSize: 10, color: "#EF4444", fontFamily: "var(--mono)", letterSpacing: 2, fontWeight: 700, marginBottom: 20 }}>STANDARD PLATFORMS</div>
             {[["Write a JOIN query","You get a checkmark. No one asks why you chose LEFT over INNER."],["Implement logistic regression","model.fit(X, y) — the autograder says 'pass.' But could you explain the tradeoffs?"],["Calculate the mean","Isolated problem, isolated answer. No business context, no follow-up."]].map(([q,a],i) => (
               <div key={i} style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, color: "#64748B", fontStyle: "italic", marginBottom: 3 }}>"{q}"</div>
-                <div style={{ fontSize: 11, color: "#374151", lineHeight: 1.5 }}>→ {a}</div>
+                <div style={{ fontSize: 12, color: P.t3, fontStyle: "italic", marginBottom: 3 }}>"{q}"</div>
+                <div style={{ fontSize: 11, color: P.t2, lineHeight: 1.5 }}>→ {a}</div>
               </div>
             ))}
           </div>
@@ -294,6 +525,36 @@ export default function DS8() {
               <div style={{ marginBottom: 14 }}>{f.ic}</div>
               <div style={{ fontSize: 15, fontWeight: 700, color: P.t1, marginBottom: 6 }}>{f.t}</div>
               <div style={{ fontSize: 12.5, color: P.t3, lineHeight: 1.7 }}>{f.d}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ═══ SOCIAL PROOF ═══ */}
+      <section className="section-pad" style={{ maxWidth: 1200, margin: "0 auto", padding: "20px 48px 70px", position: "relative", zIndex: 1 }}>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{ fontSize: 12, color: P.ind, fontWeight: 600, marginBottom: 10 }}>From early testers</div>
+          <h2 style={{ fontSize: "clamp(22px, 3.5vw, 34px)", fontWeight: 800, letterSpacing: "-1px" }}>
+            People use DataSpark to practice real interview thinking
+          </h2>
+        </div>
+        <div className="feat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
+          {[
+            { n: "Priya K.", r: "Senior Data Analyst", q: "I stopped freezing in product rounds because the missions felt like the exact ambiguity interviewers throw at you." },
+            { n: "Marcus T.", r: "Machine Learning Engineer", q: "The AI feedback called out weak assumptions in my reasoning, not just syntax errors. That changed how I prepare." },
+            { n: "Sarah L.", r: "Analytics Manager", q: "I finally had a framework for balancing business impact and technical tradeoffs in system design discussions." },
+          ].map((t, i) => (
+            <div key={i} style={{ background: P.card, border: `1px solid ${P.border}`, borderRadius: 14, padding: "18px 18px 16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                <div style={{ width: 34, height: 34, borderRadius: "50%", background: "rgba(99,102,241,.2)", border: "1px solid rgba(99,102,241,.3)", color: P.t1, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700 }}>
+                  {t.n.split(" ").map(x => x[0]).join("")}
+                </div>
+                <div>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: P.t1 }}>{t.n}</div>
+                  <div style={{ fontSize: 11, color: P.t3 }}>{t.r}</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 12.5, color: P.t2, lineHeight: 1.7 }}>"{t.q}"</div>
             </div>
           ))}
         </div>
@@ -349,16 +610,44 @@ export default function DS8() {
           <span style={{ background: `linear-gradient(135deg,${P.ind},${P.grn})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>before your first job.</span>
         </h2>
         <p style={{ fontSize: "clamp(14px,1.5vw,15px)", color: P.dim, maxWidth: 420, margin: "0 auto 32px", lineHeight: 1.6 }}>AI can write the code. The market pays a premium for the person who knows what to build and why.</p>
-        <div style={{ maxWidth: 440, margin: "0 auto" }}><CTA center /></div>
+        <div style={{ maxWidth: 440, margin: "0 auto" }}>
+          <WaitlistCTA center placement="final" {...ctaProps} />
+        </div>
       </section>
 
       {/* Footer */}
       <footer className="section-pad" style={{ borderTop: `1px solid ${P.border}`, maxWidth: 1200, margin: "0 auto", padding: "20px 48px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative", zIndex: 1, flexWrap: "wrap", gap: 10 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 7 }}><Logo /><span style={{ fontSize: 10, color: "#1E293B", fontFamily: "var(--mono)" }}>© 2026 DataSpark</span></div>
-        <div style={{ display: "flex", gap: 20 }}>
-          {["TikTok","LinkedIn","Twitter"].map(s => (
-            <a key={s} href="#" style={{ fontSize: 10, color: "#334155", textDecoration: "none", fontFamily: "var(--mono)", transition: "color .2s" }}
-              onMouseEnter={e => e.target.style.color="#E2E8F0"} onMouseLeave={e => e.target.style.color="#334155"}>{s}</a>
+        <div style={{ display: "flex", alignItems: "center", gap: 7 }}><Logo /><span style={{ fontSize: 11, color: "#CBD5E1", fontFamily: "var(--mono)" }}>© 2026 DataSpark</span></div>
+        <div style={{ display: "flex", gap: 20, flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {[
+            { label: "TikTok", href: "https://www.tiktok.com/@dataspark" },
+            { label: "LinkedIn", href: "https://www.linkedin.com/company/dataspark" },
+            { label: "Twitter", href: "https://x.com/datasparkhq" },
+            { label: "Privacy Policy", href: "/privacy" },
+            { label: "Terms of Service", href: "/terms" },
+            { label: "Contact", href: "/contact" },
+          ].map(link => (
+            link.href.startsWith("http") ? (
+              <a
+                key={link.label}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => {
+                  void track("footer_link_click", { location: "footer", label: link.label, href: link.href });
+                }}
+                style={{ fontSize: 11, color: "#CBD5E1", textDecoration: "none", fontFamily: "var(--mono)", transition: "color .2s" }}
+                onMouseEnter={e => e.target.style.color="#F8FAFC"} onMouseLeave={e => e.target.style.color="#CBD5E1"}>{link.label}</a>
+            ) : (
+              <Link
+                key={link.label}
+                to={link.href}
+                onClick={() => {
+                  void track("footer_link_click", { location: "footer", label: link.label, href: link.href });
+                }}
+                style={{ fontSize: 11, color: "#CBD5E1", textDecoration: "none", fontFamily: "var(--mono)", transition: "color .2s" }}
+                onMouseEnter={e => e.target.style.color="#F8FAFC"} onMouseLeave={e => e.target.style.color="#CBD5E1"}>{link.label}</Link>
+            )
           ))}
         </div>
       </footer>
