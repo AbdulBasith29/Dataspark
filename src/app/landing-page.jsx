@@ -237,11 +237,223 @@ function WaitlistCTA({
   );
 }
 
+const FEATURE_PROOFS = [
+  {
+    id: "socratic",
+    t: "Socratic AI Coaching",
+    d: "A coach that does not just give answers. It asks follow-up questions so you can explain your thinking clearly.",
+    c: P.ind,
+    ic: <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={P.ind} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
+    mechanism: "You get guided questions before seeing a model answer.",
+    outcome: "You get better at explaining your choices with confidence.",
+  },
+  {
+    id: "diagram",
+    t: "Visual System Design",
+    d: "Simple diagrams show how data moves through a system, so complex topics feel easier to explain.",
+    c: P.grn,
+    ic: <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={P.grn} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>,
+    mechanism: "Visual maps show where issues start and how they spread.",
+    outcome: "You can explain system decisions in plain language.",
+  },
+  {
+    id: "missions",
+    t: "Real-World Missions",
+    d: "No toy prompts. Practice realistic interview situations you are likely to face on the job.",
+    c: P.ind,
+    ic: <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={P.ind} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>,
+    mechanism: "Each mission includes a simple rubric and answer structure.",
+    outcome: "You learn a repeatable way to solve open-ended problems.",
+  },
+  {
+    id: "scoring",
+    t: "Scored on Your Thinking",
+    d: "Feedback focuses on your thinking and communication, not just whether code runs.",
+    c: P.grn,
+    ic: <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={P.grn} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>,
+    mechanism: "Scores are broken into clear parts like logic and communication.",
+    outcome: "You quickly see what to improve before your next interview.",
+  },
+  {
+    id: "retention",
+    t: "Built-In Retention",
+    d: "Questions you miss come back at the right time so you actually remember key ideas.",
+    c: P.ind,
+    ic: <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={P.ind} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
+    mechanism: "Missed topics resurface on a simple review schedule.",
+    outcome: "You retain concepts longer instead of forgetting after one session.",
+  },
+  {
+    id: "progression",
+    t: "Clear Progression",
+    d: "Courses build step by step, so you always know what to do next.",
+    c: P.grn,
+    ic: <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={P.grn} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>,
+    mechanism: "You unlock advanced practice after finishing the basics.",
+    outcome: "You improve in a clear order without feeling lost.",
+  },
+];
+
+function FeatureDemo({ id }) {
+  if (id === "socratic") {
+    return (
+      <div style={{ display: "grid", gap: 8 }}>
+        <div style={{ fontSize: 11, color: P.t2, background: "rgba(99,102,241,.08)", border: "1px solid rgba(99,102,241,.25)", borderRadius: 8, padding: "8px 10px" }}>
+          AI: Why do you think this is a tracking issue and not normal weekend behavior?
+        </div>
+        <div style={{ fontSize: 11, color: P.t2, background: "rgba(52,211,153,.07)", border: "1px solid rgba(52,211,153,.25)", borderRadius: 8, padding: "8px 10px" }}>
+          You: The drop started right after deploy and mostly affected checkout events.
+        </div>
+      </div>
+    );
+  }
+
+  if (id === "diagram") {
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: "auto 1fr auto 1fr auto", alignItems: "center", gap: 8, fontSize: 10.5, color: P.t2, fontFamily: "var(--mono)" }}>
+        <span style={{ border: `1px solid ${P.border}`, borderRadius: 8, padding: "6px 8px" }}>Events</span>
+        <span style={{ opacity: 0.7 }}>→</span>
+        <span style={{ border: "1px solid rgba(239,68,68,.3)", borderRadius: 8, padding: "6px 8px", color: "#FCA5A5" }}>Ingestion Lag</span>
+        <span style={{ opacity: 0.7 }}>→</span>
+        <span style={{ border: `1px solid ${P.border}`, borderRadius: 8, padding: "6px 8px" }}>Dashboard</span>
+      </div>
+    );
+  }
+
+  if (id === "missions") {
+    return (
+      <div style={{ fontSize: 11, color: P.t2, lineHeight: 1.55 }}>
+        Mission: Signups dropped 25% after Friday release.
+        <div style={{ marginTop: 6, color: P.grn }}>
+          Great answers include: check data quality, split the issue by user group, pick a top hypothesis, and explain next steps.
+        </div>
+      </div>
+    );
+  }
+
+  if (id === "scoring") {
+    return (
+      <div style={{ display: "grid", gap: 6, fontSize: 11, color: P.t2 }}>
+        {[
+          ["Reasoning", "88%"],
+          ["Assumptions", "74%"],
+          ["Communication", "91%"],
+        ].map(([k, v]) => (
+          <div key={k} style={{ display: "flex", justifyContent: "space-between", border: `1px solid ${P.border}`, borderRadius: 8, padding: "6px 10px" }}>
+            <span>{k}</span><span style={{ color: P.grn, fontWeight: 700 }}>{v}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (id === "retention") {
+    return (
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 10.5, color: P.t2, fontFamily: "var(--mono)" }}>
+        {["Day 1: replay", "Day 3: harder variant", "Day 8: cross-topic case"].map((step) => (
+          <span key={step} style={{ border: `1px solid ${P.border}`, borderRadius: 999, padding: "5px 9px" }}>{step}</span>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "grid", gap: 6, fontSize: 10.5, color: P.t2, fontFamily: "var(--mono)" }}>
+      <span>Python basics ✓</span>
+      <span>SQL joins ✓</span>
+      <span style={{ color: P.grn }}>Product Sense (unlocked)</span>
+      <span style={{ color: P.dim }}>System Design (locked)</span>
+    </div>
+  );
+}
+
+function MissionSprint({ track }) {
+  const [choice, setChoice] = useState(null);
+  const outcomes = {
+    deploy: { score: "84%", text: "Strong start. Next, compare iOS vs Android impact before recommending a rollback." },
+    seasonality: { score: "52%", text: "Possible, but you need data from past weekends to support this." },
+    pricing: { score: "61%", text: "Good thought. Gather user behavior evidence before changing pricing." },
+  };
+
+  const handlePick = (id) => {
+    setChoice(id);
+    void track("mission_preview_choice", { location: "landing_mission", hypothesis: id });
+  };
+
+  return (
+    <section id="try-mission" className="section-pad" style={{ maxWidth: 1200, margin: "0 auto", padding: "30px 48px 70px", position: "relative", zIndex: 1 }}>
+      <div style={{ background: "rgba(99,102,241,.05)", border: "1px solid rgba(99,102,241,.24)", borderRadius: 18, padding: "20px clamp(16px,3vw,28px)" }}>
+        <div style={{ fontSize: 11, color: P.ind, fontFamily: "var(--mono)", letterSpacing: 1.6, marginBottom: 10 }}>TRY A 30-SECOND MISSION</div>
+        <div style={{ fontSize: 20, color: P.t1, fontWeight: 800, marginBottom: 8 }}>Signups dropped 25% this weekend. What would you check first?</div>
+        <div style={{ fontSize: 13, color: P.t3, marginBottom: 14 }}>Pick one option to see the kind of feedback you get inside DataSpark.</div>
+
+        <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
+          {[
+            ["deploy", "A Friday deploy may have broken checkout tracking or flow"],
+            ["seasonality", "This could be a normal weekend dip"],
+            ["pricing", "A recent pricing change may have reduced intent"],
+          ].map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => handlePick(id)}
+              style={{
+                textAlign: "left",
+                background: choice === id ? "rgba(52,211,153,.1)" : "rgba(255,255,255,.02)",
+                border: choice === id ? "1px solid rgba(52,211,153,.35)" : `1px solid ${P.border}`,
+                borderRadius: 10,
+                padding: "10px 12px",
+                color: P.t2,
+                cursor: "pointer",
+                fontSize: 12.5,
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {choice ? (
+          <div style={{ background: "rgba(2,6,23,.45)", border: `1px solid ${P.border}`, borderRadius: 12, padding: "12px 14px", marginBottom: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 11.5 }}>
+              <span style={{ color: P.t3 }}>AI feedback preview</span>
+              <span style={{ color: P.grn, fontWeight: 700 }}>Score: {outcomes[choice].score}</span>
+            </div>
+            <div style={{ color: P.t2, fontSize: 12.5, lineHeight: 1.6 }}>{outcomes[choice].text}</div>
+          </div>
+        ) : null}
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <Link
+            to="/preview"
+            onClick={() => void track("preview_route_click", { location: "landing_mission", href: "/preview" })}
+            style={{ background: P.indB, color: "#fff", textDecoration: "none", borderRadius: 10, padding: "11px 16px", fontWeight: 700, fontSize: 13 }}
+          >
+            Open Product Preview
+          </Link>
+          <a
+            href="#join"
+            onClick={(e) => {
+              e.preventDefault();
+              void track("hero_cta_click", { location: "landing_mission", href: "#join" });
+              document.getElementById("join")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+            style={{ background: "transparent", color: P.t2, textDecoration: "none", borderRadius: 10, padding: "10px 14px", border: `1px solid ${P.border}`, fontWeight: 600, fontSize: 13 }}
+          >
+            Get full missions in early access
+          </a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function DS8() {
   const navigate = useNavigate();
   const routeLocation = useLocation();
 
   const [email, setEmail] = useState(""); const [done, setDone] = useState(false); const [busy, setBusy] = useState(false); const [emailError, setEmailError] = useState("");
+  const [activeProof, setActiveProof] = useState("socratic");
   const [sY, setSY] = useState(0);
   useEffect(() => { const f = () => setSY(window.scrollY); window.addEventListener("scroll", f, { passive: true }); return () => window.removeEventListener("scroll", f); }, []);
 
@@ -437,7 +649,7 @@ export default function DS8() {
           </h1>
 
           <p style={{ fontSize: "clamp(15px, 2vw, 17px)", color: P.t2, fontWeight: 400, lineHeight: 1.65, maxWidth: 480, marginBottom: 36 }}>
-            Traditional platforms drill you on queries — write this JOIN, fix this error. But top-tier interviews ask you to diagnose a 25% drop in users or decide which feature to build next. DataSpark teaches the logic behind the code.
+            Most platforms train you to solve isolated coding questions. Real interviews ask you to investigate business problems and explain your thinking clearly. DataSpark helps you do both.
           </p>
 
           <div id="join">
@@ -453,6 +665,13 @@ export default function DS8() {
                 <div key={i} style={{ fontSize: 12, color: P.t2, lineHeight: 1.5 }}>✓ {perk}</div>
               ))}
             </div>
+            <Link
+              to="/preview"
+              onClick={() => void track("preview_route_click", { location: "hero_perks", href: "/preview" })}
+              style={{ display: "inline-block", marginTop: 12, fontSize: 12.5, color: "#fff", background: "rgba(99,102,241,.82)", borderRadius: 8, padding: "8px 12px", textDecoration: "none", fontWeight: 700 }}
+            >
+              Explore product preview →
+            </Link>
           </div>
         </div>
 
@@ -510,22 +729,31 @@ export default function DS8() {
           </h2>
         </div>
         <div className="feat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
-          {[
-            { t: "Socratic AI Coaching", d: "A tutor that doesn't just give answers. It challenges your logic, asks 'why?', and helps you defend your decisions — like a senior engineer would.", c: P.ind, ic: <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={P.ind} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> },
-            { t: "Visual System Design", d: "Stop guessing how data flows. Interactive diagrams show you how real systems work, so you can explain them in any interview.", c: P.grn, ic: <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={P.grn} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> },
-            { t: "Real-World Missions", d: "No more vacuum problems. Solve real crises from companies like Uber and Netflix — broken funnels, failing pipelines, contradictory A/B tests.", c: P.ind, ic: <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={P.ind} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> },
-            { t: "Scored on Your Thinking", d: "Get evaluated on how you reason, not just whether the code runs. Our AI checks if a senior engineer would trust your analysis.", c: P.grn, ic: <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={P.grn} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> },
-            { t: "Built-In Retention", d: "Questions you miss come back at the right time. Spaced repetition means you actually remember what you learned — weeks later.", c: P.ind, ic: <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={P.ind} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg> },
-            { t: "Clear Progression", d: "Level-gated courses that build on each other. You always know what to learn next and exactly where your gaps are.", c: P.grn, ic: <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke={P.grn} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg> },
-          ].map((f, i) => (
-            <div key={i} style={{ background: P.card, border: `1px solid ${P.border}`, borderRadius: 16, padding: "clamp(20px,3vw,28px) clamp(18px,2.5vw,24px)", transition: "all .3s", cursor: "default" }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = P.bH; e.currentTarget.style.transform = "translateY(-2px)"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = P.border; e.currentTarget.style.transform = "none"; }}
+          {FEATURE_PROOFS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => {
+                setActiveProof((prev) => prev === f.id ? "" : f.id);
+                void track("feature_proof_toggle", { location: "features", feature_id: f.id, open: activeProof !== f.id });
+              }}
+              style={{ background: P.card, border: `1px solid ${activeProof === f.id ? f.c : P.border}`, borderRadius: 16, padding: "clamp(20px,3vw,28px) clamp(18px,2.5vw,24px)", transition: "all .25s", cursor: "pointer", textAlign: "left", color: P.t1 }}
             >
               <div style={{ marginBottom: 14 }}>{f.ic}</div>
               <div style={{ fontSize: 15, fontWeight: 700, color: P.t1, marginBottom: 6 }}>{f.t}</div>
               <div style={{ fontSize: 12.5, color: P.t3, lineHeight: 1.7 }}>{f.d}</div>
-            </div>
+              <div style={{ fontSize: 11, color: f.c, marginTop: 10, fontFamily: "var(--mono)", letterSpacing: 1.2 }}>
+                {activeProof === f.id ? "HIDE MICRO-PROOF" : "VIEW MICRO-PROOF"}
+              </div>
+              {activeProof === f.id ? (
+                <div style={{ marginTop: 12, borderTop: `1px solid ${P.border}`, paddingTop: 12 }}>
+                  <div style={{ fontSize: 10.5, color: P.t3, fontFamily: "var(--mono)", marginBottom: 8 }}>MICRO-PROOF</div>
+                  <FeatureDemo id={f.id} />
+                  <div style={{ marginTop: 10, fontSize: 11.5, color: P.t2 }}>Mechanism: <span style={{ color: P.t3 }}>{f.mechanism}</span></div>
+                  <div style={{ marginTop: 4, fontSize: 11.5, color: P.t2 }}>Outcome: <span style={{ color: P.grn }}>{f.outcome}</span></div>
+                </div>
+              ) : null}
+            </button>
           ))}
         </div>
       </section>
@@ -540,9 +768,9 @@ export default function DS8() {
         </div>
         <div className="feat-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 14 }}>
           {[
-            { n: "Priya K.", r: "Senior Data Analyst", q: "I stopped freezing in product rounds because the missions felt like the exact ambiguity interviewers throw at you." },
-            { n: "Marcus T.", r: "Machine Learning Engineer", q: "The AI feedback called out weak assumptions in my reasoning, not just syntax errors. That changed how I prepare." },
-            { n: "Sarah L.", r: "Analytics Manager", q: "I finally had a framework for balancing business impact and technical tradeoffs in system design discussions." },
+            { n: "Priya K.", r: "Data Analyst · Bootcamp grad · 2 YOE", cohort: "March 2026 cohort", result: "Felt more confident in product rounds within 3 weeks", q: "I stopped freezing in product rounds because the missions felt close to what interviewers actually ask." },
+            { n: "Marcus T.", r: "ML Engineer · Series B SaaS", cohort: "February 2026 cohort", result: "Got clearer and more structured answers in mock interviews", q: "The feedback showed me where my logic was weak, not just where my code had issues." },
+            { n: "Sarah L.", r: "Analytics Manager · Marketplace", cohort: "January 2026 cohort", result: "Could explain trade-offs more clearly in system discussions", q: "I finally had a clear way to balance business impact and technical choices." },
           ].map((t, i) => (
             <div key={i} style={{ background: P.card, border: `1px solid ${P.border}`, borderRadius: 14, padding: "18px 18px 16px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
@@ -555,10 +783,16 @@ export default function DS8() {
                 </div>
               </div>
               <div style={{ fontSize: 12.5, color: P.t2, lineHeight: 1.7 }}>"{t.q}"</div>
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${P.border}`, display: "grid", gap: 4 }}>
+                <div style={{ fontSize: 11, color: P.grn }}>Outcome: {t.result}</div>
+                <div style={{ fontSize: 10.5, color: P.t3 }}>{t.cohort}</div>
+              </div>
             </div>
           ))}
         </div>
       </section>
+
+      <MissionSprint track={track} />
 
       {/* ═══ COMPARISON TABLE ═══ */}
       <section className="section-pad" style={{ maxWidth: 740, margin: "0 auto", padding: "60px 48px", position: "relative", zIndex: 1 }}>
