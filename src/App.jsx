@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import LandingPage from "./app/landing-page.jsx";
+import DataSparkPlatform from "./app/dataspark-full-platform.jsx";
 import ContactPage from "./pages/ContactPage.jsx";
 import PrivacyPage from "./pages/PrivacyPage.jsx";
 import TermsPage from "./pages/TermsPage.jsx";
@@ -16,6 +17,8 @@ export default function App() {
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/thank-you" element={<ThankYouPage />} />
         <Route path="/preview" element={<PreviewPage />} />
+        <Route path="/platform" element={<DataSparkPlatform />} />
+        <Route path="/dashboard" element={<Navigate to="/platform" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

@@ -94,9 +94,13 @@ function LogoGlow() {
 
 export default function ThankYouPage() {
   const [copied, setCopied] = useState(false);
+  const [copyBusy, setCopyBusy] = useState(false);
+  const [shareBusy, setShareBusy] = useState(false);
   const inviteUrl = typeof window !== "undefined" ? `${window.location.origin}/` : "";
 
   const copyLink = async () => {
+    if (copyBusy) return;
+    setCopyBusy(true);
     try {
       await navigator.clipboard.writeText(inviteUrl);
       setCopied(true);
@@ -108,14 +112,18 @@ export default function ThankYouPage() {
       });
     } catch {
       setCopied(false);
+    } finally {
+      setCopyBusy(false);
     }
   };
 
   const shareNative = async () => {
+    if (shareBusy) return;
     if (!navigator.share) {
       void copyLink();
       return;
     }
+    setShareBusy(true);
     try {
       await navigator.share({
         title: "DataSpark — early access",
@@ -129,6 +137,8 @@ export default function ThankYouPage() {
       });
     } catch {
       /* user cancelled */
+    } finally {
+      setShareBusy(false);
     }
   };
 
@@ -181,6 +191,10 @@ export default function ThankYouPage() {
           100% { transform: scale(1) rotate(0deg); opacity: 1; }
         }
         .thank-check { animation: thankCheck 0.75s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s both; }
+        @media (prefers-reduced-motion: reduce) {
+          .thank-glow-ring { animation: none !important; }
+          .thank-check { animation: none !important; }
+        }
         @media (max-width: 640px) {
           .thank-cta-row { flex-direction: column !important; }
           .thank-cta-row button { width: 100% !important; }
@@ -373,38 +387,46 @@ export default function ThankYouPage() {
             <button
               type="button"
               onClick={() => void copyLink()}
+              disabled={copyBusy}
+              aria-busy={copyBusy}
               style={{
                 border: "none",
                 borderRadius: 12,
                 padding: "14px 28px",
+                minHeight: 48,
                 fontWeight: 800,
                 fontSize: 14,
-                cursor: "pointer",
+                cursor: copyBusy ? "wait" : "pointer",
                 color: "#fff",
                 background: P.indB,
                 boxShadow: "0 8px 28px rgba(99,102,241,0.45)",
                 fontFamily: "var(--sans)",
+                opacity: copyBusy ? 0.88 : 1,
               }}
             >
-              {copied ? "Copied — paste anywhere" : "Copy invite link"}
+              {copyBusy ? "Copying…" : copied ? "Copied — paste anywhere" : "Copy invite link"}
             </button>
             {typeof navigator !== "undefined" && typeof navigator.share === "function" ? (
               <button
                 type="button"
                 onClick={() => void shareNative()}
+                disabled={shareBusy}
+                aria-busy={shareBusy}
                 style={{
                   border: `1px solid ${P.border}`,
                   borderRadius: 12,
                   padding: "14px 28px",
+                  minHeight: 48,
                   fontWeight: 700,
                   fontSize: 14,
-                  cursor: "pointer",
+                  cursor: shareBusy ? "wait" : "pointer",
                   color: P.t1,
                   background: "rgba(255,255,255,0.04)",
                   fontFamily: "var(--sans)",
+                  opacity: shareBusy ? 0.88 : 1,
                 }}
               >
-                Share…
+                {shareBusy ? "Sharing…" : "Share…"}
               </button>
             ) : null}
           </div>

@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:verbose": "vite build --debug",
     "preview": "vite preview",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "lint:verbose": "eslint . --debug"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",

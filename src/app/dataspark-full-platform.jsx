@@ -1,4 +1,21 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
+import AIChatbot from "../chatbot/AIChatbot.jsx";
+import SQLJoins from "../visualizations/SQLJoins.jsx";
+import TrainValTestSplit from "../visualizations/TrainValTestSplit.jsx";
+import PythonMutabilityViz from "../visualizations/PythonMutabilityViz.jsx";
+import VizLabShell from "../components/platform/VizLabShell.jsx";
+import { DS, dsGlassCard } from "../lib/ds-platform-tokens.js";
+
+const PlatformLogo = () => (
+  <svg width="26" height="26" viewBox="0 0 40 40" fill="none" style={{ display: "block", flexShrink: 0 }}>
+    <circle cx="20" cy="8" r="4" fill={DS.ind} /><circle cx="10" cy="30" r="4" fill={DS.grn} />
+    <circle cx="30" cy="30" r="4" fill={DS.ind} /><circle cx="20" cy="20" r="4.5" fill={DS.t2} />
+    <line x1="20" y1="8" x2="20" y2="20" stroke={DS.ind} strokeWidth="2" opacity=".5" />
+    <line x1="10" y1="30" x2="20" y2="20" stroke={DS.grn} strokeWidth="2" opacity=".5" />
+    <line x1="30" y1="30" x2="20" y2="20" stroke={DS.ind} strokeWidth="2" opacity=".5" />
+  </svg>
+);
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // DATASPARK — Complete Data Science Learning Platform
@@ -592,21 +609,21 @@ const NormalDistViz = () => {
   }, [mean, stdDev]);
 
   return (
-    <div style={{ background: "#0B1120", borderRadius: 16, padding: 24, border: "1px solid #1E293B" }}>
-      <div style={{ fontSize: 18, fontWeight: 700, color: "#F8FAFC", marginBottom: 4, fontFamily: "'Outfit'" }}>Normal Distribution Explorer</div>
-      <div style={{ fontSize: 12, color: "#64748B", fontFamily: "'JetBrains Mono'", marginBottom: 16 }}>Drag the sliders to see how μ and σ change the shape</div>
-      <canvas ref={canvasRef} style={{ width: "100%", height: 280, borderRadius: 8 }} />
+    <>
+      <div style={{ fontSize: 17, fontWeight: 700, color: DS.t1, marginBottom: 4, fontFamily: "var(--ds-sans), sans-serif" }}>Normal distribution explorer</div>
+      <div style={{ fontSize: 12, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 16, lineHeight: 1.55 }}>Drag the sliders to see how μ and σ change the shape — same family as the landing “systems” story: intuition first.</div>
+      <canvas ref={canvasRef} style={{ width: "100%", height: 280, borderRadius: 12, border: `1px solid ${DS.border}`, background: "rgba(255,255,255,0.02)" }} />
       <div style={{ display: "flex", gap: 24, marginTop: 16 }}>
         <label style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "'JetBrains Mono'", marginBottom: 6 }}>Mean (μ): {mean.toFixed(1)}</div>
-          <input type="range" min={-3} max={3} step={0.1} value={mean} onChange={e => setMean(+e.target.value)} style={{ width: "100%", accentColor: "#F59E0B" }} />
+          <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Mean (μ): {mean.toFixed(1)}</div>
+          <input type="range" min={-3} max={3} step={0.1} value={mean} onChange={e => setMean(+e.target.value)} style={{ width: "100%", accentColor: DS.indB }} />
         </label>
         <label style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "'JetBrains Mono'", marginBottom: 6 }}>Std Dev (σ): {stdDev.toFixed(1)}</div>
-          <input type="range" min={0.3} max={3} step={0.1} value={stdDev} onChange={e => setStdDev(+e.target.value)} style={{ width: "100%", accentColor: "#8B5CF6" }} />
+          <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Std Dev (σ): {stdDev.toFixed(1)}</div>
+          <input type="range" min={0.3} max={3} step={0.1} value={stdDev} onChange={e => setStdDev(+e.target.value)} style={{ width: "100%", accentColor: DS.ind }} />
         </label>
       </div>
-    </div>
+    </>
   );
 };
 
@@ -716,23 +733,23 @@ const GradientDescentViz = () => {
   }, [ballPos, trail]);
 
   return (
-    <div style={{ background: "#0B1120", borderRadius: 16, padding: 24, border: "1px solid #1E293B" }}>
-      <div style={{ fontSize: 18, fontWeight: 700, color: "#F8FAFC", marginBottom: 4, fontFamily: "'Outfit'" }}>Gradient Descent in Action</div>
-      <div style={{ fontSize: 12, color: "#64748B", fontFamily: "'JetBrains Mono'", marginBottom: 16 }}>Watch the ball roll downhill following the gradient</div>
-      <canvas ref={canvasRef} style={{ width: "100%", height: 250, borderRadius: 8 }} />
-      <div style={{ display: "flex", gap: 16, marginTop: 16, alignItems: "flex-end" }}>
-        <label style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "'JetBrains Mono'", marginBottom: 6 }}>Learning Rate: {lr.toFixed(2)}</div>
-          <input type="range" min={0.01} max={0.5} step={0.01} value={lr} onChange={e => setLr(+e.target.value)} style={{ width: "100%", accentColor: "#3B82F6" }} />
+    <>
+      <div style={{ fontSize: 17, fontWeight: 700, color: DS.t1, marginBottom: 4, fontFamily: "var(--ds-sans), sans-serif" }}>Gradient descent in action</div>
+      <div style={{ fontSize: 12, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 16, lineHeight: 1.55 }}>Watch the ball roll downhill following the gradient — learning rate is the step size.</div>
+      <canvas ref={canvasRef} style={{ width: "100%", height: 250, borderRadius: 12, border: `1px solid ${DS.border}`, background: "rgba(255,255,255,0.02)" }} />
+      <div style={{ display: "flex", gap: 16, marginTop: 16, alignItems: "flex-end", flexWrap: "wrap" }}>
+        <label style={{ flex: 1, minWidth: 160 }}>
+          <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Learning rate: {lr.toFixed(2)}</div>
+          <input type="range" min={0.01} max={0.5} step={0.01} value={lr} onChange={e => setLr(+e.target.value)} style={{ width: "100%", accentColor: DS.indB }} />
         </label>
-        <button onClick={() => isRunning ? setIsRunning(false) : setIsRunning(true)} style={{ background: isRunning ? "#EF4444" : "#3B82F6", border: "none", borderRadius: 8, padding: "8px 20px", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "'JetBrains Mono'" }}>
+        <button type="button" onClick={() => isRunning ? setIsRunning(false) : setIsRunning(true)} style={{ background: isRunning ? "#EF4444" : DS.indB, border: "none", borderRadius: DS.radiusSm, padding: "8px 20px", color: "#fff", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "var(--ds-mono), monospace", boxShadow: isRunning ? "none" : DS.shadowCta }}>
           {isRunning ? "Pause" : "Run"}
         </button>
-        <button onClick={reset} style={{ background: "#1E293B", border: "1px solid #334155", borderRadius: 8, padding: "8px 20px", color: "#94A3B8", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "'JetBrains Mono'" }}>
+        <button type="button" onClick={reset} style={{ background: "rgba(255,255,255,0.04)", border: `1px solid ${DS.border}`, borderRadius: DS.radiusSm, padding: "8px 20px", color: DS.t3, fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "var(--ds-mono), monospace" }}>
           Reset
         </button>
       </div>
-    </div>
+    </>
   );
 };
 
@@ -802,17 +819,17 @@ const BiasVarianceViz = () => {
   }, [complexity]);
 
   return (
-    <div style={{ background: "#0B1120", borderRadius: 16, padding: 24, border: "1px solid #1E293B" }}>
-      <div style={{ fontSize: 18, fontWeight: 700, color: "#F8FAFC", marginBottom: 4, fontFamily: "'Outfit'" }}>Bias-Variance Tradeoff</div>
-      <div style={{ fontSize: 12, color: "#64748B", fontFamily: "'JetBrains Mono'", marginBottom: 16 }}>Drag complexity to see how bias and variance change</div>
-      <canvas ref={canvasRef} style={{ width: "100%", height: 250, borderRadius: 8 }} />
+    <>
+      <div style={{ fontSize: 17, fontWeight: 700, color: DS.t1, marginBottom: 4, fontFamily: "var(--ds-sans), sans-serif" }}>Bias–variance tradeoff</div>
+      <div style={{ fontSize: 12, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 16, lineHeight: 1.55 }}>Drag complexity — the landing page promises reasoning, not memorization; this is the core tension behind that.</div>
+      <canvas ref={canvasRef} style={{ width: "100%", height: 250, borderRadius: 12, border: `1px solid ${DS.border}`, background: "rgba(255,255,255,0.02)" }} />
       <label style={{ display: "block", marginTop: 16 }}>
-        <div style={{ fontSize: 11, color: "#94A3B8", fontFamily: "'JetBrains Mono'", marginBottom: 6 }}>
-          Model Complexity: {complexity.toFixed(1)} — {complexity < 3 ? "Underfitting (high bias)" : complexity > 6 ? "Overfitting (high variance)" : "Good balance"}
+        <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>
+          Model complexity: {complexity.toFixed(1)} — {complexity < 3 ? "Underfitting (high bias)" : complexity > 6 ? "Overfitting (high variance)" : "Good balance"}
         </div>
-        <input type="range" min={0.5} max={9.5} step={0.1} value={complexity} onChange={e => setComplexity(+e.target.value)} style={{ width: "100%", accentColor: "#F59E0B" }} />
+        <input type="range" min={0.5} max={9.5} step={0.1} value={complexity} onChange={e => setComplexity(+e.target.value)} style={{ width: "100%", accentColor: DS.grn }} />
       </label>
-    </div>
+    </>
   );
 };
 
@@ -820,131 +837,26 @@ const VISUALIZATIONS = {
   "st-p2": NormalDistViz,
   "dl-f4": GradientDescentViz,
   "ml-f2": BiasVarianceViz,
+  "ml-f3": TrainValTestSplit,
   "st-f2": NormalDistViz,
+  "sq-b2": SQLJoins,
+  "py-b3": PythonMutabilityViz,
 };
+
+/** When a lesson is marked hasViz but has no bespoke component, show a course-appropriate interactive. */
+function resolveLessonVizComponent(lessonId, courseId, hasViz) {
+  const direct = VISUALIZATIONS[lessonId];
+  if (direct) return direct;
+  if (!hasViz) return null;
+  if (courseId === "statistics") return NormalDistViz;
+  if (courseId === "ml") return BiasVarianceViz;
+  if (courseId === "deep-learning") return GradientDescentViz;
+  if (courseId === "sql") return SQLJoins;
+  if (courseId === "python") return PythonMutabilityViz;
+  return null;
+}
 
 // ─── AI CHATBOT COMPONENT ────────────────────────────────────────────────────
-const AIChatbot = ({ course, onClose }) => {
-  const [messages, setMessages] = useState([
-    { role: "assistant", content: `Hi! I'm your **${course.title}** tutor. Ask me anything about ${course.title.toLowerCase()} — concepts, how things work, why something matters, or help with a specific problem. I'll keep my answers focused on this topic.` }
-  ]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const messagesEndRef = useRef(null);
-
-  const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  useEffect(scrollToBottom, [messages]);
-
-  const sendMessage = async () => {
-    if (!input.trim() || loading) return;
-    const userMsg = input.trim();
-    setInput("");
-    setMessages(prev => [...prev, { role: "user", content: userMsg }]);
-    setLoading(true);
-
-    try {
-      const topicContext = course.topics.map(t => `${t.title}: ${t.lessons.map(l => l.title).join(", ")}`).join("\n");
-      const resp = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          system: `You are an expert ${course.title} tutor for data science students preparing for interviews. Your scope is STRICTLY limited to ${course.title} and closely related concepts. If asked about unrelated topics, politely redirect to ${course.title}.\n\nCourse topics include:\n${topicContext}\n\nBe concise but thorough. Use examples and analogies. If explaining a formula, also explain the intuition. Keep responses under 300 words unless a detailed explanation is warranted.`,
-          messages: messages.filter(m => m.role !== "assistant" || messages.indexOf(m) !== 0).concat([{ role: "user", content: userMsg }]).map(m => ({ role: m.role, content: m.content }))
-        })
-      });
-      const data = await resp.json();
-      const text = data.content?.map(b => b.text || "").join("") || "I couldn't generate a response. Please try again.";
-      setMessages(prev => [...prev, { role: "assistant", content: text }]);
-    } catch (err) {
-      setMessages(prev => [...prev, { role: "assistant", content: "Sorry, I'm having trouble connecting. Please try again in a moment." }]);
-    }
-    setLoading(false);
-  };
-
-  const renderMarkdown = (text) => {
-    return text
-      .replace(/\*\*(.*?)\*\*/g, '<strong style="color:#F8FAFC">$1</strong>')
-      .replace(/`(.*?)`/g, `<code style="background:#1E293B;padding:2px 6px;border-radius:4px;font-size:12px;font-family:'JetBrains Mono',monospace;color:${course.accent}">$1</code>`)
-      .replace(/\n/g, "<br/>");
-  };
-
-  return (
-    <div style={{
-      position: "fixed", bottom: 0, right: 0, width: "100%", maxWidth: 440, height: "70vh",
-      background: "#0B1120", border: "1px solid #1E293B", borderRadius: "16px 16px 0 0",
-      display: "flex", flexDirection: "column", zIndex: 1000,
-      boxShadow: "0 -8px 40px rgba(0,0,0,0.5)",
-    }}>
-      {/* Header */}
-      <div style={{ padding: "14px 20px", borderBottom: "1px solid #1E293B", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 20 }}>{course.icon}</span>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#F8FAFC", fontFamily: "'Outfit'" }}>{course.title} Tutor</div>
-            <div style={{ fontSize: 10, color: course.accent, fontFamily: "'JetBrains Mono'" }}>AI-powered · Topic-scoped</div>
-          </div>
-        </div>
-        <button onClick={onClose} style={{ background: "none", border: "none", color: "#64748B", fontSize: 20, cursor: "pointer", padding: 4 }}>✕</button>
-      </div>
-
-      {/* Messages */}
-      <div style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
-        {messages.map((m, i) => (
-          <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
-            <div style={{
-              maxWidth: "85%", padding: "10px 14px", borderRadius: 12,
-              background: m.role === "user" ? course.color + "20" : "#1E293B",
-              border: `1px solid ${m.role === "user" ? course.color + "30" : "#334155"}`,
-            }}>
-              <div
-                style={{ fontSize: 13, color: "#CBD5E1", lineHeight: 1.65, fontFamily: "'Outfit'" }}
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }}
-              />
-            </div>
-          </div>
-        ))}
-        {loading && (
-          <div style={{ display: "flex", gap: 4, padding: "10px 14px" }}>
-            {[0, 1, 2].map(i => (
-              <div key={i} style={{
-                width: 8, height: 8, borderRadius: "50%", background: course.accent,
-                animation: `pulse 1s infinite ${i * 0.15}s`,
-              }} />
-            ))}
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input */}
-      <div style={{ padding: "12px 16px", borderTop: "1px solid #1E293B", flexShrink: 0 }}>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && sendMessage()}
-            placeholder={`Ask about ${course.title.toLowerCase()}...`}
-            style={{
-              flex: 1, background: "#0F172A", border: "1px solid #334155", borderRadius: 10,
-              padding: "10px 14px", color: "#F8FAFC", fontSize: 13, fontFamily: "'Outfit'", outline: "none",
-            }}
-          />
-          <button onClick={sendMessage} disabled={loading || !input.trim()} style={{
-            background: input.trim() && !loading ? course.color : "#1E293B",
-            border: "none", borderRadius: 10, padding: "10px 16px", color: "#fff", fontWeight: 700,
-            fontSize: 13, cursor: input.trim() && !loading ? "pointer" : "not-allowed", fontFamily: "'Outfit'",
-          }}>
-            Send
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MAIN APP
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -967,43 +879,62 @@ export default function DataSparkPlatform() {
   const completedLessons = Object.keys(progress).filter(k => progress[k] === "done").length;
 
   const diffBadge = (d) => {
-    const c = { Easy: "#10B981", Medium: "#F59E0B", Hard: "#EF4444" };
-    return <span style={{ background: c[d] + "15", color: c[d], padding: "2px 10px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: "0.5px", textTransform: "uppercase", border: `1px solid ${c[d]}25`, fontFamily: "'JetBrains Mono'" }}>{d}</span>;
+    const c = { Easy: DS.grn, Medium: "#F59E0B", Hard: "#EF4444" };
+    return <span style={{ background: `${c[d]}18`, color: c[d], padding: "3px 10px", borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", border: `1px solid ${c[d]}35`, fontFamily: "var(--ds-mono), monospace" }}>{d}</span>;
   };
 
   // ─── HOME VIEW ─────────────────────────────────────────────────────────────
   const renderHome = () => (
-    <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 20px" }}>
-      {/* Hero */}
-      <div style={{ textAlign: "center", padding: "56px 0 44px" }}>
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-          <div style={{
-            width: 48, height: 48, borderRadius: 12,
-            background: "linear-gradient(135deg, #0EA5E9, #8B5CF6, #F59E0B)",
-            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24,
-          }}>⚡</div>
+    <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 clamp(16px, 4vw, 28px)" }}>
+      <div style={{ textAlign: "center", padding: "48px 0 40px" }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+          <PlatformLogo />
           <span style={{
-            fontSize: 44, fontWeight: 900, fontFamily: "'Outfit'",
-            background: "linear-gradient(135deg, #F8FAFC 0%, #94A3B8 100%)",
-            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-          }}>DataSpark</span>
+            fontSize: "clamp(32px, 6vw, 44px)",
+            fontWeight: 800,
+            fontFamily: "var(--ds-sans), sans-serif",
+            letterSpacing: "-0.03em",
+            background: `linear-gradient(135deg, ${DS.t1} 0%, ${DS.t3} 100%)`,
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+          >
+            DataSpark
+          </span>
         </div>
-        <p style={{ color: "#94A3B8", fontSize: 16, maxWidth: 560, margin: "0 auto", lineHeight: 1.7, fontFamily: "'Outfit'", fontWeight: 300 }}>
-          Learn data science concepts visually. Practice with context-rich problems.
-          Get AI tutoring scoped to each topic. Prepare for interviews that test how you <em style={{ color: "#F8FAFC" }}>think</em>, not just what you know.
+        <p style={{
+          color: DS.t2,
+          fontSize: "clamp(15px, 2.2vw, 17px)",
+          maxWidth: 520,
+          margin: "0 auto",
+          lineHeight: 1.65,
+          fontFamily: "var(--ds-sans), sans-serif",
+          fontWeight: 400,
+        }}
+        >
+          Same promise as the landing page: <span style={{ color: DS.ind }}>systems thinking</span>
+          {" "}over syntax drills. Learn visually, practice with context, and use the tutor when you are stuck.
         </p>
-        <div style={{ display: "flex", justifyContent: "center", gap: 32, marginTop: 32, padding: "18px 0", borderTop: "1px solid #1E293B", borderBottom: "1px solid #1E293B" }}>
+        <div style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: "clamp(20px, 5vw, 40px)",
+          marginTop: 28,
+          padding: "20px 16px",
+          borderTop: `1px solid ${DS.border}`,
+          borderBottom: `1px solid ${DS.border}`,
+        }}
+        >
           {[{ n: CURRICULUM.length, l: "Courses" }, { n: totalLessons, l: "Lessons" }, { n: totalQuestions, l: "Practice Qs" }, { n: completedLessons, l: "Completed" }].map((s, i) => (
             <div key={i} style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 26, fontWeight: 800, color: "#F8FAFC", fontFamily: "'Outfit'" }}>{s.n}</div>
-              <div style={{ fontSize: 10, color: "#64748B", fontWeight: 600, letterSpacing: "1px", textTransform: "uppercase", fontFamily: "'JetBrains Mono'" }}>{s.l}</div>
+              <div style={{ fontSize: "clamp(22px, 4vw, 28px)", fontWeight: 800, color: DS.t1, fontFamily: "var(--ds-sans), sans-serif" }}>{s.n}</div>
+              <div style={{ fontSize: 10, color: DS.dim, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "var(--ds-mono), monospace" }}>{s.l}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Course Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(310px, 1fr))", gap: 14, paddingBottom: 60 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16, paddingBottom: 72 }}>
         {CURRICULUM.map((course) => {
           const lessonCount = course.topics.reduce((a, t) => a + t.lessons.length, 0);
           const doneCount = course.topics.reduce((a, t) => a + t.lessons.filter(l => progress[l.id] === "done").length, 0);
@@ -1012,36 +943,44 @@ export default function DataSparkPlatform() {
           return (
             <div
               key={course.id}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveCourse(course); setView("course"); setCourseTab("learn"); } }}
               onClick={() => { setActiveCourse(course); setView("course"); setCourseTab("learn"); }}
               style={{
-                background: "#0C1425", border: "1px solid #1E293B", borderRadius: 14,
-                padding: "22px 20px", cursor: "pointer", transition: "all 0.25s",
-                position: "relative", overflow: "hidden",
+                ...dsGlassCard({ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s, border-color 0.2s" }),
+                padding: "22px 20px",
+                position: "relative",
+                overflow: "hidden",
               }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = course.color + "50"; e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 8px 32px ${course.color}10`; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "#1E293B"; e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "none"; }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = `${course.color}40`;
+                e.currentTarget.style.transform = "translateY(-3px)";
+                e.currentTarget.style.boxShadow = `${DS.shadowCard}, 0 0 40px ${course.color}12`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = DS.border;
+                e.currentTarget.style.transform = "none";
+                e.currentTarget.style.boxShadow = DS.shadowCard;
+              }}
             >
-              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${course.color}, transparent)` }} />
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${course.color}, ${DS.ind}40, transparent)` }} />
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <span style={{ fontSize: 28 }}>{course.icon}</span>
-                <span style={{ fontSize: 10, color: "#475569", fontFamily: "'JetBrains Mono'", fontWeight: 600 }}>{lessonCount} lessons · {course.questions.length} Qs</span>
+                <span style={{ fontSize: 10, color: DS.dim, fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>{lessonCount} lessons · {course.questions.length} Qs</span>
               </div>
-              <div style={{ fontSize: 17, fontWeight: 700, color: "#F8FAFC", fontFamily: "'Outfit'", marginBottom: 6 }}>{course.title}</div>
-              <div style={{ fontSize: 12, color: "#64748B", lineHeight: 1.6, fontFamily: "'Outfit'", fontWeight: 300, marginBottom: 14, minHeight: 40 }}>{course.description}</div>
-
-              {/* Topic pills */}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 14 }}>
+              <div style={{ fontSize: 17, fontWeight: 700, color: DS.t1, fontFamily: "var(--ds-sans), sans-serif", marginBottom: 8 }}>{course.title}</div>
+              <div style={{ fontSize: 13, color: DS.t3, lineHeight: 1.55, fontFamily: "var(--ds-sans), sans-serif", marginBottom: 14, minHeight: 44 }}>{course.description}</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
                 {course.topics.slice(0, 3).map(t => (
-                  <span key={t.id} style={{ fontSize: 9, padding: "2px 7px", borderRadius: 4, background: "#1E293B", color: "#94A3B8", fontFamily: "'JetBrains Mono'" }}>{t.title}</span>
+                  <span key={t.id} style={{ fontSize: 9, padding: "4px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: DS.t3, fontFamily: "var(--ds-mono), monospace", border: `1px solid ${DS.border}` }}>{t.title}</span>
                 ))}
-                {course.topics.length > 3 && <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 4, background: "#1E293B", color: "#64748B", fontFamily: "'JetBrains Mono'" }}>+{course.topics.length - 3}</span>}
+                {course.topics.length > 3 && <span style={{ fontSize: 9, padding: "4px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: DS.dim, fontFamily: "var(--ds-mono), monospace", border: `1px solid ${DS.border}` }}>+{course.topics.length - 3}</span>}
               </div>
-
-              {/* Progress */}
-              <div style={{ background: "#1E293B", borderRadius: 4, height: 3, overflow: "hidden" }}>
-                <div style={{ width: `${pct}%`, height: "100%", background: course.color, borderRadius: 4, transition: "width 0.4s" }} />
+              <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 6, height: 4, overflow: "hidden" }}>
+                <div style={{ width: `${pct}%`, height: "100%", background: `linear-gradient(90deg, ${course.color}, ${course.accent})`, borderRadius: 6, transition: "width 0.4s" }} />
               </div>
-              <div style={{ fontSize: 10, color: "#475569", marginTop: 4, fontFamily: "'JetBrains Mono'" }}>{pct}% complete</div>
+              <div style={{ fontSize: 10, color: DS.dim, marginTop: 6, fontFamily: "var(--ds-mono), monospace" }}>{pct}% complete</div>
             </div>
           );
         })}
@@ -1055,30 +994,29 @@ export default function DataSparkPlatform() {
     const c = activeCourse;
 
     return (
-      <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 20px" }}>
-        <button onClick={() => setView("home")} style={{ background: "none", border: "none", color: "#64748B", fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "'JetBrains Mono'" }}>← All Courses</button>
+      <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 clamp(16px, 4vw, 28px)" }}>
+        <button type="button" onClick={() => setView("home")} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>← All courses</button>
 
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 8 }}>
           <span style={{ fontSize: 36 }}>{c.icon}</span>
           <div>
-            <h1 style={{ fontSize: 28, fontWeight: 800, color: "#F8FAFC", fontFamily: "'Outfit'", margin: 0 }}>{c.title}</h1>
-            <p style={{ fontSize: 13, color: "#64748B", fontFamily: "'Outfit'", margin: 0, fontWeight: 300 }}>{c.description}</p>
+            <h1 style={{ fontSize: "clamp(22px, 4vw, 30px)", fontWeight: 800, color: DS.t1, margin: 0, letterSpacing: "-0.02em" }}>{c.title}</h1>
+            <p style={{ fontSize: 14, color: DS.t3, margin: "6px 0 0", fontWeight: 400, lineHeight: 1.55, maxWidth: 640 }}>{c.description}</p>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #1E293B", margin: "20px 0 24px" }}>
+        <div style={{ display: "flex", gap: 0, borderBottom: `1px solid ${DS.border}`, margin: "20px 0 24px", flexWrap: "wrap", alignItems: "center" }}>
           {[{ id: "learn", label: `Learn (${c.topics.reduce((a, t) => a + t.lessons.length, 0)} lessons)` }, { id: "practice", label: `Practice (${c.questions.length} questions)` }].map(tab => (
-            <button key={tab.id} onClick={() => setCourseTab(tab.id)} style={{
+            <button key={tab.id} type="button" onClick={() => setCourseTab(tab.id)} style={{
               background: "none", border: "none", borderBottom: courseTab === tab.id ? `2px solid ${c.color}` : "2px solid transparent",
-              padding: "10px 22px", color: courseTab === tab.id ? "#F8FAFC" : "#64748B", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Outfit'",
+              padding: "10px 18px", color: courseTab === tab.id ? DS.t1 : DS.dim, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--ds-sans), sans-serif",
             }}>{tab.label}</button>
           ))}
-          <button onClick={() => setChatbotCourse(c)} style={{
-            marginLeft: "auto", background: c.color + "15", border: `1px solid ${c.color}30`, borderRadius: 8,
-            padding: "6px 14px", color: c.accent, fontSize: 12, cursor: "pointer", fontFamily: "'JetBrains Mono'", fontWeight: 600, marginBottom: 8,
+          <button type="button" onClick={() => setChatbotCourse(c)} style={{
+            marginLeft: "auto", background: `${c.color}18`, border: `1px solid ${c.color}35`, borderRadius: DS.radiusSm,
+            padding: "8px 14px", color: c.accent, fontSize: 12, cursor: "pointer", fontFamily: "var(--ds-mono), monospace", fontWeight: 600, marginBottom: 8, boxShadow: DS.shadowCta,
           }}>
-            💬 Ask AI Tutor
+            Ask AI tutor
           </button>
         </div>
 
@@ -1086,39 +1024,40 @@ export default function DataSparkPlatform() {
           <div>
             {c.topics.map(topic => (
               <div key={topic.id} style={{ marginBottom: 32 }}>
-                <h3 style={{ fontSize: 15, fontWeight: 700, color: c.accent, fontFamily: "'Outfit'", marginBottom: 10, paddingBottom: 6, borderBottom: `1px solid ${c.color}15` }}>{topic.title}</h3>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <h3 style={{ fontSize: 11, fontWeight: 700, color: c.accent, fontFamily: "var(--ds-mono), monospace", marginBottom: 12, paddingBottom: 8, borderBottom: `1px solid ${c.color}22`, letterSpacing: "0.14em", textTransform: "uppercase" }}>{topic.title}</h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {topic.lessons.map((lesson, li) => {
                     const isDone = progress[lesson.id] === "done";
                     return (
                       <div
                         key={lesson.id}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveLesson(lesson); setView("lesson"); } }}
                         onClick={() => { setActiveLesson(lesson); setView("lesson"); }}
                         style={{
-                          background: "#0C1425", border: "1px solid #1E293B", borderRadius: 10,
-                          padding: "12px 16px", cursor: "pointer", display: "flex", alignItems: "center",
-                          justifyContent: "space-between", transition: "border-color 0.2s",
+                          ...dsGlassCard({ padding: "14px 16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "border-color 0.2s, box-shadow 0.2s" }),
                         }}
-                        onMouseEnter={e => e.currentTarget.style.borderColor = c.color + "30"}
-                        onMouseLeave={e => e.currentTarget.style.borderColor = "#1E293B"}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${c.color}40`; e.currentTarget.style.boxShadow = `${DS.shadowCard}, 0 0 24px ${c.color}10`; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = DS.border; e.currentTarget.style.boxShadow = DS.shadowCard; }}
                       >
                         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                           <div style={{
-                            width: 28, height: 28, borderRadius: "50%",
-                            background: isDone ? "#10B98120" : "#1E293B",
-                            border: `2px solid ${isDone ? "#10B981" : "#334155"}`,
+                            width: 30, height: 30, borderRadius: "50%",
+                            background: isDone ? `${DS.grn}18` : "rgba(255,255,255,0.04)",
+                            border: `2px solid ${isDone ? DS.grn : DS.border}`,
                             display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: 12, color: isDone ? "#10B981" : "#475569", fontWeight: 700,
+                            fontSize: 12, color: isDone ? DS.grn : DS.dim, fontWeight: 700, fontFamily: "var(--ds-mono), monospace",
                           }}>
                             {isDone ? "✓" : li + 1}
                           </div>
                           <div>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#F8FAFC", fontFamily: "'Outfit'" }}>{lesson.title}</div>
-                            <div style={{ fontSize: 10, color: "#64748B", fontFamily: "'JetBrains Mono'", marginTop: 2 }}>{lesson.duration}</div>
+                            <div style={{ fontSize: 14, fontWeight: 600, color: DS.t1 }}>{lesson.title}</div>
+                            <div style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginTop: 2 }}>{lesson.duration}</div>
                           </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          {lesson.hasViz && <span style={{ fontSize: 9, padding: "2px 7px", borderRadius: 4, background: c.color + "15", color: c.accent, fontFamily: "'JetBrains Mono'", fontWeight: 600 }}>Interactive</span>}
+                          {lesson.hasViz && <span style={{ fontSize: 9, padding: "4px 8px", borderRadius: 6, background: `${c.color}18`, color: c.accent, fontFamily: "var(--ds-mono), monospace", fontWeight: 600, border: `1px solid ${c.color}30` }}>Interactive</span>}
                         </div>
                       </div>
                     );
@@ -1131,36 +1070,38 @@ export default function DataSparkPlatform() {
 
         {courseTab === "practice" && (
           <div>
-            <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
               {["All", "Easy", "Medium", "Hard"].map(d => (
-                <button key={d} onClick={() => setDiffFilter(d)} style={{
-                  background: diffFilter === d ? "#1E293B" : "transparent", border: `1px solid ${diffFilter === d ? "#334155" : "#1E293B"}`,
-                  borderRadius: 6, padding: "5px 12px", color: diffFilter === d ? "#F8FAFC" : "#64748B", fontSize: 11, cursor: "pointer", fontFamily: "'JetBrains Mono'", fontWeight: 600,
+                <button key={d} type="button" onClick={() => setDiffFilter(d)} style={{
+                  background: diffFilter === d ? "rgba(99,102,241,0.12)" : "transparent", border: `1px solid ${diffFilter === d ? `${c.color}35` : DS.border}`,
+                  borderRadius: 8, padding: "6px 12px", color: diffFilter === d ? DS.t1 : DS.dim, fontSize: 11, cursor: "pointer", fontFamily: "var(--ds-mono), monospace", fontWeight: 600,
                 }}>{d}</button>
               ))}
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {c.questions.filter(q => diffFilter === "All" || q.difficulty === diffFilter).map(q => (
                 <div
                   key={q.id}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveQuestion(q); setUserAnswer(""); setSubmitted(false); setShowModel(false); setView("question"); } }}
                   onClick={() => { setActiveQuestion(q); setUserAnswer(""); setSubmitted(false); setShowModel(false); setView("question"); }}
                   style={{
-                    background: "#0C1425", border: "1px solid #1E293B", borderRadius: 10,
-                    padding: "14px 18px", cursor: "pointer", transition: "border-color 0.2s",
+                    ...dsGlassCard({ padding: "16px 18px", cursor: "pointer", transition: "border-color 0.2s" }),
                   }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = c.color + "30"}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = "#1E293B"}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${c.color}38`; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = DS.border; }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
                     <div>
-                      <div style={{ fontSize: 14, fontWeight: 600, color: "#F8FAFC", fontFamily: "'Outfit'", marginBottom: 4 }}>{q.title}</div>
+                      <div style={{ fontSize: 15, fontWeight: 600, color: DS.t1, marginBottom: 6 }}>{q.title}</div>
                       <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                        {q.tags.map(t => <span key={t} style={{ fontSize: 9, padding: "2px 6px", borderRadius: 4, background: "#1E293B", color: "#94A3B8", fontFamily: "'JetBrains Mono'" }}>{t}</span>)}
+                        {q.tags.map(t => <span key={t} style={{ fontSize: 9, padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: DS.t3, fontFamily: "var(--ds-mono), monospace", border: `1px solid ${DS.border}` }}>{t}</span>)}
                       </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                      <span style={{ fontSize: 10, color: "#64748B", fontFamily: "'JetBrains Mono'" }}>{q.type === "code" ? "Coding" : "Open-ended"}</span>
+                      <span style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace" }}>{q.type === "code" ? "Coding" : "Open-ended"}</span>
                       {diffBadge(q.difficulty)}
                     </div>
                   </div>
@@ -1176,61 +1117,72 @@ export default function DataSparkPlatform() {
   // ─── LESSON VIEW ───────────────────────────────────────────────────────────
   const renderLesson = () => {
     if (!activeLesson || !activeCourse) return null;
-    const VizComponent = VISUALIZATIONS[activeLesson.id];
+    const VizComponent = resolveLessonVizComponent(
+      activeLesson.id,
+      activeCourse.id,
+      activeLesson.hasViz,
+    );
 
     return (
-      <div style={{ maxWidth: 820, margin: "0 auto", padding: "0 20px" }}>
-        <button onClick={() => setView("course")} style={{ background: "none", border: "none", color: "#64748B", fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "'JetBrains Mono'" }}>← Back to {activeCourse.title}</button>
+      <div style={{ maxWidth: 820, margin: "0 auto", padding: "0 clamp(16px, 4vw, 28px)" }}>
+        <button type="button" onClick={() => setView("course")} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>← Back to {activeCourse.title}</button>
 
         <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 10, color: activeCourse.accent, fontFamily: "'JetBrains Mono'", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 4 }}>{activeCourse.title} · {activeLesson.duration}</div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: "#F8FAFC", fontFamily: "'Outfit'", margin: 0 }}>{activeLesson.title}</h1>
+          <div style={{ fontSize: 10, color: activeCourse.accent, fontFamily: "var(--ds-mono), monospace", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 6 }}>{activeCourse.title} · {activeLesson.duration}</div>
+          <h1 style={{ fontSize: "clamp(22px, 4vw, 28px)", fontWeight: 800, color: DS.t1, margin: 0, letterSpacing: "-0.02em" }}>{activeLesson.title}</h1>
         </div>
 
         {/* Visualization */}
         {VizComponent && (
           <div style={{ marginBottom: 28 }}>
-            <VizComponent />
+            <VizLabShell accent={activeCourse.accent} accentSoft={`${activeCourse.color}14`}>
+              <VizComponent />
+            </VizLabShell>
           </div>
         )}
 
         {!VizComponent && activeLesson.hasViz && (
           <div style={{
-            background: "#0C1425", border: `1px dashed ${activeCourse.color}30`, borderRadius: 14,
-            padding: 40, textAlign: "center", marginBottom: 28,
+            ...dsGlassCard(),
+            border: `1px dashed ${activeCourse.color}35`,
+            padding: "36px 28px",
+            textAlign: "center",
+            marginBottom: 28,
           }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>🎨</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#F8FAFC", fontFamily: "'Outfit'", marginBottom: 4 }}>Interactive Visualization</div>
-            <div style={{ fontSize: 12, color: "#64748B", fontFamily: "'JetBrains Mono'" }}>Animated diagram for this concept would render here</div>
+            <div style={{ fontSize: 10, color: activeCourse.accent, fontFamily: "var(--ds-mono), monospace", fontWeight: 700, letterSpacing: 1.4, marginBottom: 10 }}>INTERACTIVE LAB · COMING SOON</div>
+            <div style={{ fontSize: 36, marginBottom: 12, opacity: 0.85 }}>◇</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: DS.t1, fontFamily: "var(--ds-sans), sans-serif", marginBottom: 6 }}>Visualization in production</div>
+            <div style={{ fontSize: 13, color: DS.t3, fontFamily: "var(--ds-mono), monospace", lineHeight: 1.55, maxWidth: 400, margin: "0 auto" }}>We are shipping more interactive diagrams for this topic. Use the AI tutor below to explore the concept now.</div>
           </div>
         )}
 
-        {/* Lesson content placeholder */}
-        <div style={{ background: "#0C1425", border: "1px solid #1E293B", borderRadius: 14, padding: "28px 24px", marginBottom: 24 }}>
-          <div style={{ fontSize: 14, color: "#CBD5E1", lineHeight: 1.8, fontFamily: "'Outfit'", fontWeight: 300 }}>
-            <p style={{ marginBottom: 16 }}>This lesson covers <strong style={{ color: "#F8FAFC" }}>{activeLesson.title}</strong> in depth. The full content includes conceptual explanations, worked examples, common pitfalls, and practical applications in data science contexts.</p>
+        <div style={{ ...dsGlassCard({ padding: "26px 24px", marginBottom: 24 }) }}>
+          <div style={{ fontSize: 10, color: DS.ind, fontFamily: "var(--ds-mono), monospace", fontWeight: 700, letterSpacing: "0.12em", marginBottom: 12 }}>LESSON OVERVIEW</div>
+          <div style={{ fontSize: 15, color: DS.t2, lineHeight: 1.75, fontWeight: 400 }}>
+            <p style={{ marginBottom: 16 }}>This lesson covers <strong style={{ color: DS.t1 }}>{activeLesson.title}</strong> in depth. The full content includes conceptual explanations, worked examples, common pitfalls, and practical applications in data science contexts.</p>
             <p style={{ marginBottom: 16 }}>Each concept is broken down with <span style={{ color: activeCourse.accent }}>visual aids</span> and real-world analogies to build true intuition — not just memorization of formulas or syntax.</p>
-            <p>After completing this lesson, test your understanding with the practice questions in the <strong style={{ color: "#F8FAFC" }}>Practice</strong> tab, or ask the <strong style={{ color: "#F8FAFC" }}>AI Tutor</strong> to explain anything that's unclear.</p>
+            <p>After completing this lesson, test your understanding with the practice questions in the <strong style={{ color: DS.t1 }}>Practice</strong> tab, or ask the <strong style={{ color: DS.t1 }}>AI tutor</strong> to explain anything that is unclear.</p>
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 10, marginBottom: 40 }}>
+        <div style={{ display: "flex", gap: 10, marginBottom: 40, flexWrap: "wrap" }}>
           <button
+            type="button"
             onClick={() => { setProgress(p => ({ ...p, [activeLesson.id]: "done" })); setView("course"); }}
             style={{
-              flex: 1, background: `linear-gradient(135deg, ${activeCourse.color}, ${activeCourse.accent})`,
-              border: "none", borderRadius: 10, padding: "12px 0", color: "#fff", fontSize: 14,
-              fontWeight: 700, cursor: "pointer", fontFamily: "'Outfit'",
+              flex: 1, minWidth: 200, background: DS.indB, border: "none", borderRadius: DS.radiusSm, padding: "14px 0", color: "#fff", fontSize: 14,
+              fontWeight: 700, cursor: "pointer", fontFamily: "var(--ds-sans), sans-serif", boxShadow: DS.shadowCta,
             }}>
-            Mark Complete & Continue →
+            Mark complete & continue →
           </button>
           <button
+            type="button"
             onClick={() => setChatbotCourse(activeCourse)}
             style={{
-              background: "#1E293B", border: "1px solid #334155", borderRadius: 10, padding: "12px 20px",
-              color: "#F8FAFC", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "'Outfit'",
+              background: "rgba(255,255,255,0.04)", border: `1px solid ${DS.border}`, borderRadius: DS.radiusSm, padding: "14px 22px",
+              color: DS.t1, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "var(--ds-sans), sans-serif",
             }}>
-            💬 Ask Tutor
+            Ask tutor
           </button>
         </div>
       </div>
@@ -1243,88 +1195,87 @@ export default function DataSparkPlatform() {
     const q = activeQuestion;
 
     return (
-      <div style={{ maxWidth: 860, margin: "0 auto", padding: "0 20px" }}>
-        <button onClick={() => { setCourseTab("practice"); setView("course"); }} style={{ background: "none", border: "none", color: "#64748B", fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "'JetBrains Mono'" }}>← Back to Practice</button>
+      <div style={{ maxWidth: 860, margin: "0 auto", padding: "0 clamp(16px, 4vw, 28px)" }}>
+        <button type="button" onClick={() => { setCourseTab("practice"); setView("course"); }} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>← Back to practice</button>
 
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
             {diffBadge(q.difficulty)}
-            <span style={{ fontSize: 10, color: "#64748B", fontFamily: "'JetBrains Mono'" }}>{q.type === "code" ? "Coding Problem" : "Open-Ended Case Study"}</span>
+            <span style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace" }}>{q.type === "code" ? "Coding problem" : "Open-ended case study"}</span>
           </div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, color: "#F8FAFC", fontFamily: "'Outfit'", margin: 0 }}>{q.title}</h1>
-          <div style={{ display: "flex", gap: 5, marginTop: 8 }}>
-            {q.tags.map(t => <span key={t} style={{ fontSize: 9, padding: "2px 7px", borderRadius: 4, background: "#1E293B", color: "#94A3B8", fontFamily: "'JetBrains Mono'" }}>{t}</span>)}
+          <h1 style={{ fontSize: "clamp(20px, 3.5vw, 26px)", fontWeight: 800, color: DS.t1, margin: 0, letterSpacing: "-0.02em" }}>{q.title}</h1>
+          <div style={{ display: "flex", gap: 5, marginTop: 8, flexWrap: "wrap" }}>
+            {q.tags.map(t => <span key={t} style={{ fontSize: 9, padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: DS.t3, fontFamily: "var(--ds-mono), monospace", border: `1px solid ${DS.border}` }}>{t}</span>)}
           </div>
         </div>
 
-        {/* Problem */}
         <div style={{
-          background: "#0C1425", border: "1px solid #1E293B", borderRadius: 12,
-          padding: "20px 22px", marginBottom: 20, fontSize: 13, color: "#CBD5E1",
-          lineHeight: 1.75, fontFamily: "'Outfit'", whiteSpace: "pre-wrap",
+          ...dsGlassCard({ padding: "22px 24px", marginBottom: 20, fontSize: 14, color: DS.t2, lineHeight: 1.75, whiteSpace: "pre-wrap" }),
         }}>
           {q.prompt}
         </div>
 
-        {/* Answer area */}
         <textarea
           value={userAnswer}
           onChange={e => setUserAnswer(e.target.value)}
           placeholder={q.type === "code" ? "Write your code here..." : "Write your answer — explain your reasoning, tradeoffs, and approach..."}
           disabled={submitted}
           style={{
-            width: "100%", minHeight: 280, background: "#080E1A", border: "1px solid #1E293B",
-            borderRadius: 12, padding: 18, color: "#F8FAFC", fontSize: 13, resize: "vertical",
-            fontFamily: q.type === "code" ? "'JetBrains Mono', monospace" : "'Outfit'",
+            width: "100%", minHeight: 280, background: "rgba(255,255,255,0.03)", border: `1px solid ${DS.border}`,
+            borderRadius: DS.radiusMd, padding: 18, color: DS.t1, fontSize: 14, resize: "vertical",
+            fontFamily: q.type === "code" ? "var(--ds-mono), monospace" : "var(--ds-sans), sans-serif",
             lineHeight: 1.7, outline: "none", boxSizing: "border-box", opacity: submitted ? 0.6 : 1,
           }}
         />
 
-        <div style={{ display: "flex", gap: 10, marginTop: 16, marginBottom: 20 }}>
+        <div style={{ display: "flex", gap: 10, marginTop: 16, marginBottom: 20, flexWrap: "wrap" }}>
           {!submitted && (
             <button
+              type="button"
               onClick={() => setSubmitted(true)}
               disabled={!userAnswer.trim()}
               style={{
-                flex: 1, background: userAnswer.trim() ? `linear-gradient(135deg, ${activeCourse.color}, ${activeCourse.accent})` : "#1E293B",
-                border: "none", borderRadius: 10, padding: "12px 0", color: userAnswer.trim() ? "#fff" : "#475569",
-                fontSize: 14, fontWeight: 700, cursor: userAnswer.trim() ? "pointer" : "not-allowed", fontFamily: "'Outfit'",
+                flex: 1, minWidth: 160, background: userAnswer.trim() ? DS.indB : "rgba(255,255,255,0.06)",
+                border: "none", borderRadius: DS.radiusSm, padding: "14px 0", color: userAnswer.trim() ? "#fff" : DS.dim,
+                fontSize: 14, fontWeight: 700, cursor: userAnswer.trim() ? "pointer" : "not-allowed", fontFamily: "var(--ds-sans), sans-serif",
+                boxShadow: userAnswer.trim() ? DS.shadowCta : "none",
               }}>
-              Submit Answer
+              Submit answer
             </button>
           )}
           {submitted && !showModel && (
             <button
+              type="button"
               onClick={() => setShowModel(true)}
               style={{
-                flex: 1, background: "#10B981", border: "none", borderRadius: 10, padding: "12px 0",
-                color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "'Outfit'",
+                flex: 1, minWidth: 200, background: DS.grn, border: "none", borderRadius: DS.radiusSm, padding: "14px 0",
+                color: "#020617", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "var(--ds-sans), sans-serif",
               }}>
-              Show Model Answer & Rubric
+              Show model answer & rubric
             </button>
           )}
           <button
+            type="button"
             onClick={() => setChatbotCourse(activeCourse)}
             style={{
-              background: "#1E293B", border: "1px solid #334155", borderRadius: 10, padding: "12px 20px",
-              color: "#F8FAFC", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Outfit'",
+              background: "rgba(255,255,255,0.04)", border: `1px solid ${DS.border}`, borderRadius: DS.radiusSm, padding: "14px 20px",
+              color: DS.t1, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--ds-sans), sans-serif",
             }}>
-            💬 Get Help
+            Get help
           </button>
         </div>
 
         {showModel && (
           <div style={{
-            background: "#0C1425", border: "1px solid #10B98130", borderRadius: 12,
-            padding: "22px 24px", marginBottom: 40,
+            ...dsGlassCard({ padding: "22px 24px", marginBottom: 40, border: `1px solid rgba(52,211,153,0.25)` }),
           }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#10B981", fontFamily: "'JetBrains Mono'", marginBottom: 12, textTransform: "uppercase", letterSpacing: "1px" }}>
-              Model Answer & Evaluation Criteria
+            <div style={{ fontSize: 11, fontWeight: 700, color: DS.grn, fontFamily: "var(--ds-mono), monospace", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.12em" }}>
+              Model answer & evaluation criteria
             </div>
-            <div style={{ fontSize: 13, color: "#94A3B8", lineHeight: 1.7, fontFamily: "'Outfit'", fontWeight: 300 }}>
+            <div style={{ fontSize: 14, color: DS.t3, lineHeight: 1.7, fontWeight: 400 }}>
               <p style={{ marginBottom: 12 }}>A strong answer to this question would demonstrate clear understanding of the core concepts, structured reasoning about tradeoffs, and practical awareness of real-world constraints.</p>
               <p style={{ marginBottom: 12 }}>The AI evaluator scores your response against the rubric below — compare your answer point-by-point to identify gaps.</p>
-              <p style={{ color: "#64748B", fontSize: 12, fontStyle: "italic" }}>Full model answers with detailed rubric scoring are available in the complete platform. Use the AI Tutor to discuss your specific answer and get personalized feedback.</p>
+              <p style={{ color: DS.dim, fontSize: 13, fontStyle: "italic" }}>Full model answers with detailed rubric scoring are available in the complete platform. Use the AI tutor to discuss your specific answer and get personalized feedback.</p>
             </div>
           </div>
         )}
@@ -1333,45 +1284,84 @@ export default function DataSparkPlatform() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#080E1A", color: "#F8FAFC", fontFamily: "'Outfit', sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: DS.bg, color: DS.t1, fontFamily: "var(--ds-sans), system-ui, sans-serif", position: "relative" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+        :root { --ds-sans: 'Manrope', system-ui, sans-serif; --ds-mono: 'JetBrains Mono', monospace; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.3 } }
-        ::selection { background: #8B5CF630; }
-        textarea:focus, input:focus { border-color: #334155 !important; }
+        ::selection { background: rgba(99,102,241,.25); color: #fff; }
+        textarea:focus-visible, input:focus-visible, button:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(99,102,241,.35); border-color: ${DS.indB} !important; }
+        textarea:focus, input:focus { border-color: ${DS.indB} !important; }
         ::-webkit-scrollbar { width: 5px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 3px; }
         input[type="range"] { height: 4px; }
       `}</style>
 
-      {/* Nav */}
+      <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none" }}>
+        <div style={{ position: "absolute", width: 720, height: 720, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.07) 0%, transparent 68%)", top: "-18%", left: "-10%" }} />
+        <div style={{ position: "absolute", width: 480, height: 480, borderRadius: "50%", background: "radial-gradient(circle, rgba(52,211,153,0.05) 0%, transparent 70%)", bottom: "0%", right: "-8%" }} />
+      </div>
+
       <nav style={{
-        borderBottom: "1px solid #1E293B", padding: "10px 20px",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        position: "sticky", top: 0, background: "#080E1Aee", backdropFilter: "blur(12px)", zIndex: 100,
-      }}>
-        <div onClick={() => { setView("home"); setActiveCourse(null); }} style={{
-          display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
-        }}>
-          <div style={{
-            width: 28, height: 28, borderRadius: 7,
-            background: "linear-gradient(135deg, #0EA5E9, #8B5CF6)", display: "flex",
-            alignItems: "center", justifyContent: "center", fontSize: 14,
-          }}>⚡</div>
-          <span style={{ fontSize: 18, fontWeight: 800, color: "#F8FAFC", fontFamily: "'Outfit'" }}>DataSpark</span>
+        borderBottom: `1px solid ${DS.border}`,
+        padding: "12px clamp(16px, 3vw, 28px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 12,
+        position: "sticky",
+        top: 0,
+        background: "rgba(2,6,23,0.88)",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        zIndex: 100,
+      }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+          <div
+            onClick={() => { setView("home"); setActiveCourse(null); }}
+            style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", flexShrink: 0 }}
+          >
+            <PlatformLogo />
+            <span style={{ fontSize: 17, fontWeight: 800, color: DS.t1, letterSpacing: "-0.02em", whiteSpace: "nowrap" }}>DataSpark</span>
+          </div>
+          <Link
+            to="/"
+            style={{
+              fontSize: 11,
+              color: DS.t3,
+              textDecoration: "none",
+              fontFamily: "var(--ds-mono), monospace",
+              fontWeight: 600,
+              padding: "6px 10px",
+              borderRadius: 8,
+              border: `1px solid ${DS.border}`,
+              flexShrink: 0,
+            }}
+          >
+            Landing
+          </Link>
         </div>
 
-        <div style={{ display: "flex", gap: 4, overflowX: "auto", maxWidth: "70%" }}>
+        <div style={{ display: "flex", gap: 4, overflowX: "auto", maxWidth: "min(68vw, 520px)", paddingBottom: 2 }}>
           {CURRICULUM.slice(0, 6).map(c => (
             <button
               key={c.id}
+              type="button"
               onClick={() => { setActiveCourse(c); setView("course"); setCourseTab("learn"); }}
               style={{
-                background: activeCourse?.id === c.id ? "#1E293B" : "transparent",
-                border: "none", borderRadius: 6, padding: "5px 10px", color: activeCourse?.id === c.id ? "#F8FAFC" : "#64748B",
-                fontSize: 11, cursor: "pointer", fontFamily: "'JetBrains Mono'", fontWeight: 500, whiteSpace: "nowrap",
+                background: activeCourse?.id === c.id ? "rgba(99,102,241,0.12)" : "transparent",
+                border: `1px solid ${activeCourse?.id === c.id ? `${c.color}35` : "transparent"}`,
+                borderRadius: 8,
+                padding: "6px 10px",
+                color: activeCourse?.id === c.id ? DS.t1 : DS.dim,
+                fontSize: 11,
+                cursor: "pointer",
+                fontFamily: "var(--ds-mono), monospace",
+                fontWeight: 600,
+                whiteSpace: "nowrap",
               }}
             >
               {c.icon} {c.title.split(" ")[0]}
@@ -1380,14 +1370,13 @@ export default function DataSparkPlatform() {
         </div>
       </nav>
 
-      <main style={{ paddingBottom: 60 }}>
+      <main style={{ paddingBottom: 72, position: "relative", zIndex: 1 }}>
         {view === "home" && renderHome()}
         {view === "course" && renderCourse()}
         {view === "lesson" && renderLesson()}
         {view === "question" && renderQuestion()}
       </main>
 
-      {/* AI Chatbot */}
       {chatbotCourse && <AIChatbot course={chatbotCourse} onClose={() => setChatbotCourse(null)} />}
     </div>
   );

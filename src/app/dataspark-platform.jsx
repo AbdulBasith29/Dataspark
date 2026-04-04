@@ -734,6 +734,16 @@ export default function DataSparkApp() {
             <div
               key={key}
               onClick={() => { setSelectedCategory(key); setView("category"); }}
+              aria-label={`Open ${cat.label} category`}
+              role="button"
+              tabIndex={0}
+              onKeyDown={e => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setSelectedCategory(key);
+                  setView("category");
+                }
+              }}
               style={{
                 background: "#0F172A",
                 border: "1px solid #1E293B",
@@ -743,6 +753,8 @@ export default function DataSparkApp() {
                 transition: "all 0.2s",
                 position: "relative",
                 overflow: "hidden",
+                textAlign: "left",
+                color: "inherit",
               }}
               onMouseEnter={e => {
                 e.currentTarget.style.borderColor = cat.color + "60";
@@ -837,6 +849,15 @@ export default function DataSparkApp() {
             <div
               key={q.id}
               onClick={() => handleStartQuestion(q)}
+              aria-label={`Start question: ${q.title}`}
+              role="button"
+              tabIndex={0}
+              onKeyDown={e => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  handleStartQuestion(q);
+                }
+              }}
               style={{
                 background: "#0F172A",
                 border: "1px solid #1E293B",
@@ -847,6 +868,8 @@ export default function DataSparkApp() {
                 alignItems: "center",
                 justifyContent: "space-between",
                 transition: "border-color 0.2s",
+                textAlign: "left",
+                color: "inherit",
               }}
               onMouseEnter={e => e.currentTarget.style.borderColor = q.color + "50"}
               onMouseLeave={e => e.currentTarget.style.borderColor = "#1E293B"}
@@ -996,6 +1019,15 @@ export default function DataSparkApp() {
                   <div
                     key={q.id}
                     onClick={() => handleStartQuestion(q)}
+                    aria-label={`Start question: ${q.title}`}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleStartQuestion(q);
+                      }
+                    }}
                     style={{
                       background: "#0F172A",
                       border: "1px solid #1E293B",
@@ -1003,6 +1035,8 @@ export default function DataSparkApp() {
                       padding: "16px 20px",
                       cursor: "pointer",
                       transition: "all 0.2s",
+                      textAlign: "left",
+                      color: "inherit",
                     }}
                     onMouseEnter={e => {
                       e.currentTarget.style.borderColor = cat.color + "40";
@@ -1509,6 +1543,11 @@ export default function DataSparkApp() {
         ::selection { background: #0EA5E930; }
         textarea:focus { border-color: #0EA5E950 !important; }
         input:focus { border-color: #0EA5E950 !important; }
+        button:focus-visible, a:focus-visible, textarea:focus-visible, input:focus-visible, [role="button"]:focus-visible{
+          outline: none;
+          box-shadow: 0 0 0 3px rgba(14,165,233,0.35), 0 0 0 1px rgba(14,165,233,0.25) inset;
+          border-color: #0EA5E9 !important;
+        }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 3px; }

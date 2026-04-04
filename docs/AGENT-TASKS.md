@@ -49,7 +49,7 @@
 - `/src/visualizations/PCA.jsx` — 2D→1D projection, rotate axes
 - `/src/visualizations/ConfusionMatrix.jsx` — Interactive threshold slider showing precision/recall tradeoff
 - `/src/visualizations/ROCCurve.jsx` — Threshold sweep animation
-- `/src/visualizations/SQLJoins.jsx` — Venn diagram style with actual data rows
+- `/src/visualizations/SQLJoins.jsx` — ✅ Done — IDE-style dual source tables + live result grid (see **High-Fidelity Tabular Spec** below)
 - `/src/visualizations/WindowFunctions.jsx` — Show row-by-row computation
 - `/src/visualizations/NeuralNetwork.jsx` — Forward pass animation through layers
 - `/src/visualizations/Attention.jsx` — Token-to-token attention weights
@@ -69,22 +69,35 @@
 - `/src/visualizations/ETLPipeline.jsx` — Animated data flow through stages
 - `/src/visualizations/BatchVsStreaming.jsx` — Side-by-side processing comparison
 
-### Component Spec:
+### High-Fidelity Tabular Spec (SQL / data tooling visualizations)
+
+Use this bar for anything that represents **databases, pipelines, warehouses, or interview SQL**. Avoid “tutorial cards” (`L:` / `R:` stacks, floating pastel blobs as the primary metaphor).
+
+1. **Dual source relations** — Show each input as a real `<table>`: `border-collapse`, monospace, schema-style headers (UPPERCASE or `snake_case`, small caps), optional `schema.table` subtitle.
+2. **Join keys** — Mark the ON column visually (header rule, tint, or badge). Dim rows that **do not participate** in the current operator; brighten rows that drive the result.
+3. **Live result grid** — One wide **result set** below the sources, same IDE styling: sticky header, zebra optional, horizontal scroll on small screens, row index column.
+4. **NULL semantics** — Missing side renders as **`NULL`**: muted color + *italic* (never blank cells without explanation).
+5. **SQL alignment** — Show the query (or `NOT EXISTS` anti-join equivalent) that matches the visualization; keep identifiers consistent with the grids (`e`, `d`, `ON e.dept = d.dept`).
+6. **Traceability** — Hovering a result row should reinforce which source rows produced it (pulse/highlight on sources).
+
+Canvas / Venn is **optional garnish** only if it does not replace the grids.
+
+### Component Spec (general — canvas-first viz)
+
 ```jsx
-// Every viz component must follow this pattern:
+// Canvas-led viz: state, ref, draw loop, controls. Outer chrome is usually provided by VizLabShell on the platform.
 const MyVisualization = () => {
   // 1. State for interactive controls
   // 2. Canvas ref for animations
   // 3. useEffect for drawing
-  // 4. Return: title, description, canvas, controls
+  // 4. Return: title, description, canvas, controls (no heavy outer card if embedded in VizLabShell)
 
   return (
-    <div style={{ background: "#0B1120", borderRadius: 16, padding: 24, border: "1px solid #1E293B" }}>
-      <div style={{ fontSize: 18, fontWeight: 700, color: "#F8FAFC", fontFamily: "'Outfit'" }}>Title</div>
-      <div style={{ fontSize: 12, color: "#64748B", fontFamily: "'JetBrains Mono'", marginBottom: 16 }}>Instruction text</div>
-      <canvas ref={canvasRef} style={{ width: "100%", height: 280, borderRadius: 8 }} />
-      {/* Interactive controls */}
-    </div>
+    <>
+      <div style={{ fontSize: 17, fontWeight: 700 }}>Title</div>
+      <div style={{ fontSize: 12, marginBottom: 16 }}>Instruction text</div>
+      <canvas ref={canvasRef} style={{ width: "100%", height: 280 }} />
+    </>
   );
 };
 ```

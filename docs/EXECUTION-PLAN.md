@@ -278,3 +278,43 @@ Reasons: no staging URL verified; agent deliverables are stubs; E2E waitlist not
 Deferred until Phase 2 **GO_STAGING**: curriculum/viz/frontend/chatbot per `AGENT-TASKS.md`, Next.js migration if adopted, production cutover, monetization.
 
 Task packets for Phase 3+ will be issued after Phase 2 gate review.
+
+---
+
+## Phase 0–2 Platform Sprint Scope (2 weeks)
+
+**Sprint window:** 2026-04-03 → 2026-04-16  
+**Mission deliverable:** MVP platform experience end-to-end (home → course → module/topic → lesson → question workspace → AI tutor wiring + rubric/model answer reveal + progress tracking) accessible at `/platform`.
+
+**Locked assumptions (Phase 0–2):**
+- Route is `/platform`; add compatibility redirect `/dashboard` -> `/platform`.
+- Tutor/evaluation is not complete until Anthropic calls are moved behind secure server endpoints; frontend must call only those endpoints (no browser-side API secrets).
+
+### Phase breakdown
+
+- **Phase 0 (Days 1–2):** data contracts + platform UI skeleton + tutor/evaluation API contracts + viz/DI skeletons.
+- **Phase 1 (Days 3–8):** populate MVP curriculum/question data + finish platform UI integration + implement secure tutor/evaluate endpoints + viz components + analytics wiring.
+- **Phase 2 (Days 9–14):** review/assembly + QA smoke/regression + orchestrator gate verdict (GO_STAGING / NO_GO).
+
+### Dispatched task IDs (owners)
+
+Phase 0 tasks:
+- `P0-CURR-DATA-MODEL` → curriculum-agent
+- `P0-FE-FRAMEWORK` → frontend-agent
+- `P0-CHAT-FOUNDATION` → chatbot-agent
+- `P0-DICTIONARY` → data-instrumentation-agent
+- `P0-VIZ-SKELETON` → viz-agent
+- `P0-UI-OPT` → ui-optimizer-agent
+
+Phase 1 tasks:
+- `P1-CURR-QUESTIONBANKS` → curriculum-agent
+- `P1-FE-PLATFORM` → frontend-agent
+- `P1-CHAT-ENDPOINTS` → chatbot-agent
+- `P1-DI-WIRING` → data-instrumentation-agent
+- `P1-VIZ-COMPONENTS` → viz-agent
+- `P1-UI-POLISH` → ui-optimizer-agent
+
+Phase 2 tasks:
+- `P2-REVIEW-AND-INTEGRATE` → review-agent
+- `P2-QA-SMOKE` → qa-test-agent
+- `P2-ORCH verdict` → orchestrator-agent

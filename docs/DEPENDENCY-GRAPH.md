@@ -1,94 +1,81 @@
-# DataSpark — Execution DAG & Critical Path
+# DataSpark — Execution DAG & Critical Path (Phase 0–2 Platform Build)
 
-**As-of:** 2026-04-02
+**As-of:** 2026-04-03
 
 ---
 
 ## Legend
 
-- **Solid edges:** hard dependency (downstream blocked until upstream done)  
-- **Dashed edges:** soft dependency (can start with assumptions; reconcile later)  
+- **Solid edges:** hard dependency (downstream blocked until upstream done)
+- **Dashed edges:** soft dependency (can start with assumptions; reconcile later)
 - **Red:** critical path for **staging readiness**
 
 ---
 
-## Mermaid — Phases 0–2
+## Mermaid — Phase 0–2
 
 ```mermaid
 flowchart TB
-  subgraph P0["Phase 0 — Bootstrap"]
+  subgraph P0["Phase 0 — Setup (2 days)"]
     ORCH[P0-ORCH orchestrator]
-    PO0[P0-PO product-ops]
-    GW0[P0-GW growth]
-    QA0[P0-QA qa-test]
-    DI0[P0-DI data-instrumentation]
-    REV0[P0-REV revenue]
-    ORCH --> PO0
-    ORCH --> GW0
-    ORCH --> QA0
+    CURR0[P0-CURR-DATA-MODEL curriculum-agent]
+    FE0[P0-FE-FRAMEWORK frontend-agent]
+    CHAT0[P0-CHAT-FOUNDATION chatbot-agent]
+    DI0[P0-DICTIONARY data-instrumentation-agent]
+    VIZ0[P0-VIZ-SKELETON viz-agent]
+    UI0[P0-UI-OPT ui-optimizer-agent]
+    ORCH --> CURR0
+    ORCH --> FE0
+    ORCH --> CHAT0
     ORCH --> DI0
-    ORCH --> REV0
+    ORCH --> VIZ0
+    ORCH --> UI0
   end
 
-  subgraph P1["Phase 1 — Parallel"]
-    PO1[P1-PO product-ops]
-    GW1[P1-GW growth]
-    QA1[P1-QA qa-test]
-    DI1[P1-DI data-instrumentation]
-    REV1[P1-REV revenue]
-    PO0 --> PO1
-    DI0 --> PO1
-    GW0 --> GW1
-    DI0 --> GW1
-    QA0 --> QA1
-    PO1 -.-> QA1
+  subgraph P1["Phase 1 — Build (5 days)"]
+    CURR1[P1-CURR-QUESTIONBANKS curriculum-agent]
+    FE1[P1-FE-PLATFORM frontend-agent]
+    CHAT1[P1-CHAT-ENDPOINTS chatbot-agent]
+    DI1[P1-DI-WIRING data-instrumentation-agent]
+    VIZ1[P1-VIZ-COMPONENTS viz-agent]
+    UI1[P1-UI-POLISH ui-optimizer-agent]
+    ORCH -.-> FE1
+    CURR0 --> FE1
+    CURR0 --> CURR1
+    FE0 --> FE1
+    CHAT0 --> CHAT1
+    CHAT0 --> FE1
     DI0 --> DI1
-    REV0 --> REV1
+    VIZ0 --> VIZ1
+    VIZ0 --> FE1
+    UI0 --> UI1
   end
 
-  subgraph P2["Phase 2 — Gates"]
-    QA2[P2-QA staging sign-off]
-    ORCH2[P2-ORCH orchestrator verdict]
-    QA1 --> QA2
-    REV1 --> ORCH2
-    PO1 --> ORCH2
-    GW1 --> ORCH2
-    DI1 --> ORCH2
+  subgraph P2["Phase 2 — Integrate & Gates (6 days)"]
+    REV2[P2-REVIEW-AND-INTEGRATE review-agent]
+    QA2[P2-QA-SMOKE qa-test-agent]
+    ORCH2[P2-ORCH verdict]
+    FE1 --> REV2
+    CHAT1 --> REV2
+    DI1 --> REV2
+    VIZ1 --> REV2
+    UI1 --> REV2
+    REV2 --> QA2
     QA2 --> ORCH2
   end
+
+  %% Styling critical path: FE1 -> REV2 -> QA2 -> ORCH2
+  classDef crit fill:#7f1d1d,stroke:#ef4444,color:#fff;
+  class FE1,REV2,QA2,ORCH2 crit;
 ```
 
 ---
 
-## Critical path (staging GO)
+## Critical Path (staging readiness)
 
-The longest path to **P2-ORCH** (staging verdict):
+The longest hard dependency chain to the Phase 2 verdict:
 
-1. **P0-ORCH** → **P0-PO** → **P1-PO** (staging deploy + env documented)  
-2. **P0-QA** → **P1-QA** → **P2-QA** (staging sign-off)  
+1. `P0-FE-FRAMEWORK` + `P0-CURR-DATA-MODEL` + `P0-CHAT-FOUNDATION` (and parallel viz/DI/UI)  
+2. `P1-FE-PLATFORM` → `P2-REVIEW-AND-INTEGRATE` → `P2-QA-SMOKE` → `P2-ORCH`
 
-**Data path** (parallel but often blocking growth measurement):
-
-- **P0-DI** → **P1-DI** → **P2-ORCH**
-
-**Growth experiments** are not on the critical path for *staging* unless launch requires specific experiments.
-
----
-
-## Parallelism (maximize)
-
-| After | Run in parallel |
-|-------|-----------------|
-| P0-ORCH | P0-PO, P0-GW, P0-QA, P0-DI, P0-REV |
-| P0 complete | P1-PO, P1-GW, P1-QA (blocked on staging URL from P1-PO), P1-DI, P1-REV |
-| P1 complete | P2-QA + orchestrator prep → **P2-ORCH** |
-
----
-
-## Critical path — full program (Phase 3+)
-
-Not started in this execution. Expected bottleneck (from `AGENT-TASKS.md`):
-
-**Curriculum breadth** → **Frontend integration** → **Review/assembly** → **Deploy**
-
-Details will be appended when Phase 2 completes.
+If AI endpoints (`P1-CHAT-ENDPOINTS`) slip, `P1-FE-PLATFORM` and downstream gates are blocked by missing real tutor/evaluation wiring. `P1-FE-PLATFORM` also gates on `/platform` routing + `/dashboard` redirect + secure tutor calls (no Anthropic from browser).

@@ -45,7 +45,7 @@ const LogoMarquee = () => {
       <div style={{ textAlign: "center", marginBottom: 12, fontSize: 10, fontFamily: "var(--mono)", letterSpacing: 1.8, color: P.t3 }}>
         PRACTICE PROBLEMS INSPIRED BY INTERVIEWS AT
       </div>
-      <div style={{ display: "flex", gap: 48, animation: "marquee 30s linear infinite", width: "max-content" }}>
+      <div className="logo-marquee-track" style={{ display: "flex", gap: 48, width: "max-content" }}>
         {doubled.map((n, i) => (
           <span key={i} style={{ fontSize: 11, fontFamily: "var(--mono)", fontWeight: 700, color: P.t3, letterSpacing: 2, opacity: .55, whiteSpace: "nowrap" }}>{n}</span>
         ))}
@@ -63,19 +63,34 @@ const HeroCard = () => {
       border: `1px solid ${P.border}`, borderRadius: 18, overflow: "hidden", width: "100%", maxWidth: 420,
       boxShadow: "0 32px 64px rgba(0,0,0,0.5)",
     }}>
-      <div style={{ display: "flex", borderBottom: `1px solid ${P.border}` }}>
+      <div role="tablist" aria-label="Compare syntax-first vs strategy-first practice" style={{ display: "flex", borderBottom: `1px solid ${P.border}` }}>
         {[["syntax", "The Old Way"], ["strategy", "The DataSpark Way"]].map(([k, l]) => (
-          <button key={k} onClick={() => setMode(k)} style={{
-            flex: 1, padding: "11px 0", border: "none", cursor: "pointer",
-            background: mode === k ? (k === "strategy" ? "rgba(52,211,153,.05)" : "rgba(239,68,68,.03)") : "transparent",
-            color: mode === k ? (k === "strategy" ? P.grn : "#EF4444") : P.dim,
-            fontSize: 10, fontFamily: "var(--mono)", fontWeight: 700, letterSpacing: .8,
-            borderBottom: mode === k ? `2px solid ${k === "strategy" ? P.grn : "#EF4444"}` : "2px solid transparent",
-            transition: "all .3s",
-          }}>{l}</button>
+          <button
+            key={k}
+            type="button"
+            role="tab"
+            id={`hero-tab-${k}`}
+            aria-selected={mode === k}
+            aria-controls="hero-card-panel"
+            onClick={() => setMode(k)}
+            className="hero-card-tab"
+            style={{
+              flex: 1, padding: "11px 8px", border: "none", cursor: "pointer",
+              background: mode === k ? (k === "strategy" ? "rgba(52,211,153,.05)" : "rgba(239,68,68,.03)") : "transparent",
+              color: mode === k ? (k === "strategy" ? P.grn : "#EF4444") : P.dim,
+              fontSize: 10, fontFamily: "var(--mono)", fontWeight: 700, letterSpacing: .8,
+              borderBottom: mode === k ? `2px solid ${k === "strategy" ? P.grn : "#EF4444"}` : "2px solid transparent",
+              transition: "all .3s",
+            }}
+          >{l}</button>
         ))}
       </div>
-      <div style={{ padding: "20px 18px", minHeight: 220 }}>
+      <div
+        id="hero-card-panel"
+        role="tabpanel"
+        aria-labelledby={mode === "syntax" ? "hero-tab-syntax" : "hero-tab-strategy"}
+        style={{ padding: "20px 18px", minHeight: 220 }}
+      >
         {mode === "syntax" ? (
           <>
             <div style={{ fontSize: 8, color: "#EF4444", fontFamily: "var(--mono)", letterSpacing: 2, fontWeight: 700, marginBottom: 10 }}>PROMPT</div>
@@ -127,6 +142,24 @@ function WaitlistCTA({
   go,
 }) {
   const ctaLocation = placement === "final" ? "final" : "hero";
+  const inputId = placement === "final" ? "waitlist-email-final" : "waitlist-email-hero";
+  const statusId = placement === "final" ? "waitlist-status-final" : "waitlist-status-hero";
+  const statusText = emailError
+    ? emailError
+    : done
+      ? "You're in — we will email you before launch with early access details."
+      : "Ready to join early access. Enter your email and select Secure Your Spot.";
+  const srOnly = {
+    position: "absolute",
+    width: 1,
+    height: 1,
+    padding: 0,
+    margin: -1,
+    overflow: "hidden",
+    clip: "rect(0, 0, 0, 0)",
+    whiteSpace: "nowrap",
+    border: 0,
+  };
 
   const primary = async () => {
     const eventName = placement === "final" ? "final_cta_click" : "hero_cta_click";
@@ -139,15 +172,22 @@ function WaitlistCTA({
       {!done ? (
         <>
           <div className="cta-row" style={{ display: "flex", gap: 10, width: "100%" }}>
+            <label htmlFor={inputId} style={srOnly}>
+              Email address
+            </label>
             <input
               type="email"
+              id={inputId}
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
                 if (emailError) setEmailError("");
               }}
               placeholder="your@email.com"
-              onKeyDown={(e) => e.key === "Enter" && void primary()}
+              aria-label="Email address"
+              aria-invalid={!!emailError}
+              aria-describedby={statusId}
+              onKeyDown={(e) => e.key === "Enter" && !busy && void primary()}
               className="cta-input"
               style={{
                 background: "rgba(255,255,255,.035)",
@@ -167,6 +207,7 @@ function WaitlistCTA({
               onClick={() => void primary()}
               disabled={busy}
               className="cta-btn"
+              aria-busy={busy}
               style={{
                 background: P.indB,
                 border: "none",
@@ -187,11 +228,17 @@ function WaitlistCTA({
               {busy ? "Joining..." : "Secure Your Spot →"}
             </button>
           </div>
+          <div id={statusId} aria-live="polite" role="status" style={srOnly}>
+            {statusText}
+          </div>
           {emailError ? <div style={{ fontSize: 12, color: "#FCA5A5", marginTop: -2 }}>{emailError}</div> : null}
           <div style={{ fontSize: 11.5, color: P.t3, marginTop: -4 }}>No spam, ever. Unsubscribe anytime.</div>
         </>
       ) : (
         <div
+          aria-live="polite"
+          role="status"
+          id={statusId}
           style={{
             background: "rgba(52,211,153,.08)",
             border: "1px solid rgba(52,211,153,.2)",
@@ -396,13 +443,15 @@ function MissionSprint({ track }) {
             <button
               key={id}
               type="button"
+              aria-pressed={choice === id}
               onClick={() => handlePick(id)}
+              className="mission-choice"
               style={{
                 textAlign: "left",
                 background: choice === id ? "rgba(52,211,153,.1)" : "rgba(255,255,255,.02)",
                 border: choice === id ? "1px solid rgba(52,211,153,.35)" : `1px solid ${P.border}`,
                 borderRadius: 10,
-                padding: "10px 12px",
+                padding: "12px 14px",
                 color: P.t2,
                 cursor: "pointer",
                 fontSize: 12.5,
@@ -414,7 +463,7 @@ function MissionSprint({ track }) {
         </div>
 
         {choice ? (
-          <div style={{ background: "rgba(2,6,23,.45)", border: `1px solid ${P.border}`, borderRadius: 12, padding: "12px 14px", marginBottom: 14 }}>
+          <div id="mission-feedback" aria-live="polite" role="status" style={{ background: "rgba(2,6,23,.45)", border: `1px solid ${P.border}`, borderRadius: 12, padding: "12px 14px", marginBottom: 14 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 11.5 }}>
               <span style={{ color: P.t3 }}>AI feedback preview</span>
               <span style={{ color: P.grn, fontWeight: 700 }}>Score: {outcomes[choice].score}</span>
@@ -426,6 +475,7 @@ function MissionSprint({ track }) {
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <Link
             to="/preview"
+            className="mission-cta"
             onClick={() => void track("preview_route_click", { location: "landing_mission", href: "/preview" })}
             style={{ background: P.indB, color: "#fff", textDecoration: "none", borderRadius: 10, padding: "11px 16px", fontWeight: 700, fontSize: 13 }}
           >
@@ -433,6 +483,7 @@ function MissionSprint({ track }) {
           </Link>
           <a
             href="#join"
+            className="mission-cta"
             onClick={(e) => {
               e.preventDefault();
               void track("hero_cta_click", { location: "landing_mission", href: "#join" });
@@ -566,8 +617,20 @@ export default function DS8() {
         html{scroll-behavior:smooth}
         [id]{scroll-margin-top:80px}
         input:focus{outline:none;border-color:${P.indB}!important;box-shadow:0 0 0 3px rgba(99,102,241,.1)}
+        button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible{
+          outline:none;
+          box-shadow:0 0 0 3px rgba(99,102,241,.35), 0 0 0 1px rgba(99,102,241,.25) inset;
+          border-color:${P.indB}!important;
+        }
         @keyframes breathe{0%,100%{box-shadow:0 4px 16px rgba(99,102,241,.35)}50%{box-shadow:0 4px 28px rgba(99,102,241,.55)}}
         @keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+        .logo-marquee-track{animation:marquee 30s linear infinite}
+
+        @media (prefers-reduced-motion: reduce){
+          html{scroll-behavior:auto}
+          .logo-marquee-track{animation:none!important}
+          .header-cta-breathe{animation:none!important}
+        }
 
         /* ═══ RESPONSIVE ═══ */
         @media(max-width:768px){
@@ -584,6 +647,10 @@ export default function DS8() {
           .before-after-arrow{display:none!important}
           .section-pad{padding-left:24px!important;padding-right:24px!important}
           .head-pad{padding:12px 24px!important}
+          .hero-card-tab{min-height:44px;padding-top:12px!important;padding-bottom:12px!important}
+          .header-cta-safe{min-height:44px;display:inline-flex!important;align-items:center;justify-content:center;padding:12px 20px!important}
+          .mission-choice{min-height:44px}
+          .mission-cta{min-height:44px;display:inline-flex!important;align-items:center;justify-content:center;padding:12px 18px!important}
         }
         @media(min-width:769px) and (max-width:1024px){
           .feat-grid{grid-template-columns:1fr 1fr!important}
@@ -617,6 +684,7 @@ export default function DS8() {
             </div>
             <a
               href="#join"
+              className="header-cta-breathe header-cta-safe"
               onClick={(e) => {
                 e.preventDefault();
                 void track("hero_cta_click", { location: "hero", href: "#join" });
@@ -733,6 +801,8 @@ export default function DS8() {
             <button
               key={f.id}
               type="button"
+              aria-expanded={activeProof === f.id}
+              aria-controls={`feature-proof-${f.id}`}
               onClick={() => {
                 setActiveProof((prev) => prev === f.id ? "" : f.id);
                 void track("feature_proof_toggle", { location: "features", feature_id: f.id, open: activeProof !== f.id });
@@ -745,14 +815,22 @@ export default function DS8() {
               <div style={{ fontSize: 11, color: f.c, marginTop: 10, fontFamily: "var(--mono)", letterSpacing: 1.2 }}>
                 {activeProof === f.id ? "HIDE MICRO-PROOF" : "VIEW MICRO-PROOF"}
               </div>
-              {activeProof === f.id ? (
-                <div style={{ marginTop: 12, borderTop: `1px solid ${P.border}`, paddingTop: 12 }}>
-                  <div style={{ fontSize: 10.5, color: P.t3, fontFamily: "var(--mono)", marginBottom: 8 }}>MICRO-PROOF</div>
-                  <FeatureDemo id={f.id} />
-                  <div style={{ marginTop: 10, fontSize: 11.5, color: P.t2 }}>Mechanism: <span style={{ color: P.t3 }}>{f.mechanism}</span></div>
-                  <div style={{ marginTop: 4, fontSize: 11.5, color: P.t2 }}>Outcome: <span style={{ color: P.grn }}>{f.outcome}</span></div>
-                </div>
-              ) : null}
+              <div
+                id={`feature-proof-${f.id}`}
+                role="region"
+                aria-label={`${f.t} micro-proof`}
+                hidden={activeProof !== f.id}
+                style={activeProof === f.id ? { marginTop: 12, borderTop: `1px solid ${P.border}`, paddingTop: 12 } : undefined}
+              >
+                {activeProof === f.id ? (
+                  <>
+                    <div style={{ fontSize: 10.5, color: P.t3, fontFamily: "var(--mono)", marginBottom: 8 }}>MICRO-PROOF</div>
+                    <FeatureDemo id={f.id} />
+                    <div style={{ marginTop: 10, fontSize: 11.5, color: P.t2 }}>Mechanism: <span style={{ color: P.t3 }}>{f.mechanism}</span></div>
+                    <div style={{ marginTop: 4, fontSize: 11.5, color: P.t2 }}>Outcome: <span style={{ color: P.grn }}>{f.outcome}</span></div>
+                  </>
+                ) : null}
+              </div>
             </button>
           ))}
         </div>
@@ -867,6 +945,7 @@ export default function DS8() {
                 href={link.href}
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label={`${link.label} (opens in new tab)`}
                 onClick={() => {
                   void track("footer_link_click", { location: "footer", label: link.label, href: link.href });
                 }}
