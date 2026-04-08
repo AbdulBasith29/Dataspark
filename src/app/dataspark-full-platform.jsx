@@ -6,6 +6,11 @@ import TrainValTestSplit from "../visualizations/TrainValTestSplit.jsx";
 import PythonMutabilityViz from "../visualizations/PythonMutabilityViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import { DS, dsGlassCard } from "../lib/ds-platform-tokens.js";
+import { PYTHON_QUESTIONS } from "../data/questions-python.js";
+import { STATISTICS_QUESTIONS } from "../data/questions-statistics.js";
+
+// Combined question bank — add new courses here as banks are built
+const ALL_QUESTIONS = [...PYTHON_QUESTIONS, ...STATISTICS_QUESTIONS];
 
 const PlatformLogo = () => (
   <svg width="26" height="26" viewBox="0 0 40 40" fill="none" style={{ display: "block", flexShrink: 0 }}>
