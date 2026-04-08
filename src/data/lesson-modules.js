@@ -253,7 +253,12 @@ A tuple holding a **list** is immutable **as a tuple**, but the **list inside** 
 
 Connect answers to **thread safety**, **hashability** (dict keys), and **reasoning about side effects**.`,
 
-    video: null,
+    video: {
+      youtubeId: "W8KRzm-HUcc",
+      title: "Python Tutorial: Lists, Tuples, and Sets",
+      channel: "Corey Schafer",
+      startSeconds: 0,
+    },
     videoFallbackMarkdown: `## Curated clip (search)
 
 Look up **Corey Schafer — Python mutable vs immutable** (or your favorite Python fundamentals channel). After the list/tuple segment, pause and write **three** examples of aliasing bugs in ETL configs or nested dicts.
