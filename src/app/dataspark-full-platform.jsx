@@ -8,6 +8,8 @@ import FStringBuilderViz from "../visualizations/FStringBuilderViz.jsx";
 import DictSetOpsViz from "../visualizations/DictSetOpsViz.jsx";
 import ComprehensionBuilderViz from "../visualizations/ComprehensionBuilderViz.jsx";
 import DataFrameExplorerViz from "../visualizations/DataFrameExplorerViz.jsx";
+import ArrayShapeViz from "../visualizations/ArrayShapeViz.jsx";
+import LoopVsVectorViz from "../visualizations/LoopVsVectorViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import { DS, dsGlassCard } from "../lib/ds-platform-tokens.js";
 import { PYTHON_QUESTIONS } from "../data/questions-python.js";
@@ -1293,7 +1295,9 @@ const VISUALIZATIONS = {
   "py-b4": DictSetOpsViz,
   "py-b5": ComprehensionBuilderViz,
   // Python — py-ds
+  "py-d1": ArrayShapeViz,
   "py-d2": DataFrameExplorerViz,
+  "py-d5": LoopVsVectorViz,
 };
 
 /** When a lesson is marked hasViz but has no bespoke component, show a course-appropriate interactive. */
