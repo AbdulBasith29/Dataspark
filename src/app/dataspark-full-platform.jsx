@@ -40,43 +40,480 @@ const CURRICULUM = [
         id: "py-basics",
         title: "Core Syntax & Data Types",
         lessons: [
-          { id: "py-b1", title: "Variables, Types & Type Hints", duration: "15 min", hasViz: true },
-          { id: "py-b2", title: "Strings, f-strings & String Methods", duration: "12 min", hasViz: false },
-          { id: "py-b3", title: "Lists, Tuples & Mutability", duration: "18 min", hasViz: true },
-          { id: "py-b4", title: "Dictionaries & Sets", duration: "15 min", hasViz: true },
-          { id: "py-b5", title: "Comprehensions: The Pythonic Way", duration: "10 min", hasViz: true },
+          {
+            id: "py-b1", title: "Variables, Types & Type Hints", duration: "15 min", hasViz: true,
+            linkedQuestionId: "py-q01",
+            concepts: [
+              {
+                heading: "Python is Dynamically Typed",
+                body: "Python infers variable types at runtime — you never declare them. This makes code fast to write, but requires discipline: a column you expect to be numeric can silently arrive as a string, causing 1+2='12' instead of 3.",
+                code: "x = 42          # int\nx = 'hello'     # now str — valid!\nx = [1, 2, 3]   # now list — still valid\nprint(type(x))  # <class 'list'>",
+                dsNote: "Silent type bugs are the #1 cause of pipeline failures. Always validate types at data ingestion boundaries."
+              },
+              {
+                heading: "Type Hints Make Code Self-Documenting",
+                body: "PEP 484 lets you annotate variable and function types. They don't enforce anything at runtime — they're documentation that tools like mypy check statically before your code runs.",
+                code: "def parse_value(raw: str, default: int = 0) -> int:\n    try:\n        return int(raw)\n    except ValueError:\n        return default\n\n# mypy catches this mistake before production:\nresult: str = parse_value('42')  # Error: expected str, got int",
+                dsNote: "Production ML pipelines at Google and Stripe use type hints throughout. They catch 'expected ndarray, got DataFrame' bugs at review time, not at 3am."
+              }
+            ],
+            takeaways: [
+              "Python is dynamically typed — types are inferred at runtime, not declared",
+              "Type hints (x: int = 5) are optional but strongly recommended in production code",
+              "Use isinstance(x, int) not type(x) == int — it handles inheritance correctly",
+              "Validate types at system boundaries: user input, API responses, file reads"
+            ]
+          },
+          {
+            id: "py-b2", title: "Strings, f-strings & String Methods", duration: "12 min", hasViz: true,
+            linkedQuestionId: "py-q23",
+            concepts: [
+              {
+                heading: "f-strings Are the Modern Standard",
+                body: "f-strings (PEP 498) are the fastest and most readable way to format strings in Python 3.6+. They evaluate expressions inline at runtime — use them for logging, error messages, and SQL query building.",
+                code: "name = 'Alice'\nage = 30\n# Old way — don't do this:\nmsg = 'User %s is %d years old' % (name, age)\n# New way:\nmsg = f'User {name} is {age} years old'\n# Expressions work too:\nmsg = f'In 5 years: {age + 5}'",
+                dsNote: "In data pipelines, f-strings build dynamic SQL, log record counts, and format error messages. 'Processed {len(df):,} rows in {elapsed:.2f}s' is cleaner than any alternative."
+              },
+              {
+                heading: "Key String Methods for Data Cleaning",
+                body: "Real-world data is messy. Python's built-in string methods handle the most common cleaning tasks without importing anything extra.",
+                code: "raw = '  Alice Smith  '\nraw.strip()          # 'Alice Smith' — remove whitespace\nraw.lower()          # '  alice smith  '\nraw.split()          # ['Alice', 'Smith']\n','.join(['a','b']) # 'a,b'\n'hello'.startswith('he')  # True\n'user@co.com'.split('@')[1]  # 'co.com'",
+                dsNote: "str.strip(), str.lower(), and str.split() appear in almost every data cleaning pipeline. Mastering them means fewer pandas apply() calls and faster preprocessing."
+              }
+            ],
+            takeaways: [
+              "Use f-strings for all string formatting — they're fastest and most readable",
+              "Chaining methods is idiomatic: value.strip().lower().replace('-', '_')",
+              "str.split() and str.join() are inverses — split to parse, join to serialize",
+              "For heavy text processing in pandas, .str accessor gives vectorized string ops"
+            ]
+          },
+          {
+            id: "py-b3", title: "Lists, Tuples & Mutability", duration: "18 min", hasViz: true,
+            linkedQuestionId: "py-q05",
+            concepts: [
+              {
+                heading: "Lists Are Mutable, Tuples Are Not",
+                body: "Lists can be changed after creation — you can append, remove, or replace elements. Tuples are fixed once created. This distinction matters for performance, safety, and how Python stores data in memory.",
+                code: "# List — mutable:\nscores = [85, 92, 78]\nscores.append(95)     # modifies in place\nscores[0] = 100       # works\n\n# Tuple — immutable:\npoint = (10, 20)\n# point[0] = 5       # TypeError!\nnew_point = (5, 20)  # must create new tuple",
+                dsNote: "Use tuples for fixed records (coordinates, RGB values, DB row keys). Use lists when the collection will grow or change. Tuples are hashable — they can be dict keys and set members."
+              },
+              {
+                heading: "Shallow vs Deep Copy Gotcha",
+                body: "Assigning a list to a new variable doesn't copy it — both names point to the same object. This causes one of the most common Python bugs in data work.",
+                code: "original = [1, 2, 3]\nalias = original      # SAME object!\nalias.append(4)\nprint(original)       # [1, 2, 3, 4] — surprise!\n\n# Fix: copy it\nshallow = original.copy()  # or list(original)\nimport copy\ndeep = copy.deepcopy(original)  # for nested lists",
+                dsNote: "Pandas DataFrames have the same issue. df2 = df is an alias. df2 = df.copy() is a real copy. Modifying an alias silently changes your original data."
+              }
+            ],
+            takeaways: [
+              "Lists are mutable (append, remove, reassign); tuples are immutable",
+              "Assignment (b = a) creates an alias, not a copy — use .copy() or list()",
+              "Tuples are hashable and faster to create; use them for fixed records",
+              "list comprehensions are faster than for-loops + append for building new lists"
+            ]
+          },
+          {
+            id: "py-b4", title: "Dictionaries & Sets", duration: "15 min", hasViz: true,
+            linkedQuestionId: "py-q02",
+            concepts: [
+              {
+                heading: "Dicts Are O(1) Lookup — Use Them",
+                body: "Python dicts use hash tables internally, giving O(1) average-case lookup, insert, and delete. This makes them the right data structure for any mapping, counting, or caching operation.",
+                code: "# Count word frequencies in O(n)\ncounts = {}\nfor word in text.split():\n    counts[word] = counts.get(word, 0) + 1\n\n# Better: use defaultdict or Counter\nfrom collections import Counter\ncounts = Counter(text.split())\ncounts.most_common(5)",
+                dsNote: "In ML feature engineering, dicts power lookup tables, target encoding maps, and label-to-index mappings. O(1) lookup instead of O(n) list scan matters at 10M+ rows."
+              },
+              {
+                heading: "Sets for Fast Membership Testing",
+                body: "Sets store unique values in a hash table — membership testing (x in my_set) is O(1) vs O(n) for lists. Use sets to deduplicate and to do fast intersection/union/difference operations.",
+                code: "# O(n) — bad for large data:\nif user_id in user_list:  # scans entire list\n\n# O(1) — good:\nuser_set = set(user_ids)\nif user_id in user_set:\n\n# Set operations:\nactive & premium   # intersection\nall_users - churned  # difference",
+                dsNote: "Set intersection is the fast way to find users in both A and B segments. Converting a million-item list to a set before repeated lookups reduces O(n²) to O(n)."
+              }
+            ],
+            takeaways: [
+              "Dict lookup, insert, delete are O(1) average — the go-to for mappings and caches",
+              "dict.get(key, default) avoids KeyError without try/except",
+              "Sets give O(1) membership testing — convert lists to sets before repeated lookups",
+              "Use collections.Counter for frequency counting, defaultdict to avoid key initialization"
+            ]
+          },
+          {
+            id: "py-b5", title: "Comprehensions: The Pythonic Way", duration: "10 min", hasViz: true,
+            linkedQuestionId: "py-q31",
+            concepts: [
+              {
+                heading: "List/Dict/Set Comprehensions Replace Loops",
+                body: "Comprehensions are a compact, readable way to transform or filter collections. They run faster than equivalent for-loops with .append() because they're optimized at the bytecode level.",
+                code: "# For-loop version:\nclean = []\nfor x in raw_prices:\n    if x > 0:\n        clean.append(round(x, 2))\n\n# Comprehension — faster and clearer:\nclean = [round(x, 2) for x in raw_prices if x > 0]\n\n# Dict comprehension:\nindex = {item['id']: item for item in records}\n\n# Set comprehension:\ndomains = {email.split('@')[1] for email in emails}",
+                dsNote: "Dict comprehensions for building lookup tables from lists are a daily pattern in data engineering: {row['user_id']: row for row in db_result} gives O(1) user lookup."
+              },
+              {
+                heading: "Generator Expressions Save Memory",
+                body: "Replace square brackets with parentheses to get a generator — it produces items lazily instead of building the full list in memory. Critical for large datasets.",
+                code: "# List comprehension — all 10M items in RAM:\ntotals = [price * qty for price, qty in orders]\n\n# Generator — one item at a time:\ntotals = (price * qty for price, qty in orders)\nprint(sum(totals))  # sum() consumes lazily\n\n# Use with any function that accepts iterables:\nmax(x**2 for x in numbers)  # no list created",
+                dsNote: "When processing 10GB CSV files, generator expressions allow line-by-line processing without loading the whole file. sum(), max(), and min() all accept generators."
+              }
+            ],
+            takeaways: [
+              "List comprehensions are faster than for-loop + append — prefer them for transformation",
+              "Add an if clause to filter: [x for x in data if x > 0]",
+              "Dict comprehensions build lookup tables: {k: v for k, v in pairs}",
+              "Use generator expressions (parentheses) instead of list comprehensions when you only need to iterate once — saves memory"
+            ]
+          },
         ]
       },
       {
         id: "py-control",
         title: "Control Flow & Functions",
         lessons: [
-          { id: "py-c1", title: "Conditionals & Pattern Matching", duration: "12 min", hasViz: false },
-          { id: "py-c2", title: "Loops, Iterators & Generators", duration: "20 min", hasViz: true },
-          { id: "py-c3", title: "Functions: Args, *args, **kwargs", duration: "15 min", hasViz: true },
-          { id: "py-c4", title: "Lambda, Map, Filter, Reduce", duration: "12 min", hasViz: true },
-          { id: "py-c5", title: "Error Handling & Debugging", duration: "10 min", hasViz: false },
+          {
+            id: "py-c1", title: "Conditionals & Pattern Matching", duration: "12 min", hasViz: true,
+            linkedQuestionId: "py-q06",
+            concepts: [
+              {
+                heading: "if/elif/else and Truthiness",
+                body: "Python's truthiness rules mean you rarely need explicit == comparisons. Empty lists, empty strings, 0, and None all evaluate to False. This enables cleaner guard clauses and early returns.",
+                code: "# Explicit — verbose:\nif len(records) > 0 and records is not None:\n\n# Pythonic — cleaner:\nif records:\n    process(records)\n\n# Guard clause pattern:\ndef process(df):\n    if df is None or df.empty:\n        return None  # exit early\n    # main logic here",
+                dsNote: "Guard clauses (early returns) keep ML training loops clean. Check for empty DataFrames, None models, or invalid configs at the top of functions — don't nest all logic inside ifs."
+              },
+              {
+                heading: "match/case — Structural Pattern Matching",
+                body: "Python 3.10 added structural pattern matching (match/case). It's more powerful than if/elif chains — it can destructure objects and match on type, value, and shape simultaneously.",
+                code: "# Clean event routing without long if/elif:\ndef handle_event(event):\n    match event:\n        case {'type': 'click', 'x': x, 'y': y}:\n            return f'Click at ({x},{y})'\n        case {'type': 'scroll', 'delta': d}:\n            return f'Scrolled {d}px'\n        case {'type': 'error', 'code': c}:\n            return f'Error {c}'\n        case _:\n            return 'Unknown event'",
+                dsNote: "Use match/case for routing ML pipeline stages, parsing event types from Kafka streams, or handling different API response shapes cleanly."
+              }
+            ],
+            takeaways: [
+              "Truthy/falsy: 0, '', [], {}, None, False are all falsy — use 'if data:' not 'if len(data) > 0:'",
+              "Use guard clauses (early return) to flatten nested logic",
+              "match/case (Python 3.10+) is cleaner than long if/elif chains for multiple conditions",
+              "Ternary: x = a if condition else b — good for simple one-liners"
+            ]
+          },
+          {
+            id: "py-c2", title: "Loops, Iterators & Generators", duration: "20 min", hasViz: true,
+            linkedQuestionId: "py-q07",
+            concepts: [
+              {
+                heading: "Iterators: The Protocol Behind for Loops",
+                body: "Every Python for loop calls __iter__() then __next__() repeatedly. Understanding this protocol lets you build memory-efficient data pipelines that process one item at a time instead of loading everything into RAM.",
+                code: "# What for x in data: actually does:\niterator = iter(data)      # calls data.__iter__()\nwhile True:\n    try:\n        x = next(iterator)  # calls __iter__().__next__()\n        process(x)\n    except StopIteration:\n        break",
+                dsNote: "Pandas read_csv(chunksize=10000) returns an iterator of DataFrames — process 10B rows without loading them all. This is the iterator protocol in production."
+              },
+              {
+                heading: "Generators: Write Iterators Without a Class",
+                body: "A generator function uses yield instead of return. Each call to next() runs until the next yield, then pauses — the function's state is preserved between calls. This creates lazy sequences with almost no memory overhead.",
+                code: "def read_batches(path, batch_size=1000):\n    batch = []\n    with open(path) as f:\n        for line in f:\n            batch.append(line)\n            if len(batch) == batch_size:\n                yield batch\n                batch = []  # state resets!\n    if batch:\n        yield batch  # last partial batch\n\n# Zero memory overhead — processes one batch at a time:\nfor batch in read_batches('10gb_file.csv'):\n    train_model(batch)",
+                dsNote: "This generator pattern powers ETL pipelines that process files too large to fit in memory. It's how pandas chunked reading works internally."
+              }
+            ],
+            takeaways: [
+              "Generators use yield — they pause execution and resume, keeping state between calls",
+              "Generator functions produce items lazily — perfect for large files and streams",
+              "Use enumerate(items) not range(len(items)) when you need index + value",
+              "zip(a, b) pairs two iterables — stops at the shorter one"
+            ]
+          },
+          {
+            id: "py-c3", title: "Functions: Args, *args, **kwargs", duration: "15 min", hasViz: true,
+            linkedQuestionId: "py-q08",
+            concepts: [
+              {
+                heading: "Positional, Keyword, and Default Args",
+                body: "Python functions support four kinds of arguments. Knowing when to use each makes your APIs cleaner and less prone to mistakes when called with the wrong parameter order.",
+                code: "def fit_model(X, y, lr=0.01, epochs=100, verbose=False):\n    pass\n\n# Positional — order matters:\nfit_model(X_train, y_train)\n\n# Keyword — order doesn't matter:\nfit_model(X_train, y_train, epochs=50, lr=0.001)\n\n# Force keyword-only args with * separator:\ndef plot(data, *, title, figsize=(10,6)):\n    pass  # title MUST be passed as keyword",
+                dsNote: "sklearn's fit(X, y, sample_weight=...) uses this exact pattern. Force keyword-only args on ML training functions to prevent silent mistakes like passing labels as features."
+              },
+              {
+                heading: "*args and **kwargs for Flexible APIs",
+                body: "*args collects extra positional arguments into a tuple. **kwargs collects extra keyword arguments into a dict. Together they let you write functions that pass arguments through to other functions without knowing them in advance.",
+                code: "# Wrapper that adds logging to any function:\ndef logged(fn):\n    def wrapper(*args, **kwargs):  # capture everything\n        print(f'Calling {fn.__name__}')\n        result = fn(*args, **kwargs)  # forward everything\n        print(f'Done: {result}')\n        return result\n    return wrapper\n\n@logged\ndef train(X, y, lr=0.01):\n    return 'model'",
+                dsNote: "*args/**kwargs are how sklearn's Pipeline and PyTorch's nn.Module forward() methods work — they pass arguments through layers without knowing their shapes in advance."
+              }
+            ],
+            takeaways: [
+              "Default args are evaluated once at function definition — never use mutable defaults (def f(x=[]))",
+              "Use * to force callers to pass arguments as keywords, reducing positional mistakes",
+              "*args = extra positional args as tuple; **kwargs = extra keyword args as dict",
+              "Functions are first-class objects — pass them as arguments, store in dicts, return from functions"
+            ]
+          },
+          {
+            id: "py-c4", title: "Lambda, Map, Filter, Reduce", duration: "12 min", hasViz: true,
+            linkedQuestionId: "py-q34",
+            concepts: [
+              {
+                heading: "Lambda: Anonymous One-Line Functions",
+                body: "lambda creates a small anonymous function inline. Use it only when the function is short and used once — if you need to name it or reuse it, use def instead.",
+                code: "# Good use: sort by a key\nrecords.sort(key=lambda r: r['score'], reverse=True)\n\n# Good use: inline with map/filter\nclean = list(filter(lambda x: x > 0, values))\n\n# Bad use — just use def:\nprocess = lambda x, y: x**2 + y**2  # just write def!\n\n# Better in pandas:\ndf.sort_values('score', ascending=False)\ndf[df['score'] > 0]",
+                dsNote: "In pandas, lambda appears most in df.apply(lambda row: ...). For simple column operations, vectorized pandas methods (df['col'] * 2) are 10-100x faster than apply()."
+              },
+              {
+                heading: "map() and filter() vs Comprehensions",
+                body: "map() applies a function to every item; filter() keeps only items where the function returns True. Both return lazy iterators. In most cases, a list comprehension is more readable — use map/filter when working with functional pipelines.",
+                code: "prices = [1.999, 2.505, 0.0, 3.14]\n\n# map() to transform:\nrounded = list(map(lambda x: round(x, 2), prices))\n# Same as: [round(x, 2) for x in prices]\n\n# filter() to select:\npositive = list(filter(lambda x: x > 0, prices))\n# Same as: [x for x in prices if x > 0]\n\n# functools.reduce() to aggregate:\nfrom functools import reduce\ntotal = reduce(lambda a, b: a + b, prices)\n# Same as: sum(prices)",
+                dsNote: "Prefer comprehensions for readability. Use map() when passing to libraries that expect iterables, or when chaining many transformations functionally."
+              }
+            ],
+            takeaways: [
+              "lambda is for short, throwaway functions — if it's complex, use def",
+              "map(fn, iterable) and filter(fn, iterable) return lazy iterators",
+              "List comprehensions are usually more readable than map/filter with lambda",
+              "functools.reduce() replaces manual accumulation loops — but sum(), max(), any() are clearer for common cases"
+            ]
+          },
+          {
+            id: "py-c5", title: "Error Handling & Debugging", duration: "10 min", hasViz: false,
+            linkedQuestionId: "py-q09",
+            concepts: [
+              {
+                heading: "try/except: Catch What You Can Handle",
+                body: "Catch specific exceptions, not bare except. Bare except silently swallows every error including KeyboardInterrupt and SystemExit. Only catch what you know how to recover from.",
+                code: "# Bad — catches everything including SystemExit:\ntry:\n    result = process(data)\nexcept:\n    pass\n\n# Good — specific, with recovery:\ntry:\n    value = int(raw_input)\nexcept ValueError as e:\n    print(f'Invalid number: {e}')\n    value = 0\nexcept (TypeError, OverflowError):\n    value = 0\nfinally:\n    cleanup()  # always runs",
+                dsNote: "In ML pipelines, catch specific exceptions at boundaries: FileNotFoundError when loading data, ValueError when parsing features, requests.Timeout when calling APIs. Never silence them inside model training code."
+              },
+              {
+                heading: "Context Managers: with Handles Cleanup",
+                body: "The with statement guarantees cleanup code runs even if an exception is raised. It calls __enter__() on open and __exit__() on close. Use it for files, DB connections, and any resource that needs cleanup.",
+                code: "# Without context manager — resource leak risk:\nf = open('data.csv')\ntry:\n    data = f.read()\nfinally:\n    f.close()  # easy to forget\n\n# With context manager — automatic cleanup:\nwith open('data.csv') as f:\n    data = f.read()  # f.close() called automatically\n\n# Custom context manager:\nfrom contextlib import contextmanager\n@contextmanager\ndef timer():\n    import time; start = time.time()\n    yield\n    print(f'Elapsed: {time.time()-start:.2f}s')",
+                dsNote: "Database connections, file handles, and GPU memory all need explicit cleanup. Context managers ensure __exit__() runs even when exceptions occur — critical for production reliability."
+              }
+            ],
+            takeaways: [
+              "Always catch specific exceptions (ValueError, FileNotFoundError) — never bare except",
+              "Use finally for cleanup that must always run (close connections, release locks)",
+              "with statement calls __exit__() automatically — use for files, DB connections, timers",
+              "raise ValueError('descriptive message') beats silent failure every time"
+            ]
+          },
         ]
       },
       {
         id: "py-oop",
         title: "Object-Oriented Python",
         lessons: [
-          { id: "py-o1", title: "Classes, Objects & __init__", duration: "18 min", hasViz: true },
-          { id: "py-o2", title: "Inheritance & Polymorphism", duration: "15 min", hasViz: true },
-          { id: "py-o3", title: "Dunder Methods & Operator Overloading", duration: "12 min", hasViz: false },
-          { id: "py-o4", title: "Decorators & Context Managers", duration: "15 min", hasViz: true },
+          {
+            id: "py-o1", title: "Classes, Objects & __init__", duration: "18 min", hasViz: true,
+            linkedQuestionId: "py-q11",
+            concepts: [
+              {
+                heading: "Classes Define Blueprints, Objects Are Instances",
+                body: "__init__ is the constructor — it runs when you create an instance and sets up instance attributes. Class attributes (defined outside __init__) are shared across all instances; instance attributes (self.x) belong to each object.",
+                code: "class DataPipeline:\n    default_batch_size = 1000  # class attribute (shared)\n\n    def __init__(self, source: str, batch_size: int = None):\n        self.source = source    # instance attribute\n        self.batch_size = batch_size or self.default_batch_size\n        self._records_processed = 0  # private by convention\n\n    def run(self):\n        print(f'Processing {self.source} in batches of {self.batch_size}')\n\npipeline = DataPipeline('s3://bucket/data.csv')\npipeline.run()",
+                dsNote: "sklearn's LinearRegression() uses this exact pattern. fit() sets self.coef_ and self.intercept_ on the instance. Each fitted model is an independent object."
+              },
+              {
+                heading: "@classmethod and @staticmethod",
+                body: "@classmethod receives the class as first arg (cls) — use it for alternative constructors. @staticmethod is just a regular function that lives inside the class namespace for organisation.",
+                code: "class Dataset:\n    def __init__(self, data, name):\n        self.data = data\n        self.name = name\n\n    @classmethod\n    def from_csv(cls, path):  # alternative constructor\n        import pandas as pd\n        return cls(pd.read_csv(path), name=path)\n\n    @staticmethod\n    def validate_schema(df, required_cols):  # no self/cls needed\n        missing = set(required_cols) - set(df.columns)\n        if missing:\n            raise ValueError(f'Missing columns: {missing}')\n\n# Usage:\nds = Dataset.from_csv('data.csv')",
+                dsNote: "sklearn's Pipeline.fit_transform() and pandas' DataFrame.from_dict() are both @classmethod alternative constructors — a common pattern in ML library design."
+              }
+            ],
+            takeaways: [
+              "__init__ sets instance attributes; class attributes are shared across all instances",
+              "self is just a convention — it's the first argument to instance methods",
+              "@classmethod (cls) enables alternative constructors like Model.from_checkpoint()",
+              "@staticmethod is a utility function organised inside the class — no self needed"
+            ]
+          },
+          {
+            id: "py-o2", title: "Inheritance & Polymorphism", duration: "15 min", hasViz: true,
+            linkedQuestionId: "py-q29",
+            concepts: [
+              {
+                heading: "Inheritance Lets Subclasses Extend Behaviour",
+                body: "A child class inherits all methods and attributes of its parent. Use super().__init__() to run the parent's constructor, then add your own attributes. Override methods to change behaviour for the subclass.",
+                code: "class BaseTransform:\n    def __init__(self, name):\n        self.name = name\n\n    def transform(self, X):\n        raise NotImplementedError  # must override\n\nclass StandardScaler(BaseTransform):\n    def __init__(self):\n        super().__init__('StandardScaler')\n        self.mean_ = None\n        self.std_ = None\n\n    def fit(self, X):\n        self.mean_, self.std_ = X.mean(0), X.std(0)\n\n    def transform(self, X):\n        return (X - self.mean_) / self.std_",
+                dsNote: "This is exactly how sklearn builds its transformer API. Every transformer inherits from BaseEstimator, overrides fit() and transform(), and gets fit_transform() for free."
+              },
+              {
+                heading: "Polymorphism: Same Interface, Different Behaviour",
+                body: "Polymorphism means different classes can respond to the same method call. Code that calls transform(X) doesn't need to know whether it's a Scaler, Normalizer, or Encoder — they all respond to the same interface.",
+                code: "# All transformers share the same interface:\ntransformers = [\n    StandardScaler(),\n    MinMaxScaler(),\n    RobustScaler()\n]\n\n# Polymorphic: each responds to fit/transform differently:\nfor t in transformers:\n    t.fit(X_train)\n    X_transformed = t.transform(X_test)\n    print(f'{t.name}: {X_transformed.std():.3f}')",
+                dsNote: "sklearn pipelines exploit polymorphism: Pipeline([('scaler', StandardScaler()), ('model', LogisticRegression())]).fit(X, y) works because both have .fit()."
+              }
+            ],
+            takeaways: [
+              "Child classes inherit parent methods — override only what needs to change",
+              "Always call super().__init__() to run parent constructor first",
+              "Abstract base classes (raise NotImplementedError) document required overrides",
+              "Polymorphism lets you swap implementations without changing calling code"
+            ]
+          },
+          {
+            id: "py-o3", title: "Dunder Methods & Operator Overloading", duration: "12 min", hasViz: false,
+            linkedQuestionId: "py-q13",
+            concepts: [
+              {
+                heading: "Dunder Methods Make Objects Behave Like Builtins",
+                body: "Double-underscore methods (__len__, __repr__, __add__) let your classes integrate with Python's built-in operators and functions. When you write len(x), Python calls x.__len__(). This makes custom classes feel native.",
+                code: "class DataBatch:\n    def __init__(self, items):\n        self.items = list(items)\n\n    def __len__(self):       # len(batch)\n        return len(self.items)\n\n    def __repr__(self):      # repr(batch)\n        return f'DataBatch({len(self)} items)'\n\n    def __getitem__(self, i):  # batch[i] and for loops\n        return self.items[i]\n\n    def __contains__(self, x):  # x in batch\n        return x in self.items\n\nbatch = DataBatch([1, 2, 3])\nprint(len(batch))      # 3\nprint(batch[0])        # 1\nprint(2 in batch)      # True",
+                dsNote: "PyTorch's Dataset class requires __len__ and __getitem__. Implementing them makes your custom datasets work with DataLoader batching automatically."
+              },
+              {
+                heading: "__eq__ and __hash__ for Collections",
+                body: "__eq__ controls == comparisons. If you define __eq__, you must also define __hash__ if you want instances to be usable as dict keys or set members (Python sets __hash__ = None automatically when you only define __eq__).",
+                code: "class ModelConfig:\n    def __init__(self, lr, layers):\n        self.lr = lr\n        self.layers = layers\n\n    def __eq__(self, other):   # == comparison\n        return self.lr == other.lr and self.layers == other.layers\n\n    def __hash__(self):         # needed for sets/dict keys\n        return hash((self.lr, tuple(self.layers)))\n\n# Now usable in sets:\nconfigs = {ModelConfig(0.01, [64,32]), ModelConfig(0.1, [128])}\nc = ModelConfig(0.01, [64,32])\nprint(c in configs)  # True",
+                dsNote: "Hyperparameter deduplication, model registries, and experiment tracking all use __eq__/__hash__ to compare and deduplicate configs."
+              }
+            ],
+            takeaways: [
+              "__repr__ should return a string that lets you recreate the object — crucial for debugging",
+              "__len__ + __getitem__ makes your class work with len(), indexing, and for loops",
+              "Always define __hash__ when you define __eq__ if you need dict keys / set membership",
+              "PyTorch Dataset, sklearn transformers, and pandas Series all use dunder methods internally"
+            ]
+          },
+          {
+            id: "py-o4", title: "Decorators & Context Managers", duration: "15 min", hasViz: true,
+            linkedQuestionId: "py-q38",
+            concepts: [
+              {
+                heading: "Decorators Wrap Functions Without Changing Them",
+                body: "A decorator is a function that takes a function and returns a new function. Using @my_decorator above a function definition is syntactic sugar for fn = my_decorator(fn). This lets you add logging, caching, timing, and retries without touching the function body.",
+                code: "import functools, time\n\ndef timer(fn):\n    @functools.wraps(fn)  # preserves fn.__name__\n    def wrapper(*args, **kwargs):\n        start = time.perf_counter()\n        result = fn(*args, **kwargs)\n        elapsed = time.perf_counter() - start\n        print(f'{fn.__name__} took {elapsed:.3f}s')\n        return result\n    return wrapper\n\n@timer\ndef train_model(X, y):\n    # ... training code ...\n    return model\n\n# @timer is shorthand for: train_model = timer(train_model)",
+                dsNote: "sklearn's @deprecated, Python's @functools.lru_cache, Flask's @app.route — decorators are everywhere in ML tooling. Writing your own unlocks powerful cross-cutting concerns like caching, logging, and retry."
+              },
+              {
+                heading: "functools.wraps and Stacking Decorators",
+                body: "Always use @functools.wraps(fn) inside your wrapper — it copies the function's __name__ and __doc__ so debugging tools work correctly. Multiple decorators stack: applied bottom-up, executed outside-in.",
+                code: "def retry(max_attempts=3):\n    def decorator(fn):\n        @functools.wraps(fn)\n        def wrapper(*args, **kwargs):\n            for attempt in range(max_attempts):\n                try:\n                    return fn(*args, **kwargs)\n                except Exception as e:\n                    if attempt == max_attempts - 1:\n                        raise\n                    print(f'Attempt {attempt+1} failed: {e}')\n        return wrapper\n    return decorator\n\n@timer          # applied second (outer)\n@retry(3)       # applied first (inner)\ndef fetch_data(url):\n    return requests.get(url).json()",
+                dsNote: "The @retry pattern is used in every production data pipeline that calls external APIs. Combine @retry + @timer + @cache for robust, observable data fetching."
+              }
+            ],
+            takeaways: [
+              "Decorators wrap functions — @timer is fn = timer(fn) in shorthand",
+              "Always use @functools.wraps(fn) to preserve the wrapped function's metadata",
+              "Multiple decorators stack bottom-up: @b\\n@a\\ndef f → f = b(a(f))",
+              "Parameterised decorators (@retry(3)) need a factory function that returns the decorator"
+            ]
+          },
         ]
       },
       {
         id: "py-ds",
         title: "Python for Data (NumPy & Pandas)",
         lessons: [
-          { id: "py-d1", title: "NumPy Arrays & Vectorization", duration: "20 min", hasViz: true },
-          { id: "py-d2", title: "Pandas Series & DataFrames", duration: "25 min", hasViz: true },
-          { id: "py-d3", title: "GroupBy, Merge, Pivot", duration: "20 min", hasViz: true },
-          { id: "py-d4", title: "Handling Missing Data", duration: "12 min", hasViz: false },
-          { id: "py-d5", title: "Performance: Vectorize Don't Loop", duration: "15 min", hasViz: true },
+          {
+            id: "py-d1", title: "NumPy Arrays & Vectorization", duration: "20 min", hasViz: true,
+            linkedQuestionId: "py-q16",
+            concepts: [
+              {
+                heading: "Arrays vs Lists: Why NumPy Matters",
+                body: "NumPy arrays store data as contiguous blocks of typed memory (like C arrays). This means math operations run at C speed in vectorized form instead of Python's slow per-element loop. A NumPy operation on 1M elements runs ~100x faster than an equivalent Python list loop.",
+                code: "import numpy as np\n\n# Python list — slow, element-by-element:\nresult = [x * 2 for x in range(1_000_000)]  # ~0.2s\n\n# NumPy — vectorized C operation:\narr = np.arange(1_000_000)\nresult = arr * 2  # ~0.002s — 100x faster\n\n# Array operations work element-wise:\na = np.array([1, 2, 3])\nb = np.array([4, 5, 6])\nprint(a + b)   # [5, 7, 9]\nprint(a * b)   # [4, 10, 18]\nprint(a @ b)   # 32 (dot product)",
+                dsNote: "Every ML library (sklearn, PyTorch, TensorFlow) is built on NumPy arrays. Understanding shape, dtype, and vectorisation is non-negotiable for data science work."
+              },
+              {
+                heading: "Shape, Reshape, and Broadcasting",
+                body: "Arrays have a shape (rows, cols, ...). Reshaping changes the dimensions without copying data. Broadcasting lets NumPy perform operations between arrays of compatible but different shapes — eliminating many loop-heavy patterns.",
+                code: "arr = np.arange(12)\nprint(arr.shape)          # (12,)\narr2d = arr.reshape(3, 4)  # 3 rows, 4 cols\nprint(arr2d.shape)        # (3, 4)\n\n# Broadcasting: subtract row means from each row\nX = np.random.randn(100, 5)  # 100 samples, 5 features\nmeans = X.mean(axis=0)       # shape (5,)\nX_centered = X - means       # (100,5) - (5,) broadcasts!",
+                dsNote: "Broadcasting removes explicit loops from feature normalisation, distance calculations, and attention score computations. X - means normalises a 100×5 matrix in one line."
+              }
+            ],
+            takeaways: [
+              "NumPy arrays are contiguous typed memory — ~100x faster than Python lists for math",
+              "Operations are element-wise by default: a + b, a * b add/multiply per position",
+              "axis=0 reduces along rows (per-column result); axis=1 reduces along cols (per-row result)",
+              "Broadcasting allows operations between compatible shapes without copying data"
+            ]
+          },
+          {
+            id: "py-d2", title: "Pandas Series & DataFrames", duration: "25 min", hasViz: true,
+            linkedQuestionId: "py-q18",
+            concepts: [
+              {
+                heading: "DataFrames Are Labelled 2D Arrays",
+                body: "A pandas DataFrame is a dict of Series (columns) sharing a common index. This gives you both column-name and row-label access. loc uses labels; iloc uses integer positions — never mix them up.",
+                code: "import pandas as pd\ndf = pd.read_csv('orders.csv')\n\n# Column selection:\ndf['amount']         # Series\ndf[['amount','user']]  # DataFrame (list of cols)\n\n# Row selection:\ndf.loc[0]            # row with index label 0\ndf.iloc[0]           # first row by position\ndf.loc[0:3, 'amount']  # rows 0-3, amount column\n\n# Boolean indexing:\nbig_orders = df[df['amount'] > 1000]\ndf.loc[df['status'] == 'completed', 'amount']",
+                dsNote: "loc vs iloc confusion is one of the top pandas interview gotchas. loc is label-based (inclusive on both ends); iloc is position-based (exclusive end, like Python slices)."
+              },
+              {
+                heading: "Apply vs Vectorized Operations",
+                body: "df.apply(fn) runs a Python function row-by-row — it's convenient but slow. Vectorized pandas/numpy operations run in C and are 10-100x faster. Always try vectorised first.",
+                code: "# Slow — apply runs Python loop:\ndf['total'] = df.apply(lambda r: r['price'] * r['qty'], axis=1)\n\n# Fast — vectorized:\ndf['total'] = df['price'] * df['qty']  # 10-100x faster\n\n# String operations — vectorized via .str:\ndf['email_domain'] = df['email'].str.split('@').str[1]\ndf['name_upper'] = df['name'].str.upper()\n\n# Datetime — vectorized via .dt:\ndf['day_of_week'] = df['created_at'].dt.day_name()",
+                dsNote: "In a 10M-row DataFrame, apply() takes ~60s; the vectorised equivalent takes <1s. This difference between a pipeline that times out and one that completes."
+              }
+            ],
+            takeaways: [
+              "loc is label-based (inclusive); iloc is position-based (exclusive end)",
+              "Boolean indexing: df[df['col'] > value] filters rows — the go-to selection method",
+              "Vectorized ops (df['a'] + df['b']) are 10-100x faster than df.apply(lambda...)",
+              "df.dtypes, df.info(), df.describe() are your first three calls on any new dataset"
+            ]
+          },
+          {
+            id: "py-d3", title: "GroupBy, Merge, Pivot", duration: "20 min", hasViz: true,
+            linkedQuestionId: "py-q19",
+            concepts: [
+              {
+                heading: "GroupBy: Split-Apply-Combine",
+                body: "groupby() splits the DataFrame into groups, you apply an aggregation to each group, and pandas combines the results. This is the pandas equivalent of SQL's GROUP BY — and follows the same split-apply-combine pattern.",
+                code: "# SQL: SELECT user_id, COUNT(*), SUM(amount) FROM orders GROUP BY user_id\nresult = df.groupby('user_id').agg(\n    order_count=('order_id', 'count'),\n    total_spend=('amount', 'sum'),\n    avg_order=('amount', 'mean')\n).reset_index()\n\n# Multiple aggregations per group:\ndf.groupby(['country', 'category'])['revenue'].agg(['sum','mean','count'])\n\n# Custom function per group:\ndf.groupby('cohort')['retention'].apply(lambda x: (x > 0.3).mean())",
+                dsNote: "groupby().agg() is the core of cohort analysis, feature aggregation for ML, and business reporting. Master .agg({'col': 'func'}) and .transform() for window-style operations."
+              },
+              {
+                heading: "Merge: Joining DataFrames Like SQL",
+                body: "pd.merge() is SQL JOIN in Python. It supports inner, left, right, and outer joins. Match columns using on= (same name in both) or left_on=/right_on= (different names). Watch for duplicated rows when join keys aren't unique.",
+                code: "# Inner join (only matching rows):\nresult = pd.merge(orders, users, on='user_id', how='inner')\n\n# Left join (keep all orders, add user info where available):\nresult = pd.merge(orders, users, on='user_id', how='left')\n\n# Different column names:\nresult = pd.merge(orders, products,\n    left_on='product_id', right_on='id')\n\n# Diagnose unexpected row count growth:\nprint('Before:', len(orders))\nprint('After:', len(result))  # > before = duplicate keys!",
+                dsNote: "Always print len() before and after a merge in production. A many-to-many join silently multiplies rows — 1M × 1M = 1T rows — and will crash your pipeline."
+              }
+            ],
+            takeaways: [
+              "groupby() follows split-apply-combine: split by key, apply aggregation, combine results",
+              "Use .agg({'col': 'func'}) for multiple different aggregations in one pass",
+              "merge() is SQL JOIN — inner/left/right/outer behaves exactly like SQL",
+              "Always verify row counts after a merge — unexpected growth means duplicate join keys"
+            ]
+          },
+          {
+            id: "py-d4", title: "Handling Missing Data", duration: "12 min", hasViz: false,
+            linkedQuestionId: "py-q20",
+            concepts: [
+              {
+                heading: "NaN is Not None — Know Your Missing Values",
+                body: "pandas uses NaN (float) for numeric missing values and None (Python object) for object columns. They behave differently: NaN propagates in arithmetic, None doesn't. Use pd.isna() / pd.notna() to check both — never == None or == np.nan.",
+                code: "import pandas as pd, numpy as np\n\ndf = pd.DataFrame({'a': [1, np.nan, 3], 'b': ['x', None, 'z']})\n\n# Check for missing:\ndf.isna()           # True where NaN or None\ndf.isna().sum()     # count per column\ndf.isna().mean()    # % missing per column\n\n# This does NOT work:\ndf['a'] == np.nan   # always False!\npd.isna(np.nan)     # True — correct way",
+                dsNote: "np.nan == np.nan is False — NaN is never equal to itself by IEEE 754 definition. Always use pd.isna() or np.isnan() to detect missing values."
+              },
+              {
+                heading: "Imputation Strategy Depends on the Feature",
+                body: "Dropping rows wastes data. Filling with mean works for symmetric distributions. Median is better for skewed data. Forward-fill makes sense for time-series. Predictive imputation is most accurate but expensive.",
+                code: "# Drop rows with any missing:\ndf.dropna()\n# Drop only if ALL values are missing:\ndf.dropna(how='all')\n\n# Fill with statistics:\ndf['age'].fillna(df['age'].median())\n\n# Forward fill for time-series:\ndf['price'].fillna(method='ffill')\n\n# Fill with group median (better than global):\ndf['salary'] = df.groupby('job_title')['salary']\\\n    .transform(lambda x: x.fillna(x.median()))",
+                dsNote: "Group-based imputation (fill with the median for that user's country/job) consistently outperforms global mean imputation in ML models. The feature distribution within groups is tighter."
+              }
+            ],
+            takeaways: [
+              "pd.isna() detects both NaN and None — never use == np.nan (always False)",
+              "df.isna().mean() quickly shows % missing per column",
+              "Mean imputation is wrong for skewed distributions — use median",
+              "Group-based imputation (fill with group median) beats global imputation in ML models"
+            ]
+          },
+          {
+            id: "py-d5", title: "Performance: Vectorize Don't Loop", duration: "15 min", hasViz: true,
+            linkedQuestionId: "py-q30",
+            concepts: [
+              {
+                heading: "The Performance Hierarchy",
+                body: "Operations in pandas have a strict performance hierarchy. From fastest to slowest: vectorised NumPy ops > pandas built-ins > df.apply() column-wise > df.apply(axis=1) row-wise > Python for loop. Most performance problems come from doing row-wise apply when a vectorised solution exists.",
+                code: "import time\n\n# Benchmark on 1M rows:\n# Vectorised: 0.002s\ndf['result'] = df['a'] * df['b']\n\n# Column apply: 0.5s (250x slower)\ndf['result'] = df['a'].apply(lambda x: x * 2)\n\n# Row apply: 5s (2500x slower!)\ndf['result'] = df.apply(lambda r: r['a'] * r['b'], axis=1)\n\n# Python loop: 15s+ (don't do this):\nfor i, row in df.iterrows():\n    df.at[i, 'result'] = row['a'] * row['b']",
+                dsNote: "Most pandas performance bugs are row-wise apply() that could be replaced by vectorised operations. Before any apply(axis=1), ask: 'Can I express this as column operations?'"
+              },
+              {
+                heading: "np.where and np.select for Conditional Logic",
+                body: "np.where(condition, if_true, if_false) is the vectorised ternary — 50-100x faster than apply() for conditional column creation. np.select handles multiple conditions like a vectorised if/elif chain.",
+                code: "# Slow apply for conditional:\ndf['label'] = df['score'].apply(\n    lambda x: 'high' if x > 80 else ('medium' if x > 50 else 'low')\n)\n\n# Fast np.select:\nimport numpy as np\nconditions = [df['score'] > 80, df['score'] > 50]\nchoices    = ['high', 'medium']\ndf['label'] = np.select(conditions, choices, default='low')\n\n# Even simpler binary condition: np.where\ndf['passed'] = np.where(df['score'] > 60, 'pass', 'fail')",
+                dsNote: "np.where is the standard tool for creating boolean flag columns in feature engineering. It processes the entire column in a single C-level operation."
+              }
+            ],
+            takeaways: [
+              "Performance order: vectorised NumPy > pandas built-ins > column apply > row apply > iterrows",
+              "Before any apply(axis=1), ask: can I do this with column operations?",
+              "np.where(cond, a, b) is vectorised ternary — use it instead of apply for flags",
+              "np.select handles multiple conditions vectorised — replaces apply with if/elif chains"
+            ]
+          },
         ]
       }
     ],
