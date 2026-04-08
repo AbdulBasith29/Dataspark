@@ -2,7 +2,7 @@
 
 **Owner:** Product / ops  
 **Sources:** `docs/AGENT-TASKS.md`, `docs/ARCHITECTURE.md`, repo state (landing + Supabase waitlist)  
-**Last updated:** 2026-04-02
+**Last updated:** 2026-04-04
 
 ---
 
@@ -106,5 +106,5 @@ Re-sequence when **Delivery risk** or dependencies change; record changes in `do
 
 ## Notes
 
-- **Current repo:** `src/App.jsx` ships marketing routes only; full platform components exist under `src/app/` — integration item **PO-005** closes the gap between prototype and production routing.
+- **Current repo:** `src/App.jsx` includes `/platform` (full `DataSparkPlatform`) and marketing routes. **PO-005** now means merging polish, data extraction (`src/data/`), and review sign-off—not basic routing.
 - **IDs** are stable: new work gets new `PO-###` IDs; do not renumber retired items (mark **Cancelled** in the decision log instead).

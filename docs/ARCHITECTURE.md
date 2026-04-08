@@ -23,7 +23,7 @@ DataSpark is a comprehensive data science learning + interview prep platform tha
 | # | Course | Topics | Target Lessons | Target Questions |
 |---|--------|--------|----------------|-----------------|
 | 1 | Python Fundamentals | Core syntax, control flow, OOP, NumPy/Pandas | 18 | 40+ |
-| 2 | SQL & Databases | Fundamentals, advanced SQL, DB design | 14 | 40+ |
+| 2 | SQL & Databases | Fundamentals, advanced SQL, DB design | 14 | **34–45** |
 | 3 | Statistics & Probability | Descriptive, probability, inference, applied | 16 | 40+ |
 | 4 | Machine Learning | Foundations, supervised, unsupervised, evaluation | 18 | 40+ |
 | 5 | Deep Learning | NN foundations, architectures (CNN/RNN/Transformer) | 9 | 25+ |
@@ -31,6 +31,8 @@ DataSpark is a comprehensive data science learning + interview prep platform tha
 | 7 | Product Sense & Cases | Metrics, experimentation, business cases | 10 | 30+ |
 | 8 | System Design | Pipeline architecture, ML system design | 8 | 20+ |
 | 9 | MLOps, Cloud & Tools | MLOps, Git, APIs, Docker, cloud, viz | 12 | 25+ |
+
+**Expanded module/subtopic IDs, lesson depth (written tutorials + viz), optional “spoke” tracks, and 18–20 min lesson modules:** see [`docs/CURRICULUM-SCOPE.md`](CURRICULUM-SCOPE.md).
 
 **TOTAL: ~114 lessons, ~285+ questions, 9 AI tutors, 30+ visualizations**
 

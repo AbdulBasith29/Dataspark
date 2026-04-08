@@ -15,7 +15,7 @@ gh repo create dataspark --public --push
 - ✅ Platform prototype V1 (src/app/dataspark-platform.jsx)
 - ✅ Platform prototype V2 — full (src/app/dataspark-full-platform.jsx)
 - ✅ Python question bank — 40 questions (src/data/questions-python.js)
-- ✅ SQL question bank — 40 questions (src/data/questions-sql.js)
+- ✅ SQL question bank — **34–45 questions** (mastery band; `src/data/questions-sql.js`)
 - ✅ Statistics question bank — 40 questions (src/data/questions-statistics.js)
 - ✅ AI tutor system prompts — all 9 courses (src/chatbot/system-prompts.js)
 - ✅ README with full project overview

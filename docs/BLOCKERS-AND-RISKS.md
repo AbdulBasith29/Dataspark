@@ -1,6 +1,6 @@
 # DataSpark — Blockers & Risks
 
-**As-of:** 2026-04-03
+**As-of:** 2026-04-04
 
 ---
 
@@ -8,9 +8,8 @@
 
 | ID | Severity | Description | Owner | Mitigation |
 |----|----------|-------------|--------|------------|
-| B-PLAT-001 | High | Platform experience is not routed into `src/App.jsx` yet (only marketing + preview). | frontend-agent | Frontend adds `/platform` route and renders platform MVP pages. Also add compatibility redirect `/dashboard` -> `/platform`. |
-| B-AI-SEC-001 | High | Tutor/evaluation is not secure: current code may call Anthropic directly in the browser. | chatbot-agent + frontend-agent | Move all Anthropic traffic behind secure server endpoints. Frontend must call only your secure endpoints (no browser API secrets). |
-| B-VID-001 | Medium | No `src/visualizations/` folder/components currently exist; lessons in prototypes reference embedded viz. | viz-agent | Extract/create a minimal set of visualization components for the top lessons. |
+| B-DEPLOY-001 | Medium | Production/staging not verified with `ANTHROPIC_API_KEY` and live `/api/ai/*` on the host (e.g. Vercel). | product-ops + frontend-agent | Deploy preview; hit `/api/ai/chat` and `/api/ai/evaluate`; document URL + env in runbook. |
+| B-CURR-001 | Medium | Practice questions and rubrics are embedded in `dataspark-full-platform.jsx`, not the structured `src/data/questions-*` files from `AGENT-TASKS`. | curriculum-agent | Extract schema-aligned JSON; platform imports banks by `course.id`. |
 
 ---
 
@@ -18,16 +17,19 @@
 
 | ID | Risk | Likelihood | Impact | Mitigation |
 |----|------|------------|--------|------------|
-| R-STACK-001 | Stack drift: orchestration rule examples are Next.js, repo is Vite + React Router | Med | Med | Document Vite assumptions in `EXECUTION-PLAN.md` and keep endpoints Vite-compatible. |
-| R-EVENTS-001 | Analytics table `event_logs` has insert-only RLS; no client reads | Med | Med | Data instrumentation focuses on stable `event_name` writes; dashboard queries stay server-side. |
-| R-MVP-001 | Curriculum may be large (25–40+ per course) for a 2-week sprint | High | High | Phase 0–2 targets MVP quantities (renderable subset) and defers scale to Phase 3+. |
-| R-E2E-001 | No automated E2E tooling in `package.json` | Med | Med | QA uses a manual smoke matrix for Phase 2; propose Playwright in Phase 3+. |
+| R-STACK-001 | Stack drift: orchestrator rule still mentions Next.js; repo is Vite + React Router | Med | Low | Prefer `EXECUTION-PLAN.md` + this file; update rule in a dedicated docs pass. |
+| R-EVENTS-001 | Analytics `event_logs` insert-only RLS | Med | Med | Instrumentation focuses on stable `event_name` writes. |
+| R-MVP-001 | Full curriculum size vs sprint | High | High | MVP = renderable subset + honest copy; scale in Phase 3+. |
+| R-E2E-001 | No Playwright in `package.json` | Med | Med | Manual smoke matrix for Phase 2; automate later. |
+| R-EVAL-001 | Derived rubric is generic until per-question rubrics land | Med | Med | Ship curated rubric arrays per question with PO-001. |
 
 ---
 
-## Resolved (this session)
+## Resolved (recent)
 
 | Item | Resolution |
 |------|------------|
-| Local baseline | `npm run build` + `npm run lint` are green before Phase 0 agent changes |
-
+| B-PLAT-001 | `/platform` routed; `/dashboard` redirects. |
+| B-AI-SEC-001 | No browser Anthropic key path for chat; server handlers + dev middleware. |
+| B-VID-001 | `src/visualizations/` exists with multiple components + tabular SQL joins spec. |
+| Practice AI eval | Submit calls `/api/ai/evaluate`; scorecard renders (fallback when key missing per API). |

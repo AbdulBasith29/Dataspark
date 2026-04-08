@@ -1,6 +1,8 @@
 # DataSpark — Execution DAG & Critical Path (Phase 0–2 Platform Build)
 
-**As-of:** 2026-04-03
+**As-of:** 2026-04-04
+
+**Reality check:** Platform shell, `/api/ai/chat`, `/api/ai/evaluate`, and several viz components are already in-repo; the diagram below is still the **logical** dependency order for formal sign-off (review + QA + orchestrator verdict).
 
 ---
 

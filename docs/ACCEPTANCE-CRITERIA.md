@@ -38,6 +38,7 @@
 5. **Filter/search:** Difficulty filter, tag filter, and search operate on the loaded question list without errors.
 6. **Timer:** Timer can start, stop, and reset without breaking navigation state.
 7. **Responsive:** At ≤768px width, layout is single-column and usable (no horizontal scroll for main content).
+8. **Lesson modules:** Shipped lessons that are marked learner-ready follow **`docs/CURRICULUM-SCOPE.md` §2.1–2.2**: **18–20 minutes** minimum designed engaged time, **1,200–2,000 words** of core prose where a written body exists, and **distinct UI sections** for Learn, Watch or deep-dive fallback, Try (viz/sandbox), and Knowledge check — not a single undifferentiated interactive-only view.
 
 ---
 

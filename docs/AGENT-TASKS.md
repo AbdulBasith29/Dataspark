@@ -4,13 +4,18 @@
 ---
 
 ## DEPT 1: CURRICULUM CONTENT (Agent: curriculum-agent)
-**Mission**: Generate the complete question bank for all 9 courses.
-**Output**: JSON files per course with 25-40+ questions each.
-**Quality Bar**: Every question must have business context, model answer, rubric, hints, tags.
+**Mission**: Generate the complete question bank for all 9 courses **and** align content with the expanded subtopic map and lesson depth spec (data science is broad; learners need both coverage and real tutorials).
+**Output**: JS question modules per course (targets vary by course; see `docs/CURRICULUM-SCOPE.md` §4) **plus** lesson bodies that follow the written-tutorial standard in `docs/CURRICULUM-SCOPE.md`.
+**Quality Bar**: Every question must have business context, model answer, rubric, hints, tags. Every **lesson** must be a **18–20 minute module** (not one short page + one widget): time budget, word count, and blocks in `CURRICULUM-SCOPE.md` §2–2.2; use **`topicId`s from §3** so questions, tutors, and mastery line up.
+
+### Canonical scope
+- **Subtopics & module IDs:** `docs/CURRICULUM-SCOPE.md` (expanded spine + optional spokes per course).
+- **Lesson skeleton (written + viz + exercises):** same doc, §2.
+- **Volume targets:** same doc, §4.
 
 ### Deliverables:
 - `/src/data/questions-python.js` — 40 questions
-- `/src/data/questions-sql.js` — 40 questions
+- `/src/data/questions-sql.js` — **34–45 questions** (mastery band: enough coverage across fundamentals, joins, aggregates, subqueries, windows, CTEs, modeling, performance)
 - `/src/data/questions-statistics.js` — 40 questions
 - `/src/data/questions-ml.js` — 40 questions
 - `/src/data/questions-deep-learning.js` — 25 questions
@@ -18,6 +23,7 @@
 - `/src/data/questions-product-sense.js` — 30 questions
 - `/src/data/questions-system-design.js` — 20 questions
 - `/src/data/questions-mlops.js` — 25 questions
+- **Lesson library (phased)** — manifests + markdown (or equivalent) per course, e.g. `src/data/lessons/<course>.js` + `content/lessons/<courseId>/<lessonId>.md`, each lesson: **`duration` 18–20 min**, outcome, motivation, concepts, worked example, pitfalls, linked visualization id, mini exercise, interview/on-the-job hooks (`docs/CURRICULUM-SCOPE.md` §2–3).
 
 ### Rules:
 1. Every coding question needs a COMPLETE working model answer (not pseudocode)
@@ -27,7 +33,7 @@
 5. Tags must be specific enough to enable filtering
 6. Company context should be realistic (use real company names)
 7. Difficulty distribution per course: 30% Easy, 40% Medium, 30% Hard
-8. Questions should cover ALL subtopics within each course
+8. Questions should cover **all core subtopics** in `docs/CURRICULUM-SCOPE.md` §3 for that course (and spokes where questions exist)
 9. Open-ended questions should have ambiguity — no single right answer
 10. Include "commonMistakes" field with 2-3 typical errors
 
@@ -112,7 +118,7 @@ const MyVisualization = () => {
 ### Deliverables:
 - `/src/pages/HomePage.jsx` — Course grid, stats, progress overview
 - `/src/pages/CoursePage.jsx` — Learn/Practice tabs, topic list, AI tutor button
-- `/src/pages/LessonPage.jsx` — Lesson content, embedded visualizations, mark complete
+- `/src/pages/LessonPage.jsx` — **Sectioned** lesson module (Learn → Watch/deep-dive → Try/interactive → Knowledge check), **18–20 min** duration surfaced in UI, long-form markdown, embedded visualizations, mark complete
 - `/src/pages/QuestionPage.jsx` — Problem display, code editor, submission, model answer reveal, rubric scoring
 - `/src/components/Navigation.jsx` — Sticky nav with course shortcuts
 - `/src/components/DifficultyBadge.jsx` — Reusable difficulty pill
@@ -190,5 +196,5 @@ Each prompt must include:
 - Review Agent → Integrate everything, test, fix, ship
 
 ### Phase 5: Scale
-- Curriculum Agent → Expand to 40+ questions per course
+- Curriculum Agent → Expand each course toward its **mastery target** in `docs/CURRICULUM-SCOPE.md` §4 (e.g. SQL **34–45**)
 - Viz Agent → Build remaining 20 visualizations

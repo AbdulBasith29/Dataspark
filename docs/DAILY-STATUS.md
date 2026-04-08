@@ -1,6 +1,6 @@
 # DataSpark — Daily Status
 
-**Date:** 2026-04-03  
+**Date:** 2026-04-04  
 **Orchestrator:** orchestrator-agent (platform Phase 0–2)
 
 ---
@@ -9,13 +9,15 @@
 
 | Area | Status | Notes |
 |------|--------|--------|
-| Platform mission alignment | Updated | Execution plan + DAG now focus on home/course/lesson/question + tutor wiring |
-| Route decision | Locked | `/platform` is the Phase 0–2 entry route; add compatibility redirect `/dashboard` -> `/platform` |
-| Tutor security | Locked | No Anthropic calls from browser; must use secure server endpoints |
-| Local build (G0) | Green (baseline) | `npm run build` currently expected green; re-check after agent changes |
-| Lint (G1) | Green (baseline) | `npm run lint` currently expected green; re-check after agent changes |
-| Staging deploy | Not verified | Requires product-ops staging URL + env parity |
-| Supabase E2E | Not verified | Waitlist insert + event_logs insert need staging/live keys |
+| Platform route | **Shipped** | `/platform` + `/dashboard` → `/platform` in `src/App.jsx`; full shell in `dataspark-full-platform.jsx` |
+| Marketing ↔ platform visual parity | **Improved** | Shared `DS` tokens, Manrope, glass surfaces, IDE-style practice UI |
+| Tutor security | **Shipped** | Browser calls `POST /api/ai/chat` only; `api/ai/chat.js` + Vite dev middleware (`vite-dev-ai-api.mjs`) |
+| Practice evaluation | **Shipped** | Submit triggers `POST /api/ai/evaluate` with derived rubric; scorecard UI on question view |
+| SQL joins viz | **Shipped** | High-fidelity tabular spec: dual sources + result grid + SQL strip (`SQLJoins.jsx`) |
+| Local build (G0) | Green | Re-run `npm run build` after pulls |
+| Lint (G1) | Green | `dataspark-*.jsx` still eslint-ignored by policy |
+| Staging deploy | Not verified | Vercel env: `ANTHROPIC_API_KEY`; confirm `/api/*` on production |
+| Supabase E2E | Not verified | Waitlist + `event_logs` on target project |
 
 ---
 
@@ -23,30 +25,24 @@
 
 | ID | Owner | Status |
 |----|--------|--------|
-| P0-ORCH | orchestrator-agent | **In planning (this dispatch)** |
-| P0-CURR-DATA-MODEL | curriculum-agent | Pending |
-| P0-FE-FRAMEWORK | frontend-agent | Pending |
-| P0-CHAT-FOUNDATION | chatbot-agent | Pending |
-| P0-DICTIONARY | data-instrumentation-agent | Pending |
-| P0-VIZ-SKELETON | viz-agent | Pending |
-| P0-UI-OPT | ui-optimizer-agent | Pending |
-| P1-CURR-QUESTIONBANKS | curriculum-agent | Pending |
-| P1-FE-PLATFORM | frontend-agent | Pending |
-| P1-CHAT-ENDPOINTS | chatbot-agent | Pending |
-| P1-DI-WIRING | data-instrumentation-agent | Pending |
-| P1-VIZ-COMPONENTS | viz-agent | Pending |
-| P1-UI-POLISH | ui-optimizer-agent | Pending |
+| P0-ORCH | orchestrator-agent | **Active** — docs + integration checkpoints |
+| P0-FE-FRAMEWORK / P1-FE-PLATFORM | frontend-agent | **Partial** — monolithic platform route; page split deferred |
+| P0-CHAT-FOUNDATION / P1-CHAT-ENDPOINTS | chatbot-agent | **Partial** — tutor + evaluate wired; prompts/config present |
+| P0-VIZ-SKELETON / P1-VIZ-COMPONENTS | viz-agent | **Partial** — SQL joins, train/val split, mutability, KMeans, confusion matrix, decision tree + inline labs |
+| P0-CURR-DATA-MODEL | curriculum-agent | Pending — question JSON + per-item rubrics not yet extracted from platform |
+| P0-UI-OPT | ui-optimizer-agent | Partial — UI audit docs landed; more polish in backlog |
 | P2-REVIEW-AND-INTEGRATE | review-agent | Pending |
 | P2-QA-SMOKE | qa-test-agent | Pending |
 | P2-ORCH verdict | orchestrator-agent | Pending |
 
 ---
 
-## Next 24–48h
+## Next 24–48h (orchestrator)
 
-1. Dispatch Phase 0 packets to each agent with strict `file_scope`.
-2. Agents create/extend the assigned deliverables and update their own QA notes in `docs/agents/<agent>/PHASE-0-2.md` (if present).
-3. Orchestrator updates `BLOCKERS-AND-RISKS.md` with any newly discovered integration blockers during Phase 0.
+1. **Curriculum:** Externalize practice questions + rubrics to `src/data/`; keep IDs stable for progress persistence later.
+2. **Viz:** Continue PO-002 — next components from `AGENT-TASKS` Dept 2 list (e.g. LinearRegression, WindowFunctions).
+3. **QA:** Manual smoke: landing → `/platform` → lesson with viz → practice → submit score (with and without `ANTHROPIC_API_KEY`).
+4. **Ops:** Confirm Vercel preview has API routes and document env parity in `BLOCKERS-AND-RISKS.md` when verified.
 
 ---
 
@@ -54,4 +50,5 @@
 
 | Date | Update |
 |------|--------|
+| 2026-04-04 | Post-push orchestration: practice evaluate API wired, docs refreshed, critical-path status updated. |
 | 2026-04-03 | Phase 0–2 platform sprint tasks issued; DAG re-authored for critical path. |

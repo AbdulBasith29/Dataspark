@@ -1,10 +1,43 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import AIChatbot from "../chatbot/AIChatbot.jsx";
 import SQLJoins from "../visualizations/SQLJoins.jsx";
 import TrainValTestSplit from "../visualizations/TrainValTestSplit.jsx";
 import PythonMutabilityViz from "../visualizations/PythonMutabilityViz.jsx";
+import KMeansClustering from "../visualizations/KMeansClustering.jsx";
+import ConfusionMatrix from "../visualizations/ConfusionMatrix.jsx";
+import DecisionTree from "../visualizations/DecisionTree.jsx";
+import LinearRegression from "../visualizations/LinearRegression.jsx";
+import LogisticRegression from "../visualizations/LogisticRegression.jsx";
+import PCA from "../visualizations/PCA.jsx";
+import ROCCurve from "../visualizations/ROCCurve.jsx";
+import WindowFunctions from "../visualizations/WindowFunctions.jsx";
+import FeatureScaling from "../visualizations/FeatureScaling.jsx";
+import NeuralNetwork from "../visualizations/NeuralNetwork.jsx";
+import Attention from "../visualizations/Attention.jsx";
+import BackpropAnimation from "../visualizations/BackpropAnimation.jsx";
+import ActivationFunctions from "../visualizations/ActivationFunctions.jsx";
+import ConvolutionFilter from "../visualizations/ConvolutionFilter.jsx";
+import BayesTheorem from "../visualizations/BayesTheorem.jsx";
+import HypothesisTesting from "../visualizations/HypothesisTesting.jsx";
+import CrossValidation from "../visualizations/CrossValidation.jsx";
+import ABTestSimulator from "../visualizations/ABTestSimulator.jsx";
+import FunnelAnalysis from "../visualizations/FunnelAnalysis.jsx";
+import RegularizationEffect from "../visualizations/RegularizationEffect.jsx";
+import TimeSeriesDecomposition from "../visualizations/TimeSeriesDecomposition.jsx";
+import WordEmbeddings from "../visualizations/WordEmbeddings.jsx";
+import RecSysCollaborativeFiltering from "../visualizations/RecSysCollaborativeFiltering.jsx";
+import BatchVsStreaming from "../visualizations/BatchVsStreaming.jsx";
+import ETLPipeline from "../visualizations/ETLPipeline.jsx";
+import StreamingEnginesTrinity from "../visualizations/StreamingEnginesTrinity.jsx";
+import WarehouseStarSchema from "../visualizations/WarehouseStarSchema.jsx";
+import MLSystemPipeline from "../visualizations/MLSystemPipeline.jsx";
+import FeatureStoreViz from "../visualizations/FeatureStoreViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
+import LessonModule from "../components/platform/LessonModule.jsx";
+import { getResolvedLessonModule } from "../data/lesson-modules.js";
+import { PYTHON_QUESTIONS } from "../data/questions-python.js";
+import { STATISTICS_QUESTIONS } from "../data/questions-statistics.js";
 import { DS, dsGlassCard } from "../lib/ds-platform-tokens.js";
 
 const PlatformLogo = () => (
@@ -17,19 +50,54 @@ const PlatformLogo = () => (
   </svg>
 );
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// DATASPARK — Complete Data Science Learning Platform
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+/** Monogram chip — consistent across OS/fonts (replaces emoji course icons). */
+function CourseMark({ color, mark, size = "lg" }) {
+  const dims = { lg: 52, md: 44, sm: 26 };
+  const dim = dims[size] ?? 52;
+  const fs = mark.length > 4 ? 9 : mark.length > 2 ? 10 : size === "sm" ? 9 : 12;
+  return (
+    <span
+      aria-hidden
+      style={{
+        width: dim,
+        height: dim,
+        minWidth: dim,
+        borderRadius: size === "sm" ? 8 : 13,
+        background: `linear-gradient(145deg, ${color}28, ${color}0a)`,
+        border: `1px solid ${color}50`,
+        boxShadow: size === "sm" ? `0 2px 8px ${color}14` : `0 6px 18px ${color}18`,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: fs,
+        fontWeight: 700,
+        color,
+        letterSpacing: "0.03em",
+        lineHeight: 1,
+        padding: "0 4px",
+        flexShrink: 0,
+        ...(size === "lg" ? { marginBottom: 10 } : {}),
+      }}
+    >
+      {mark}
+    </span>
+  );
+}
 
-// ─── FULL CURRICULUM DATA ────────────────────────────────────────────────────
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+// DATASPARK â€” Complete Data Science Learning Platform
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+
+// â”€â”€â”€ FULL CURRICULUM DATA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const CURRICULUM = [
   {
     id: "python",
     title: "Python Fundamentals",
-    icon: "🐍",
+    mark: "PY",
     color: "#3B82F6",
     accent: "#60A5FA",
-    description: "The foundation of every data science career. Master Python's core — not just syntax, but how to think programmatically.",
+    description: "The foundation of every data science career. Master Python's core â€” not just syntax, but how to think programmatically.",
     topics: [
       {
         id: "py-basics",
@@ -75,18 +143,12 @@ const CURRICULUM = [
         ]
       }
     ],
-    questions: [
-      { id: "pq1", title: "Build a Data Validator Class", difficulty: "Medium", type: "code", prompt: "Create a Python class DataValidator that takes a pandas DataFrame and validates column types, null thresholds, and value ranges based on a config dict. Include proper error reporting.", tags: ["OOP", "pandas", "validation"] },
-      { id: "pq2", title: "Implement a LRU Cache from Scratch", difficulty: "Hard", type: "code", prompt: "Implement a Least Recently Used cache using only Python builtins (no functools). Support get(key) and put(key, value) with O(1) time complexity. Use an OrderedDict or build your own doubly-linked list + dict.", tags: ["data-structures", "algorithms", "OOP"] },
-      { id: "pq3", title: "Refactor This Messy Script", difficulty: "Easy", type: "code", prompt: "Given a 50-line script that reads a CSV, filters rows, calculates stats, and writes output — all in one giant function with no error handling — refactor it into clean, modular, documented Python.", tags: ["clean-code", "refactoring", "functions"] },
-      { id: "pq4", title: "Generator Pipeline for Large Files", difficulty: "Medium", type: "code", prompt: "Write a generator-based pipeline that reads a 10GB CSV file line by line, filters rows where amount > 1000, transforms dates to ISO format, and yields cleaned records without loading the full file into memory.", tags: ["generators", "memory-efficiency", "ETL"] },
-      { id: "pq5", title: "Decorator for Function Timing & Logging", difficulty: "Easy", type: "code", prompt: "Write a decorator @profile that logs the function name, arguments, return value, and execution time. It should work with any function signature.", tags: ["decorators", "logging", "functions"] },
-    ]
+    questions: PYTHON_QUESTIONS,
   },
   {
     id: "sql",
     title: "SQL & Databases",
-    icon: "🗄️",
+    mark: "SQL",
     color: "#0EA5E9",
     accent: "#38BDF8",
     description: "The language of data. From basic queries to advanced window functions, CTEs, and query optimization.",
@@ -117,7 +179,7 @@ const CURRICULUM = [
         id: "sql-design",
         title: "Database Design",
         lessons: [
-          { id: "sq-d1", title: "Normalization: 1NF → 3NF → BCNF", duration: "20 min", hasViz: true },
+          { id: "sq-d1", title: "Normalization: 1NF â†’ 3NF â†’ BCNF", duration: "20 min", hasViz: true },
           { id: "sq-d2", title: "Indexing Strategies", duration: "18 min", hasViz: true },
           { id: "sq-d3", title: "Star Schema vs Snowflake Schema", duration: "15 min", hasViz: true },
           { id: "sq-d4", title: "OLTP vs OLAP: Choosing the Right DB", duration: "12 min", hasViz: true },
@@ -127,7 +189,7 @@ const CURRICULUM = [
     questions: [
       { id: "sqq1", title: "Revenue by Customer Segment", difficulty: "Easy", type: "code", prompt: "Write a query returning each customer segment, unique purchasers, total revenue (completed orders only), and avg order value. Filter to segments with >$10K revenue.", tags: ["joins", "aggregation", "HAVING"] },
       { id: "sqq2", title: "Cohort Retention Analysis", difficulty: "Hard", type: "code", prompt: "Build a monthly cohort retention table showing cohort_month, cohort_size, months_since_signup (0-6), retained_users, and retention_rate for the last 12 months.", tags: ["CTEs", "window-functions", "cohort-analysis"] },
-      { id: "sqq3", title: "Funnel Conversion by City", difficulty: "Medium", type: "code", prompt: "Calculate step-over-step conversion rates for a 5-step funnel (app_open → search → select → confirm → complete) broken down by city for the last 30 days.", tags: ["conditional-aggregation", "funnel", "product-analytics"] },
+      { id: "sqq3", title: "Funnel Conversion by City", difficulty: "Medium", type: "code", prompt: "Calculate step-over-step conversion rates for a 5-step funnel (app_open â†’ search â†’ select â†’ confirm â†’ complete) broken down by city for the last 30 days.", tags: ["conditional-aggregation", "funnel", "product-analytics"] },
       { id: "sqq4", title: "Recursive Org Chart", difficulty: "Hard", type: "code", prompt: "Using a recursive CTE, generate a full org hierarchy showing employee, manager, level, full chain path, and team size (all direct + indirect reports).", tags: ["recursive-CTE", "hierarchy", "self-join"] },
       { id: "sqq5", title: "Running Total with Gaps", difficulty: "Medium", type: "code", prompt: "Calculate daily signups with a running total, day-over-day change, and 7-day moving average. Handle days with zero signups using a date series.", tags: ["window-functions", "date-series", "running-totals"] },
       { id: "sqq6", title: "Duplicate Detection & Cleanup", difficulty: "Easy", type: "code", prompt: "Find duplicate listings (same host_id, title, city), show counts, then write a DELETE keeping only the most recently updated record per group.", tags: ["deduplication", "ROW_NUMBER", "data-quality"] },
@@ -136,10 +198,10 @@ const CURRICULUM = [
   {
     id: "statistics",
     title: "Statistics & Probability",
-    icon: "📐",
+    mark: "STAT",
     color: "#8B5CF6",
     accent: "#A78BFA",
-    description: "The mathematical backbone. Understand distributions, hypothesis testing, and statistical thinking — not just formulas, but intuition.",
+    description: "The mathematical backbone. Understand distributions, hypothesis testing, and statistical thinking â€” not just formulas, but intuition.",
     topics: [
       {
         id: "stat-foundations",
@@ -184,18 +246,12 @@ const CURRICULUM = [
         ]
       }
     ],
-    questions: [
-      { id: "stq1", title: "A/B Test from Scratch (No Libraries)", difficulty: "Hard", type: "code", prompt: "Implement a full A/B test analysis function: conversion rates, z-test, p-value, 95% CI, and sample size calculation — using only math, no scipy.", tags: ["hypothesis-testing", "z-test", "from-scratch"] },
-      { id: "stq2", title: "The PM Says It's Significant at p=0.049", difficulty: "Medium", type: "open-ended", prompt: "Your PM ran 12 A/B tests simultaneously and one came back significant at p=0.049. They want to ship. What do you tell them? Discuss multiple testing, practical significance, and how to communicate this diplomatically.", tags: ["multiple-testing", "communication", "p-values"] },
-      { id: "stq3", title: "Choose the Right Statistical Test", difficulty: "Easy", type: "open-ended", prompt: "Given 5 different scenarios (comparing two means, testing independence, comparing proportions, testing normality, comparing 3+ groups), identify the appropriate test and justify why.", tags: ["test-selection", "fundamentals"] },
-      { id: "stq4", title: "Power Analysis for a Pricing Experiment", difficulty: "Medium", type: "open-ended", prompt: "Your company wants to test a 5% price increase. Current conversion is 12%. How many users per group do you need? What assumptions are you making? What if the CEO wants results in 1 week?", tags: ["power-analysis", "sample-size", "business-context"] },
-      { id: "stq5", title: "Simpson's Paradox in Real Data", difficulty: "Hard", type: "open-ended", prompt: "You find that Drug A has a higher recovery rate overall, but Drug B has a higher rate in every individual subgroup. Explain how this is possible, what you'd recommend, and how you'd present this to a non-technical stakeholder.", tags: ["paradoxes", "confounding", "communication"] },
-    ]
+    questions: STATISTICS_QUESTIONS,
   },
   {
     id: "ml",
     title: "Machine Learning",
-    icon: "🧠",
+    mark: "ML",
     color: "#F59E0B",
     accent: "#FBBF24",
     description: "From linear regression to gradient boosting. Learn to build, evaluate, and deploy ML models that solve real problems.",
@@ -255,7 +311,7 @@ const CURRICULUM = [
   {
     id: "deep-learning",
     title: "Deep Learning",
-    icon: "🔮",
+    mark: "DL",
     color: "#EC4899",
     accent: "#F472B6",
     description: "Neural networks from first principles. Build intuition for architectures, then implement with PyTorch.",
@@ -291,7 +347,7 @@ const CURRICULUM = [
   {
     id: "genai",
     title: "GenAI & LLMs",
-    icon: "✨",
+    mark: "GEN",
     color: "#10B981",
     accent: "#34D399",
     description: "The frontier. Understand how LLMs work, how to build with them, and how to evaluate AI-powered systems.",
@@ -327,7 +383,7 @@ const CURRICULUM = [
   {
     id: "product-sense",
     title: "Product Sense & Business Cases",
-    icon: "📊",
+    mark: "PM",
     color: "#F97316",
     accent: "#FB923C",
     description: "The questions that separate good from great. Metric design, experiment analysis, stakeholder communication, and ambiguity.",
@@ -364,7 +420,7 @@ const CURRICULUM = [
     ],
     questions: [
       { id: "psq1", title: "Slack Huddles: Define Success Metrics", difficulty: "Medium", type: "open-ended", prompt: "Slack is launching Huddles. Define the North Star metric, 3-5 supporting metrics, guardrails, 90-day targets, instrumentation plan, and kill criteria.", tags: ["metrics", "product-launch", "KPIs"] },
-      { id: "psq2", title: "Conversion Dropped 25% — Now What?", difficulty: "Hard", type: "open-ended", prompt: "DoorDash weekend conversion dropped from 32% to 24%. Walk through your investigation: framework, first 5 analyses, hypotheses ranked, distinguishing data issues from real problems, and what you present to the VP by EOD.", tags: ["metric-investigation", "debugging", "stakeholders"] },
+      { id: "psq2", title: "Conversion Dropped 25% â€” Now What?", difficulty: "Hard", type: "open-ended", prompt: "DoorDash weekend conversion dropped from 32% to 24%. Walk through your investigation: framework, first 5 analyses, hypotheses ranked, distinguishing data issues from real problems, and what you present to the VP by EOD.", tags: ["metric-investigation", "debugging", "stakeholders"] },
       { id: "psq3", title: "A/B Test Shows Contradictory Results", difficulty: "Hard", type: "open-ended", prompt: "Netflix A/B test: +5% CTR, -3% viewing hours, +8% titles started. PM wants to ship. Content team is worried. Interpret the results, propose additional analyses, and make a recommendation.", tags: ["AB-testing", "tradeoffs", "experimentation"] },
       { id: "psq4", title: "Build vs Buy: ML Monitoring", difficulty: "Medium", type: "open-ended", prompt: "Team of 6, patchwork monitoring. Evaluate build vs buy for ML monitoring. Cover decision criteria, cost comparison, hidden costs, recommendation, and executive presentation.", tags: ["build-vs-buy", "decision-framework", "communication"] },
     ]
@@ -372,7 +428,7 @@ const CURRICULUM = [
   {
     id: "system-design",
     title: "System Design & Architecture",
-    icon: "🏗️",
+    mark: "SYS",
     color: "#6366F1",
     accent: "#818CF8",
     description: "How to design data systems that scale. Pipelines, ML infrastructure, and the architecture decisions interviewers love to ask.",
@@ -400,14 +456,14 @@ const CURRICULUM = [
     ],
     questions: [
       { id: "sdq1", title: "Real-Time Fraud Detection Pipeline", difficulty: "Hard", type: "open-ended", prompt: "Design a fraud detection pipeline: 10K TPS, <500ms latency, rules + ML, cold start handling, 3x scaling for Black Friday, audit trail. Cover architecture, tech choices, model updates, monitoring, phased rollout.", tags: ["streaming", "fraud", "architecture"] },
-      { id: "sdq2", title: "Recommendation System for 400M Users", difficulty: "Hard", type: "open-ended", prompt: "Design a multi-stage recommendation pipeline: candidate gen → ranking → re-ranking. Cover embedding strategy, explore/exploit, offline vs online evaluation, real-time personalization, and cold-start.", tags: ["recommendations", "scale", "ML-systems"] },
+      { id: "sdq2", title: "Recommendation System for 400M Users", difficulty: "Hard", type: "open-ended", prompt: "Design a multi-stage recommendation pipeline: candidate gen â†’ ranking â†’ re-ranking. Cover embedding strategy, explore/exploit, offline vs online evaluation, real-time personalization, and cold-start.", tags: ["recommendations", "scale", "ML-systems"] },
       { id: "sdq3", title: "Data Warehouse Migration Plan", difficulty: "Medium", type: "open-ended", prompt: "Migrate from Postgres to cloud warehouse. 5TB data, 300 dbt models, 50 Looker dashboards, team of 7. Cover warehouse choice, migration strategy, zero downtime, validation, dbt changes, timeline.", tags: ["migration", "data-warehouse", "dbt"] },
     ]
   },
   {
     id: "mlops",
     title: "MLOps, Cloud & Tools",
-    icon: "⚙️",
+    mark: "OPS",
     color: "#64748B",
     accent: "#94A3B8",
     description: "The engineering skills that make you production-ready. CI/CD for ML, cloud services, Git, APIs, and environments.",
@@ -445,17 +501,17 @@ const CURRICULUM = [
     ],
     questions: [
       { id: "moq1", title: "Design a CI/CD Pipeline for ML", difficulty: "Medium", type: "open-ended", prompt: "Design a CI/CD pipeline for an ML model: include linting, testing, data validation, model training, evaluation gates, staging deployment, canary release, and rollback strategy.", tags: ["CI/CD", "MLOps", "deployment"] },
-      { id: "moq2", title: "Your Model is Drifting — Now What?", difficulty: "Medium", type: "open-ended", prompt: "You get an alert that your production model's prediction distribution has shifted significantly from training. Walk through your response: investigation, diagnosis, short-term fix, long-term prevention.", tags: ["monitoring", "drift", "production"] },
+      { id: "moq2", title: "Your Model is Drifting â€” Now What?", difficulty: "Medium", type: "open-ended", prompt: "You get an alert that your production model's prediction distribution has shifted significantly from training. Walk through your response: investigation, diagnosis, short-term fix, long-term prevention.", tags: ["monitoring", "drift", "production"] },
       { id: "moq3", title: "Build a Model Serving API", difficulty: "Easy", type: "code", prompt: "Build a FastAPI endpoint that loads a trained sklearn model, accepts JSON input, validates it with Pydantic, returns predictions with confidence scores, and handles errors gracefully.", tags: ["FastAPI", "deployment", "API"] },
     ]
   },
   {
     id: "specialized",
     title: "Specialized AI",
-    icon: "🎯",
+    mark: "ADV",
     color: "#EF4444",
     accent: "#F87171",
-    description: "Deep dives into recommendation engines, time series analysis, and NLP — the specialized skills that make you stand out.",
+    description: "Deep dives into recommendation engines, time series analysis, and NLP â€” the specialized skills that make you stand out.",
     topics: [
       {
         id: "spec-recsys",
@@ -496,7 +552,7 @@ const CURRICULUM = [
   }
 ];
 
-// ─── INTERACTIVE VISUALIZATIONS ──────────────────────────────────────────────
+// â”€â”€â”€ INTERACTIVE VISUALIZATIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const NormalDistViz = () => {
   const canvasRef = useRef(null);
@@ -600,7 +656,7 @@ const NormalDistViz = () => {
       ctx.fillStyle = "#F59E0B";
       ctx.font = "bold 22px 'JetBrains Mono'";
       ctx.textAlign = "center";
-      ctx.fillText(`μ = ${mean.toFixed(1)}`, meanX, 30);
+      ctx.fillText(`Î¼ = ${mean.toFixed(1)}`, meanX, 30);
 
       animRef.current = requestAnimationFrame(draw);
     };
@@ -611,15 +667,15 @@ const NormalDistViz = () => {
   return (
     <>
       <div style={{ fontSize: 17, fontWeight: 700, color: DS.t1, marginBottom: 4, fontFamily: "var(--ds-sans), sans-serif" }}>Normal distribution explorer</div>
-      <div style={{ fontSize: 12, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 16, lineHeight: 1.55 }}>Drag the sliders to see how μ and σ change the shape — same family as the landing “systems” story: intuition first.</div>
+      <div style={{ fontSize: 12, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 16, lineHeight: 1.55 }}>Drag the sliders to see how Î¼ and Ïƒ change the shape â€” same family as the landing â€œsystemsâ€ story: intuition first.</div>
       <canvas ref={canvasRef} style={{ width: "100%", height: 280, borderRadius: 12, border: `1px solid ${DS.border}`, background: "rgba(255,255,255,0.02)" }} />
       <div style={{ display: "flex", gap: 24, marginTop: 16 }}>
         <label style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Mean (μ): {mean.toFixed(1)}</div>
+          <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Mean (Î¼): {mean.toFixed(1)}</div>
           <input type="range" min={-3} max={3} step={0.1} value={mean} onChange={e => setMean(+e.target.value)} style={{ width: "100%", accentColor: DS.indB }} />
         </label>
         <label style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Std Dev (σ): {stdDev.toFixed(1)}</div>
+          <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Std Dev (Ïƒ): {stdDev.toFixed(1)}</div>
           <input type="range" min={0.3} max={3} step={0.1} value={stdDev} onChange={e => setStdDev(+e.target.value)} style={{ width: "100%", accentColor: DS.ind }} />
         </label>
       </div>
@@ -729,13 +785,13 @@ const GradientDescentViz = () => {
     ctx.fillText(`x = ${ballPos.toFixed(2)}`, 20, 36);
     ctx.fillText(`f(x) = ${f(ballPos).toFixed(2)}`, 20, 62);
     ctx.fillStyle = "#10B981";
-    ctx.fillText(`∇f = ${df(ballPos).toFixed(2)}`, 20, 88);
+    ctx.fillText(`âˆ‡f = ${df(ballPos).toFixed(2)}`, 20, 88);
   }, [ballPos, trail]);
 
   return (
     <>
       <div style={{ fontSize: 17, fontWeight: 700, color: DS.t1, marginBottom: 4, fontFamily: "var(--ds-sans), sans-serif" }}>Gradient descent in action</div>
-      <div style={{ fontSize: 12, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 16, lineHeight: 1.55 }}>Watch the ball roll downhill following the gradient — learning rate is the step size.</div>
+      <div style={{ fontSize: 12, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 16, lineHeight: 1.55 }}>Watch the ball roll downhill following the gradient â€” learning rate is the step size.</div>
       <canvas ref={canvasRef} style={{ width: "100%", height: 250, borderRadius: 12, border: `1px solid ${DS.border}`, background: "rgba(255,255,255,0.02)" }} />
       <div style={{ display: "flex", gap: 16, marginTop: 16, alignItems: "flex-end", flexWrap: "wrap" }}>
         <label style={{ flex: 1, minWidth: 160 }}>
@@ -787,7 +843,7 @@ const BiasVarianceViz = () => {
       ctx.fillText(label, toX(labelX) + 8, toY(fn(labelX)) - 10);
     };
 
-    drawCurve(bias, "#3B82F6", "Bias²", 1);
+    drawCurve(bias, "#3B82F6", "BiasÂ²", 1);
     drawCurve(variance, "#EF4444", "Variance", 8);
     drawCurve(total, "#F59E0B", "Total Error", 6);
 
@@ -815,17 +871,17 @@ const BiasVarianceViz = () => {
     ctx.fillStyle = "#64748B";
     ctx.font = "16px 'JetBrains Mono'";
     ctx.textAlign = "center";
-    ctx.fillText("Simple ← Model Complexity → Complex", W / 2, H - 6);
+    ctx.fillText("Simple â† Model Complexity â†’ Complex", W / 2, H - 6);
   }, [complexity]);
 
   return (
     <>
-      <div style={{ fontSize: 17, fontWeight: 700, color: DS.t1, marginBottom: 4, fontFamily: "var(--ds-sans), sans-serif" }}>Bias–variance tradeoff</div>
-      <div style={{ fontSize: 12, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 16, lineHeight: 1.55 }}>Drag complexity — the landing page promises reasoning, not memorization; this is the core tension behind that.</div>
+      <div style={{ fontSize: 17, fontWeight: 700, color: DS.t1, marginBottom: 4, fontFamily: "var(--ds-sans), sans-serif" }}>Biasâ€“variance tradeoff</div>
+      <div style={{ fontSize: 12, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 16, lineHeight: 1.55 }}>Drag complexity â€” the landing page promises reasoning, not memorization; this is the core tension behind that.</div>
       <canvas ref={canvasRef} style={{ width: "100%", height: 250, borderRadius: 12, border: `1px solid ${DS.border}`, background: "rgba(255,255,255,0.02)" }} />
       <label style={{ display: "block", marginTop: 16 }}>
         <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>
-          Model complexity: {complexity.toFixed(1)} — {complexity < 3 ? "Underfitting (high bias)" : complexity > 6 ? "Overfitting (high variance)" : "Good balance"}
+          Model complexity: {complexity.toFixed(1)} â€” {complexity < 3 ? "Underfitting (high bias)" : complexity > 6 ? "Overfitting (high variance)" : "Good balance"}
         </div>
         <input type="range" min={0.5} max={9.5} step={0.1} value={complexity} onChange={e => setComplexity(+e.target.value)} style={{ width: "100%", accentColor: DS.grn }} />
       </label>
@@ -834,14 +890,83 @@ const BiasVarianceViz = () => {
 };
 
 const VISUALIZATIONS = {
+  "st-p1": BayesTheorem,
+  "st-i1": HypothesisTesting,
+  "st-a1": ABTestSimulator,
   "st-p2": NormalDistViz,
+  "dl-f1": NeuralNetwork,
+  "dl-f2": BackpropAnimation,
+  "dl-f3": ActivationFunctions,
   "dl-f4": GradientDescentViz,
+  "dl-a1": ConvolutionFilter,
+  "dl-f5": RegularizationEffect,
   "ml-f2": BiasVarianceViz,
   "ml-f3": TrainValTestSplit,
+  "ml-f5": FeatureScaling,
+  "ml-s1": LinearRegression,
+  "ml-s2": LogisticRegression,
+  "ml-s3": DecisionTree,
+  "ml-u1": KMeansClustering,
+  "ml-u3": PCA,
+  "ml-e1": ConfusionMatrix,
+  "ml-e2": ROCCurve,
+  "ml-e3": CrossValidation,
   "st-f2": NormalDistViz,
   "sq-b2": SQLJoins,
+  "sq-a1": WindowFunctions,
+  "ga-f2": WordEmbeddings,
+  "ga-f3": Attention,
+  "ps-e1": ABTestSimulator,
+  "ps-m4": FunnelAnalysis,
+  "sp-t1": TimeSeriesDecomposition,
+  "sp-r1": RecSysCollaborativeFiltering,
+  "sp-n2": WordEmbeddings,
   "py-b3": PythonMutabilityViz,
+  "sd-p1": BatchVsStreaming,
+  "sd-p2": ETLPipeline,
+  "sd-p3": StreamingEnginesTrinity,
+  "sd-p4": WarehouseStarSchema,
+  "sd-m1": MLSystemPipeline,
+  "sd-m2": FeatureStoreViz,
+  "sd-m3": BatchVsStreaming,
+  "sd-m4": RecSysCollaborativeFiltering,
 };
+
+const ML_VIZ_FALLBACK = [
+  BiasVarianceViz,
+  TrainValTestSplit,
+  FeatureScaling,
+  LinearRegression,
+  LogisticRegression,
+  DecisionTree,
+  KMeansClustering,
+  PCA,
+  ConfusionMatrix,
+  ROCCurve,
+];
+
+function mlVizFallbackForLesson(lessonId) {
+  let h = 0;
+  for (let i = 0; i < lessonId.length; i++) h = (h * 31 + lessonId.charCodeAt(i)) | 0;
+  return ML_VIZ_FALLBACK[Math.abs(h) % ML_VIZ_FALLBACK.length];
+}
+
+const SD_VIZ_FALLBACK = [
+  BatchVsStreaming,
+  ETLPipeline,
+  StreamingEnginesTrinity,
+  WarehouseStarSchema,
+  MLSystemPipeline,
+  FeatureStoreViz,
+  RecSysCollaborativeFiltering,
+  FunnelAnalysis,
+];
+
+function sdVizFallbackForLesson(lessonId) {
+  let h = 0;
+  for (let i = 0; i < lessonId.length; i++) h = (h * 31 + lessonId.charCodeAt(i)) | 0;
+  return SD_VIZ_FALLBACK[Math.abs(h) % SD_VIZ_FALLBACK.length];
+}
 
 /** When a lesson is marked hasViz but has no bespoke component, show a course-appropriate interactive. */
 function resolveLessonVizComponent(lessonId, courseId, hasViz) {
@@ -849,17 +974,30 @@ function resolveLessonVizComponent(lessonId, courseId, hasViz) {
   if (direct) return direct;
   if (!hasViz) return null;
   if (courseId === "statistics") return NormalDistViz;
-  if (courseId === "ml") return BiasVarianceViz;
+  if (courseId === "ml") return mlVizFallbackForLesson(lessonId);
   if (courseId === "deep-learning") return GradientDescentViz;
   if (courseId === "sql") return SQLJoins;
   if (courseId === "python") return PythonMutabilityViz;
+  if (courseId === "system-design") return sdVizFallbackForLesson(lessonId);
   return null;
 }
 
-// ─── AI CHATBOT COMPONENT ────────────────────────────────────────────────────
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”€â”€â”€ AI CHATBOT COMPONENT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 // MAIN APP
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+
+const DEFAULT_PRACTICE_RUBRIC = [
+  "Addresses the core question directly",
+  "Shows structured reasoning",
+  "Mentions relevant tradeoffs or edge cases",
+  "Uses correct terminology for the domain",
+];
+
+function rubricForPracticeQuestion(q) {
+  if (Array.isArray(q?.rubric) && q.rubric.length > 0) return q.rubric;
+  return DEFAULT_PRACTICE_RUBRIC;
+}
 
 export default function DataSparkPlatform() {
   const [view, setView] = useState("home");
@@ -873,17 +1011,50 @@ export default function DataSparkPlatform() {
   const [progress, setProgress] = useState({});
   const [courseTab, setCourseTab] = useState("learn");
   const [diffFilter, setDiffFilter] = useState("All");
+  const [evalLoading, setEvalLoading] = useState(false);
+  const [evalError, setEvalError] = useState(null);
+  const [evalResult, setEvalResult] = useState(null);
 
   const totalLessons = CURRICULUM.reduce((a, c) => a + c.topics.reduce((b, t) => b + t.lessons.length, 0), 0);
   const totalQuestions = CURRICULUM.reduce((a, c) => a + c.questions.length, 0);
   const completedLessons = Object.keys(progress).filter(k => progress[k] === "done").length;
+
+  const submitPracticeAnswer = useCallback(async () => {
+    if (!activeQuestion || !userAnswer.trim()) return;
+    setSubmitted(true);
+    setEvalLoading(true);
+    setEvalError(null);
+    setEvalResult(null);
+    const rubric = rubricForPracticeQuestion(activeQuestion);
+    try {
+      const res = await fetch("/api/ai/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionPrompt: `${activeQuestion.title}\n\n${activeQuestion.prompt}`,
+          userAnswer: userAnswer.trim(),
+          rubric,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEvalError(typeof data?.error === "string" ? data.error : "Evaluation failed");
+        return;
+      }
+      setEvalResult(data);
+    } catch {
+      setEvalError("Could not reach the evaluator. Check your connection or try again.");
+    } finally {
+      setEvalLoading(false);
+    }
+  }, [activeQuestion, userAnswer]);
 
   const diffBadge = (d) => {
     const c = { Easy: DS.grn, Medium: "#F59E0B", Hard: "#EF4444" };
     return <span style={{ background: `${c[d]}18`, color: c[d], padding: "3px 10px", borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", border: `1px solid ${c[d]}35`, fontFamily: "var(--ds-mono), monospace" }}>{d}</span>;
   };
 
-  // ─── HOME VIEW ─────────────────────────────────────────────────────────────
+  // â”€â”€â”€ HOME VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const renderHome = () => (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 clamp(16px, 4vw, 28px)" }}>
       <div style={{ textAlign: "center", padding: "48px 0 40px" }}>
@@ -966,8 +1137,8 @@ export default function DataSparkPlatform() {
             >
               <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${course.color}, ${DS.ind}40, transparent)` }} />
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                <span style={{ fontSize: 28 }}>{course.icon}</span>
-                <span style={{ fontSize: 10, color: DS.dim, fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>{lessonCount} lessons · {course.questions.length} Qs</span>
+                <CourseMark color={course.color} mark={course.mark} size="lg" />
+                <span style={{ fontSize: 10, color: DS.dim, fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>{lessonCount} lessons Â· {course.questions.length} Qs</span>
               </div>
               <div style={{ fontSize: 17, fontWeight: 700, color: DS.t1, fontFamily: "var(--ds-sans), sans-serif", marginBottom: 8 }}>{course.title}</div>
               <div style={{ fontSize: 13, color: DS.t3, lineHeight: 1.55, fontFamily: "var(--ds-sans), sans-serif", marginBottom: 14, minHeight: 44 }}>{course.description}</div>
@@ -988,17 +1159,17 @@ export default function DataSparkPlatform() {
     </div>
   );
 
-  // ─── COURSE VIEW ───────────────────────────────────────────────────────────
+  // â”€â”€â”€ COURSE VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const renderCourse = () => {
     if (!activeCourse) return null;
     const c = activeCourse;
 
     return (
       <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 clamp(16px, 4vw, 28px)" }}>
-        <button type="button" onClick={() => setView("home")} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>← All courses</button>
+        <button type="button" onClick={() => setView("home")} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>â† All courses</button>
 
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 8 }}>
-          <span style={{ fontSize: 36 }}>{c.icon}</span>
+          <CourseMark color={c.color} mark={c.mark} size="md" />
           <div>
             <h1 style={{ fontSize: "clamp(22px, 4vw, 30px)", fontWeight: 800, color: DS.t1, margin: 0, letterSpacing: "-0.02em" }}>{c.title}</h1>
             <p style={{ fontSize: 14, color: DS.t3, margin: "6px 0 0", fontWeight: 400, lineHeight: 1.55, maxWidth: 640 }}>{c.description}</p>
@@ -1049,7 +1220,7 @@ export default function DataSparkPlatform() {
                             display: "flex", alignItems: "center", justifyContent: "center",
                             fontSize: 12, color: isDone ? DS.grn : DS.dim, fontWeight: 700, fontFamily: "var(--ds-mono), monospace",
                           }}>
-                            {isDone ? "✓" : li + 1}
+                            {isDone ? "âœ“" : li + 1}
                           </div>
                           <div>
                             <div style={{ fontSize: 14, fontWeight: 600, color: DS.t1 }}>{lesson.title}</div>
@@ -1085,8 +1256,8 @@ export default function DataSparkPlatform() {
                   key={q.id}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveQuestion(q); setUserAnswer(""); setSubmitted(false); setShowModel(false); setView("question"); } }}
-                  onClick={() => { setActiveQuestion(q); setUserAnswer(""); setSubmitted(false); setShowModel(false); setView("question"); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveQuestion(q); setUserAnswer(""); setSubmitted(false); setShowModel(false); setEvalLoading(false); setEvalResult(null); setEvalError(null); setView("question"); } }}
+                  onClick={() => { setActiveQuestion(q); setUserAnswer(""); setSubmitted(false); setShowModel(false); setEvalLoading(false); setEvalResult(null); setEvalError(null); setView("question"); }}
                   style={{
                     ...dsGlassCard({ padding: "16px 18px", cursor: "pointer", transition: "border-color 0.2s" }),
                   }}
@@ -1097,7 +1268,7 @@ export default function DataSparkPlatform() {
                     <div>
                       <div style={{ fontSize: 15, fontWeight: 600, color: DS.t1, marginBottom: 6 }}>{q.title}</div>
                       <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                        {q.tags.map(t => <span key={t} style={{ fontSize: 9, padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: DS.t3, fontFamily: "var(--ds-mono), monospace", border: `1px solid ${DS.border}` }}>{t}</span>)}
+                        {(q.tags || []).map(t => <span key={t} style={{ fontSize: 9, padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: DS.t3, fontFamily: "var(--ds-mono), monospace", border: `1px solid ${DS.border}` }}>{t}</span>)}
                       </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
@@ -1114,7 +1285,7 @@ export default function DataSparkPlatform() {
     );
   };
 
-  // ─── LESSON VIEW ───────────────────────────────────────────────────────────
+  // â”€â”€â”€ LESSON VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const renderLesson = () => {
     if (!activeLesson || !activeCourse) return null;
     const VizComponent = resolveLessonVizComponent(
@@ -1122,81 +1293,34 @@ export default function DataSparkPlatform() {
       activeCourse.id,
       activeLesson.hasViz,
     );
+    const moduleSpec = getResolvedLessonModule(activeLesson, activeCourse);
 
     return (
-      <div style={{ maxWidth: 820, margin: "0 auto", padding: "0 clamp(16px, 4vw, 28px)" }}>
-        <button type="button" onClick={() => setView("course")} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>← Back to {activeCourse.title}</button>
-
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 10, color: activeCourse.accent, fontFamily: "var(--ds-mono), monospace", textTransform: "uppercase", letterSpacing: "0.14em", marginBottom: 6 }}>{activeCourse.title} · {activeLesson.duration}</div>
-          <h1 style={{ fontSize: "clamp(22px, 4vw, 28px)", fontWeight: 800, color: DS.t1, margin: 0, letterSpacing: "-0.02em" }}>{activeLesson.title}</h1>
-        </div>
-
-        {/* Visualization */}
-        {VizComponent && (
-          <div style={{ marginBottom: 28 }}>
-            <VizLabShell accent={activeCourse.accent} accentSoft={`${activeCourse.color}14`}>
-              <VizComponent />
-            </VizLabShell>
-          </div>
-        )}
-
-        {!VizComponent && activeLesson.hasViz && (
-          <div style={{
-            ...dsGlassCard(),
-            border: `1px dashed ${activeCourse.color}35`,
-            padding: "36px 28px",
-            textAlign: "center",
-            marginBottom: 28,
-          }}>
-            <div style={{ fontSize: 10, color: activeCourse.accent, fontFamily: "var(--ds-mono), monospace", fontWeight: 700, letterSpacing: 1.4, marginBottom: 10 }}>INTERACTIVE LAB · COMING SOON</div>
-            <div style={{ fontSize: 36, marginBottom: 12, opacity: 0.85 }}>◇</div>
-            <div style={{ fontSize: 17, fontWeight: 700, color: DS.t1, fontFamily: "var(--ds-sans), sans-serif", marginBottom: 6 }}>Visualization in production</div>
-            <div style={{ fontSize: 13, color: DS.t3, fontFamily: "var(--ds-mono), monospace", lineHeight: 1.55, maxWidth: 400, margin: "0 auto" }}>We are shipping more interactive diagrams for this topic. Use the AI tutor below to explore the concept now.</div>
-          </div>
-        )}
-
-        <div style={{ ...dsGlassCard({ padding: "26px 24px", marginBottom: 24 }) }}>
-          <div style={{ fontSize: 10, color: DS.ind, fontFamily: "var(--ds-mono), monospace", fontWeight: 700, letterSpacing: "0.12em", marginBottom: 12 }}>LESSON OVERVIEW</div>
-          <div style={{ fontSize: 15, color: DS.t2, lineHeight: 1.75, fontWeight: 400 }}>
-            <p style={{ marginBottom: 16 }}>This lesson covers <strong style={{ color: DS.t1 }}>{activeLesson.title}</strong> in depth. The full content includes conceptual explanations, worked examples, common pitfalls, and practical applications in data science contexts.</p>
-            <p style={{ marginBottom: 16 }}>Each concept is broken down with <span style={{ color: activeCourse.accent }}>visual aids</span> and real-world analogies to build true intuition — not just memorization of formulas or syntax.</p>
-            <p>After completing this lesson, test your understanding with the practice questions in the <strong style={{ color: DS.t1 }}>Practice</strong> tab, or ask the <strong style={{ color: DS.t1 }}>AI tutor</strong> to explain anything that is unclear.</p>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", gap: 10, marginBottom: 40, flexWrap: "wrap" }}>
-          <button
-            type="button"
-            onClick={() => { setProgress(p => ({ ...p, [activeLesson.id]: "done" })); setView("course"); }}
-            style={{
-              flex: 1, minWidth: 200, background: DS.indB, border: "none", borderRadius: DS.radiusSm, padding: "14px 0", color: "#fff", fontSize: 14,
-              fontWeight: 700, cursor: "pointer", fontFamily: "var(--ds-sans), sans-serif", boxShadow: DS.shadowCta,
-            }}>
-            Mark complete & continue →
-          </button>
-          <button
-            type="button"
-            onClick={() => setChatbotCourse(activeCourse)}
-            style={{
-              background: "rgba(255,255,255,0.04)", border: `1px solid ${DS.border}`, borderRadius: DS.radiusSm, padding: "14px 22px",
-              color: DS.t1, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "var(--ds-sans), sans-serif",
-            }}>
-            Ask tutor
-          </button>
-        </div>
-      </div>
+      <LessonModule
+        course={activeCourse}
+        lesson={activeLesson}
+        moduleSpec={moduleSpec}
+        VizComponent={VizComponent}
+        vizComingSoon={!VizComponent && !!activeLesson.hasViz}
+        onBack={() => setView("course")}
+        backLabel={`â† Back to ${activeCourse.title}`}
+        onMarkComplete={() => {
+          setProgress((p) => ({ ...p, [activeLesson.id]: "done" }));
+          setView("course");
+        }}
+        onAskTutor={() => setChatbotCourse(activeCourse)}
+      />
     );
   };
 
-  // ─── QUESTION VIEW ─────────────────────────────────────────────────────────
+  // â”€â”€â”€ QUESTION VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const renderQuestion = () => {
     if (!activeQuestion || !activeCourse) return null;
     const q = activeQuestion;
 
     return (
       <div style={{ maxWidth: 860, margin: "0 auto", padding: "0 clamp(16px, 4vw, 28px)" }}>
-        <button type="button" onClick={() => { setCourseTab("practice"); setView("course"); }} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>← Back to practice</button>
+        <button type="button" onClick={() => { setCourseTab("practice"); setView("course"); }} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>â† Back to practice</button>
 
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -1205,7 +1329,7 @@ export default function DataSparkPlatform() {
           </div>
           <h1 style={{ fontSize: "clamp(20px, 3.5vw, 26px)", fontWeight: 800, color: DS.t1, margin: 0, letterSpacing: "-0.02em" }}>{q.title}</h1>
           <div style={{ display: "flex", gap: 5, marginTop: 8, flexWrap: "wrap" }}>
-            {q.tags.map(t => <span key={t} style={{ fontSize: 9, padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: DS.t3, fontFamily: "var(--ds-mono), monospace", border: `1px solid ${DS.border}` }}>{t}</span>)}
+            {(q.tags || []).map(t => <span key={t} style={{ fontSize: 9, padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: DS.t3, fontFamily: "var(--ds-mono), monospace", border: `1px solid ${DS.border}` }}>{t}</span>)}
           </div>
         </div>
 
@@ -1218,7 +1342,7 @@ export default function DataSparkPlatform() {
         <textarea
           value={userAnswer}
           onChange={e => setUserAnswer(e.target.value)}
-          placeholder={q.type === "code" ? "Write your code here..." : "Write your answer — explain your reasoning, tradeoffs, and approach..."}
+          placeholder={q.type === "code" ? "Write your code here..." : "Write your answer â€” explain your reasoning, tradeoffs, and approach..."}
           disabled={submitted}
           style={{
             width: "100%", minHeight: 280, background: "rgba(255,255,255,0.03)", border: `1px solid ${DS.border}`,
@@ -1232,15 +1356,15 @@ export default function DataSparkPlatform() {
           {!submitted && (
             <button
               type="button"
-              onClick={() => setSubmitted(true)}
-              disabled={!userAnswer.trim()}
+              onClick={() => void submitPracticeAnswer()}
+              disabled={!userAnswer.trim() || evalLoading}
               style={{
-                flex: 1, minWidth: 160, background: userAnswer.trim() ? DS.indB : "rgba(255,255,255,0.06)",
-                border: "none", borderRadius: DS.radiusSm, padding: "14px 0", color: userAnswer.trim() ? "#fff" : DS.dim,
-                fontSize: 14, fontWeight: 700, cursor: userAnswer.trim() ? "pointer" : "not-allowed", fontFamily: "var(--ds-sans), sans-serif",
-                boxShadow: userAnswer.trim() ? DS.shadowCta : "none",
+                flex: 1, minWidth: 160, background: userAnswer.trim() && !evalLoading ? DS.indB : "rgba(255,255,255,0.06)",
+                border: "none", borderRadius: DS.radiusSm, padding: "14px 0", color: userAnswer.trim() && !evalLoading ? "#fff" : DS.dim,
+                fontSize: 14, fontWeight: 700, cursor: userAnswer.trim() && !evalLoading ? "pointer" : "not-allowed", fontFamily: "var(--ds-sans), sans-serif",
+                boxShadow: userAnswer.trim() && !evalLoading ? DS.shadowCta : "none",
               }}>
-              Submit answer
+              Submit & score
             </button>
           )}
           {submitted && !showModel && (
@@ -1265,6 +1389,47 @@ export default function DataSparkPlatform() {
           </button>
         </div>
 
+        {(submitted || evalLoading) && (
+          <div style={{ ...dsGlassCard({ padding: "20px 22px", marginBottom: 20, border: `1px solid ${DS.indB}40` }) }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: DS.ind, fontFamily: "var(--ds-mono), monospace", letterSpacing: "0.12em", marginBottom: 12 }}>
+              AI SCORECARD
+            </div>
+            {evalLoading && <p style={{ color: DS.t3, fontSize: 14 }}>Scoring your answerâ€¦</p>}
+            {evalError && <p style={{ color: "#FCA5A5", fontSize: 14 }}>{evalError}</p>}
+            {evalResult && !evalLoading && (
+              <>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginBottom: 14, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 36, fontWeight: 800, color: DS.t1 }}>{Math.round(evalResult.score)}</span>
+                  <span style={{ color: DS.t3, fontFamily: "var(--ds-mono), monospace", fontSize: 13 }}>{evalResult.totalScore}</span>
+                </div>
+                <p style={{ fontSize: 14, color: DS.t2, lineHeight: 1.65, marginBottom: 16 }}>{evalResult.feedback}</p>
+                {Array.isArray(evalResult.rubricScores) && (
+                  <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 8 }}>
+                    {evalResult.rubricScores.map((rs, i) => (
+                      <li
+                        key={i}
+                        style={{
+                          fontSize: 12,
+                          fontFamily: "var(--ds-mono), monospace",
+                          color: rs.met ? DS.grn : DS.t3,
+                          padding: "8px 10px",
+                          borderRadius: 8,
+                          background: "rgba(255,255,255,0.03)",
+                          border: `1px solid ${DS.border}`,
+                        }}
+                      >
+                        <span style={{ marginRight: 8 }}>{rs.met ? "âœ“" : "â—‹"}</span>
+                        {rs.criterion}
+                        <span style={{ color: DS.dim, marginLeft: 8 }}>({rs.confidence})</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
         {showModel && (
           <div style={{
             ...dsGlassCard({ padding: "22px 24px", marginBottom: 40, border: `1px solid rgba(52,211,153,0.25)` }),
@@ -1272,11 +1437,39 @@ export default function DataSparkPlatform() {
             <div style={{ fontSize: 11, fontWeight: 700, color: DS.grn, fontFamily: "var(--ds-mono), monospace", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.12em" }}>
               Model answer & evaluation criteria
             </div>
-            <div style={{ fontSize: 14, color: DS.t3, lineHeight: 1.7, fontWeight: 400 }}>
-              <p style={{ marginBottom: 12 }}>A strong answer to this question would demonstrate clear understanding of the core concepts, structured reasoning about tradeoffs, and practical awareness of real-world constraints.</p>
-              <p style={{ marginBottom: 12 }}>The AI evaluator scores your response against the rubric below — compare your answer point-by-point to identify gaps.</p>
-              <p style={{ color: DS.dim, fontSize: 13, fontStyle: "italic" }}>Full model answers with detailed rubric scoring are available in the complete platform. Use the AI tutor to discuss your specific answer and get personalized feedback.</p>
-            </div>
+            {q.modelAnswer ? (
+              <div style={{ fontSize: 14, color: DS.t2, lineHeight: 1.75, fontWeight: 400, whiteSpace: "pre-wrap", marginBottom: 16 }}>{q.modelAnswer}</div>
+            ) : (
+              <div style={{ fontSize: 14, color: DS.t3, lineHeight: 1.7, fontWeight: 400 }}>
+                <p style={{ marginBottom: 12 }}>A strong answer to this question would demonstrate clear understanding of the core concepts, structured reasoning about tradeoffs, and practical awareness of real-world constraints.</p>
+                <p style={{ marginBottom: 12 }}>Compare your scorecard above to these expectations.</p>
+                <p style={{ color: DS.dim, fontSize: 13, fontStyle: "italic" }}>Use the AI tutor to dig into your specific answer line by line.</p>
+              </div>
+            )}
+            {Array.isArray(q.rubric) && q.rubric.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 8 }}>Rubric</div>
+                <ul style={{ margin: 0, paddingLeft: 20, color: DS.t2, fontSize: 13, lineHeight: 1.65 }}>
+                  {q.rubric.map((line, i) => <li key={i}>{line}</li>)}
+                </ul>
+              </div>
+            )}
+            {Array.isArray(q.hints) && q.hints.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 8 }}>Hints</div>
+                <ul style={{ margin: 0, paddingLeft: 20, color: DS.t2, fontSize: 13, lineHeight: 1.65 }}>
+                  {q.hints.map((h, i) => <li key={i}>{h}</li>)}
+                </ul>
+              </div>
+            )}
+            {Array.isArray(q.commonMistakes) && q.commonMistakes.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#FCA5A5", fontFamily: "var(--ds-mono), monospace", marginBottom: 8 }}>Common mistakes</div>
+                <ul style={{ margin: 0, paddingLeft: 20, color: DS.t2, fontSize: 13, lineHeight: 1.65 }}>
+                  {q.commonMistakes.map((m, i) => <li key={i}>{m}</li>)}
+                </ul>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1355,16 +1548,21 @@ export default function DataSparkPlatform() {
                 background: activeCourse?.id === c.id ? "rgba(99,102,241,0.12)" : "transparent",
                 border: `1px solid ${activeCourse?.id === c.id ? `${c.color}35` : "transparent"}`,
                 borderRadius: 8,
-                padding: "6px 10px",
+                padding: "4px 8px 4px 4px",
                 color: activeCourse?.id === c.id ? DS.t1 : DS.dim,
                 fontSize: 11,
                 cursor: "pointer",
                 fontFamily: "var(--ds-mono), monospace",
                 fontWeight: 600,
                 whiteSpace: "nowrap",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                minHeight: 36,
               }}
             >
-              {c.icon} {c.title.split(" ")[0]}
+              <CourseMark color={c.color} mark={c.mark} size="sm" />
+              {c.title.split(" ")[0]}
             </button>
           ))}
         </div>
@@ -1381,3 +1579,5 @@ export default function DataSparkPlatform() {
     </div>
   );
 }
+
+

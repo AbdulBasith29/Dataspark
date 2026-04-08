@@ -1,7 +1,7 @@
 # DataSpark — Startup Execution Plan (Orchestrator)
 
 **Version:** 1.0  
-**As-of:** 2026-04-02  
+**As-of:** 2026-04-04  
 **Scope:** End-to-end startup operations across product-ops, growth, QA, data instrumentation, and revenue.  
 **Source alignment:** `.cursor/rules/orchestrator.md`, `docs/ARCHITECTURE.md`, `docs/AGENT-TASKS.md`, `docs/MARKETING-PLAYBOOK.md`.  
 **Note:** Canonical agent specs live under `docs/*-AGENT.md` (orchestrator, product-ops, growth, qa-test, data-instrumentation, revenue). Stack details follow **`package.json`**; `.cursor/rules/orchestrator.md` may describe a future Next.js layout.

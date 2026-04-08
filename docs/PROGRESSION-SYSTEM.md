@@ -2,32 +2,33 @@
 
 ## Lesson Content Structure
 
-Every lesson is a layered experience with 4 components:
+Every lesson is a **full module** (target **18–20 minutes** minimum engaged time — see `docs/CURRICULUM-SCOPE.md` §2.1). It is **not** acceptable to ship a single short page plus one widget; learners need read → watch or deep-dive → hands-on → check.
+
+Every lesson is a layered experience with **5 content layers** plus the tutor:
 
 ### Layer 1: Written Concept Explanation (Original)
-- Short, clear, jargon-decoded explanation (500-800 words)
+- Substantial, jargon-decoded tutorial: **1,200–2,000 words** for a typical lesson (see `CURRICULUM-SCOPE.md` §2.2)
 - Written in conversational tone — "here's what this actually means"
-- Includes the interactive visualization where applicable
-- Key takeaway box at the end
-- Format: markdown rendered in-app
+- Multiple subheadings, at least one full worked example, pitfalls / “gotchas,” and key takeaways
+- Format: markdown rendered in-app (scrollable **Learn** section — not a single card)
 
 ### Layer 2: Curated Video (Embedded YouTube)
-- Hand-picked best video for this exact topic
+- Hand-picked best video for this exact topic (timestamped segment when the full video is longer than needed)
 - Priority channels: StatQuest (stats/ML), 3Blue1Brown (math/intuition), 
   Corey Schafer (Python), Tech With Tim (Python), sentdex (ML), 
   Fireship (quick overviews), CS Dojo (algorithms)
-- Timestamped links when full video covers more than needed
-- Fallback: if no great video exists, mark for original content creation
+- **Fallback:** if no great video exists, replace with **original deep-dive prose + second worked example + timed “you try”** totaling ~3–6 minutes — do not omit this layer
 
 ### Layer 3: Interactive Element
 - Code sandbox for Python/SQL topics (run code in browser)
 - Interactive visualization for conceptual topics
 - Drag-and-drop exercises for architectural topics
 - "Fill in the blank" SQL/Python for quick practice
+- Should include **guided prompts** so the learner spends **~4–6 minutes** actively manipulating, not passively watching
 
 ### Layer 4: Knowledge Check (Adaptive)
-- Only appears if the topic has associated practice questions
-- 2-3 quick multiple choice or short answer questions
+- **Required for mastery** when the lesson ships (2–3 questions minimum)
+- 2-3 multiple choice or short answer questions tied to **this lesson’s** claims
 - Must score 70%+ to "master" the lesson
 - Failed checks suggest reviewing specific sections
 
@@ -155,7 +156,7 @@ REVIEW SCHEDULE:
   moduleId: "ml-foundations",
   title: "Bias-Variance Tradeoff: The Core Tension",
   order: 2,  // position within module
-  duration: "20 min",
+  duration: "18-20 min",  // minimum module size; see CURRICULUM-SCOPE.md §2.1
   
   // Content layers
   content: {
@@ -271,7 +272,7 @@ REVIEW SCHEDULE:
 ┌─────────────────────────────────────────┐
 │ ← Back to ML > Supervised Learning       │
 │                                          │
-│ DECISION TREES                    15 min │
+│ DECISION TREES                 18–20 min │
 │ Splitting Criteria Visualized            │
 │                                          │
 │ ┌─ LEARN ─────────────────────────────┐ │
@@ -366,14 +367,15 @@ REVIEW SCHEDULE:
 ## Content Roadmap
 
 ### Phase 1: MVP (Curated + Skeleton)
-- Written lessons: 2-3 paragraph summaries per topic (AI-generated, human-reviewed)
-- Videos: curated YouTube embeds for all 114 lessons
-- Visualizations: 3 done, 7 more priority ones
+- **Lesson modules:** Every shipped lesson follows the **18–20 minute** structure in `docs/CURRICULUM-SCOPE.md` §2.1 (Learn → Watch or deep-dive → Try → Check), not a single interactive-only page.
+- **Written lessons:** **1,200–2,000 words** for spine / priority topics; shorter placeholders only where explicitly marked “draft” in the catalog (and still must include all layers with stub copy to validate UX).
+- Videos: curated YouTube embeds (timestamped) or **video-fallback** deep-dive block per Layer 2 rules above
+- Visualizations: 3 done, 7 more priority ones; each embedded in a full lesson flow
 - Code sandbox: embed via iframe (Replit, CodeSandbox, or Judge0 API)
-- Knowledge checks: 2-3 MCQ per lesson where applicable
+- Knowledge checks: **2–3 questions per lesson** where the lesson ships as learner-ready
 
 ### Phase 2: Depth
-- Written lessons: expand to full 500-800 word explanations
+- Written lessons: bring **all** catalog lessons up to **1,200–2,000 words** and verify real **18–20 min** engaged time with analytics or internal timing
 - Original content: record videos for topics with no good YouTube coverage
 - Code sandbox: custom built-in editor with test cases
 - More visualizations: target 30 total

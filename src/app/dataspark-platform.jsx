@@ -1,11 +1,47 @@
 import { useState, useEffect, useRef } from "react";
 
+/** Monogram chip — avoids OS-dependent emoji rendering in category chrome. */
+function CategoryMark({ color, mark, size = "lg" }) {
+  const dims = { lg: 56, md: 48, sm: 28 };
+  const dim = dims[size] ?? 56;
+  const fs = mark.length > 5 ? 9 : mark.length > 3 ? 10 : size === "sm" ? 9 : 12;
+  return (
+    <span
+      aria-hidden
+      style={{
+        width: dim,
+        height: dim,
+        minWidth: dim,
+        borderRadius: size === "sm" ? 8 : 14,
+        background: `linear-gradient(145deg, ${color}28, ${color}0a)`,
+        border: `1px solid ${color}50`,
+        boxShadow: size === "sm" ? `0 2px 8px ${color}14` : `0 6px 20px ${color}18`,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: fs,
+        fontWeight: 700,
+        color,
+        letterSpacing: "0.04em",
+        lineHeight: 1,
+        textAlign: "center",
+        padding: "0 4px",
+        flexShrink: 0,
+        ...(size === "lg" ? { marginBottom: 12 } : {}),
+      }}
+    >
+      {mark}
+    </span>
+  );
+}
+
 // ─── QUESTION BANK ───────────────────────────────────────────────────────────
 // Organized by category → subcategory → difficulty
 const QUESTIONS = {
   "sql-python": {
     label: "SQL & Python",
-    icon: "⌨️",
+    mark: "SQL·PY",
     color: "#0EA5E9",
     subcategories: {
       "sql-fundamentals": {
@@ -180,7 +216,7 @@ const QUESTIONS = {
   },
   "system-design": {
     label: "System Design & Architecture",
-    icon: "🏗️",
+    mark: "SYS",
     color: "#8B5CF6",
     subcategories: {
       "data-pipeline-design": {
@@ -302,7 +338,7 @@ const QUESTIONS = {
   },
   "business-cases": {
     label: "Business Case Studies",
-    icon: "📊",
+    mark: "CASE",
     color: "#F59E0B",
     subcategories: {
       "metric-definition": {
@@ -420,7 +456,7 @@ const QUESTIONS = {
   },
   "ai-tooling": {
     label: "AI Tooling & Prompt Engineering",
-    icon: "🤖",
+    mark: "AI",
     color: "#10B981",
     subcategories: {
       "prompt-engineering": {
@@ -776,7 +812,7 @@ export default function DataSparkApp() {
                 background: `linear-gradient(90deg, ${cat.color}, ${cat.color}40)`,
               }} />
 
-              <div style={{ fontSize: 32, marginBottom: 12 }}>{cat.icon}</div>
+              <CategoryMark color={cat.color} mark={cat.mark} size="lg" />
               <div style={{
                 fontSize: 18,
                 fontWeight: 700,
@@ -941,7 +977,7 @@ export default function DataSparkApp() {
         </button>
 
         <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 30 }}>
-          <span style={{ fontSize: 40 }}>{cat.icon}</span>
+          <CategoryMark color={cat.color} mark={cat.mark} size="md" />
           <div>
             <h1 style={{
               fontSize: 32,
@@ -1585,21 +1621,27 @@ export default function DataSparkApp() {
           {Object.entries(QUESTIONS).map(([key, cat]) => (
             <button
               key={key}
+              type="button"
               onClick={() => { setSelectedCategory(key); setView("category"); }}
               style={{
                 background: selectedCategory === key ? "#1E293B" : "transparent",
                 border: "1px solid transparent",
-                borderRadius: 6,
-                padding: "6px 12px",
+                borderRadius: 8,
+                padding: "6px 10px 6px 6px",
                 color: selectedCategory === key ? "#F8FAFC" : "#64748B",
                 fontSize: 12,
                 cursor: "pointer",
                 fontFamily: "'JetBrains Mono', monospace",
                 fontWeight: 500,
                 transition: "all 0.2s",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                minHeight: 40,
               }}
             >
-              {cat.icon} {cat.label}
+              <CategoryMark color={cat.color} mark={cat.mark} size="sm" />
+              <span style={{ whiteSpace: "nowrap" }}>{cat.label}</span>
             </button>
           ))}
         </div>

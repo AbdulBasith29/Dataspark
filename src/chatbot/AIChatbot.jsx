@@ -251,8 +251,9 @@ const AIChatbot = ({ course, onClose }) => {
 
   const tutorCfg = CHATBOT_CONFIG[course.id] || {};
   const tutorName = tutorCfg.tutorName || SYSTEM_PROMPTS[course.id]?.name || "Tutor";
-  const headerIcon = tutorCfg.icon || course.icon;
+  const headerIcon = tutorCfg.icon;
   const headerSubtitle = tutorCfg.scopeLabel || "AI-powered · Topic-scoped";
+  const courseMark = course.mark;
 
   return (
     <div
@@ -284,7 +285,31 @@ const AIChatbot = ({ course, onClose }) => {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 20 }}>{headerIcon}</span>
+          {courseMark ? (
+            <span
+              aria-hidden
+              style={{
+                width: 40,
+                height: 40,
+                minWidth: 40,
+                borderRadius: 10,
+                background: `linear-gradient(145deg, ${course.color}28, ${course.color}0a)`,
+                border: `1px solid ${course.color}50`,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: courseMark.length > 3 ? 9 : 11,
+                fontWeight: 700,
+                color: course.color,
+                letterSpacing: "0.03em",
+              }}
+            >
+              {courseMark}
+            </span>
+          ) : headerIcon ? (
+            <span style={{ fontSize: 20 }}>{headerIcon}</span>
+          ) : null}
           <div>
             <div
               style={{
