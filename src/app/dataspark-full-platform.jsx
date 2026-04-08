@@ -1598,14 +1598,108 @@ export default function DataSparkPlatform() {
           </div>
         )}
 
-        <div style={{ ...dsGlassCard({ padding: "26px 24px", marginBottom: 24 }) }}>
-          <div style={{ fontSize: 10, color: DS.ind, fontFamily: "var(--ds-mono), monospace", fontWeight: 700, letterSpacing: "0.12em", marginBottom: 12 }}>LESSON OVERVIEW</div>
-          <div style={{ fontSize: 15, color: DS.t2, lineHeight: 1.75, fontWeight: 400 }}>
-            <p style={{ marginBottom: 16 }}>This lesson covers <strong style={{ color: DS.t1 }}>{activeLesson.title}</strong> in depth. The full content includes conceptual explanations, worked examples, common pitfalls, and practical applications in data science contexts.</p>
-            <p style={{ marginBottom: 16 }}>Each concept is broken down with <span style={{ color: activeCourse.accent }}>visual aids</span> and real-world analogies to build true intuition — not just memorization of formulas or syntax.</p>
-            <p>After completing this lesson, test your understanding with the practice questions in the <strong style={{ color: DS.t1 }}>Practice</strong> tab, or ask the <strong style={{ color: DS.t1 }}>AI tutor</strong> to explain anything that is unclear.</p>
+        {/* ── Concept Cards ── */}
+        {activeLesson.concepts?.length > 0 && activeLesson.concepts.map((concept, ci) => (
+          <div key={ci} style={{ ...dsGlassCard({ padding: "22px 24px", marginBottom: 16 }) }}>
+            <div style={{ fontSize: 10, color: activeCourse.accent, fontFamily: "var(--ds-mono), monospace", fontWeight: 700, letterSpacing: "0.12em", marginBottom: 10 }}>
+              CONCEPT {ci + 1} OF {activeLesson.concepts.length}
+            </div>
+            <h3 style={{ fontSize: 17, fontWeight: 700, color: DS.t1, margin: "0 0 10px", fontFamily: "var(--ds-sans), sans-serif" }}>
+              {concept.heading}
+            </h3>
+            <p style={{ fontSize: 14, color: DS.t2, lineHeight: 1.72, margin: "0 0 14px", fontFamily: "var(--ds-sans), sans-serif" }}>
+              {concept.body}
+            </p>
+            {concept.code && (
+              <pre style={{
+                background: "rgba(255,255,255,0.03)",
+                border: `1px solid ${DS.border}`,
+                borderRadius: 10,
+                padding: "14px 16px",
+                fontFamily: "var(--ds-mono), monospace",
+                fontSize: 12,
+                lineHeight: 1.65,
+                color: DS.t2,
+                overflowX: "auto",
+                margin: "0 0 14px",
+                whiteSpace: "pre",
+              }}>{concept.code}</pre>
+            )}
+            {concept.dsNote && (
+              <div style={{
+                background: `${activeCourse.color}0d`,
+                border: `1px solid ${activeCourse.color}30`,
+                borderRadius: 8,
+                padding: "10px 14px",
+                fontSize: 12,
+                color: activeCourse.accent,
+                fontFamily: "var(--ds-mono), monospace",
+                lineHeight: 1.6,
+              }}>
+                <span style={{ fontWeight: 700, marginRight: 6 }}>◈ DS NOTE:</span>{concept.dsNote}
+              </div>
+            )}
           </div>
-        </div>
+        ))}
+
+        {/* Fallback for courses without enriched content yet */}
+        {(!activeLesson.concepts || activeLesson.concepts.length === 0) && (
+          <div style={{ ...dsGlassCard({ padding: "26px 24px", marginBottom: 24 }) }}>
+            <div style={{ fontSize: 10, color: DS.ind, fontFamily: "var(--ds-mono), monospace", fontWeight: 700, letterSpacing: "0.12em", marginBottom: 12 }}>LESSON OVERVIEW</div>
+            <div style={{ fontSize: 15, color: DS.t2, lineHeight: 1.75 }}>
+              <p style={{ marginBottom: 16 }}>This lesson covers <strong style={{ color: DS.t1 }}>{activeLesson.title}</strong> in depth.</p>
+              <p>After completing this lesson, test your understanding in the <strong style={{ color: DS.t1 }}>Practice</strong> tab or ask the <strong style={{ color: DS.t1 }}>AI tutor</strong>.</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Key Takeaways ── */}
+        {activeLesson.takeaways?.length > 0 && (
+          <div style={{ ...dsGlassCard({ padding: "20px 24px", marginBottom: 24 }) }}>
+            <div style={{ fontSize: 10, color: DS.grn, fontFamily: "var(--ds-mono), monospace", fontWeight: 700, letterSpacing: "0.12em", marginBottom: 12 }}>
+              KEY TAKEAWAYS
+            </div>
+            <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none" }}>
+              {activeLesson.takeaways.map((t, i) => (
+                <li key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: i < activeLesson.takeaways.length - 1 ? 10 : 0 }}>
+                  <span style={{ color: DS.grn, fontWeight: 700, fontSize: 14, lineHeight: 1.5, flexShrink: 0 }}>✓</span>
+                  <span style={{ fontSize: 13, color: DS.t2, lineHeight: 1.6, fontFamily: "var(--ds-sans), sans-serif" }}>{t}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* ── Linked Practice Question ── */}
+        {(() => {
+          const q = activeLesson.linkedQuestionId
+            ? ALL_QUESTIONS.find(x => x.id === activeLesson.linkedQuestionId)
+            : null;
+          if (!q) return null;
+          const diffColor = { Easy: DS.grn, Medium: "#F59E0B", Hard: "#EF4444" }[q.difficulty] || DS.t3;
+          return (
+            <div style={{ ...dsGlassCard({ padding: "20px 24px", marginBottom: 24 }), border: `1px solid ${activeCourse.color}30` }}>
+              <div style={{ fontSize: 10, color: activeCourse.accent, fontFamily: "var(--ds-mono), monospace", fontWeight: 700, letterSpacing: "0.12em", marginBottom: 12 }}>
+                LESSON CHALLENGE
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: DS.t1, fontFamily: "var(--ds-sans), sans-serif" }}>{q.title}</span>
+                <span style={{ background: `${diffColor}18`, color: diffColor, padding: "2px 8px", borderRadius: 999, fontSize: 10, fontWeight: 700, border: `1px solid ${diffColor}35`, fontFamily: "var(--ds-mono), monospace" }}>{q.difficulty}</span>
+                <span style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace" }}>{q.company} · {q.estimatedMinutes}m</span>
+              </div>
+              <p style={{ fontSize: 13, color: DS.t3, lineHeight: 1.65, margin: "0 0 14px", fontFamily: "var(--ds-sans), sans-serif" }}>
+                {q.prompt.slice(0, 180)}{q.prompt.length > 180 ? "…" : ""}
+              </p>
+              <button
+                type="button"
+                onClick={() => { setActiveQuestion(q); setUserAnswer(""); setSubmitted(false); setShowModel(false); setView("question"); }}
+                style={{ background: DS.indB, border: "none", borderRadius: DS.radiusSm, padding: "10px 20px", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "var(--ds-sans), sans-serif", boxShadow: DS.shadowCta }}
+              >
+                Attempt this question →
+              </button>
+            </div>
+          );
+        })()}
 
         <div style={{ display: "flex", gap: 10, marginBottom: 40, flexWrap: "wrap" }}>
           <button
