@@ -4,6 +4,9 @@ import AIChatbot from "../chatbot/AIChatbot.jsx";
 import SQLJoins from "../visualizations/SQLJoins.jsx";
 import TrainValTestSplit from "../visualizations/TrainValTestSplit.jsx";
 import PythonMutabilityViz from "../visualizations/PythonMutabilityViz.jsx";
+import FStringBuilderViz from "../visualizations/FStringBuilderViz.jsx";
+import DictSetOpsViz from "../visualizations/DictSetOpsViz.jsx";
+import ComprehensionBuilderViz from "../visualizations/ComprehensionBuilderViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import { DS, dsGlassCard } from "../lib/ds-platform-tokens.js";
 import { PYTHON_QUESTIONS } from "../data/questions-python.js";
@@ -1276,13 +1279,18 @@ const BiasVarianceViz = () => {
 };
 
 const VISUALIZATIONS = {
+  // existing
   "st-p2": NormalDistViz,
   "dl-f4": GradientDescentViz,
   "ml-f2": BiasVarianceViz,
   "ml-f3": TrainValTestSplit,
   "st-f2": NormalDistViz,
   "sq-b2": SQLJoins,
+  // Python — py-basics
+  "py-b2": FStringBuilderViz,
   "py-b3": PythonMutabilityViz,
+  "py-b4": DictSetOpsViz,
+  "py-b5": ComprehensionBuilderViz,
 };
 
 /** When a lesson is marked hasViz but has no bespoke component, show a course-appropriate interactive. */
