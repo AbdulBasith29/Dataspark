@@ -7,6 +7,7 @@ import PythonMutabilityViz from "../visualizations/PythonMutabilityViz.jsx";
 import FStringBuilderViz from "../visualizations/FStringBuilderViz.jsx";
 import DictSetOpsViz from "../visualizations/DictSetOpsViz.jsx";
 import ComprehensionBuilderViz from "../visualizations/ComprehensionBuilderViz.jsx";
+import DataFrameExplorerViz from "../visualizations/DataFrameExplorerViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import { DS, dsGlassCard } from "../lib/ds-platform-tokens.js";
 import { PYTHON_QUESTIONS } from "../data/questions-python.js";
@@ -1291,6 +1292,8 @@ const VISUALIZATIONS = {
   "py-b3": PythonMutabilityViz,
   "py-b4": DictSetOpsViz,
   "py-b5": ComprehensionBuilderViz,
+  // Python — py-ds
+  "py-d2": DataFrameExplorerViz,
 };
 
 /** When a lesson is marked hasViz but has no bespoke component, show a course-appropriate interactive. */
