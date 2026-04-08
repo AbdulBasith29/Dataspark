@@ -118,7 +118,26 @@ const CURRICULUM = [
               "Assignment (b = a) creates an alias, not a copy — use .copy() or list()",
               "Tuples are hashable and faster to create; use them for fixed records",
               "list comprehensions are faster than for-loops + append for building new lists"
-            ]
+            ],
+            interviewInsights: [
+              {
+                q: "Is b = a a copy?",
+                a: "No — it's an alias. Both names point to the same object. Use b = a.copy() for a shallow copy, or copy.deepcopy(a) for nested structures.",
+              },
+              {
+                q: "Why can't lists be dict keys?",
+                a: "Dict keys must be hashable. Mutable objects aren't hashable because their hash value could change if mutated. Tuples are hashable; lists are not. This comes up in every graph/cache interview question.",
+              },
+              {
+                q: "What does a += [4] actually do vs a = a + [4]?",
+                a: "a += [4] calls __iadd__ — it mutates in place, same id(). a = a + [4] creates a new list and rebinds a, new id(). Interviewers use this to check if you understand Python's data model.",
+              },
+            ],
+            scenario: {
+              prompt: "You're debugging a batch ETL job. A helper function clean_record(record) is supposed to sanitise a row without affecting the caller's data. But the original records are getting modified. What's the bug, and how do you fix it?",
+              answer: "clean_record is mutating the dict or list passed in — Python passes object references, not copies. The fix is to copy at the function boundary: record = record.copy() or copy.deepcopy(record) at the top of the function.",
+              seniorInsight: "A senior engineer adds a defensive copy at every function boundary that shouldn't own the data, and uses type annotations (record: dict → dict) to make the contract clear. For production pipelines, consider dataclasses with frozen=True to make records genuinely immutable.",
+            },
           },
           {
             id: "py-b4", title: "Dictionaries & Sets", duration: "15 min", hasViz: true,
@@ -1690,6 +1709,69 @@ export default function DataSparkPlatform() {
             </ul>
           </div>
         )}
+
+        {/* ── Interviewer's Lens ── */}
+        {activeLesson.interviewInsights?.length > 0 && (() => {
+          const [openIdx, setOpenIdx] = useState(null);
+          return (
+            <div style={{ ...dsGlassCard({ padding: "20px 24px", marginBottom: 24 }), borderTop: `2px solid ${activeCourse.color}60` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <span style={{ fontSize: 16 }}>🎯</span>
+                <div style={{ fontSize: 10, color: activeCourse.accent, fontFamily: "var(--ds-mono), monospace", fontWeight: 700, letterSpacing: "0.12em" }}>INTERVIEWER'S LENS</div>
+                <span style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace" }}>— questions they will actually ask</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {activeLesson.interviewInsights.map((item, i) => (
+                  <div key={i}>
+                    <button type="button"
+                      onClick={() => setOpenIdx(openIdx === i ? null : i)}
+                      style={{ background: openIdx === i ? `${activeCourse.color}12` : "rgba(255,255,255,0.03)", border: `1px solid ${openIdx === i ? activeCourse.color + "40" : DS.border}`, borderRadius: 8, padding: "10px 14px", width: "100%", textAlign: "left", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: DS.t1, fontFamily: "var(--ds-sans), sans-serif" }}>"{item.q}"</span>
+                      <span style={{ color: DS.t3, fontFamily: "var(--ds-mono), monospace", fontSize: 12 }}>{openIdx === i ? "▲" : "▼"}</span>
+                    </button>
+                    {openIdx === i && (
+                      <div style={{ padding: "12px 14px", background: `${activeCourse.color}08`, borderRadius: "0 0 8px 8px", border: `1px solid ${activeCourse.color}20`, borderTop: "none" }}>
+                        <p style={{ margin: "0 0 10px", fontSize: 13, color: DS.t2, lineHeight: 1.7, fontFamily: "var(--ds-sans), sans-serif" }}>{item.a}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── Scenario Knowledge Check ── */}
+        {activeLesson.scenario && (() => {
+          const [showAnswer, setShowAnswer] = useState(false);
+          return (
+            <div style={{ ...dsGlassCard({ padding: "20px 24px", marginBottom: 24 }), borderTop: `2px solid rgba(52,211,153,0.4)` }}>
+              <div style={{ fontSize: 10, color: DS.grn, fontFamily: "var(--ds-mono), monospace", fontWeight: 700, letterSpacing: "0.12em", marginBottom: 12 }}>
+                SCENARIO · THINK BEFORE REVEALING
+              </div>
+              <p style={{ fontSize: 14, color: DS.t1, lineHeight: 1.75, margin: "0 0 16px", fontFamily: "var(--ds-sans), sans-serif", fontWeight: 500 }}>
+                {activeLesson.scenario.prompt}
+              </p>
+              {!showAnswer ? (
+                <button type="button" onClick={() => setShowAnswer(true)}
+                  style={{ background: "rgba(52,211,153,0.1)", border: `1px solid rgba(52,211,153,0.3)`, borderRadius: DS.radiusSm, padding: "10px 20px", color: DS.grn, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "var(--ds-sans), sans-serif" }}>
+                  Reveal answer →
+                </button>
+              ) : (
+                <div>
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 10, color: DS.grn, fontFamily: "var(--ds-mono), monospace", fontWeight: 700, letterSpacing: "0.1em", marginBottom: 6 }}>ANSWER</div>
+                    <p style={{ fontSize: 13, color: DS.t2, lineHeight: 1.7, margin: 0, fontFamily: "var(--ds-sans), sans-serif" }}>{activeLesson.scenario.answer}</p>
+                  </div>
+                  <div style={{ background: "rgba(129,140,248,0.08)", border: `1px solid rgba(129,140,248,0.2)`, borderRadius: 8, padding: "12px 14px" }}>
+                    <div style={{ fontSize: 10, color: DS.ind, fontFamily: "var(--ds-mono), monospace", fontWeight: 700, letterSpacing: "0.1em", marginBottom: 6 }}>SENIOR INTUITION</div>
+                    <p style={{ fontSize: 13, color: DS.t2, lineHeight: 1.7, margin: 0, fontFamily: "var(--ds-sans), sans-serif" }}>{activeLesson.scenario.seniorInsight}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ── Linked Practice Question ── */}
         {(() => {
