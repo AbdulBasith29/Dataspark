@@ -12,6 +12,7 @@ import ArrayShapeViz from "../visualizations/ArrayShapeViz.jsx";
 import LoopVsVectorViz from "../visualizations/LoopVsVectorViz.jsx";
 import IteratorStepViz from "../visualizations/IteratorStepViz.jsx";
 import ObjectMemoryViz from "../visualizations/ObjectMemoryViz.jsx";
+import LessonVideo from "../components/platform/LessonVideo.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import { DS, dsGlassCard } from "../lib/ds-platform-tokens.js";
 import { PYTHON_QUESTIONS } from "../data/questions-python.js";
@@ -99,25 +100,54 @@ const CURRICULUM = [
           {
             id: "py-b3", title: "Lists, Tuples & Mutability", duration: "18 min", hasViz: true,
             linkedQuestionId: "py-q05",
+            video: {
+              id: "W8KRzm-HUcc",
+              title: "Python Lists, Tuples & Sets — Corey Schafer",
+              start: 0,
+              note: "Watch 0:00–12:00 for lists/tuples, then 14:30 onward for the mutability gotchas.",
+            },
             concepts: [
               {
-                heading: "Lists Are Mutable, Tuples Are Not",
-                body: "Lists can be changed after creation — you can append, remove, or replace elements. Tuples are fixed once created. This distinction matters for performance, safety, and how Python stores data in memory.",
-                code: "# List — mutable:\nscores = [85, 92, 78]\nscores.append(95)     # modifies in place\nscores[0] = 100       # works\n\n# Tuple — immutable:\npoint = (10, 20)\n# point[0] = 5       # TypeError!\nnew_point = (5, 20)  # must create new tuple",
-                dsNote: "Use tuples for fixed records (coordinates, RGB values, DB row keys). Use lists when the collection will grow or change. Tuples are hashable — they can be dict keys and set members."
+                heading: "A list is a whiteboard. A tuple is a laminated card.",
+                body: "That's the mental model. A list can be erased and rewritten — you can add items, remove them, swap them out. A tuple is printed and sealed. Once it exists, it exists exactly like that. Python enforces this: try to change a tuple item and you get a TypeError immediately.\n\nWhy does this matter in practice? Because mutability determines how Python stores and passes data. Lists live at an address in memory that can be written to. Tuples are read-only — Python can store them more compactly and share them safely across threads.",
+                code: `# Whiteboard — can rewrite anything
+scores = [85, 92, 78]
+scores.append(95)     # add item → works
+scores[0] = 100       # rewrite item → works
+scores.pop()          # remove last → works
+
+# Laminated card — sealed
+point = (10.5, 20.3)
+point[0] = 5          # TypeError: 'tuple' object does not support item assignment
+
+# "Changing" a tuple means creating a new one:
+new_point = (5.0, point[1])   # entirely new object`,
+                dsNote: "Use tuples for fixed records — (user_id, timestamp, event_type), RGB values, coordinate pairs. Use lists when the collection grows or changes. The payoff: tuples are hashable, so they can be dict keys and set members. A list cannot."
               },
               {
-                heading: "Shallow vs Deep Copy Gotcha",
-                body: "Assigning a list to a new variable doesn't copy it — both names point to the same object. This causes one of the most common Python bugs in data work.",
-                code: "original = [1, 2, 3]\nalias = original      # SAME object!\nalias.append(4)\nprint(original)       # [1, 2, 3, 4] — surprise!\n\n# Fix: copy it\nshallow = original.copy()  # or list(original)\nimport copy\ndeep = copy.deepcopy(original)  # for nested lists",
-                dsNote: "Pandas DataFrames have the same issue. df2 = df is an alias. df2 = df.copy() is a real copy. Modifying an alias silently changes your original data."
+                heading: "b = a is not a copy. It's a second name for the same thing.",
+                body: "This trips up almost everyone learning Python. When you write b = a, you haven't made a copy of the list — you've created a second variable name that points to the exact same list in memory. There is still only one list. So when you change it through b, you're also changing what a sees, because they're looking at the same place.\n\nYou can verify this yourself: id(a) == id(b) will be True after b = a. They share an identity. This is called aliasing, and it's the source of one of the most common and hardest-to-debug bugs in data pipelines: a helper function 'cleans' data passed to it, and silently corrupts the caller's original.",
+                code: `original = [1, 2, 3]
+alias = original           # NOT a copy — same object
+alias.append(4)
+print(original)            # [1, 2, 3, 4]  ← surprise!
+print(id(original) == id(alias))  # True — same memory address
+
+# ✓ Fix 1: shallow copy (new outer list, shared inner objects)
+copy1 = original.copy()    # or list(original)
+
+# ✓ Fix 2: deep copy (new everything, all the way down)
+import copy
+copy2 = copy.deepcopy(original)  # use when list contains nested lists/dicts`,
+                dsNote: "Pandas has this exact same issue. df2 = df is an alias — modifying df2 modifies df. Always write df2 = df.copy() when you need an independent DataFrame. The SettingWithCopyWarning pandas shows you is this exact problem."
               }
             ],
             takeaways: [
-              "Lists are mutable (append, remove, reassign); tuples are immutable",
-              "Assignment (b = a) creates an alias, not a copy — use .copy() or list()",
-              "Tuples are hashable and faster to create; use them for fixed records",
-              "list comprehensions are faster than for-loops + append for building new lists"
+              "Lists are mutable (you can change them); tuples are immutable (they're sealed)",
+              "b = a creates an alias — both names point to the same object in memory. Use .copy() to get an independent copy",
+              "Use id(x) to see an object's memory address — if two variables share an id, they share an object",
+              "Tuples are hashable (usable as dict keys); lists are not — because a mutable key would break the dict",
+              "Shallow copy duplicates the outer container but shares nested objects. Deep copy duplicates everything"
             ],
             interviewInsights: [
               {
@@ -1638,6 +1668,16 @@ export default function DataSparkPlatform() {
           </div>
         )}
 
+        {/* ── Embedded Video ── */}
+        {activeLesson.video && (
+          <LessonVideo
+            videoId={activeLesson.video.id}
+            title={activeLesson.video.title}
+            start={activeLesson.video.start || 0}
+            note={activeLesson.video.note}
+          />
+        )}
+
         {/* ── Concept Cards ── */}
         {activeLesson.concepts?.length > 0 && activeLesson.concepts.map((concept, ci) => (
           <div key={ci} style={{ ...dsGlassCard({ padding: "22px 24px", marginBottom: 16 }) }}>
@@ -1647,9 +1687,13 @@ export default function DataSparkPlatform() {
             <h3 style={{ fontSize: 17, fontWeight: 700, color: DS.t1, margin: "0 0 10px", fontFamily: "var(--ds-sans), sans-serif" }}>
               {concept.heading}
             </h3>
-            <p style={{ fontSize: 14, color: DS.t2, lineHeight: 1.72, margin: "0 0 14px", fontFamily: "var(--ds-sans), sans-serif" }}>
-              {concept.body}
-            </p>
+            <div style={{ marginBottom: 14 }}>
+              {concept.body.split("\n\n").map((para, pi) => (
+                <p key={pi} style={{ fontSize: 14, color: DS.t2, lineHeight: 1.78, margin: pi > 0 ? "12px 0 0" : 0, fontFamily: "var(--ds-sans), sans-serif" }}>
+                  {para}
+                </p>
+              ))}
+            </div>
             {concept.code && (
               <pre style={{
                 background: "rgba(255,255,255,0.03)",
