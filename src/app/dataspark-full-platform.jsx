@@ -10,6 +10,8 @@ import ComprehensionBuilderViz from "../visualizations/ComprehensionBuilderViz.j
 import DataFrameExplorerViz from "../visualizations/DataFrameExplorerViz.jsx";
 import ArrayShapeViz from "../visualizations/ArrayShapeViz.jsx";
 import LoopVsVectorViz from "../visualizations/LoopVsVectorViz.jsx";
+import IteratorStepViz from "../visualizations/IteratorStepViz.jsx";
+import ObjectMemoryViz from "../visualizations/ObjectMemoryViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import { DS, dsGlassCard } from "../lib/ds-platform-tokens.js";
 import { PYTHON_QUESTIONS } from "../data/questions-python.js";
@@ -1294,6 +1296,10 @@ const VISUALIZATIONS = {
   "py-b3": PythonMutabilityViz,
   "py-b4": DictSetOpsViz,
   "py-b5": ComprehensionBuilderViz,
+  // Python — py-control
+  "py-c2": IteratorStepViz,
+  // Python — py-oop
+  "py-o1": ObjectMemoryViz,
   // Python — py-ds
   "py-d1": ArrayShapeViz,
   "py-d2": DataFrameExplorerViz,
