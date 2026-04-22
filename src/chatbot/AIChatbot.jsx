@@ -81,7 +81,6 @@ const AIChatbot = ({ course, onClose }) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
           max_tokens: 800,
           system,
           messages: prior,
@@ -89,7 +88,23 @@ const AIChatbot = ({ course, onClose }) => {
       });
 
       const data = await resp.json();
-      const text = data?.text || "I couldn't generate a response. Please try again.";
+      if (!resp.ok || !data?.text) {
+        const details =
+          data?.details?.message ||
+          data?.details?.error?.message ||
+          data?.error ||
+          "unknown_error";
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: `I couldn't generate a response right now. Error: \`${details}\``,
+          },
+        ]);
+        setLoading(false);
+        return;
+      }
+      const text = data.text;
 
       setMessages((prev) => [...prev, { role: "assistant", content: text }]);
     } catch {
