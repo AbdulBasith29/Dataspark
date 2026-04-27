@@ -4,6 +4,14 @@ import AIChatbot from "../chatbot/AIChatbot.jsx";
 import SQLJoins from "../visualizations/SQLJoins.jsx";
 import TrainValTestSplit from "../visualizations/TrainValTestSplit.jsx";
 import PythonMutabilityViz from "../visualizations/PythonMutabilityViz.jsx";
+import StringFormatAtelier from "../visualizations/StringFormatAtelier.jsx";
+import HashLab from "../visualizations/HashLab.jsx";
+import ComprehensionForge from "../visualizations/ComprehensionForge.jsx";
+import BranchRouter from "../visualizations/BranchRouter.jsx";
+import IteratorEngine from "../visualizations/IteratorEngine.jsx";
+import ArgumentBinder from "../visualizations/ArgumentBinder.jsx";
+import FoldMachine from "../visualizations/FoldMachine.jsx";
+import TracebackTheater from "../visualizations/TracebackTheater.jsx";
 import KMeansClustering from "../visualizations/KMeansClustering.jsx";
 import ConfusionMatrix from "../visualizations/ConfusionMatrix.jsx";
 import DecisionTree from "../visualizations/DecisionTree.jsx";
@@ -104,21 +112,21 @@ const CURRICULUM = [
         title: "Core Syntax & Data Types",
         lessons: [
           { id: "py-b1", title: "Variables, Types & Type Hints", duration: "15 min", hasViz: true },
-          { id: "py-b2", title: "Strings, f-strings & String Methods", duration: "12 min", hasViz: false },
+          { id: "py-b2", title: "Strings, f-strings & String Methods", duration: "18 min", hasViz: true },
           { id: "py-b3", title: "Lists, Tuples & Mutability", duration: "18 min", hasViz: true },
-          { id: "py-b4", title: "Dictionaries & Sets", duration: "15 min", hasViz: true },
-          { id: "py-b5", title: "Comprehensions: The Pythonic Way", duration: "10 min", hasViz: true },
+          { id: "py-b4", title: "Dictionaries & Sets", duration: "20 min", hasViz: true },
+          { id: "py-b5", title: "Comprehensions: The Pythonic Way", duration: "18 min", hasViz: true },
         ]
       },
       {
         id: "py-control",
         title: "Control Flow & Functions",
         lessons: [
-          { id: "py-c1", title: "Conditionals & Pattern Matching", duration: "12 min", hasViz: false },
+          { id: "py-c1", title: "Conditionals & Pattern Matching", duration: "18 min", hasViz: true },
           { id: "py-c2", title: "Loops, Iterators & Generators", duration: "20 min", hasViz: true },
           { id: "py-c3", title: "Functions: Args, *args, **kwargs", duration: "15 min", hasViz: true },
           { id: "py-c4", title: "Lambda, Map, Filter, Reduce", duration: "12 min", hasViz: true },
-          { id: "py-c5", title: "Error Handling & Debugging", duration: "10 min", hasViz: false },
+          { id: "py-c5", title: "Error Handling & Debugging", duration: "18 min", hasViz: true },
         ]
       },
       {
@@ -921,7 +929,15 @@ const VISUALIZATIONS = {
   "sp-t1": TimeSeriesDecomposition,
   "sp-r1": RecSysCollaborativeFiltering,
   "sp-n2": WordEmbeddings,
+  "py-b2": StringFormatAtelier,
   "py-b3": PythonMutabilityViz,
+  "py-b4": HashLab,
+  "py-b5": ComprehensionForge,
+  "py-c1": BranchRouter,
+  "py-c2": IteratorEngine,
+  "py-c3": ArgumentBinder,
+  "py-c4": FoldMachine,
+  "py-c5": TracebackTheater,
   "sd-p1": BatchVsStreaming,
   "sd-p2": ETLPipeline,
   "sd-p3": StreamingEnginesTrinity,

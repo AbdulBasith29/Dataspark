@@ -107,6 +107,12 @@ export function SimpleMarkdown({ text, accent }) {
       continue;
     }
     const para = [];
+    // Always consume the current line as a paragraph line so the loop makes
+    // progress even when the line starts with `#` but isn't a recognized
+    // heading (e.g. a bare Python comment like `# A` at column 0). Without
+    // this safeguard the outer while hangs forever.
+    para.push(lines[i]);
+    i += 1;
     while (i < lines.length && lines[i].trim() !== "" && !lines[i].startsWith("#") && !lines[i].startsWith("- ")) {
       para.push(lines[i]);
       i += 1;

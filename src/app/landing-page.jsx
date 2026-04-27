@@ -932,35 +932,18 @@ export default function DS8() {
         <div style={{ display: "flex", alignItems: "center", gap: 7 }}><Logo /><span style={{ fontSize: 11, color: "#CBD5E1", fontFamily: "var(--mono)" }}>© 2026 DataSpark</span></div>
         <div style={{ display: "flex", gap: 20, flexWrap: "wrap", justifyContent: "flex-end" }}>
           {[
-            { label: "TikTok", href: "https://www.tiktok.com/@dataspark" },
-            { label: "LinkedIn", href: "https://www.linkedin.com/company/dataspark" },
-            { label: "Twitter", href: "https://x.com/datasparkhq" },
             { label: "Privacy Policy", href: "/privacy" },
             { label: "Terms of Service", href: "/terms" },
             { label: "Contact", href: "/contact" },
           ].map(link => (
-            link.href.startsWith("http") ? (
-              <a
-                key={link.label}
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={`${link.label} (opens in new tab)`}
-                onClick={() => {
-                  void track("footer_link_click", { location: "footer", label: link.label, href: link.href });
-                }}
-                style={{ fontSize: 11, color: "#CBD5E1", textDecoration: "none", fontFamily: "var(--mono)", transition: "color .2s" }}
-                onMouseEnter={e => e.target.style.color="#F8FAFC"} onMouseLeave={e => e.target.style.color="#CBD5E1"}>{link.label}</a>
-            ) : (
-              <Link
-                key={link.label}
-                to={link.href}
-                onClick={() => {
-                  void track("footer_link_click", { location: "footer", label: link.label, href: link.href });
-                }}
-                style={{ fontSize: 11, color: "#CBD5E1", textDecoration: "none", fontFamily: "var(--mono)", transition: "color .2s" }}
-                onMouseEnter={e => e.target.style.color="#F8FAFC"} onMouseLeave={e => e.target.style.color="#CBD5E1"}>{link.label}</Link>
-            )
+            <Link
+              key={link.label}
+              to={link.href}
+              onClick={() => {
+                void track("footer_link_click", { location: "footer", label: link.label, href: link.href });
+              }}
+              style={{ fontSize: 11, color: "#CBD5E1", textDecoration: "none", fontFamily: "var(--mono)", transition: "color .2s" }}
+              onMouseEnter={e => e.target.style.color="#F8FAFC"} onMouseLeave={e => e.target.style.color="#CBD5E1"}>{link.label}</Link>
           ))}
         </div>
       </footer>
