@@ -3,6 +3,7 @@ name: Vercel Preview
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  workflow_dispatch:
 
 jobs:
   deploy-preview:
@@ -13,6 +14,8 @@ jobs:
     env:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_TELEMETRY_DISABLED: "1"
 
     steps:
       - name: Checkout
@@ -24,6 +27,19 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Verify Vercel secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for secret_name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!secret_name:-}" ]; then
+              echo "::error title=Missing GitHub Actions secret::${secret_name} is not configured. Add it in GitHub Settings -> Secrets and variables -> Actions, then re-run this workflow."
+              missing=1
+            fi
+          done
+          exit "$missing"
+
       - name: Install dependencies
         run: npm ci
 
@@ -31,21 +47,22 @@ jobs:
         run: npm run build
 
       - name: Pull Vercel environment
-        run: npx vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+        run: npx vercel@53.2.0 pull --yes --environment=preview --token "$VERCEL_TOKEN"
 
       - name: Build on Vercel
-        run: npx vercel build --token=${{ secrets.VERCEL_TOKEN }}
+        run: npx vercel@53.2.0 build --token "$VERCEL_TOKEN"
 
       - name: Deploy prebuilt output to Vercel
         id: deploy
         shell: bash
         run: |
           set -euo pipefail
-          DEPLOYMENT_URL="$(npx vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }} | tail -n 1)"
+          DEPLOYMENT_URL="$(npx vercel@53.2.0 deploy --prebuilt --token "$VERCEL_TOKEN" | tail -n 1)"
           echo "deployment_url=$DEPLOYMENT_URL" >> "$GITHUB_OUTPUT"
           echo "Preview URL: $DEPLOYMENT_URL"
 
       - name: Comment preview URL on PR
+        if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
