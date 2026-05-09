@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DS } from "../lib/ds-platform-tokens.js";
 
 const N = 24;
@@ -9,7 +9,7 @@ export default function CrossValidation() {
   const [playing, setPlaying] = useState(false);
   const canvasRef = useRef(null);
 
-  const foldOf = (i) => i % k;
+  const foldOf = useCallback((i) => i % k, [k]);
 
   useEffect(() => {
     if (!playing) return;
@@ -21,7 +21,7 @@ export default function CrossValidation() {
 
   useEffect(() => {
     if (fold >= k) setFold(0);
-  }, [k, fold]);
+  }, [k, fold, foldOf]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -80,7 +80,7 @@ export default function CrossValidation() {
     ctx.font = "11px var(--ds-mono), monospace";
     ctx.textAlign = "left";
     ctx.fillText(`K = ${k} folds · validation fold = ${fold + 1} (gold border)`, pad, 18);
-  }, [k, fold]);
+  }, [k, fold, foldOf]);
 
   return (
     <div>

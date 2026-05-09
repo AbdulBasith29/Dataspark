@@ -716,12 +716,15 @@ export default function DS8() {
             <span style={{ background: `linear-gradient(135deg,${P.ind},${P.grn})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>systems.</span>
           </h1>
 
-          <p style={{ fontSize: "clamp(15px, 2vw, 17px)", color: P.t2, fontWeight: 400, lineHeight: 1.65, maxWidth: 480, marginBottom: 36 }}>
-            Most platforms train you to solve isolated coding questions. Real interviews ask you to investigate business problems and explain your thinking clearly. DataSpark helps you do both.
+          <p style={{ fontSize: "clamp(15px, 2vw, 17px)", color: P.t2, fontWeight: 400, lineHeight: 1.65, maxWidth: 520, marginBottom: 36 }}>
+            Most platforms train you to solve isolated coding questions. Real interviews ask you to investigate business problems and explain your thinking clearly. DataSpark helps you do both — with a familiar practice flow (difficulty filters, tagged prompts, focused solve screen) that feels natural if you already use LeetCode.
           </p>
 
           <div id="join">
             <WaitlistCTA placement="hero" {...ctaProps} />
+          </div>
+          <div style={{ marginTop: 10, fontSize: 11, color: P.t3, fontFamily: "var(--mono)" }}>
+            Product + copy refresh live as of May 2, 2026.
           </div>
 
           <div style={{ marginTop: 22, background: "rgba(99,102,241,.06)", border: "1px solid rgba(99,102,241,.25)", borderRadius: 12, padding: "14px 16px", maxWidth: 520 }}>
