@@ -416,7 +416,7 @@ function FoldAnimationMode() {
   const reducer = REDUCERS.find((r) => r.id === reducerId);
   const initialOpt = reducer.initials.find((i) => i.id === initialId) ?? reducer.initials[0];
 
-  const items = emptyMode ? [] : FOLD_ITEMS;
+  const items = useMemo(() => (emptyMode ? [] : FOLD_ITEMS), [emptyMode]);
   const trace = useMemo(
     () => reduceTrace({ items, initial: initialOpt.value, fn: reducer.apply }),
     [items, initialOpt, reducer],

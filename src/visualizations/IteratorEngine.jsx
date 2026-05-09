@@ -497,7 +497,7 @@ function LazyPipeline({ events, visible, lastEvent, finished, tick, totalYielded
   );
 }
 
-function EagerPipeline({ source, filtered, mapped, taken, filter, mapper, takeN }) {
+function EagerPipeline({ filtered, mapped, taken, filter, mapper, takeN }) {
   return (
     <div style={{ marginTop: 14 }}>
       <SectionFrame title="EAGER PIPELINE · materialize, then slice" tone="danger">

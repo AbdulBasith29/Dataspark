@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DS } from "../lib/ds-platform-tokens.js";
 
 const EDGE_INDEX = [
@@ -22,12 +22,15 @@ export default function BackpropAnimation() {
   const tickRef = useRef(0);
 
   const decay = Math.exp(-epoch * 0.12);
-  const grads = {
-    out: [0.95 * decay],
-    h: [0.7 * decay, 0.52 * decay],
-    in: [0.22 * decay, 0.16 * decay],
-    edges: [0.84, 0.61, 0.55, 0.42, 0.92, 0.68].map((g) => g * decay),
-  };
+  const grads = useMemo(
+    () => ({
+      out: [0.95 * decay],
+      h: [0.7 * decay, 0.52 * decay],
+      in: [0.22 * decay, 0.16 * decay],
+      edges: [0.84, 0.61, 0.55, 0.42, 0.92, 0.68].map((g) => g * decay),
+    }),
+    [decay],
+  );
 
   useEffect(() => {
     if (!playing) return;

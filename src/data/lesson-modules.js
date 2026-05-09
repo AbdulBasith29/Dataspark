@@ -1636,7 +1636,7 @@ def describe(value):
 Half the lines, same behaviour, clearer intent. Note how \`case 0:\` quietly handles **only** integer 0 (and \`False\`, since \`False == 0\`) — if that asymmetry matters, add \`case 0 if value is not False:\` as a guard.`,
 
     tryGuidance:
-      "Open the **branch router** and run two experiments. **Mode 1 (if-chain)**: pick the empty string \`\"\"\` and notice it falls all the way to the \`isinstance(x, str)\` branch — the truthiness branch never fires. Then pick \`None\` and watch the very first branch catch it. **Mode 2 (match/case)**: send \`Point(0, 0)\` and watch the \`Point(x=0, y=0)\` branch fire instead of \`Point(x, y) if x == y\` — first-match-wins. Then send \`Point(3, 3)\` and watch how the *order* of cases changes the answer. Finally, scroll to the wildcard \`case _:\` and ask yourself: which branches above it are reachable for which subjects?",
+      "Open the **branch router** and run two experiments. **Mode 1 (if-chain)**: pick the empty string `\"\"` and notice it falls all the way to the `isinstance(x, str)` branch — the truthiness branch never fires. Then pick `None` and watch the very first branch catch it. **Mode 2 (match/case)**: send `Point(0, 0)` and watch the `Point(x=0, y=0)` branch fire instead of `Point(x, y) if x == y` — first-match-wins. Then send `Point(3, 3)` and watch how the *order* of cases changes the answer. Finally, scroll to the wildcard `case _:` and ask yourself: which branches above it are reachable for which subjects?",
 
     knowledgeCheck: [
       {
@@ -2084,7 +2084,7 @@ list(zip([1, 2, 3], ['a', 'b'], strict=True))   # ValueError, as it should
 If you can spot all four in code review without running it, you are calibrated.`,
 
     tryGuidance:
-      "Open the **iterator engine** below and run it in two passes. **Mode 1 (Iterator Protocol)**: pick a small source, then click *next()* repeatedly. Watch the cursor index advance, the consumed items move into the *yielded* tray, and the eventual \`StopIteration\`. Try clicking *next()* one more time after exhaustion — it stays raised, the cursor doesn't reset. **Mode 2 (Lazy Pipeline)**: pick a source and chain a *filter → map → take*. Click *pull* one step at a time and watch *only one item at a time* flow through every stage — that is laziness made visible. Compare with the *eager* toggle to see how the equivalent list-comprehension version would inflate intermediate lists. The bottom \"memory in flight\" counter tells the whole story: lazy stays at 1, eager grows linearly with N.",
+      "Open the **iterator engine** below and run it in two passes. **Mode 1 (Iterator Protocol)**: pick a small source, then click *next()* repeatedly. Watch the cursor index advance, the consumed items move into the *yielded* tray, and the eventual `StopIteration`. Try clicking *next()* one more time after exhaustion — it stays raised, the cursor doesn't reset. **Mode 2 (Lazy Pipeline)**: pick a source and chain a *filter → map → take*. Click *pull* one step at a time and watch *only one item at a time* flow through every stage — that is laziness made visible. Compare with the *eager* toggle to see how the equivalent list-comprehension version would inflate intermediate lists. The bottom \"memory in flight\" counter tells the whole story: lazy stays at 1, eager grows linearly with N.",
 
     knowledgeCheck: [
       {
@@ -2568,7 +2568,7 @@ Answers: ① fails — \`e\` is required keyword-only, missing. ② passes — \
 If you can do that in five seconds per call, you have internalized the binding rules.`,
 
     tryGuidance:
-      "Open the **argument binder** below and run two experiments. **Mode 1 (signature)**: pick a signature with all five slot kinds (the *render* example) and watch the divider lines for \`/\` and \`*\` — every parameter to the left of \`/\` is positional-only, every parameter to the right of \`*\` is keyword-only. **Mode 2 (call site)**: add positional, keyword, \`*list\`, and \`**dict\` arguments and watch them route into the slots in real time. The arrows turn red the moment a binding rule breaks — *missing required*, *multiple values*, *unexpected keyword*. Toggle the *mutable default* example to see the same default-list object grow across three call frames — that is the bug, made literal.",
+      "Open the **argument binder** below and run two experiments. **Mode 1 (signature)**: pick a signature with all five slot kinds (the *render* example) and watch the divider lines for `/` and `*` — every parameter to the left of `/` is positional-only, every parameter to the right of `*` is keyword-only. **Mode 2 (call site)**: add positional, keyword, `*list`, and `**dict` arguments and watch them route into the slots in real time. The arrows turn red the moment a binding rule breaks — *missing required*, *multiple values*, *unexpected keyword*. Toggle the *mutable default* example to see the same default-list object grow across three call frames — that is the bug, made literal.",
 
     knowledgeCheck: [
       {
@@ -2659,8 +2659,8 @@ If you can do that in five seconds per call, you have internalized the binding r
     outcomes: [
       "Read and write a **lambda** fluently — and know its three hard restrictions (single expression, no statements, anonymous in tracebacks).",
       "Use **`map`**, **`filter`**, and **`functools.reduce`** with a clear mental model: *transform / keep / fold* — and remember they all return **iterators** in Python 3.",
-      "Default to a **comprehension** over `map` / `filter` when readability is the tiebreaker, and pick the right escape hatch — \`operator.*\`, \`functools.partial\`, named \`def\` — when a lambda becomes a smell.",
-      "Pick the right **reducer**: `sum` / `min` / `max` / `any` / `all` / `Counter` / \`statistics.fmean\` — and only fall back to **`reduce`** for genuinely custom folds.",
+      "Default to a **comprehension** over `map` / `filter` when readability is the tiebreaker, and pick the right escape hatch — `operator.*`, `functools.partial`, named `def` — when a lambda becomes a smell.",
+      "Pick the right **reducer**: `sum` / `min` / `max` / `any` / `all` / `Counter` / `statistics.fmean` — and only fall back to **`reduce`** for genuinely custom folds.",
       "Avoid the four canonical **lambda traps**: late-binding closures in loops, multi-statement temptation, lambdas as dict keys, and reaching for `lambda` where `operator.itemgetter` / `attrgetter` is shorter and faster.",
     ],
     learnMarkdown: `## The mental model: three primitives, one shape
@@ -3040,7 +3040,7 @@ df["full_name"] = df["first"] + " " + df["last"]
 A 10× speedup is normal. The senior heuristic in pandas: **if you reach for \`lambda\` inside \`apply\`, ask whether you can vectorize first**. \`apply\` is for genuinely row-shaped logic that can't be expressed as column-wise ops.`,
 
     tryGuidance:
-      "Open the **fold machine** below and run three experiments. **Mode 1 (lambda decoder)**: pick a recipe like \`lambda r: r[\"revenue\"]\` and watch four equivalents render side-by-side — \`def\`, comprehension, \`operator.itemgetter\`, \`functools.partial\`. The verdict pill tells you which one a senior reviewer would prefer. **Mode 2 (pipeline lab)**: configure a filter and a map; watch the source flow through both stages with rejected items struck out and transformed values lit up. **Mode 3 (fold animation)**: pick a binary reducer (sum / max / product / set-union / dict-merge), step one item at a time, and watch the accumulator update — \`acc = fn(acc, x)\` — frame by frame. The empty-iterable + no-initial case is one of the buttons; click it to see the actual TypeError Python raises.",
+      "Open the **fold machine** below and run three experiments. **Mode 1 (lambda decoder)**: pick a recipe like `lambda r: r[\"revenue\"]` and watch four equivalents render side-by-side — `def`, comprehension, `operator.itemgetter`, `functools.partial`. The verdict pill tells you which one a senior reviewer would prefer. **Mode 2 (pipeline lab)**: configure a filter and a map; watch the source flow through both stages with rejected items struck out and transformed values lit up. **Mode 3 (fold animation)**: pick a binary reducer (sum / max / product / set-union / dict-merge), step one item at a time, and watch the accumulator update — `acc = fn(acc, x)` — frame by frame. The empty-iterable + no-initial case is one of the buttons; click it to see the actual TypeError Python raises.",
 
     knowledgeCheck: [
       {
@@ -3130,10 +3130,10 @@ A 10× speedup is normal. The senior heuristic in pandas: **if you reach for \`l
     durationLabel: MODULE_TIME_LABEL,
     outcomes: [
       "Read and write the four-clause **`try / except / else / finally`** block fluently — and predict exactly which clauses run for each of the five outcomes (success · caught · uncaught · return · raise inside except).",
-      "Catch the **narrowest exception that means what you mean** — never bare \`except:\` (which swallows \`KeyboardInterrupt\` / \`SystemExit\`), rarely \`except Exception:\` — and use multi-type \`except (A, B):\` and the \`as e\` binding correctly.",
+      "Catch the **narrowest exception that means what you mean** — never bare `except:` (which swallows `KeyboardInterrupt` / `SystemExit`), rarely `except Exception:` — and use multi-type `except (A, B):` and the `as e` binding correctly.",
       "Re-raise without losing the traceback (`raise`), chain causes (`raise NewError() from e`), and silence chains (`raise NewError() from None`) — and explain the difference between **`__cause__`** (explicit) and **`__context__`** (implicit during handling).",
       "Read a Python traceback **bottom-up**: the actual error is the **last** line; the frames above are the call stack from outermost to innermost. Distinguish the two boilerplate lines — *direct cause of* vs *during handling of*.",
-      "Debug like a senior: \`breakpoint()\` over \`print\`, \`logger.exception()\` over \`print(e)\`, **pdb post-mortem** (`python -m pdb -c continue script.py`), \`traceback.format_exc()\` for capture, and \`assert\` for invariants — with the \`-O\` caveat.",
+      "Debug like a senior: `breakpoint()` over `print`, `logger.exception()` over `print(e)`, **pdb post-mortem** (`python -m pdb -c continue script.py`), `traceback.format_exc()` for capture, and `assert` for invariants — with the `-O` caveat.",
     ],
     learnMarkdown: `## The mental model: errors are values that travel up the stack
 
@@ -3564,7 +3564,7 @@ Two different things:
 A stripped \`assert\` is one of the most embarrassing production bugs in Python — your validation just disappears.`,
 
     tryGuidance:
-      "Open the **traceback theater** below and run three experiments. **Mode 1 (try/except router)**: pick what happens inside the \`try\` (raise ValueError, raise KeyError, return early, no error) and an except chain — watch the green/red highlights show *exactly* which clauses run, in order, and check that \`finally\` is always lit. **Mode 2 (hierarchy match)**: pick a raised exception class and a chain of \`except\` clauses; the visualization walks the chain top-down using \`isinstance\` and shows the first match winning — try ordering \`OSError\` *before* \`FileNotFoundError\` to see the dead-code case. **Mode 3 (traceback reader)**: toggle \`raise\` vs \`raise from e\` vs \`raise from None\` and read how the boilerplate lines change between *direct cause of* and *during handling of* — and which line is the actual error.",
+      "Open the **traceback theater** below and run three experiments. **Mode 1 (try/except router)**: pick what happens inside the `try` (raise ValueError, raise KeyError, return early, no error) and an except chain — watch the green/red highlights show *exactly* which clauses run, in order, and check that `finally` is always lit. **Mode 2 (hierarchy match)**: pick a raised exception class and a chain of `except` clauses; the visualization walks the chain top-down using `isinstance` and shows the first match winning — try ordering `OSError` *before* `FileNotFoundError` to see the dead-code case. **Mode 3 (traceback reader)**: toggle `raise` vs `raise from e` vs `raise from None` and read how the boilerplate lines change between *direct cause of* and *during handling of* — and which line is the actual error.",
 
     knowledgeCheck: [
       {
