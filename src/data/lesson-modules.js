@@ -3849,6 +3849,1088 @@ This module still ships a full **written** walkthrough and the mutability lab �
     ],
   },
 
+
+  "py-o1": {
+    durationLabel: MODULE_TIME_LABEL,
+    outcomes: [
+      "Explain the difference between a **class**, an **instance**, an **attribute**, and a **method** without mixing up the blueprint/object metaphor.",
+      "Write a clean `__init__` that validates inputs, stores instance state, and avoids shared mutable class-state bugs.",
+      "Decide when a lightweight class is better than a plain dict, tuple, `dataclass`, or simple function in data-pipeline code.",
+      "Use `self` deliberately: know why it is passed explicitly, how method lookup binds it, and what breaks when you forget it.",
+      "Design small objects with useful `__repr__`, invariants, and behavior close to the data it protects.",
+    ],
+    learnMarkdown: `## Why classes matter in data work
+
+A lot of Python for data science starts as dictionaries and functions. That is fine — until the same dictionary shape appears in five files, every function assumes different keys, and one pipeline step silently mutates a config that another step thought was stable.
+
+Classes give you a way to put **state**, **validation**, and **behavior** in one named place.
+
+Think of a class as a small contract:
+
+- **What data does this object always have?**
+- **What rules must be true after it is created?**
+- **What operations are allowed on it?**
+- **How should it explain itself when printed in a log or traceback?**
+
+In interviews, classes are not about showing off OOP vocabulary. They are about proving you can make code easier to reason about as it grows.
+
+---
+
+## Class vs instance
+
+A **class** is the definition. An **instance** is one concrete object created from that definition.
+
+\`\`\`python
+class DatasetJob:
+    pass
+
+job_a = DatasetJob()
+job_b = DatasetJob()
+\`\`\`
+
+Here:
+
+- \`DatasetJob\` is the class.
+- \`job_a\` and \`job_b\` are different instances.
+- Each instance has its own identity: \`job_a is job_b\` is \`False\`.
+
+The useful interview sentence is:
+
+> A class defines the type and behavior; an instance carries the actual runtime state.
+
+---
+
+## What \`__init__\` really does
+
+\`__init__\` is the initializer that runs **after** Python creates the instance. Its job is to put the object into a valid starting state.
+
+\`\`\`python
+class DatasetJob:
+    def __init__(self, source: str, table: str, batch_size: int = 1000):
+        if not source:
+            raise ValueError("source is required")
+        if not table:
+            raise ValueError("table is required")
+        if batch_size <= 0:
+            raise ValueError("batch_size must be positive")
+
+        self.source = source
+        self.table = table
+        self.batch_size = batch_size
+        self.rows_processed = 0
+\`\`\`
+
+Notice the pattern:
+
+1. **Validate boundary inputs first**.
+2. Store clean values on \`self\`.
+3. Initialize runtime state explicitly.
+
+A good \`__init__\` leaves the object ready to use. Avoid half-valid objects where callers need to remember extra setup steps.
+
+---
+
+## The meaning of \`self\`
+
+\`self\` is the current instance. It is not a keyword, but it is the universal convention.
+
+\`\`\`python
+class Counter:
+    def __init__(self):
+        self.count = 0
+
+    def increment(self, n=1):
+        self.count += n
+        return self.count
+\`\`\`
+
+When you call:
+
+\`\`\`python
+c = Counter()
+c.increment(3)
+\`\`\`
+
+Python effectively binds the instance for you:
+
+\`\`\`python
+Counter.increment(c, 3)
+\`\`\`
+
+That is why instance methods must include \`self\` as their first parameter. If you forget it, Python still passes the instance, and your argument binding breaks.
+
+---
+
+## Instance attributes vs class attributes
+
+This is the first major OOP footgun.
+
+### Instance attributes: per-object state
+
+\`\`\`python
+class Job:
+    def __init__(self, name):
+        self.name = name
+        self.errors = []
+\`\`\`
+
+Each \`Job\` gets its own \`errors\` list.
+
+### Class attributes: shared by the class
+
+\`\`\`python
+class BadJob:
+    errors = []  # shared across all instances
+
+    def __init__(self, name):
+        self.name = name
+\`\`\`
+
+Now every instance shares the same \`BadJob.errors\` list unless you shadow it with an instance attribute. This is exactly the same category of bug as mutable default arguments.
+
+Use class attributes for **constants** or shared configuration:
+
+\`\`\`python
+class Job:
+    DEFAULT_BATCH_SIZE = 1000
+\`\`\`
+
+Use instance attributes for per-object state.
+
+---
+
+## Put behavior near the data
+
+A weak class is just a dictionary with dot syntax. A strong class protects invariants and names behavior.
+
+Weak:
+
+\`\`\`python
+job = {"rows_processed": 0, "failed": False}
+job["rows_processed"] += 100
+\`\`\`
+
+Stronger:
+
+\`\`\`python
+class DatasetJob:
+    def __init__(self, source, table):
+        self.source = source
+        self.table = table
+        self.rows_processed = 0
+        self.failed = False
+
+    def record_success(self, rows: int):
+        if rows < 0:
+            raise ValueError("rows cannot be negative")
+        self.rows_processed += rows
+
+    def mark_failed(self):
+        self.failed = True
+\`\`\`
+
+The class gives names to state transitions: \`record_success\`, \`mark_failed\`. That makes logs, tests, and interview explanations clearer.
+
+---
+
+## Add a useful \`__repr__\`
+
+The default object repr is rarely helpful:
+
+\`\`\`text
+<__main__.DatasetJob object at 0x104ab...>
+\`\`\`
+
+A debugging-friendly class should explain itself:
+
+\`\`\`python
+class DatasetJob:
+    def __init__(self, source, table, batch_size=1000):
+        self.source = source
+        self.table = table
+        self.batch_size = batch_size
+        self.rows_processed = 0
+
+    def __repr__(self):
+        return (
+            f"DatasetJob(source={self.source!r}, table={self.table!r}, "
+            f"batch_size={self.batch_size}, rows_processed={self.rows_processed})"
+        )
+\`\`\`
+
+Use \`!r\` in f-strings when the representation should be unambiguous for debugging.
+
+---
+
+## When should you use a class?
+
+Use a class when at least two of these are true:
+
+- The same data shape is passed through many functions.
+- There are invariants that must always be true.
+- Related functions keep taking the same first argument.
+- You need lifecycle/state transitions: pending → running → succeeded/failed.
+- You want better logs and test fixtures.
+
+Avoid a class when:
+
+- A simple pure function is clearer.
+- A plain dict is truly temporary and local.
+- You are creating “manager” objects with vague responsibilities.
+- The class has no behavior and no invariants — in that case, consider a \`dataclass\` or named tuple.
+
+---
+
+## Senior pattern: small class, explicit contract
+
+\`\`\`python
+class BatchAccumulator:
+    def __init__(self, max_size: int):
+        if max_size <= 0:
+            raise ValueError("max_size must be positive")
+        self.max_size = max_size
+        self._items = []
+
+    def add(self, item):
+        self._items.append(item)
+        if len(self._items) >= self.max_size:
+            return self.flush()
+        return []
+
+    def flush(self):
+        batch = self._items
+        self._items = []
+        return batch
+
+    def __repr__(self):
+        return f"BatchAccumulator(max_size={self.max_size}, pending={len(self._items)})"
+\`\`\`
+
+This object has a tight purpose: collect items until a batch is ready. It owns its mutable list so callers do not have to coordinate shared state manually.
+
+---
+
+## Common interview traps
+
+1. **Forgetting \`self\`** in a method signature.
+2. **Using a mutable class attribute** for per-instance state.
+3. **Doing too much in \`__init__\`** — avoid network calls, expensive file reads, or hidden side effects unless the class is explicitly a resource wrapper.
+4. **Creating god objects** such as \`DataPipelineManagerServiceHelper\` that knows everything.
+5. **Overusing inheritance** before you have a stable interface. Composition is often simpler.
+
+---
+
+## Two-sentence interview answer
+
+If asked “Why use a class here?” say:
+
+> I would use a class when the data has invariants and behavior that should travel together. The initializer validates the object once, instance methods enforce legal state transitions, and a clear \`__repr__\` makes failures easier to debug.
+
+That answer is more senior than “because classes organize code.”`,
+
+    video: {
+      youtubeId: "ZDa-Z5JzLYM",
+      title: "Python OOP Tutorial 1: Classes and Instances",
+      channel: "Corey Schafer",
+      startSeconds: 0,
+    },
+    videoFallbackMarkdown: `## Curated clip
+
+Watch **Corey Schafer — Python OOP Tutorial 1: Classes and Instances**. Pause after the first class example and rewrite it as a data-pipeline object with three attributes and one method.
+
+While watching, keep a scratchpad with two columns: **class attribute** vs **instance attribute**. Every time an attribute appears, classify it and ask whether it should be shared or per-instance.`,
+
+    tryGuidance: `Open a scratch file and build a tiny \`DatasetJob\` class. First create it with a mutable class-level \`errors = []\` and observe the bug across two instances. Then move \`errors\` into \`__init__\`, add validation, and print the object before and after adding a custom \`__repr__\`.`,
+
+    knowledgeCheck: [
+      {
+        question: "What is the best description of `self` in an instance method?",
+        options: [
+          "The current instance; Python passes it automatically when the method is called through an object",
+          "A keyword that creates a new object",
+          "A private variable that cannot be accessed outside the class",
+        ],
+        correctIndex: 0,
+        explanation: "`self` is the conventional name for the instance being operated on. Calling `obj.method(x)` binds `obj` as the first argument.",
+      },
+      {
+        question: "Why is `errors = []` at class scope usually a bug for per-job errors?",
+        options: [
+          "It creates one list shared by all instances unless shadowed",
+          "Python will refuse to import the class",
+          "Lists can only be created inside functions",
+        ],
+        correctIndex: 0,
+        explanation: "Class attributes live on the class. Mutable values there are shared, so one instance can accidentally see another instance's changes.",
+      },
+      {
+        question: "What should `__init__` primarily do?",
+        options: [
+          "Validate inputs and put the new object into a usable initial state",
+          "Run the entire data pipeline immediately",
+          "Print all attributes for debugging and return a dictionary",
+        ],
+        correctIndex: 0,
+        explanation: "A good initializer establishes invariants. Avoid surprising heavy side effects unless resource acquisition is the class's explicit purpose.",
+      },
+      {
+        question: "When is a small class better than passing around a plain dict?",
+        options: [
+          "When the data has repeated structure, invariants, and related behavior",
+          "Whenever you want fewer lines of code, regardless of behavior",
+          "Only when inheritance is required",
+        ],
+        correctIndex: 0,
+        explanation: "Classes earn their keep by naming and enforcing a contract. Inheritance is optional and often not the first tool.",
+      },
+    ],
+  },
+
+
+  "py-o2": {
+    durationLabel: MODULE_TIME_LABEL,
+    outcomes: [
+      "Explain inheritance as an **is-a** relationship and composition as a **has-a / uses-a** relationship, then choose the simpler design for a real data workflow.",
+      "Implement a small base class with shared behavior and subclasses that override only the pieces that genuinely vary.",
+      "Use `super()` correctly to extend parent initialization without duplicating validation or shared setup.",
+      "Describe polymorphism as **same interface, different implementation** — not as a requirement to write deep inheritance trees.",
+      "Spot inheritance footguns: fragile base classes, wrong method signatures, hidden side effects, and subclassing when a function or injected strategy would be clearer.",
+    ],
+    learnMarkdown: `## Why this lesson matters
+
+Inheritance is one of the easiest Python topics to overuse. In interviews, many candidates can write \`class Child(Parent)\`, but fewer can explain when that design helps and when it makes the code harder to change.
+
+The senior framing is:
+
+> Inheritance shares behavior through an **is-a** relationship. Polymorphism lets different objects satisfy the same interface so the caller does not need to know the exact concrete class.
+
+For data work, this shows up in:
+
+- readers for different file types: CSV, JSON, Parquet
+- validators for different schemas
+- feature transforms with a shared \`fit\` / \`transform\` shape
+- exporters that write to S3, local disk, a database, or an API
+- model monitoring checks with common reporting behavior and different scoring logic
+
+The goal is not “more OOP.” The goal is code where new variants can be added without rewriting every caller.
+
+---
+
+## The core vocabulary
+
+### Base class / parent class
+
+A class that holds shared behavior.
+
+### Subclass / child class
+
+A more specific class that inherits from the base class.
+
+### Override
+
+A subclass defines a method with the same name as a parent method to provide specialized behavior.
+
+### Polymorphism
+
+Different object types can be used through the same method names or protocol.
+
+\`\`\`python
+def preview(reader):
+    rows = reader.read()
+    return rows[:5]
+\`\`\`
+
+\`preview\` does not need to know whether \`reader\` is a \`CsvReader\`, \`JsonReader\`, or \`ParquetReader\`. It only needs something with a \`read()\` method.
+
+---
+
+## A practical inheritance example
+
+Start with repeated code:
+
+\`\`\`python
+class CsvExporter:
+    def __init__(self, destination):
+        if not destination:
+            raise ValueError("destination is required")
+        self.destination = destination
+        self.rows_written = 0
+
+    def write(self, rows):
+        self.rows_written += len(rows)
+        return f"csv -> {self.destination}: {len(rows)} rows"
+
+class JsonExporter:
+    def __init__(self, destination):
+        if not destination:
+            raise ValueError("destination is required")
+        self.destination = destination
+        self.rows_written = 0
+
+    def write(self, rows):
+        self.rows_written += len(rows)
+        return f"json -> {self.destination}: {len(rows)} rows"
+\`\`\`
+
+Both classes validate \`destination\` and track \`rows_written\`. That shared state belongs in a base class.
+
+\`\`\`python
+class BaseExporter:
+    format_name = "base"
+
+    def __init__(self, destination):
+        if not destination:
+            raise ValueError("destination is required")
+        self.destination = destination
+        self.rows_written = 0
+
+    def write(self, rows):
+        payload = self.serialize(rows)
+        self.rows_written += len(rows)
+        return f"{self.format_name} -> {self.destination}: {payload}"
+
+    def serialize(self, rows):
+        raise NotImplementedError("subclasses must implement serialize")
+
+class CsvExporter(BaseExporter):
+    format_name = "csv"
+
+    def serialize(self, rows):
+        return f"{len(rows)} CSV rows"
+
+class JsonExporter(BaseExporter):
+    format_name = "json"
+
+    def serialize(self, rows):
+        return f"{len(rows)} JSON records"
+\`\`\`
+
+Now the invariant lives in one place: every exporter has a destination and a row counter. The subclass only supplies what varies: serialization format.
+
+---
+
+## Method resolution order: where does Python look?
+
+When you call:
+
+\`\`\`python
+exporter = CsvExporter("s3://bucket/out.csv")
+exporter.write([{"id": 1}])
+\`\`\`
+
+Python looks for \`write\` in this order:
+
+1. \`CsvExporter\`
+2. \`BaseExporter\`
+3. \`object\`
+
+Because \`CsvExporter\` does not define \`write\`, Python uses \`BaseExporter.write\`. Inside that method, \`self.serialize(rows)\` still dispatches to \`CsvExporter.serialize\` because \`self\` is the concrete instance.
+
+That is the key polymorphism moment: parent code can call a method that the child supplies.
+
+---
+
+## Using \`super()\` correctly
+
+Use \`super()\` when a subclass wants to extend parent setup instead of replacing it.
+
+\`\`\`python
+class DatabaseExporter(BaseExporter):
+    format_name = "database"
+
+    def __init__(self, destination, table):
+        super().__init__(destination)
+        if not table:
+            raise ValueError("table is required")
+        self.table = table
+
+    def serialize(self, rows):
+        return f"insert {len(rows)} rows into {self.table}"
+\`\`\`
+
+This avoids duplicating the destination validation and \`rows_written\` setup.
+
+The common bug is to write a subclass \`__init__\` and forget \`super().__init__(...)\`. Then the object may exist but be missing attributes that parent methods expect.
+
+---
+
+## Polymorphism without inheritance
+
+Python is dynamically typed, so polymorphism often does not require inheritance.
+
+\`\`\`python
+class S3Writer:
+    def write(self, rows):
+        return "wrote rows to S3"
+
+class LocalWriter:
+    def write(self, rows):
+        return "wrote rows to local disk"
+
+def run_export(writer, rows):
+    return writer.write(rows)
+\`\`\`
+
+\`S3Writer\` and \`LocalWriter\` share no base class, but \`run_export\` works with both because both implement \`write\`.
+
+This is sometimes called **duck typing**:
+
+> If it walks like a duck and quacks like a duck, Python cares more about the behavior than the declared ancestry.
+
+For interviews, say:
+
+> In Python, inheritance is one way to get polymorphism, but not the only way. A shared method shape or protocol can be enough.
+
+---
+
+## Abstract base classes: useful, but not mandatory
+
+When you want to force subclasses to implement methods, use \`abc.ABC\` and \`@abstractmethod\`.
+
+\`\`\`python
+from abc import ABC, abstractmethod
+
+class Reader(ABC):
+    @abstractmethod
+    def read(self):
+        """Return a list of rows."""
+
+class CsvReader(Reader):
+    def __init__(self, path):
+        self.path = path
+
+    def read(self):
+        return ["row1", "row2"]
+\`\`\`
+
+If a subclass forgets \`read\`, Python prevents instantiation. That can be useful in libraries or larger teams.
+
+But do not reach for ABCs automatically. For a small app, a clear docstring, tests, or a lightweight protocol may be enough.
+
+---
+
+## Inheritance vs composition
+
+Inheritance says: **this object is a specialized kind of that object**.
+
+Composition says: **this object uses another object to do part of its work**.
+
+### Inheritance version
+
+\`\`\`python
+class RetryingApiClient(ApiClient):
+    def request(self, url):
+        # retry around parent request
+        ...
+\`\`\`
+
+### Composition version
+
+\`\`\`python
+class RetryingClient:
+    def __init__(self, client, max_retries=3):
+        self.client = client
+        self.max_retries = max_retries
+
+    def request(self, url):
+        for attempt in range(self.max_retries):
+            try:
+                return self.client.request(url)
+            except TimeoutError:
+                if attempt == self.max_retries - 1:
+                    raise
+\`\`\`
+
+The composition version can wrap any object with a \`request\` method. It is often easier to test because you can inject a fake client.
+
+Rule of thumb:
+
+- Use inheritance when the subtype relationship is stable and obvious.
+- Use composition when you mostly want to reuse a collaborator or swap behavior.
+
+---
+
+## The Liskov substitution sanity check
+
+A subclass should be usable anywhere the parent is expected without surprising the caller.
+
+If \`BaseExporter.write(rows)\` accepts any list of rows, a subclass should not suddenly require rows to be sorted, non-empty, or shaped differently unless that contract is explicitly part of the base class.
+
+Bad smell:
+
+\`\`\`python
+class NonEmptyCsvExporter(BaseExporter):
+    def write(self, rows):
+        if not rows:
+            raise ValueError("empty rows not allowed")
+        return super().write(rows)
+\`\`\`
+
+Maybe that rule is valid, but now code that works with a generic \`BaseExporter\` may fail for this subtype. If callers must know the exact subclass to use it safely, the inheritance design is leaking.
+
+---
+
+## Common footguns
+
+1. **Forgetting \`super().__init__\`** and leaving parent attributes unset.
+2. **Overriding with an incompatible signature**, such as parent \`write(rows)\` but child \`write(rows, schema, strict)\`.
+3. **Deep inheritance chains** where behavior is spread across five classes.
+4. **Subclassing for configuration only** when an instance attribute or constructor argument would work.
+5. **Using inheritance to share two lines of code** — a helper function may be clearer.
+6. **Assuming polymorphism requires inheritance** — in Python, shared behavior can be enough.
+
+---
+
+## A compact interview answer
+
+If asked “How do inheritance and polymorphism differ?” answer:
+
+> Inheritance is a code-organization relationship where a subclass reuses or specializes a parent class. Polymorphism is the caller-side benefit: different objects can be used through the same interface, so the caller can ask all of them to \`write\`, \`read\`, or \`transform\` without caring about the concrete class.
+
+If asked “Inheritance or composition?” answer:
+
+> I use inheritance for a stable is-a hierarchy with a clear shared contract. I use composition when I mainly want to reuse behavior, inject dependencies, or swap strategies because it tends to be easier to test and less fragile.`,
+
+    video: {
+      youtubeId: "RSl87lqOXDE",
+      title: "Python OOP Tutorial 4: Inheritance - Creating Subclasses",
+      channel: "Corey Schafer",
+      startSeconds: 0,
+    },
+    videoFallbackMarkdown: `## Curated clip
+
+Watch **Corey Schafer — Python OOP Tutorial 4: Inheritance - Creating Subclasses**. As you watch, pause whenever a child class calls \`super()\` and write down which attributes would be missing if that line disappeared.
+
+Then rewrite the example in data terms: a base \`Reader\`, then \`CsvReader\` and \`JsonReader\` subclasses.`,
+
+    tryGuidance: `Create a base \`BaseExporter\` with \`write(rows)\` and \`serialize(rows)\`. Implement \`CsvExporter\` and \`JsonExporter\`, then pass both into one \`run_export(exporter, rows)\` function. Finally, refactor one version to composition by injecting a serializer object and compare which version is easier to test.`,
+
+    knowledgeCheck: [
+      {
+        question: "What is polymorphism in practical Python terms?",
+        options: [
+          "Different objects can be used through the same interface, such as all having a `write(rows)` method",
+          "Every class must inherit from a custom base class",
+          "A subclass automatically becomes faster than its parent",
+        ],
+        correctIndex: 0,
+        explanation: "Polymorphism is about caller behavior: the caller can use different concrete objects the same way. Inheritance can help, but duck typing can also provide polymorphism.",
+      },
+      {
+        question: "Why call `super().__init__(...)` in a subclass initializer?",
+        options: [
+          "To run the parent initialization so shared validation and attributes are set up",
+          "To skip parent validation and make the subclass independent",
+          "To convert the subclass into a dataclass",
+        ],
+        correctIndex: 0,
+        explanation: "If parent methods expect attributes initialized by the parent, forgetting `super()` leaves the object partially initialized and fragile.",
+      },
+      {
+        question: "Which situation is the best fit for composition instead of inheritance?",
+        options: [
+          "You want to wrap or swap a collaborator, such as injecting a retrying client or serializer",
+          "The subtype relationship is stable and every subclass truly is a kind of the base type",
+          "You need to override exactly one method in a clear base contract",
+        ],
+        correctIndex: 0,
+        explanation: "Composition is usually better when the goal is dependency injection, strategy swapping, or testing with fakes rather than modeling a true is-a relationship.",
+      },
+      {
+        question: "What is a fragile inheritance smell?",
+        options: [
+          "A child override changes the method signature or strengthens requirements so generic parent callers break",
+          "A base class has a short docstring",
+          "A class uses `self` as the first method parameter",
+        ],
+        correctIndex: 0,
+        explanation: "Subclasses should preserve the parent contract. If callers must know the exact subclass to avoid surprises, the hierarchy is leaking implementation details.",
+      },
+    ],
+  },
+
+
+  "py-o3": {
+    durationLabel: MODULE_TIME_LABEL,
+    outcomes: [
+      "Explain dunder methods as Python's **data model hooks**: functions like `len`, `repr`, `iter`, `==`, `+`, and `with` delegate to methods with double underscores.",
+      "Implement useful object representations with `__repr__` and know when `__str__` should differ from the debug representation.",
+      "Add equality, hashing, ordering, and container behavior only when the object has a clear semantic contract.",
+      "Overload operators in a way that makes domain code clearer, not cuter, and return `NotImplemented` for unsupported operand types.",
+      "Recognize interview and production footguns: inconsistent `__eq__` / `__hash__`, surprising mutation, expensive magic methods, and clever APIs that hide side effects.",
+    ],
+    learnMarkdown: `## Why dunder methods matter
+
+Dunder methods are Python's customization hooks. They are the reason your objects can work with built-in syntax:
+
+- \`len(x)\` calls \`x.__len__()\`
+- \`repr(x)\` calls \`x.__repr__()\`
+- \`x == y\` calls \`x.__eq__(y)\`
+- \`x + y\` calls \`x.__add__(y)\`
+- \`for item in x\` asks for \`x.__iter__()\`
+- \`with x:\` uses \`x.__enter__()\` and \`x.__exit__()\`
+
+This is called the **Python data model**. It is not trivia — it is how Python lets user-defined classes feel native.
+
+The senior rule is:
+
+> Add dunder methods when they make your object obey an existing Python expectation. Do not add magic just to make code look clever.
+
+---
+
+## Start with \`__repr__\`
+
+\`__repr__\` is usually the first dunder method worth writing because it improves logs, tests, notebooks, and debugging.
+
+\`\`\`python
+class FeatureSpec:
+    def __init__(self, name, dtype, nullable=True):
+        self.name = name
+        self.dtype = dtype
+        self.nullable = nullable
+
+    def __repr__(self):
+        return (
+            f"FeatureSpec(name={self.name!r}, dtype={self.dtype!r}, "
+            f"nullable={self.nullable!r})"
+        )
+\`\`\`
+
+A good \`repr\` should answer: “What is this object, and what important state does it carry?”
+
+When possible, make it unambiguous and close to valid constructor syntax. That makes failed assertions and logs much easier to read.
+
+---
+
+## \`__repr__\` vs \`__str__\`
+
+\`__repr__\` is for developers. \`__str__\` is for users.
+
+\`\`\`python
+class MetricResult:
+    def __init__(self, name, value):
+        self.name = name
+        self.value = value
+
+    def __repr__(self):
+        return f"MetricResult(name={self.name!r}, value={self.value!r})"
+
+    def __str__(self):
+        return f"{self.name}: {self.value:.3f}"
+\`\`\`
+
+Now:
+
+- \`repr(result)\` is debug-friendly.
+- \`str(result)\` is presentation-friendly.
+
+If you only implement one, implement \`__repr__\`. Python will fall back to \`__repr__\` for \`str\` if \`__str__\` is missing.
+
+---
+
+## Equality: \`__eq__\`
+
+By default, objects compare by identity. Two separate instances are not equal unless you say what equality means.
+
+\`\`\`python
+class FeatureSpec:
+    def __init__(self, name, dtype, nullable=True):
+        self.name = name
+        self.dtype = dtype
+        self.nullable = nullable
+
+    def __eq__(self, other):
+        if not isinstance(other, FeatureSpec):
+            return NotImplemented
+        return (
+            self.name == other.name
+            and self.dtype == other.dtype
+            and self.nullable == other.nullable
+        )
+\`\`\`
+
+Return \`NotImplemented\` for unknown types rather than \`False\` when the other operand may know how to compare itself. This lets Python try the reflected operation or make the right fallback decision.
+
+---
+
+## Hashing: the contract that breaks sets and dicts
+
+If an object is hashable, Python assumes:
+
+> If \`a == b\`, then \`hash(a) == hash(b)\`.
+
+That means \`__eq__\` and \`__hash__\` must agree.
+
+\`\`\`python
+class FeatureSpec:
+    def __init__(self, name, dtype, nullable=True):
+        self.name = name
+        self.dtype = dtype
+        self.nullable = nullable
+
+    def __eq__(self, other):
+        if not isinstance(other, FeatureSpec):
+            return NotImplemented
+        return (self.name, self.dtype, self.nullable) == (
+            other.name,
+            other.dtype,
+            other.nullable,
+        )
+
+    def __hash__(self):
+        return hash((self.name, self.dtype, self.nullable))
+\`\`\`
+
+Only implement \`__hash__\` if the values used for equality are stable. Mutable hash keys are dangerous: if an object is inside a set and you mutate the fields used for hashing, the set may no longer be able to find it correctly.
+
+For mutable objects, it is often better to leave them unhashable.
+
+---
+
+## Ordering: use the smallest useful surface
+
+You can implement ordering manually:
+
+\`\`\`python
+class ModelScore:
+    def __init__(self, model_name, auc):
+        self.model_name = model_name
+        self.auc = auc
+
+    def __lt__(self, other):
+        if not isinstance(other, ModelScore):
+            return NotImplemented
+        return self.auc < other.auc
+\`\`\`
+
+Then \`sorted(scores)\` works.
+
+But ask whether ordering is obvious. Does a model score sort by AUC, latency, cost, timestamp, or name? If there is no single natural ordering, prefer an explicit key:
+
+\`\`\`python
+sorted(scores, key=lambda s: s.auc, reverse=True)
+\`\`\`
+
+A dunder method should encode a natural behavior, not a one-off report choice.
+
+---
+
+## Container behavior: \`__len__\`, \`__iter__\`, and \`__contains__\`
+
+If your class acts like a collection, implement the collection hooks.
+
+\`\`\`python
+class Batch:
+    def __init__(self, rows):
+        self._rows = list(rows)
+
+    def __len__(self):
+        return len(self._rows)
+
+    def __iter__(self):
+        return iter(self._rows)
+
+    def __contains__(self, row):
+        return row in self._rows
+\`\`\`
+
+Now Python syntax works naturally:
+
+\`\`\`python
+batch = Batch([{"id": 1}, {"id": 2}])
+len(batch)
+for row in batch:
+    print(row)
+{"id": 1} in batch
+\`\`\`
+
+The guiding idea: if your object promises collection behavior, make it obey collection expectations.
+
+---
+
+## Operator overloading: make domain code clearer
+
+Operator overloading can be excellent when the operator has an obvious meaning.
+
+Example: combining filter predicates.
+
+\`\`\`python
+class Predicate:
+    def __init__(self, expression):
+        self.expression = expression
+
+    def __and__(self, other):
+        if not isinstance(other, Predicate):
+            return NotImplemented
+        return Predicate(f"({self.expression}) AND ({other.expression})")
+
+    def __or__(self, other):
+        if not isinstance(other, Predicate):
+            return NotImplemented
+        return Predicate(f"({self.expression}) OR ({other.expression})")
+
+    def __repr__(self):
+        return f"Predicate({self.expression!r})"
+\`\`\`
+
+Then:
+
+\`\`\`python
+is_active = Predicate("active = true")
+high_value = Predicate("amount > 100")
+combined = is_active & high_value
+\`\`\`
+
+This is readable because \`&\` already suggests combining conditions in pandas and NumPy-style workflows.
+
+Bad operator overloading is when \`+\`, \`*\`, \`<<\`, or \`&\` perform surprising side effects. If the reader has to memorize your private meaning, use a named method instead.
+
+---
+
+## Indexing: \`__getitem__\`
+
+\`__getitem__\` powers square brackets.
+
+\`\`\`python
+class Row:
+    def __init__(self, **values):
+        self._values = values
+
+    def __getitem__(self, key):
+        return self._values[key]
+\`\`\`
+
+Now \`row["user_id"]\` works.
+
+But be careful: supporting square brackets implies mapping or sequence behavior. If your object is not really a mapping or sequence, a named method may be clearer:
+
+\`\`\`python
+row.get_value("user_id")
+\`\`\`
+
+---
+
+## Context manager dunders
+
+Context managers use \`__enter__\` and \`__exit__\`.
+
+\`\`\`python
+class Timer:
+    def __enter__(self):
+        from time import perf_counter
+        self.started = perf_counter()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        from time import perf_counter
+        self.elapsed = perf_counter() - self.started
+        return False  # do not suppress exceptions
+\`\`\`
+
+The return value of \`__exit__\` matters. Returning truthy suppresses exceptions. Most context managers should return \`False\` or \`None\` unless they intentionally handle the error.
+
+---
+
+## Prefer dataclasses when you mostly store data
+
+If your class is mainly data with generated \`__init__\`, \`__repr__\`, and \`__eq__\`, use \`dataclasses.dataclass\`.
+
+\`\`\`python
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class FeatureSpec:
+    name: str
+    dtype: str
+    nullable: bool = True
+\`\`\`
+
+This creates a solid default implementation and avoids hand-writing boring dunder methods.
+
+Use a hand-written class when you need custom validation, lifecycle behavior, lazy computation, resource management, or a carefully designed API.
+
+---
+
+## Common footguns
+
+1. **Cute operator overloads** — \`+\` should not secretly write to a database.
+2. **Inconsistent equality and hashing** — equal objects must have equal hashes.
+3. **Hashing mutable state** — never mutate fields that determine a hash while the object is in a set or dict key.
+4. **Expensive \`__repr__\`** — logging should not trigger a huge query or expensive serialization.
+5. **Returning \`False\` instead of \`NotImplemented\`** for unknown operand types.
+6. **Implementing ordering when there is no natural order** — prefer \`key=...\`.
+7. **Surprising \`__len__\`** — \`if obj:\` uses length for truthiness if \`__bool__\` is absent.
+
+---
+
+## Compact interview answer
+
+If asked “What are dunder methods?” answer:
+
+> Dunder methods are hooks into Python's data model. They let user-defined objects participate in built-in syntax like \`len(x)\`, \`repr(x)\`, \`x == y\`, iteration, indexing, operators, and context managers.
+
+If asked “When should you overload an operator?” answer:
+
+> Only when the operator has an obvious domain meaning and preserves reader expectations. If a named method is clearer, I would avoid the magic method.`,
+
+    video: {
+      youtubeId: "3ohzBxoFHAY",
+      title: "Enriching Your Python Classes With Dunder Methods",
+      channel: "Real Python",
+      startSeconds: 0,
+    },
+    videoFallbackMarkdown: `## Curated deep dive
+
+Search for **Real Python dunder methods** or **Python data model special methods**. While watching, write a two-column table: syntax on the left, dunder method on the right.
+
+Examples to include: \`len(x)\`, \`repr(x)\`, \`x == y\`, \`x + y\`, \`x[key]\`, \`for item in x\`, and \`with x:\`.`,
+
+    tryGuidance: `Build a tiny \`FeatureSpec\` class. First add only \`__repr__\`; then add \`__eq__\`; then decide whether it should be hashable. Finally create a \`Batch\` wrapper with \`__len__\` and \`__iter__\`, and explain out loud which Python syntax each method unlocks.`,
+
+    knowledgeCheck: [
+      {
+        question: "What does `len(obj)` call under the hood?",
+        options: [
+          "`obj.__len__()`",
+          "`obj.__repr__()`",
+          "`obj.__getitem__('length')`",
+        ],
+        correctIndex: 0,
+        explanation: "`len` is part of Python's data model and delegates to `__len__` for user-defined objects that implement it.",
+      },
+      {
+        question: "What is the safest rule for `__eq__` and `__hash__`?",
+        options: [
+          "If two objects compare equal, their hashes must also be equal, and hashed fields should be stable",
+          "Any object with `__eq__` is automatically safe as a dict key",
+          "Hashes should use `id(self)` even when equality compares values",
+        ],
+        correctIndex: 0,
+        explanation: "Sets and dicts rely on the equality/hash contract. Mixing value equality with identity hashing causes hard-to-debug lookup behavior.",
+      },
+      {
+        question: "When should you return `NotImplemented` from an operator dunder?",
+        options: [
+          "When the other operand type is unsupported and Python should try fallback behavior",
+          "Whenever the result would be falsey",
+          "Only from `__repr__`",
+        ],
+        correctIndex: 0,
+        explanation: "`NotImplemented` tells Python this operation is not supported for that operand type, allowing reflected methods or a proper TypeError.",
+      },
+      {
+        question: "Which is the best reason to implement `__repr__`?",
+        options: [
+          "To make debugging, logs, notebooks, and failed assertions show useful object state",
+          "To make the object mutable",
+          "To make all operators work automatically",
+        ],
+        correctIndex: 0,
+        explanation: "A good repr is a debugging contract: it should identify the object and the important state that explains its behavior.",
+      },
+    ],
+  },
+
   "ml-f2": {
     durationLabel: MODULE_TIME_LABEL,
     outcomes: [
