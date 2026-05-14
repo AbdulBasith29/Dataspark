@@ -4,6 +4,7 @@ import AIChatbot from "../chatbot/AIChatbot.jsx";
 import SQLJoins from "../visualizations/SQLJoins.jsx";
 import TrainValTestSplit from "../visualizations/TrainValTestSplit.jsx";
 import PythonMutabilityViz from "../visualizations/PythonMutabilityViz.jsx";
+import VariableBindingLab from "../visualizations/VariableBindingLab.jsx";
 import StringFormatAtelier from "../visualizations/StringFormatAtelier.jsx";
 import HashLab from "../visualizations/HashLab.jsx";
 import ComprehensionForge from "../visualizations/ComprehensionForge.jsx";
@@ -929,6 +930,7 @@ const VISUALIZATIONS = {
   "sp-t1": TimeSeriesDecomposition,
   "sp-r1": RecSysCollaborativeFiltering,
   "sp-n2": WordEmbeddings,
+  "py-b1": VariableBindingLab,
   "py-b2": StringFormatAtelier,
   "py-b3": PythonMutabilityViz,
   "py-b4": HashLab,
