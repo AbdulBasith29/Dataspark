@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { DS, dsGlassCard } from "../../lib/ds-platform-tokens.js";
+import { renderInlineMarkdown } from "../../lib/inline-markdown.jsx";
 import { SimpleMarkdown } from "../../lib/simple-markdown.jsx";
 import VizLabShell from "./VizLabShell.jsx";
 
@@ -134,7 +135,7 @@ export default function LessonModule({
           }}
           >
             {moduleSpec.outcomes.map((o) => (
-              <li key={o} style={{ marginBottom: 6 }}>{o}</li>
+              <li key={o} style={{ marginBottom: 6 }}>{renderInlineMarkdown(o)}</li>
             ))}
           </ul>
         )}

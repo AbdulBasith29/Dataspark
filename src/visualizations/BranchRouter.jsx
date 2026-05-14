@@ -73,12 +73,6 @@ const IF_BRANCHES = [
   },
 ];
 
-function isFalsyPy(v) {
-  if (v === null || v === false || v === 0 || v === "") return true;
-  if (Array.isArray(v) && v.length === 0) return true;
-  if (typeof v === "object" && v !== null && !Array.isArray(v) && Object.keys(v).length === 0) return true;
-  return false;
-}
 
 // ──────────────────────────────────────────────────────────────
 // MATCH-CASE MODE
