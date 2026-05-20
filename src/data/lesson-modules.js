@@ -286,7 +286,7 @@ def append_to(element, to=None):
 
 If you can explain these tradeoffs clearly, you’ll outperform most candidates.`,
 
-    tryGuidance: "In the interactive, treat every run as a prediction game: before you click or run code, decide whether you expect **mutation** (same id) or **rebinding** (new id). Then verify with id()/is/==. If the viz is about mutability, map the same mental model onto name binding.",
+    tryGuidance: "Use the binding lab below as a prediction game: choose a scenario, decide whether the code will **mutate** an existing object, **rebind** a name, or compare **value vs identity**, then verify the name → object diagram and debugger cue.",
 
     knowledgeCheck: [
       {
