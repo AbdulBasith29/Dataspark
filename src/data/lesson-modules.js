@@ -1,4 +1,3 @@
-/* eslint-disable no-useless-escape */
 /**
  * Full lesson modules: Learn (long-form) → Watch / deep dive → Try → Knowledge check.
  * Aligns with docs/CURRICULUM-SCOPE.md §2. Lessons without an entry use buildFallbackModule().
