@@ -96,7 +96,7 @@ export default function ContactPage() {
             {CONTACT_EMAIL}
           </a>
           <p style={{ marginTop: 10, fontSize: 13, color: P.t3, lineHeight: 1.55 }}>
-            Prefer your own email app? Use the form below — it opens a draft addressed to this inbox (same as Shopify-style “contact us” flows that use your mail client).
+            Prefer your own email app? Use the form below to open a draft addressed to this inbox.
           </p>
         </div>
 
@@ -174,22 +174,6 @@ export default function ContactPage() {
         </form>
       </div>
 
-      <div
-        style={{
-          marginTop: 28,
-          padding: "14px 16px",
-          borderRadius: 12,
-          border: `1px solid ${P.border}`,
-          background: "rgba(255,255,255,0.02)",
-          maxWidth: 560,
-        }}
-      >
-        <div style={{ fontSize: 12, fontWeight: 700, color: P.t2, marginBottom: 8 }}>Domain email forwarding (for you as the owner)</div>
-        <p style={{ fontSize: 12.5, color: P.t3, lineHeight: 1.65 }}>
-          Incoming mail to <strong style={{ color: P.t2 }}>{CONTACT_EMAIL}</strong> is not configured by this website. Set it up where <strong style={{ color: P.t2 }}>dataspark-prep.com</strong> DNS and email are managed (for example Cloudflare Email Routing, Google Workspace, or your registrar), and forward to the inbox where you want to read messages — for example your Gmail account. See{" "}
-          <code style={{ fontFamily: "var(--mono)", fontSize: 11, color: P.t2 }}>docs/EMAIL-FORWARDING.md</code> in the repository for steps.
-        </p>
-      </div>
     </PageShell>
   );
 }
