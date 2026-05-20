@@ -68,7 +68,7 @@ export default function PrivacyPage() {
 
       <h3 style={{ marginTop: 20 }}>10. Contact</h3>
       <p>
-        For privacy requests or questions, contact <strong>hello@dataspark.ai</strong>.
+        For privacy requests or questions, contact <strong>hello@dataspark-prep.com</strong>.
       </p>
     </PageShell>
   );

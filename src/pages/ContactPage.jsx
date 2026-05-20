@@ -13,7 +13,7 @@ const P = {
   inputBg: "rgba(6,8,20,0.85)",
 };
 
-const CONTACT_EMAIL = "hello@dataspark.ai";
+const CONTACT_EMAIL = "hello@dataspark-prep.com";
 
 function inputStyle(focusError) {
   return {
@@ -186,7 +186,7 @@ export default function ContactPage() {
       >
         <div style={{ fontSize: 12, fontWeight: 700, color: P.t2, marginBottom: 8 }}>Domain email forwarding (for you as the owner)</div>
         <p style={{ fontSize: 12.5, color: P.t3, lineHeight: 1.65 }}>
-          Incoming mail to <strong style={{ color: P.t2 }}>{CONTACT_EMAIL}</strong> is not configured by this website. Set it up where <strong style={{ color: P.t2 }}>dataspark.ai</strong> DNS and email are managed (for example Cloudflare Email Routing, Google Workspace, or your registrar), and forward to the inbox where you want to read messages — for example your Gmail account. See{" "}
+          Incoming mail to <strong style={{ color: P.t2 }}>{CONTACT_EMAIL}</strong> is not configured by this website. Set it up where <strong style={{ color: P.t2 }}>dataspark-prep.com</strong> DNS and email are managed (for example Cloudflare Email Routing, Google Workspace, or your registrar), and forward to the inbox where you want to read messages — for example your Gmail account. See{" "}
           <code style={{ fontFamily: "var(--mono)", fontSize: 11, color: P.t2 }}>docs/EMAIL-FORWARDING.md</code> in the repository for steps.
         </p>
       </div>

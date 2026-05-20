@@ -72,7 +72,7 @@ export default function TermsPage() {
 
       <h3 style={{ marginTop: 20 }}>10. Contact</h3>
       <p>
-        For questions about these Terms, contact <strong>hello@dataspark.ai</strong>.
+        For questions about these Terms, contact <strong>hello@dataspark-prep.com</strong>.
       </p>
     </PageShell>
   );
