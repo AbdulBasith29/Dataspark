@@ -197,46 +197,195 @@ const PYTHON_EXTENDED_MODULES = {
     interviewHook: "Walk through a safe retry decorator and a context-managed file/database operation.",
     tryGuidance: "In the argument-binding interactive, trace what args/kwargs the wrapper receives and forwards.",
   }),
-  "py-d1": buildPythonExtendedModule({
-    title: "NumPy Arrays & Vectorization",
-    outcomes: ["Differentiate Python loops from vectorized array ops.","Reason about shape, dtype, and broadcasting.","Avoid accidental copies when slicing large arrays."],
-    concepts: "Vectorization shifts work to optimized C-level kernels. Validate array shape and dtype before applying operations.",
-    pitfall: "Broadcasting mismatch causing silent logical errors.",
-    interviewHook: "Show how you would rewrite a loop-heavy transform with vectorized operations and benchmark it.",
-    tryGuidance: "Use the mutability/binding interactive to reason about view vs copy behavior and identity changes.",
-  }),
-  "py-d2": buildPythonExtendedModule({
-    title: "Pandas Series & DataFrames",
-    outcomes: ["Select columns/rows safely using explicit indexing.","Handle dtype drift and missing values early.","Write transform steps that are auditable and composable."],
-    concepts: "Treat DataFrames as typed tables with index semantics. Make transformations explicit and avoid chained operations that hide intent.",
-    pitfall: "Chained assignment confusion leading to unexpected updates.",
-    interviewHook: "Explain how you would structure a clean, testable pandas pipeline for an analytics task.",
-    tryGuidance: "Use the binding interactive and narrate when you expect a new object vs shared reference in tabular transforms.",
-  }),
-  "py-d3": buildPythonExtendedModule({
-    title: "GroupBy, Merge, Pivot",
-    outcomes: ["Predict output grain before grouping or merging.","Avoid join fan-out and double counting.","Use pivot operations to communicate trends clearly."],
-    concepts: "Grouping changes grain, merges combine grains, pivots reshape dimensions. Always predict row counts and null behavior first.",
-    pitfall: "Merging on non-unique keys and inflating aggregates.",
-    interviewHook: "Demonstrate a quick QA checklist before trusting a merged dataset.",
-    tryGuidance: "Use the hash/branch interactive and predict cardinality and null propagation before each change.",
-  }),
-  "py-d4": buildPythonExtendedModule({
-    title: "Handling Missing Data",
-    outcomes: ["Differentiate missing-at-source vs missing-after-join.","Choose drop/fill/impute strategies intentionally.","Track missingness impact in downstream metrics."],
-    concepts: "Missing data is a modeling and business decision, not just a cleanup step. Encode policy explicitly and document assumptions.",
-    pitfall: "Blindly filling nulls with zeros and changing business meaning.",
-    interviewHook: "Discuss when you would impute vs filter and how you validate impact.",
-    tryGuidance: "Use the traceback-style interactive to inspect failure paths and choose explicit missing-data handling branches.",
-  }),
-  "py-d5": buildPythonExtendedModule({
-    title: "Performance: Vectorize Don't Loop",
-    outcomes: ["Profile bottlenecks before optimizing.","Replace row-wise loops with vectorized/batch operations.","Balance readability, memory, and speed."],
-    concepts: "Performance wins come from reducing Python-level loops and minimizing temporary allocations. Measure before and after each optimization.",
-    pitfall: "Micro-optimizing syntax while ignoring algorithmic complexity or I/O constraints.",
-    interviewHook: "Share a before/after optimization story with metrics and tradeoffs.",
-    tryGuidance: "Use the fold/iterator interactive to compare eager step-by-step loops vs batched transforms and narrate cost differences.",
-  }),
+  "py-d1": {
+    durationLabel: MODULE_TIME_LABEL,
+    outcomes: [
+      "Model ndarrays by shape + dtype before writing transforms.",
+      "Use broadcasting intentionally and detect mismatch risks early.",
+      "Differentiate views from copies to avoid hidden side effects.",
+    ],
+    learnMarkdown: `## Outcomes
+
+- Predict array behavior from **shape, dtype, and axis intent**.
+- Explain why vectorized code is fast (native loops, contiguous memory).
+- Prevent silent bugs from accidental broadcasting and aliasing.
+
+## Mental model
+
+NumPy is a memory model plus optimized kernels, not just “fast lists.” Strong practitioners narrate an array contract before coding: input shape, output shape, dtype change, and memory ownership.
+
+## Broadcasting discipline
+
+Broadcasting compares dimensions from right to left. A dimension pair is compatible when equal or one side is 1. That means many expressions run successfully while still being semantically wrong. Write expected shapes next to key expressions, then verify.
+
+## View vs copy
+
+Basic slicing often returns a **view**; advanced indexing usually returns a **copy**. If you mutate a view, parent data may change unexpectedly. Use explicit .copy() at ownership boundaries (feature handoff, model input assembly, cached artifacts).
+
+## Interview framing
+
+Show correctness on a tiny fixture first, then vectorize, then benchmark. Explain both runtime gains and memory tradeoffs.`,
+    video: { youtubeId: "QUT1VHiLmmI", title: "NumPy Arrays and Vectorization", channel: "freeCodeCamp.org", startSeconds: 0 },
+    videoFallbackMarkdown: `## Deep dive fallback
+
+1. Build a small \`(10000, 20)\` array and compute row means via Python loop.
+2. Rewrite with \`arr.mean(axis=1)\` and compare runtime.
+3. Trigger one intentional broadcasting mistake, then fix it.
+4. Slice a view, mutate it, and observe parent changes; repeat with .copy().
+
+Finish with a short note: what improved, why it improved, and where memory ownership mattered.`,
+    tryGuidance: "In the interactive, predict shape, dtype, and view/copy behavior before each step. Run it, then reconcile prediction vs observed output.",
+    knowledgeCheck: [
+      {
+        question: "What should you verify before relying on broadcasting between shapes (5000, 1) and (1, 12)?",
+        options: [
+          "That the resulting (5000, 12) expansion matches business intent, not just syntax compatibility.",
+          "That NumPy flattens both arrays to 1D first.",
+          "That identical shape is required for all arithmetic.",
+        ],
+        correctIndex: 0,
+        explanation: "These shapes are compatible, but semantic correctness still depends on whether cross-combining rows and columns is intended.",
+      },
+      {
+        question: "Why can mutating arr[:, :3] change the original array?",
+        options: [
+          "Because basic slicing usually returns a view sharing underlying memory.",
+          "Because NumPy deep-copies slices and syncs them back.",
+          "Because slicing converts arrays into Python lists.",
+        ],
+        correctIndex: 0,
+        explanation: "Shared memory is the key behavior; call copy() when you need isolation.",
+      },
+      {
+        question: "Which interview answer signals mature vectorization judgment?",
+        options: [
+          "Demonstrate correctness first, then benchmark loop vs vectorized code and discuss memory tradeoffs.",
+          "Claim vectorization is always faster without measurement.",
+          "Focus only on shorter syntax.",
+        ],
+        correctIndex: 0,
+        explanation: "Measured tradeoff reasoning is stronger than slogan-level optimization advice.",
+      },
+    ],
+  },
+  "py-d2": {
+    durationLabel: MODULE_TIME_LABEL,
+    outcomes: ["Use explicit indexing to avoid chained-assignment ambiguity.","Track dtype/null drift after each transform stage.","Build auditable DataFrame pipelines with clear contracts."],
+    learnMarkdown: `## Outcomes
+
+- Apply explicit row/column selection with predictable mutation semantics.
+- Detect dtype drift before it corrupts downstream logic.
+- Treat row-count, schema, and null-rate checks as first-class QA.
+
+## Core approach
+
+Pandas code fails silently when intent is implicit. Keep transforms staged: ingest, validate schema, normalize types, apply feature logic, then QA output.
+
+Prefer .loc / .iloc with clear targets. Avoid ambiguous chained updates. After key steps, verify dtypes, null rates, and row counts so semantic errors are caught early.
+
+## Interview framing
+
+Strong answers explain reliability controls, not just API memory: schema assertions, null policy, and post-transform checks.`,
+    video: { youtubeId: "vmEHCJofslg", title: "Pandas DataFrames Tutorial", channel: "freeCodeCamp.org", startSeconds: 0 },
+    videoFallbackMarkdown: `## Deep dive fallback
+
+Load a messy CSV, snapshot dtypes/nulls/row count, perform one filter and one explicit .loc assignment, normalize one column type, then re-snapshot.
+
+Close by writing a mini data contract: required columns, expected dtype families, and null thresholds.`,
+    tryGuidance: "Before each interactive step, predict row count and dtype/null changes. After execution, explain any mismatch as a contract violation or expected behavior.",
+    knowledgeCheck: [
+      { question: "Why prefer explicit .loc assignments in production pandas code?", options: ["They clarify mutation intent and reduce ambiguous chained-assignment behavior.","They are always the fastest possible operation.","They automatically enforce relational constraints."], correctIndex: 0, explanation: "Deterministic, reviewable mutation semantics matter more than micro-optimizations." },
+      { question: "Why is dtype drift dangerous when code still runs?", options: ["Operations can change meaning silently, producing wrong business conclusions.","Pandas will always raise compile-time errors.","Drift only changes plotting style."], correctIndex: 0, explanation: "Silent semantic errors are the real risk; assertions catch them." },
+      { question: "What signals senior pandas judgment in interviews?", options: ["A staged pipeline with schema checks, null policy, type normalization, and QA.","Listing many pandas methods quickly.","Relying on visual inspection only."], correctIndex: 0, explanation: "Process rigor and validation discipline are key senior signals." },
+    ],
+  },
+  "py-d3": {
+    durationLabel: MODULE_TIME_LABEL,
+    outcomes: ["Define data grain before groupby/merge/pivot operations.","Prevent join fan-out and aggregate inflation.","Validate reshaped outputs with reconciliation checks."],
+    learnMarkdown: `## Outcomes
+
+- State table grain clearly before transformation.
+- Merge datasets without accidental duplication.
+- Use pivots for communication while preserving reconciled totals.
+
+## Grain-first workflow
+
+Most groupby/merge bugs come from unclear grain. Ask: what does one row represent now, and what should it represent after this step?
+
+Before merges, check key uniqueness and record pre-join row counts. After merges, compare row counts and null deltas. For groupby, choose aggregates that reflect business meaning, then name output columns accordingly.
+
+## Interview framing
+
+Discuss a QA checklist: uniqueness assertions, row-count deltas, and reconciliation totals before trusting metrics.`,
+    video: { youtubeId: "txMdrV1Ut64", title: "Pandas GroupBy, Merge, and Pivot", channel: "Data School", startSeconds: 0 },
+    videoFallbackMarkdown: `## Deep dive fallback
+
+Create two toy tables with duplicate keys, predict merge row count, run merge, fix fan-out via dedupe/pre-agg policy, then group and pivot results while reconciling totals.`,
+    tryGuidance: "In the interactive, say the grain out loud at every stage (e.g., one row per customer-day), then verify whether joins/groupings changed it as predicted.",
+    knowledgeCheck: [
+      { question: "What most often causes inflated metrics after a merge?", options: ["Non-unique join keys multiplying rows.","Using left join instead of right join.","Pivoting before filtering."], correctIndex: 0, explanation: "Duplicate-key fan-out is the classic double-counting failure mode." },
+      { question: "Why define grain before groupby logic?", options: ["Aggregate correctness depends on what each row represents.","Pandas requires grain metadata to run.","Grain only affects chart formatting."], correctIndex: 0, explanation: "Without grain clarity, outputs can be plausible but wrong." },
+      { question: "Which interview response is strongest?", options: ["State uniqueness assumptions, expected row counts, and reconciliation checks.","Memorize join syntax only.","Trust outputs if nulls are low."], correctIndex: 0, explanation: "Reliability thinking beats syntax-only recall." },
+    ],
+  },
+  "py-d4": {
+    durationLabel: MODULE_TIME_LABEL,
+    outcomes: ["Classify missingness sources and pick policy intentionally.","Measure metric impact of drop/fill/impute choices.","Document null assumptions as data-contract decisions."],
+    learnMarkdown: `## Outcomes
+
+- Distinguish missing-at-source from missing-after-transform.
+- Choose null policy by business meaning, not convenience.
+- Quantify downstream impact and monitor null behavior over time.
+
+## Nulls are semantic, not cosmetic
+
+A null can mean unknown, inapplicable, delayed ingestion, or pipeline failure. Treating all nulls as zero often rewrites business meaning.
+
+Use a decision loop: identify cause, determine whether missingness is informative, choose policy (drop/fill/impute/indicator), then compare KPI deltas before vs after.
+
+## Interview framing
+
+Mature answers discuss bias, explainability, and monitoring thresholds — not one universal imputation rule.`,
+    video: { youtubeId: "f9vYq2xFAm8", title: "Handling Missing Data in Pandas", channel: "Data School", startSeconds: 0 },
+    videoFallbackMarkdown: `## Deep dive fallback
+
+Profile null rates by column and segment, apply three policies on one important field (drop, statistical fill, domain sentinel), recompute a KPI under each, then justify one monitored policy choice.`,
+    tryGuidance: "Use each interactive branch as a policy fork: predict row-count, null-rate, and downstream metric impact before selecting a strategy.",
+    knowledgeCheck: [
+      { question: "Why is blanket zero-fill risky?", options: ["Zero may represent a real value and distort business meaning when substituted for unknowns.","Pandas blocks zero-filled columns.","Zero always causes runtime errors."], correctIndex: 0, explanation: "Imputation must preserve semantics, not just remove nulls." },
+      { question: "Best first step for null handling?", options: ["Identify missingness mechanism and business context.","Apply median fill globally.","Drop every row with any null."], correctIndex: 0, explanation: "Policy quality depends on cause and decision context." },
+      { question: "Strongest interview answer on missing data?", options: ["Compare strategies, quantify downstream impact, and justify a monitored policy.","State one universal rule.","Treat null handling as cosmetic cleanup."], correctIndex: 0, explanation: "Evidence-backed tradeoff reasoning signals maturity." },
+    ],
+  },
+  "py-d5": {
+    durationLabel: MODULE_TIME_LABEL,
+    outcomes: ["Profile first, then optimize bottlenecks with evidence.","Replace row-wise loops with vectorized/batched work when appropriate.","Balance runtime gains against memory/readability costs."],
+    learnMarkdown: `## Outcomes
+
+- Separate Python-loop overhead from algorithmic or I/O bottlenecks.
+- Apply optimization changes that preserve correctness and maintainability.
+- Present performance improvements with reproducible measurements.
+
+## Optimization workflow
+
+Use this sequence: profile, lock correctness, optimize dominant cost, re-measure, document tradeoffs. “Vectorize don’t loop” is directionally useful, but not a substitute for measurement.
+
+Vectorized rewrites can raise memory usage via temporary arrays. Good engineering weighs runtime, memory headroom, and long-term readability.
+
+## Interview framing
+
+Tell a concrete before/after story with numbers, mechanism, and one tradeoff you accepted or mitigated.`,
+    video: { youtubeId: "0A5x5x9N7YQ", title: "Vectorization vs Loops in Python", channel: "Krish Naik", startSeconds: 0 },
+    videoFallbackMarkdown: `## Deep dive fallback
+
+Implement a row-wise baseline transform, profile it, rewrite with vectorized/batched operations, re-measure runtime and memory, then summarize baseline vs optimized metrics and tradeoffs.`,
+    tryGuidance: "In the interactive, classify each step before running it: Python iteration, vectorized native execution, or I/O-bound. Compare prediction to observed runtime behavior.",
+    knowledgeCheck: [
+      { question: "What should happen before any performance rewrite?", options: ["Profile to locate the true bottleneck.","Replace all loops immediately.","Tune comments and variable names for speed."], correctIndex: 0, explanation: "Measurement prevents wasted optimization effort." },
+      { question: "Why can a vectorized rewrite still be a poor production choice?", options: ["It may increase memory pressure or reduce maintainability despite CPU gains.","Vectorized code cannot be tested.","Vectorized code is numerically random."], correctIndex: 0, explanation: "Performance decisions are multi-objective, not CPU-only." },
+      { question: "What interview response best demonstrates optimization maturity?", options: ["Present before/after metrics, explain mechanism, and discuss tradeoffs.","Claim a big speedup without method.","Say optimization is unnecessary if code runs."], correctIndex: 0, explanation: "Evidence plus tradeoff clarity is the strongest signal." },
+    ],
+  },
 };
 
 export const LESSON_MODULES = {
