@@ -1044,6 +1044,23 @@ export default function DataSparkPlatform() {
 
   const totalLessons = CURRICULUM.reduce((a, c) => a + c.topics.reduce((b, t) => b + t.lessons.length, 0), 0);
   const totalQuestions = CURRICULUM.reduce((a, c) => a + c.questions.length, 0);
+  useEffect(() => {
+    window.history.pushState({ dsView: view }, "");
+  }, [view]);
+
+  useEffect(() => {
+    const onPop = (event) => {
+      const nextView = event?.state?.dsView;
+      if (nextView && ["home", "course", "lesson", "question"].includes(nextView)) {
+        setView(nextView);
+      } else if (view !== "home") {
+        setView("home");
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [view]);
+
   const completedLessons = Object.keys(progress).filter(k => progress[k] === "done").length;
 
   const submitPracticeAnswer = useCallback(async () => {

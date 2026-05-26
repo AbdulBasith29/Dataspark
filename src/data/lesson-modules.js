@@ -106,6 +106,139 @@ If there is no exact tag match, ask the **AI tutor**: “Give me a 5-minute dril
  * }} LessonModuleSpec */
 
 /** @type {Record<string, LessonModuleSpec>} */
+
+function buildPythonExtendedModule({ title, outcomes, concepts, pitfall, interviewHook, tryGuidance }) {
+  return {
+    durationLabel: MODULE_TIME_LABEL,
+    outcomes,
+    learnMarkdown: `## Outcomes
+
+${outcomes.map((o)=>`- ${o}`).join('\n')}
+
+## Core concept
+
+${concepts}
+
+## Common pitfall
+
+- ${pitfall}
+
+## Interview framing
+
+${interviewHook}`,
+    video: null,
+    videoFallbackMarkdown: `## Guided deep dive
+
+Use the clip in this lesson, then write a 4-line note: (1) the key API/pattern, (2) where it fails, (3) how you would test it, (4) how you explain it to a teammate.`,
+    tryGuidance,
+    knowledgeCheck: [
+      {
+        question: `For ${title}, what should you do first in production code?`,
+        options: [
+          'Make behavior explicit with small reproducible examples and tests',
+          'Memorize syntax without validating behavior',
+          'Assume defaults are always safe across datasets',
+        ],
+        correctIndex: 0,
+        explanation: 'Reliable Python work starts with explicit contracts and observable behavior under tests.',
+      },
+      {
+        question: 'What is the best interview signal for this topic?',
+        options: [
+          'Explain tradeoffs and failure modes, not only happy-path syntax',
+          'Only mention function names',
+          'Avoid discussing edge cases',
+        ],
+        correctIndex: 0,
+        explanation: 'Senior-level answers include edge cases, data quality risk, and operational tradeoffs.',
+      },
+    ],
+  };
+}
+
+const PYTHON_EXTENDED_MODULES = {
+  "py-o1": buildPythonExtendedModule({
+    title: "Classes, Objects & __init__",
+    outcomes: [
+      "Design small classes with clear constructor contracts.",
+      "Separate instance state from class-level configuration.",
+      "Debug attribute errors quickly using object introspection.",
+    ],
+    concepts: "Classes define behavior; instances hold state. Keep `__init__` focused on validating and assigning required fields. Prefer explicit dependencies over hidden globals.",
+    pitfall: "Packing too much side effect logic into `__init__`, which makes object creation slow and brittle.",
+    interviewHook: "Show how you would model a small domain object, validate inputs once, and expose methods that are easy to test.",
+    tryGuidance: "Use the interactive to track name→object state and narrate how instance attributes change after each operation.",
+  }),
+  "py-o2": buildPythonExtendedModule({
+    title: "Inheritance & Polymorphism",
+    outcomes: [
+      "Use inheritance when shared behavior is stable.",
+      "Override methods safely while preserving contracts.",
+      "Prefer composition if subclass branching gets deep.",
+    ],
+    concepts: "Polymorphism lets callers use one interface while concrete types provide behavior. Keep base class contracts explicit and avoid fragile inheritance trees.",
+    pitfall: "Subclass methods changing parameter or return expectations without documenting the contract break.",
+    interviewHook: "Describe when you would choose composition over inheritance for maintainability.",
+    tryGuidance: "Use the branch-style interactive and predict which implementation path executes for each input.",
+  }),
+  "py-o3": buildPythonExtendedModule({
+    title: "Dunder Methods & Operator Overloading",
+    outcomes: ["Implement `__repr__`, equality, and ordering semantics intentionally.","Avoid surprising operator overload behavior.","Keep overloaded types predictable and testable."],
+    concepts: "Dunder methods define protocol behavior. Overload only when semantics are natural and consistent with user expectation.",
+    pitfall: "Overloading operators with side effects that violate intuitive behavior.",
+    interviewHook: "Explain why readability and predictability are more important than clever operator tricks.",
+    tryGuidance: "Use the fold/transform interactive and compare expected vs actual results after each operation.",
+  }),
+  "py-o4": buildPythonExtendedModule({
+    title: "Decorators & Context Managers",
+    outcomes: ["Use decorators for cross-cutting concerns like logging and retries.","Use context managers for deterministic setup/teardown.","Preserve function signatures and metadata when wrapping."],
+    concepts: "Decorators wrap call behavior; context managers control resource lifecycle. Both are abstraction tools for reducing repeated boilerplate.",
+    pitfall: "Decorator wrappers dropping function metadata or swallowing exceptions.",
+    interviewHook: "Walk through a safe retry decorator and a context-managed file/database operation.",
+    tryGuidance: "In the argument-binding interactive, trace what args/kwargs the wrapper receives and forwards.",
+  }),
+  "py-d1": buildPythonExtendedModule({
+    title: "NumPy Arrays & Vectorization",
+    outcomes: ["Differentiate Python loops from vectorized array ops.","Reason about shape, dtype, and broadcasting.","Avoid accidental copies when slicing large arrays."],
+    concepts: "Vectorization shifts work to optimized C-level kernels. Validate array shape and dtype before applying operations.",
+    pitfall: "Broadcasting mismatch causing silent logical errors.",
+    interviewHook: "Show how you would rewrite a loop-heavy transform with vectorized operations and benchmark it.",
+    tryGuidance: "Use the mutability/binding interactive to reason about view vs copy behavior and identity changes.",
+  }),
+  "py-d2": buildPythonExtendedModule({
+    title: "Pandas Series & DataFrames",
+    outcomes: ["Select columns/rows safely using explicit indexing.","Handle dtype drift and missing values early.","Write transform steps that are auditable and composable."],
+    concepts: "Treat DataFrames as typed tables with index semantics. Make transformations explicit and avoid chained operations that hide intent.",
+    pitfall: "Chained assignment confusion leading to unexpected updates.",
+    interviewHook: "Explain how you would structure a clean, testable pandas pipeline for an analytics task.",
+    tryGuidance: "Use the binding interactive and narrate when you expect a new object vs shared reference in tabular transforms.",
+  }),
+  "py-d3": buildPythonExtendedModule({
+    title: "GroupBy, Merge, Pivot",
+    outcomes: ["Predict output grain before grouping or merging.","Avoid join fan-out and double counting.","Use pivot operations to communicate trends clearly."],
+    concepts: "Grouping changes grain, merges combine grains, pivots reshape dimensions. Always predict row counts and null behavior first.",
+    pitfall: "Merging on non-unique keys and inflating aggregates.",
+    interviewHook: "Demonstrate a quick QA checklist before trusting a merged dataset.",
+    tryGuidance: "Use the hash/branch interactive and predict cardinality and null propagation before each change.",
+  }),
+  "py-d4": buildPythonExtendedModule({
+    title: "Handling Missing Data",
+    outcomes: ["Differentiate missing-at-source vs missing-after-join.","Choose drop/fill/impute strategies intentionally.","Track missingness impact in downstream metrics."],
+    concepts: "Missing data is a modeling and business decision, not just a cleanup step. Encode policy explicitly and document assumptions.",
+    pitfall: "Blindly filling nulls with zeros and changing business meaning.",
+    interviewHook: "Discuss when you would impute vs filter and how you validate impact.",
+    tryGuidance: "Use the traceback-style interactive to inspect failure paths and choose explicit missing-data handling branches.",
+  }),
+  "py-d5": buildPythonExtendedModule({
+    title: "Performance: Vectorize Don't Loop",
+    outcomes: ["Profile bottlenecks before optimizing.","Replace row-wise loops with vectorized/batch operations.","Balance readability, memory, and speed."],
+    concepts: "Performance wins come from reducing Python-level loops and minimizing temporary allocations. Measure before and after each optimization.",
+    pitfall: "Micro-optimizing syntax while ignoring algorithmic complexity or I/O constraints.",
+    interviewHook: "Share a before/after optimization story with metrics and tradeoffs.",
+    tryGuidance: "Use the fold/iterator interactive to compare eager step-by-step loops vs batched transforms and narrate cost differences.",
+  }),
+};
+
 export const LESSON_MODULES = {
   "py-b1": {
     durationLabel: MODULE_TIME_LABEL,
@@ -3861,6 +3994,8 @@ This module still ships a full **written** walkthrough and the mutability lab �
       },
     ],
   },
+
+  ...PYTHON_EXTENDED_MODULES,
 
   "ml-f2": {
     durationLabel: MODULE_TIME_LABEL,
