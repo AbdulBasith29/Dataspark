@@ -68,6 +68,19 @@ Write, on paper or in a notes app:
 Expect variations of: “Tell me about a time this went wrong in production” or “How would you validate that result?” Tie your answer to **business impact** (revenue, trust, latency), not only correctness.`;
 }
 
+
+const PYTHON_VIDEO_FALLBACKS = {
+  "py-o1": { youtubeId: "JeznW_7DlB0", title: "Python Classes and Objects", channel: "freeCodeCamp.org", startSeconds: 0 },
+  "py-o2": { youtubeId: "S9uPNppGsGo", title: "Python Inheritance Explained", channel: "Corey Schafer", startSeconds: 0 },
+  "py-o3": { youtubeId: "3ohzBxoFHAY", title: "Special (dunder) methods in Python", channel: "Corey Schafer", startSeconds: 0 },
+  "py-o4": { youtubeId: "FsAPt_9Bf3U", title: "Python Decorators and Context Managers", channel: "Corey Schafer", startSeconds: 0 },
+  "py-d1": { youtubeId: "QUT1VHiLmmI", title: "NumPy Arrays and Vectorization", channel: "freeCodeCamp.org", startSeconds: 0 },
+  "py-d2": { youtubeId: "vmEHCJofslg", title: "Pandas DataFrames Tutorial", channel: "freeCodeCamp.org", startSeconds: 0 },
+  "py-d3": { youtubeId: "txMdrV1Ut64", title: "Pandas GroupBy, Merge, and Pivot", channel: "Data School", startSeconds: 0 },
+  "py-d4": { youtubeId: "f9vYq2xFAm8", title: "Handling Missing Data in Pandas", channel: "Data School", startSeconds: 0 },
+  "py-d5": { youtubeId: "0A5x5x9N7YQ", title: "Vectorization vs Loops in Python", channel: "Krish Naik", startSeconds: 0 },
+};
+
 function fallbackDeepDive(lesson) {
   return `## Deep dive until a curated clip ships
 
@@ -286,7 +299,7 @@ def append_to(element, to=None):
 
 If you can explain these tradeoffs clearly, you’ll outperform most candidates.`,
 
-    tryGuidance: "In the interactive, treat every run as a prediction game: before you click or run code, decide whether you expect **mutation** (same id) or **rebinding** (new id). Then verify with id()/is/==. If the viz is about mutability, map the same mental model onto name binding.",
+    tryGuidance: "Use the binding lab below as a prediction game: choose a scenario, decide whether the code will **mutate** an existing object, **rebind** a name, or compare **value vs identity**, then verify the name → object diagram and debugger cue.",
 
     knowledgeCheck: [
       {
@@ -3944,6 +3957,8 @@ export function getResolvedLessonModule(lesson, course) {
   const spec = LESSON_MODULES[lesson.id];
   if (spec) return spec;
 
+  const pythonVideo = course.id === "python" ? (PYTHON_VIDEO_FALLBACKS[lesson.id] || null) : null;
+
   return {
     durationLabel: MODULE_TIME_LABEL,
     outcomes: [
@@ -3952,8 +3967,10 @@ export function getResolvedLessonModule(lesson, course) {
       "Drill with Practice + tutor until you can teach it",
     ],
     learnMarkdown: fallbackLearn(lesson, course.title),
-    video: null,
-    videoFallbackMarkdown: fallbackDeepDive(lesson),
+    video: pythonVideo,
+    videoFallbackMarkdown: pythonVideo
+      ? `## Guided deep dive\n\nWatch the clip, pause every 2–3 minutes, and write one concrete example from your own project or interview prep where **${lesson.title}** changes the outcome. Then open the interactive block and run a predict → verify loop before moving on.`
+      : fallbackDeepDive(lesson),
     tryGuidance: lesson.hasViz
       ? "Use the interactive lab in the **Try it** section: change one control at a time and narrate what moved before you read the label text."
       : "No primary visualization is mapped for this lesson yet. Use **Practice** questions and the tutor to simulate the same predict→verify loop.",
