@@ -162,11 +162,11 @@ A high-signal answer: “We split constructor purity from runtime side effects, 
 Run a 12-minute class audit:
 1. List every constructor line item as **pure** vs **side effect**.
 2. Measure constructor p50/p95 in a local benchmark.
-3. Move one side effect behind `connect()`.
+3. Move one side effect behind \`connect()\`.
 4. Add one unit test that instantiates the class with fake dependencies and zero network.`,
     tryGuidance: "In the interactive, classify each transition as constructor-safe, deferred side effect, or lifecycle risk. Predict failure mode if that step is executed during service startup.",
     freeResponsePrompt: {
-      prompt: "You inherit a flaky ingestion client where `__init__` loads secrets, opens Postgres pool, and starts a thread. In 5–7 sentences: identify the top reliability risks, propose a staged refactor, and define two metrics you would track to prove improvement.",
+      prompt: "You inherit a flaky ingestion client where \`__init__\` loads secrets, opens Postgres pool, and starts a thread. In 5–7 sentences: identify the top reliability risks, propose a staged refactor, and define two metrics you would track to prove improvement.",
       rubric: [
         "Correctly identifies hidden network/DB/thread side effects in constructor",
         "Separates invariant checks from runtime side effects using explicit lifecycle methods",
@@ -247,7 +247,7 @@ class BillingTransformer(BaseTransformer):
         return df
 \`\`\`
 
-A caller treats both as `BaseTransformer`, then combines outputs. One path dedupes, the other preserves duplicates, and revenue reports diverge.
+A caller treats both as \`BaseTransformer\`, then combines outputs. One path dedupes, the other preserves duplicates, and revenue reports diverge.
 
 ## Failure mechanics
 
@@ -293,7 +293,7 @@ Pick one inheritance tree from your codebase and do a contract audit:
 4. Add one regression test that previously would have passed incorrectly.`,
     tryGuidance: "In the interactive, predict dispatch behavior and explicitly state whether input assumptions/output guarantees match the base contract.",
     freeResponsePrompt: {
-      prompt: "Your team has 7 subclasses of `BaseTransformer` and metrics drift appears between regions. In 5–7 sentences, diagnose likely contract violations, propose a composition-based redesign, and describe one migration strategy that avoids downtime.",
+      prompt: "Your team has 7 subclasses of \`BaseTransformer\` and metrics drift appears between regions. In 5–7 sentences, diagnose likely contract violations, propose a composition-based redesign, and describe one migration strategy that avoids downtime.",
       rubric: [
         "Identifies subtype contract drift (preconditions/postconditions differ)",
         "Proposes composition/policy object approach rather than deeper inheritance",
@@ -357,12 +357,12 @@ Two keys compare equal but hash differently. Dict/set behavior becomes undefined
 
 - Cache key lookups fail despite “equal” objects.
 - Set dedupe behavior appears random under mutation.
-- Incident triage is slow if `__repr__` omits critical fields.
+- Incident triage is slow if \`__repr__\` omits critical fields.
 
 ## Senior refactor pattern
 
 1. Decide object role: mutable entity vs immutable value object.
-2. For hashable keys, enforce immutability (`frozen=True`) and align eq/hash fields.
+2. For hashable keys, enforce immutability (\`frozen=True\`) and align eq/hash fields.
 3. Keep overloaded operators side-effect free.
 4. Add invariant tests.
 
@@ -379,9 +379,9 @@ class FeatureKey:
 
 ## Test checklist
 
-- `a == b` implies `hash(a) == hash(b)`.
+- \`a == b\` implies \`hash(a) == hash(b)\`.
 - Objects used as set keys do not mutate fields involved in hash.
-- Operator overloads (`__add__`, ordering) do not trigger I/O or mutation surprises.
+- Operator overloads (\`__add__\`, ordering) do not trigger I/O or mutation surprises.
 
 ## Interview framing
 
@@ -389,10 +389,10 @@ High-signal answer: “We made key objects immutable, aligned eq/hash fields, an
     video: PYTHON_VIDEO_FALLBACKS["py-o3"],
     videoFallbackMarkdown: `## Guided deep dive
 
-Implement a `FeatureKey` and write 3 tests:
+Implement a \`FeatureKey\` and write 3 tests:
 1. Eq/hash consistency.
 2. Set behavior with duplicate logical keys.
-3. `repr` includes fields needed for incident debugging.`,
+3. \`repr\` includes fields needed for incident debugging.`,
     tryGuidance: "Use the interactive to predict object protocol behavior (equality, hashing, transform operators). If behavior surprises you, identify which protocol contract was violated.",
     freeResponsePrompt: {
       prompt: "A feature cache miss rate jumped from 8% to 41% after a key-class refactor. In 5–7 sentences, diagnose probable dunder-contract mistakes, propose a fix, and define two tests/metrics to prevent recurrence.",
@@ -465,7 +465,7 @@ Under error/early-return paths this leaks resources, eventually starving the poo
 
 1. Retry only explicit transient exceptions.
 2. Require idempotency key or dedupe guard for retried write operations.
-3. Preserve function metadata via `functools.wraps`.
+3. Preserve function metadata via \`functools.wraps\`.
 4. Use context managers for cleanup guarantees.
 
 \`\`\`python
@@ -617,7 +617,7 @@ const PYTHON_EXTENDED_MODULES = {
 
 ## Core model
 
-A class should express **state + behavior + invariants**. The constructor (`__init__`) is not a dumping ground for network calls, global mutation, or hidden file reads.
+A class should express **state + behavior + invariants**. The constructor (\`__init__\`) is not a dumping ground for network calls, global mutation, or hidden file reads.
 
 A useful litmus test: if object creation fails intermittently, your constructor is probably doing too much runtime work.
 
@@ -635,8 +635,8 @@ A constructor that validates inputs, fetches secrets, opens DB pools, makes API 
 
 ### Refactor target
 
-1. Keep `__init__` for assignment + validation only.
-2. Move side effects to explicit methods (`connect()`, `load()`, `start()`).
+1. Keep \`__init__\` for assignment + validation only.
+2. Move side effects to explicit methods (\`connect()\`, \`load()\`, \`start()\`).
 3. Make dependencies injectable (client/session/logger).
 
 ## Production scenario
@@ -723,11 +723,11 @@ Teams subclass a base class just to reuse utility methods, then override core be
 
 - Extract shared utilities into collaborators.
 - Keep base interface narrow and explicit.
-- Use composition (`Strategy`, policy objects) for behavior variants.
+- Use composition (\`Strategy\`, policy objects) for behavior variants.
 
 ## Production scenario
 
-A pricing pipeline uses `BasePricer.compute(order)`; one subclass expects net price, another gross price. Results diverge silently across markets.
+A pricing pipeline uses \`BasePricer.compute(order)\`; one subclass expects net price, another gross price. Results diverge silently across markets.
 
 Fix by introducing explicit pricing policies and normalized input contracts.
 
@@ -766,19 +766,19 @@ Dunder methods are **protocol contracts**. Overloading should preserve user expe
 
 ### Bad
 
-`__add__` mutates left operand or triggers I/O; `__eq__` compares one field while `__hash__` uses another.
+\`__add__\` mutates left operand or triggers I/O; \`__eq__\` compares one field while \`__hash__\` uses another.
 
 ### Failure modes
 
 - Bugs in caches/sets due to unstable hashing semantics.
 - Non-obvious side effects during arithmetic-looking code.
-- Impossible debugging when `repr` is vague.
+- Impossible debugging when \`repr\` is vague.
 
 ### Refactor target
 
 - Keep operators pure and side-effect free.
-- Keep `__eq__` and `__hash__` consistent.
-- Implement informative `__repr__` for debugging and logs.
+- Keep \`__eq__\` and \`__hash__\` consistent.
+- Implement informative \`__repr__\` for debugging and logs.
 
 ## Production scenario
 
@@ -792,7 +792,7 @@ Mature answers emphasize predictability, protocol consistency, and testing invar
     video: PYTHON_VIDEO_FALLBACKS["py-o3"],
     videoFallbackMarkdown: `## Guided deep dive
 
-Watch the clip and then implement `__repr__`, `__eq__`, and `__hash__` for one toy class. Add tests proving equality/hash consistency.`,
+Watch the clip and then implement \`__repr__\`, \`__eq__\`, and \`__hash__\` for one toy class. Add tests proving equality/hash consistency.`,
     tryGuidance: "Use the interactive to compare expected vs observed behavior after overloaded operations. Flag any semantic surprise as a design bug.",
     knowledgeCheck: [
       { question: "What must remain consistent for dict/set keys?", options: ["Objects considered equal must produce equal hashes", "Hash can change after insertion", "Only repr matters"], correctIndex: 0, explanation: "Hash/equality consistency is required for hash-table correctness." },
@@ -832,12 +832,12 @@ A retry decorator catches all exceptions, retries blindly, drops traceback conte
 ### Refactor target
 
 - Retry only on known transient errors.
-- Preserve metadata with `functools.wraps`.
+- Preserve metadata with \`functools.wraps\`.
 - Log attempts with context and re-raise terminal failures.
 
 ## Anti-pattern drill: Manual resource cleanup
 
-Using `open()/close()` patterns scattered across early returns leads to leaks.
+Using \`open()/close()\` patterns scattered across early returns leads to leaks.
 
 Use context managers to guarantee teardown even during exceptions.
 
@@ -1605,7 +1605,7 @@ If you can narrate all five of these, you are ahead of most Python screens.`,
     outcomes: [
       "Explain **why** `dict` and `set` lookups are O(1) average — in terms of hashing, not magic.",
       "Pick the right container fast: `dict` for key→value, `set` for membership, `Counter` / `defaultdict` for the common ETL cases.",
-      "State the **hashability contract** (`__hash__` + `__eq__`) and predict which types can be keys.",
+      "State the **hashability contract** (\`__hash__\` + \`__eq__\`) and predict which types can be keys.",
       "Use dict/set **operators** fluently: `|`, `&`, `-`, `^`, `|=`, `{**a, **b}` — and spot their complexity.",
       "Avoid the bugs: mutating during iteration, shared-reference values, relying on hash order across runs.",
     ],
