@@ -3,6 +3,7 @@ import { DS, dsGlassCard } from "../../lib/ds-platform-tokens.js";
 import { renderInlineMarkdown } from "../../lib/inline-markdown.jsx";
 import { SimpleMarkdown } from "../../lib/simple-markdown.jsx";
 import VizLabShell from "./VizLabShell.jsx";
+import AsyncActionButton from "../AsyncActionButton.jsx";
 
 const sectionLabel = {
   fontSize: 10,
@@ -73,6 +74,7 @@ export default function LessonModule({
 }) {
   const [answers, setAnswers] = useState(() => ({}));
   const [revealed, setRevealed] = useState({});
+  const [freeResponse, setFreeResponse] = useState("");
 
   const checks = moduleSpec.knowledgeCheck || [];
   let correctCount = 0;
@@ -83,6 +85,9 @@ export default function LessonModule({
   const score = checks.length ? correctCount / checks.length : 1;
   const minCorrect = checks.length ? Math.max(1, Math.round(0.7 * checks.length)) : 0;
   const passedCheck = checks.length === 0 || correctCount >= minCorrect;
+  const freeResponseReady = !moduleSpec.freeResponsePrompt || freeResponse.trim().length >= 30;
+  const canMarkComplete = passedCheck && freeResponseReady;
+  const actionState = canMarkComplete ? "idle" : "error";
 
   const durationBadge = moduleSpec.durationLabel || lesson.duration || "18–20 min";
 
@@ -184,6 +189,12 @@ export default function LessonModule({
         <p style={{ margin: "0 0 16px", color: DS.t2, fontSize: 15, lineHeight: 1.75 }}>
           {moduleSpec.tryGuidance}
         </p>
+        {moduleSpec.tutorPrompts?.preTry && (
+          <div style={{ marginBottom: 16, padding: 12, border: `1px solid ${DS.border}`, borderRadius: DS.radiusSm, background: "rgba(255,255,255,0.02)" }}>
+            <div style={{ fontSize: 11, color: DS.dim, fontFamily: "var(--ds-mono), monospace", marginBottom: 8 }}>PRE-TRY TUTOR PROMPT</div>
+            <p style={{ margin: 0, color: DS.t3, fontSize: 13, lineHeight: 1.55 }}>{moduleSpec.tutorPrompts.preTry}</p>
+          </div>
+        )}
         {VizComponent ? (
           <VizLabShell accent={course.accent} accentSoft={`${course.color}14`}>
             <VizComponent />
@@ -278,6 +289,35 @@ export default function LessonModule({
                 )}
               </div>
             ))}
+            {moduleSpec.freeResponsePrompt && (
+              <div style={{ borderTop: `1px solid ${DS.border}`, paddingTop: 16 }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: DS.t1, marginBottom: 8 }}>Free response (production reasoning)</div>
+                <p style={{ margin: "0 0 10px", color: DS.t3, fontSize: 13, lineHeight: 1.6 }}>{moduleSpec.freeResponsePrompt.prompt}</p>
+                <textarea
+                  value={freeResponse}
+                  onChange={(e) => setFreeResponse(e.target.value)}
+                  placeholder="Write 3–5 sentences here..."
+                  style={{ width: "100%", minHeight: 120, background: "rgba(255,255,255,0.02)", border: `1px solid ${DS.border}`, borderRadius: DS.radiusSm, color: DS.t2, padding: 10, fontSize: 13, lineHeight: 1.5 }}
+                />
+                {Array.isArray(moduleSpec.freeResponsePrompt.rubric) && moduleSpec.freeResponsePrompt.rubric.length > 0 && (
+                  <ul style={{ margin: "10px 0 0", paddingLeft: 18, color: DS.t3, fontSize: 12, lineHeight: 1.6 }}>
+                    {moduleSpec.freeResponsePrompt.rubric.map((r) => <li key={r}>{r}</li>)}
+                  </ul>
+                )}
+              </div>
+            )}
+            {moduleSpec.tutorPrompts?.postFail && !passedCheck && (
+              <div style={{ marginTop: 12, padding: 10, border: `1px solid ${DS.border}`, borderRadius: DS.radiusSm, background: "rgba(248,113,113,0.06)" }}>
+                <div style={{ fontSize: 11, color: "#FCA5A5", fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>POST-FAIL TUTOR PROMPT</div>
+                <p style={{ margin: 0, color: DS.t3, fontSize: 12, lineHeight: 1.55 }}>{moduleSpec.tutorPrompts.postFail}</p>
+              </div>
+            )}
+            {moduleSpec.tutorPrompts?.weeklyRecap && (
+              <div style={{ marginTop: 10, padding: 10, border: `1px solid ${DS.border}`, borderRadius: DS.radiusSm, background: "rgba(96,165,250,0.06)" }}>
+                <div style={{ fontSize: 11, color: DS.ind, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>WEEKLY RECAP TUTOR PROMPT</div>
+                <p style={{ margin: 0, color: DS.t3, fontSize: 12, lineHeight: 1.55 }}>{moduleSpec.tutorPrompts.weeklyRecap}</p>
+              </div>
+            )}
             <div style={{
               fontSize: 13,
               color: passedCheck ? DS.grn : DS.t3,
@@ -294,29 +334,20 @@ export default function LessonModule({
         )}
       </SectionCard>
 
+      <div aria-live="polite" style={{ fontSize: 12, color: DS.t3, marginBottom: 8 }}>
+        {canMarkComplete ? "Ready to complete this lesson." : "Complete checks and free-response to unlock completion."}
+      </div>
+
       <div style={{ display: "flex", gap: 10, marginBottom: 48, marginTop: 8, flexWrap: "wrap" }}>
-        <button
-          type="button"
-          disabled={!passedCheck}
+        <AsyncActionButton
           onClick={onMarkComplete}
-          title={!passedCheck ? `Answer all questions; need at least ${minCorrect} correct` : undefined}
-          style={{
-            flex: 1,
-            minWidth: 220,
-            background: passedCheck ? DS.indB : "rgba(255,255,255,0.06)",
-            border: "none",
-            borderRadius: DS.radiusSm,
-            padding: "14px 0",
-            color: passedCheck ? "#fff" : DS.dim,
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: passedCheck ? "pointer" : "not-allowed",
-            fontFamily: "var(--ds-sans), sans-serif",
-            boxShadow: passedCheck ? DS.shadowCta : "none",
-          }}
-        >
-          Mark complete & continue →
-        </button>
+          state={actionState}
+          idleLabel="Mark complete & continue →"
+          errorLabel="Complete required checks"
+          disabled={!canMarkComplete}
+          title={!canMarkComplete ? (!passedCheck ? `Answer all questions; need at least ${minCorrect} correct` : "Complete the free-response prompt before marking complete") : undefined}
+          style={{ flex: 1, minWidth: 220, padding: "14px 0" }}
+        />
         <button
           type="button"
           onClick={onAskTutor}

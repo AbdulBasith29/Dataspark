@@ -18,6 +18,7 @@ export const DS = {
   radiusLg: 18,
   radiusMd: 12,
   radiusSm: 10,
+  focusRing: "0 0 0 2px rgba(99,102,241,0.75)",
 };
 
 export function dsGlassCard(extra = {}) {
@@ -29,5 +30,14 @@ export function dsGlassCard(extra = {}) {
     borderRadius: DS.radiusLg,
     boxShadow: DS.shadowCard,
     ...extra,
+  };
+}
+
+
+export function dsInteractiveButton(base = {}) {
+  return {
+    outline: "none",
+    transition: "box-shadow 0.15s ease, border-color 0.15s ease",
+    ...base,
   };
 }

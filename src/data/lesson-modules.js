@@ -70,11 +70,456 @@ Expect variations of: “Tell me about a time this went wrong in production” o
 
 
 const PYTHON_VIDEO_FALLBACKS = {
-  "py-o1": { youtubeId: "JeznW_7DlB0", title: "Python Classes and Objects", channel: "freeCodeCamp.org", startSeconds: 0 },
-  "py-o2": { youtubeId: "S9uPNppGsGo", title: "Python Inheritance Explained", channel: "Corey Schafer", startSeconds: 0 },
-  "py-o3": { youtubeId: "3ohzBxoFHAY", title: "Special (dunder) methods in Python", channel: "Corey Schafer", startSeconds: 0 },
-  "py-o4": { youtubeId: "FsAPt_9Bf3U", title: "Python Decorators and Context Managers", channel: "Corey Schafer", startSeconds: 0 },
-  "py-d1": { youtubeId: "QUT1VHiLmmI", title: "NumPy Arrays and Vectorization", channel: "freeCodeCamp.org", startSeconds: 0 },
+  "py-o1": {
+    durationLabel: MODULE_TIME_LABEL,
+    outcomes: [
+      "Design deterministic constructors for data clients and ETL services.",
+      "Extract expensive side effects from object creation into explicit lifecycle steps.",
+      "Audit legacy classes for initialization latency, retries, and testability risk.",
+    ],
+    learnMarkdown: `## Outcomes
+
+- Build production classes that are **safe to instantiate under load**.
+- Identify and remove constructor work that creates flaky startups.
+- Explain the reliability tradeoffs of init-time side effects in interviews and design reviews.
+
+## Why this matters in data engineering
+
+In real data platforms, objects are created in hot paths: workers, API handlers, Airflow tasks, and notebook sessions. If construction performs hidden network work, your service boot path becomes nondeterministic. That leads to flaky deploys, noisy pager alerts, and expensive retries.
+
+### Legacy anti-pattern (realistic)
+
+\`\`\`python
+class FeatureStoreClient:
+    def __init__(self, project, region):
+        self.project = project
+        self.region = region
+
+        # 1) secret fetch (network)
+        self.token = requests.get(f"https://secrets/api/{project}", timeout=5).json()["token"]
+
+        # 2) schema fetch (network)
+        self.schema = requests.get(
+            f"https://registry/{project}/{region}/schema",
+            headers={"Authorization": f"Bearer {self.token}"},
+            timeout=8,
+        ).json()
+
+        # 3) pool setup (can fail on startup spikes)
+        self.pool = psycopg2.pool.SimpleConnectionPool(1, 20, dsn=os.environ["WAREHOUSE_DSN"])
+
+        # 4) background thread started implicitly
+        self._refresh_thread = threading.Thread(target=self._refresh_schema_forever, daemon=True)
+        self._refresh_thread.start()
+\`\`\`
+
+### What breaks
+
+- **Cold-start latency explodes** when secrets/registry are slow.
+- **Retries are ambiguous**: should caller retry construction or just schema fetch?
+- **Unit tests are expensive** because instantiation requires network + DB.
+- **Deploys become brittle**: every pod does heavy work before it can serve.
+
+## Senior refactor pattern
+
+1. Keep \`__init__\` pure: assignments, type checks, invariant checks.
+2. Move side effects into explicit methods: \`connect()\`, \`warmup_schema()\`, \`start_background_refresh()\`.
+3. Inject dependencies (HTTP client, pool factory, clock, logger) for deterministic tests.
+4. Add instrumentation: init duration, warmup duration, retry counters.
+
+\`\`\`python
+class FeatureStoreClient:
+    def __init__(self, project, region, http, pool_factory, logger):
+        self.project = project
+        self.region = region
+        self.http = http
+        self.pool_factory = pool_factory
+        self.logger = logger
+        self.token = None
+        self.schema = None
+        self.pool = None
+
+    def connect(self):
+        self.token = self.http.get_token(self.project)
+        self.pool = self.pool_factory()
+
+    def warmup_schema(self):
+        self.schema = self.http.get_schema(self.project, self.region, self.token)
+\`\`\`
+
+## Tradeoff table
+
+- **Init purity** improves reliability and tests, but requires explicit lifecycle management.
+- **Deferred warmup** reduces startup failures, but must be visible in health checks.
+- **Dependency injection** improves observability/testing, but introduces more constructor arguments (acceptable in infra-facing classes).
+
+## Interview framing
+
+A high-signal answer: “We split constructor purity from runtime side effects, tracked boot-time percentiles, and removed transient registry failures from pod readiness.” That shows both software design and operations maturity.`,
+    video: PYTHON_VIDEO_FALLBACKS["py-o1"],
+    videoFallbackMarkdown: `## Guided deep dive
+
+Run a 12-minute class audit:
+1. List every constructor line item as **pure** vs **side effect**.
+2. Measure constructor p50/p95 in a local benchmark.
+3. Move one side effect behind `connect()`.
+4. Add one unit test that instantiates the class with fake dependencies and zero network.`,
+    tryGuidance: "In the interactive, classify each transition as constructor-safe, deferred side effect, or lifecycle risk. Predict failure mode if that step is executed during service startup.",
+    freeResponsePrompt: {
+      prompt: "You inherit a flaky ingestion client where `__init__` loads secrets, opens Postgres pool, and starts a thread. In 5–7 sentences: identify the top reliability risks, propose a staged refactor, and define two metrics you would track to prove improvement.",
+      rubric: [
+        "Correctly identifies hidden network/DB/thread side effects in constructor",
+        "Separates invariant checks from runtime side effects using explicit lifecycle methods",
+        "Mentions testability gains via dependency injection/fakes",
+        "Defines at least two concrete metrics (e.g., init p95, boot failure rate, retry count)",
+        "Explains rollout/risk mitigation (backward compatibility or phased migration)",
+      ],
+    },
+    knowledgeCheck: [
+      {
+        question: "Which constructor operation is most likely to create deployment flakiness?",
+        options: [
+          "Blocking network calls to secrets/registry during __init__",
+          "Assigning immutable config fields",
+          "Validating required argument presence",
+        ],
+        correctIndex: 0,
+        explanation: "Startup now depends on external services before app readiness, which amplifies transient outages.",
+      },
+      {
+        question: "What is the best first refactor step for a legacy god constructor?",
+        options: [
+          "Separate pure state assignment from runtime side effects via explicit lifecycle methods",
+          "Increase HTTP timeouts in constructor",
+          "Wrap constructor in broad try/except and ignore failures",
+        ],
+        correctIndex: 0,
+        explanation: "Timeout tweaks do not solve structural coupling between construction and runtime effects.",
+      },
+      {
+        question: "Which metric best validates constructor hardening work?",
+        options: [
+          "Pod/service boot failure rate and constructor latency percentiles",
+          "Total lines of code in class",
+          "Number of TODO comments removed",
+        ],
+        correctIndex: 0,
+        explanation: "Reliability improvements should show up in startup success and latency distributions.",
+      },
+    ],
+  },
+"py-o2": {
+    durationLabel: MODULE_TIME_LABEL,
+    outcomes: [
+      "Enforce subtype contracts in production data systems.",
+      "Detect inheritance trees that hide incompatible assumptions.",
+      "Refactor brittle hierarchies into composition-based policy modules.",
+    ],
+    learnMarkdown: `## Outcomes
+
+- Use inheritance only when behavioral contracts are truly substitutable.
+- Diagnose Liskov violations in ETL, pricing, and scoring pipelines.
+- Migrate legacy subclass trees into safer composition patterns.
+
+## Production context
+
+In data engineering, “small” contract mismatches can corrupt metrics silently. A subclass expecting UTC timestamps while another assumes local time can skew daily aggregates by region and pass tests if fixtures are naive.
+
+## Legacy anti-pattern (realistic)
+
+\`\`\`python
+class BaseTransformer:
+    def transform(self, df):
+        """expects unique primary key and UTC timestamps"""
+        return df
+
+class OrdersTransformer(BaseTransformer):
+    def transform(self, df):
+        # silently dedupes by latest local timestamp
+        return (
+            df.sort_values("event_time_local")
+              .drop_duplicates(subset=["order_id"], keep="last")
+        )
+
+class BillingTransformer(BaseTransformer):
+    def transform(self, df):
+        # assumes duplicates are valid adjustments; no dedupe
+        return df
+\`\`\`
+
+A caller treats both as `BaseTransformer`, then combines outputs. One path dedupes, the other preserves duplicates, and revenue reports diverge.
+
+## Failure mechanics
+
+- Hidden precondition changes per subclass.
+- Callers cannot reason from base contract alone.
+- Every new subclass requires defensive branching upstream.
+
+## Senior refactor path
+
+Use composition with explicit policies:
+
+\`\`\`python
+@dataclass
+class DedupPolicy:
+    key: list[str]
+    keep: str  # "first" | "last" | "none"
+
+class Transformer:
+    def __init__(self, dedup_policy: DedupPolicy, tz_policy, validator):
+        self.dedup_policy = dedup_policy
+        self.tz_policy = tz_policy
+        self.validator = validator
+\`\`\`
+
+Now variation is explicit and testable without pretending all behaviors are one subtype contract.
+
+## Tradeoffs
+
+- **Inheritance** can reduce boilerplate when contract is stable.
+- **Composition** has more wiring overhead but scales better when behavior variants multiply.
+- In analytics pipelines, explicit policy objects usually win because auditability matters more than class hierarchy elegance.
+
+## Interview framing
+
+A strong answer ties design choice to incident prevention: “We replaced hidden subclass assumptions with explicit policy modules and caught duplicate inflation before finance close.”`,
+    video: PYTHON_VIDEO_FALLBACKS["py-o2"],
+    videoFallbackMarkdown: `## Guided deep dive
+
+Pick one inheritance tree from your codebase and do a contract audit:
+1. Write base preconditions/postconditions.
+2. Verify each subclass preserves them.
+3. Mark violations and redesign one branch using composition + policy objects.
+4. Add one regression test that previously would have passed incorrectly.`,
+    tryGuidance: "In the interactive, predict dispatch behavior and explicitly state whether input assumptions/output guarantees match the base contract.",
+    freeResponsePrompt: {
+      prompt: "Your team has 7 subclasses of `BaseTransformer` and metrics drift appears between regions. In 5–7 sentences, diagnose likely contract violations, propose a composition-based redesign, and describe one migration strategy that avoids downtime.",
+      rubric: [
+        "Identifies subtype contract drift (preconditions/postconditions differ)",
+        "Proposes composition/policy object approach rather than deeper inheritance",
+        "Includes data-quality guardrails (row-count, uniqueness, reconciliation checks)",
+        "Describes safe migration plan (dual-run, shadow compare, phased cutover)",
+        "Connects design change to concrete business risk reduction",
+      ],
+    },
+    knowledgeCheck: [
+      { question: "What is the clearest sign inheritance is failing in production code?", options: ["Callers must branch on subclass type to stay correct", "Classes share a helper method", "Base class has many comments"], correctIndex: 0, explanation: "If callers branch on subtype, substitutability is broken." },
+      { question: "Why does composition often beat inheritance in data pipelines?", options: ["Variation can be made explicit with testable policies", "Python cannot support inheritance", "Inheritance is always slower"], correctIndex: 0, explanation: "Explicit policy modules improve auditability and limit hidden assumptions." },
+      { question: "Best rollout for refactoring a critical hierarchy?", options: ["Dual-run old/new outputs with reconciliation before cutover", "Hard switch in one deploy with no comparison", "Postpone tests until after migration"], correctIndex: 0, explanation: "Parallel verification reduces migration risk in business-critical data flows." },
+    ],
+  },
+"py-o3": {
+    durationLabel: MODULE_TIME_LABEL,
+    outcomes: [
+      "Implement equality/hash/repr contracts that remain stable under production load.",
+      "Avoid operator overload semantics that hide side effects or mutable identity drift.",
+      "Test protocol invariants for cache keys, set membership, and sorting behavior.",
+    ],
+    learnMarkdown: `## Outcomes
+
+- Design custom value objects that behave predictably in dict/set/cache usage.
+- Prevent subtle hash/equality bugs that produce hard-to-debug cache misses.
+- Explain protocol guarantees and their business impact in interviews.
+
+## Production context
+
+Data systems often use custom keys (feature key, partition key, dedupe key). If dunder contracts are inconsistent, you can silently explode cache miss rates, duplicate work, or corrupt aggregation semantics.
+
+## Legacy anti-pattern (realistic)
+
+\`\`\`python
+@dataclass
+class FeatureKey:
+    entity_id: str
+    event_date: date
+    source: str
+    observed_at: datetime  # mutable field updated later
+
+    def __eq__(self, other):
+        return (
+            self.entity_id,
+            self.event_date,
+            self.source,
+        ) == (
+            other.entity_id,
+            other.event_date,
+            other.source,
+        )
+
+    def __hash__(self):
+        # BUG: includes observed_at which equality ignores
+        return hash((self.entity_id, self.event_date, self.source, self.observed_at))
+\`\`\`
+
+Two keys compare equal but hash differently. Dict/set behavior becomes undefined from the application perspective.
+
+## Failure mechanics
+
+- Cache key lookups fail despite “equal” objects.
+- Set dedupe behavior appears random under mutation.
+- Incident triage is slow if `__repr__` omits critical fields.
+
+## Senior refactor pattern
+
+1. Decide object role: mutable entity vs immutable value object.
+2. For hashable keys, enforce immutability (`frozen=True`) and align eq/hash fields.
+3. Keep overloaded operators side-effect free.
+4. Add invariant tests.
+
+\`\`\`python
+@dataclass(frozen=True)
+class FeatureKey:
+    entity_id: str
+    event_date: date
+    source: str
+
+    def __repr__(self):
+        return f"FeatureKey(entity_id={self.entity_id!r}, event_date={self.event_date!s}, source={self.source!r})"
+\`\`\`
+
+## Test checklist
+
+- `a == b` implies `hash(a) == hash(b)`.
+- Objects used as set keys do not mutate fields involved in hash.
+- Operator overloads (`__add__`, ordering) do not trigger I/O or mutation surprises.
+
+## Interview framing
+
+High-signal answer: “We made key objects immutable, aligned eq/hash fields, and added invariant tests; cache hit rate recovered and duplicate recomputation dropped.”`,
+    video: PYTHON_VIDEO_FALLBACKS["py-o3"],
+    videoFallbackMarkdown: `## Guided deep dive
+
+Implement a `FeatureKey` and write 3 tests:
+1. Eq/hash consistency.
+2. Set behavior with duplicate logical keys.
+3. `repr` includes fields needed for incident debugging.`,
+    tryGuidance: "Use the interactive to predict object protocol behavior (equality, hashing, transform operators). If behavior surprises you, identify which protocol contract was violated.",
+    freeResponsePrompt: {
+      prompt: "A feature cache miss rate jumped from 8% to 41% after a key-class refactor. In 5–7 sentences, diagnose probable dunder-contract mistakes, propose a fix, and define two tests/metrics to prevent recurrence.",
+      rubric: [
+        "Identifies eq/hash inconsistency or mutable hash-field risk",
+        "Proposes immutable value-object strategy for hash keys",
+        "Specifies concrete invariant tests (eq→hash, set/dict behavior)",
+        "Mentions observability metric (cache hit rate, duplicate recompute rate)",
+        "Provides rollback/validation approach for production safety",
+      ],
+    },
+    knowledgeCheck: [
+      { question: "Which rule must always hold for hashable keys?", options: ["If a == b then hash(a) == hash(b)", "Hash can include fields excluded from equality", "Hash should change over object lifetime"], correctIndex: 0, explanation: "Hash/equality consistency is required for correct dict/set semantics." },
+      { question: "Why is mutable state dangerous in hash keys?", options: ["Changing hashed fields after insertion breaks lookup behavior", "Mutable objects are faster for hashing", "Python auto-repairs hash table entries"], correctIndex: 0, explanation: "Mutation of hashed fields invalidates bucket placement assumptions." },
+      { question: "Best first guardrail after a key-contract incident?", options: ["Add invariant unit tests plus cache-hit monitoring", "Disable repr methods", "Stop using dict/set entirely"], correctIndex: 0, explanation: "Protocol tests + runtime metrics catch both correctness and impact regressions." },
+    ],
+  },
+"py-o4": {
+    durationLabel: MODULE_TIME_LABEL,
+    outcomes: [
+      "Design decorators and context managers that preserve reliability and observability.",
+      "Model retry/idempotency boundaries for external side effects.",
+      "Eliminate resource leaks with deterministic teardown patterns.",
+    ],
+    learnMarkdown: `## Outcomes
+
+- Build safe wrappers for HTTP/database/file operations in data workflows.
+- Prevent silent failures caused by broad exception swallowing.
+- Explain retry policy and resource-lifecycle tradeoffs at senior interview depth.
+
+## Production context
+
+Decorators and context managers are infrastructure multipliers: one bug in a retry decorator can corrupt thousands of writes. One missing cleanup path can exhaust DB connections and take down a pipeline.
+
+## Legacy anti-pattern: black-box retry decorator
+
+\`\`\`python
+def retry_forever(fn):
+    def wrapper(*args, **kwargs):
+        while True:
+            try:
+                return fn(*args, **kwargs)
+            except Exception:
+                time.sleep(0.2)
+                # swallows cause, retries non-idempotent calls forever
+    return wrapper
+\`\`\`
+
+### Failure modes
+
+- Retries non-idempotent operations (duplicate charges, duplicate writes).
+- Eats traceback taxonomy (cannot distinguish transient vs terminal).
+- Infinite loop burns worker capacity and obscures root cause.
+
+## Legacy anti-pattern: manual resource cleanup
+
+\`\`\`python
+conn = pool.getconn()
+cur = conn.cursor()
+cur.execute(query)
+if should_exit_early:
+    return  # leaked cursor + connection
+cur.close()
+pool.putconn(conn)
+\`\`\`
+
+Under error/early-return paths this leaks resources, eventually starving the pool.
+
+## Senior refactor pattern
+
+1. Retry only explicit transient exceptions.
+2. Require idempotency key or dedupe guard for retried write operations.
+3. Preserve function metadata via `functools.wraps`.
+4. Use context managers for cleanup guarantees.
+
+\`\`\`python
+def retry_transient(max_attempts=4, backoff=0.2):
+    def deco(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            for i in range(max_attempts):
+                try:
+                    return fn(*args, **kwargs)
+                except (TimeoutError, ConnectionError) as e:
+                    if i == max_attempts - 1:
+                        raise
+                    time.sleep(backoff * (2 ** i))
+        return wrapper
+    return deco
+\`\`\`
+
+## Reliability checklist
+
+- Retry scope limited to transient failures.
+- Non-idempotent operations require safeguards before retry.
+- Context manager coverage verified for success and exception paths.
+- Logs include attempt count, operation id, and terminal error type.
+
+## Interview framing
+
+Strong answers connect abstractions to operations: “We narrowed retry taxonomy, added idempotency keys, and wrapped DB resources in context managers; connection exhaustion and duplicate writes dropped to zero.”`,
+    video: PYTHON_VIDEO_FALLBACKS["py-o4"],
+    videoFallbackMarkdown: `## Guided deep dive
+
+Take one legacy decorator and one manual cleanup block from your code:
+1. Write exception taxonomy (transient vs terminal).
+2. Add idempotency guard rules for retried side effects.
+3. Refactor resource handling into context managers.
+4. Add tests for early-return and exception cleanup paths.`,
+    tryGuidance: "In the interactive, trace wrapper call flow and exception paths. Mark where idempotency assumptions are required and where teardown must be guaranteed.",
+    freeResponsePrompt: {
+      prompt: "A nightly backfill duplicated rows and exhausted DB connections after introducing a new retry decorator. In 5–7 sentences, diagnose the likely decorator/context-manager bugs, design a safer retry policy, and specify verification tests.",
+      rubric: [
+        "Identifies broad exception swallowing and retrying non-idempotent operations",
+        "Defines transient exception taxonomy and bounded retry strategy",
+        "Explains deterministic cleanup via context managers on all code paths",
+        "Includes concrete verification tests (duplicate-write guard, pool leak test, retry-attempt assertions)",
+        "Connects design changes to production outcomes (error rate, pool health, duplicate count)",
+      ],
+    },
+    knowledgeCheck: [
+      { question: "What is the most dangerous retry-decorator behavior?", options: ["Retrying non-idempotent writes with broad exception catch", "Using functools.wraps", "Logging retry attempts"], correctIndex: 0, explanation: "Blind retries can duplicate side effects and hide root causes." },
+      { question: "Why are context managers critical in data services?", options: ["They guarantee cleanup on both success and exception paths", "They eliminate need for monitoring", "They increase algorithmic complexity"], correctIndex: 0, explanation: "Deterministic teardown prevents connection/file handle leaks." },
+      { question: "Which post-fix metric best validates success?", options: ["Drop in duplicate writes and connection pool exhaustion incidents", "Increase in decorator count", "Lower number of try blocks"], correctIndex: 0, explanation: "Operational metrics confirm reliability improvements in production." },
+    ],
+  },
+"py-d1": { youtubeId: "QUT1VHiLmmI", title: "NumPy Arrays and Vectorization", channel: "freeCodeCamp.org", startSeconds: 0 },
   "py-d2": { youtubeId: "vmEHCJofslg", title: "Pandas DataFrames Tutorial", channel: "freeCodeCamp.org", startSeconds: 0 },
   "py-d3": { youtubeId: "txMdrV1Ut64", title: "Pandas GroupBy, Merge, and Pivot", channel: "Data School", startSeconds: 0 },
   "py-d4": { youtubeId: "f9vYq2xFAm8", title: "Handling Missing Data in Pandas", channel: "Data School", startSeconds: 0 },
@@ -107,7 +552,7 @@ If there is no exact tag match, ask the **AI tutor**: “Give me a 5-minute dril
 
 /** @type {Record<string, LessonModuleSpec>} */
 
-function buildPythonExtendedModule({ title, outcomes, concepts, pitfall, interviewHook, tryGuidance }) {
+function buildPythonExtendedModule({ title, outcomes, concepts, pitfall, interviewHook, tryGuidance, video = null }) {
   return {
     durationLabel: MODULE_TIME_LABEL,
     outcomes,
@@ -126,10 +571,10 @@ ${concepts}
 ## Interview framing
 
 ${interviewHook}`,
-    video: null,
-    videoFallbackMarkdown: `## Guided deep dive
-
-Use the clip in this lesson, then write a 4-line note: (1) the key API/pattern, (2) where it fails, (3) how you would test it, (4) how you explain it to a teammate.`,
+    video,
+    videoFallbackMarkdown: video
+      ? `## Guided deep dive\n\nUse the clip in this lesson, then write a 4-line note: (1) the key API/pattern, (2) where it fails, (3) how you would test it, (4) how you explain it to a teammate.`
+      : `## Guided deep dive\n\nNo curated clip is configured for this lesson yet. Use Practice + AI tutor to run a 5-minute drill: identify one failure mode, write one test, and explain one tradeoff.` ,
     tryGuidance,
     knowledgeCheck: [
       {
@@ -157,46 +602,259 @@ Use the clip in this lesson, then write a 4-line note: (1) the key API/pattern, 
 }
 
 const PYTHON_EXTENDED_MODULES = {
-  "py-o1": buildPythonExtendedModule({
-    title: "Classes, Objects & __init__",
+  "py-o1": {
+    durationLabel: MODULE_TIME_LABEL,
     outcomes: [
-      "Design small classes with clear constructor contracts.",
-      "Separate instance state from class-level configuration.",
-      "Debug attribute errors quickly using object introspection.",
+      "Design constructors that validate inputs without hiding side effects.",
+      "Separate object state, dependencies, and runtime services cleanly.",
+      "Refactor brittle classes into testable units with clear contracts.",
     ],
-    concepts: "Classes define behavior; instances hold state. Keep `__init__` focused on validating and assigning required fields. Prefer explicit dependencies over hidden globals.",
-    pitfall: "Packing too much side effect logic into `__init__`, which makes object creation slow and brittle.",
-    interviewHook: "Show how you would model a small domain object, validate inputs once, and expose methods that are easy to test.",
-    tryGuidance: "Use the interactive to track name→object state and narrate how instance attributes change after each operation.",
-  }),
-  "py-o2": buildPythonExtendedModule({
-    title: "Inheritance & Polymorphism",
+    learnMarkdown: `## Outcomes
+
+- Build classes that are easy to initialize, test, and reason about.
+- Diagnose constructor anti-patterns before they become production incidents.
+- Explain design tradeoffs in code review and interviews.
+
+## Core model
+
+A class should express **state + behavior + invariants**. The constructor (`__init__`) is not a dumping ground for network calls, global mutation, or hidden file reads.
+
+A useful litmus test: if object creation fails intermittently, your constructor is probably doing too much runtime work.
+
+## Anti-pattern drill: God constructor
+
+### Bad
+
+A constructor that validates inputs, fetches secrets, opens DB pools, makes API calls, and starts background jobs.
+
+### Why it fails
+
+- Instantiation becomes slow and flaky.
+- Unit tests require heavy mocking.
+- Retries become unclear: did failure happen in validation or side-effect logic?
+
+### Refactor target
+
+1. Keep `__init__` for assignment + validation only.
+2. Move side effects to explicit methods (`connect()`, `load()`, `start()`).
+3. Make dependencies injectable (client/session/logger).
+
+## Production scenario
+
+You ship a feature-store client class. During incident response, half of object creations timeout because constructor performs remote schema fetch.
+
+Refactor by caching schema fetch in an explicit warmup step and keeping constructor deterministic.
+
+## Interview framing
+
+Strong answers mention invariants, dependency injection, deterministic initialization, and observability hooks (timings/errors) around explicit lifecycle methods.`,
+    video: PYTHON_VIDEO_FALLBACKS["py-o1"],
+    videoFallbackMarkdown: `## Guided deep dive
+
+Watch the clip, then run this 10-minute audit on one class from your code:
+1. List constructor responsibilities.
+2. Mark each as validation vs side effect.
+3. Move one side effect behind an explicit method.
+4. Add one test that instantiates without network access.`,
+    tryGuidance: "Use the interactive to trace object state transitions. After each step, label whether behavior is constructor-safe or should be moved to an explicit lifecycle method.",
+    knowledgeCheck: [
+      {
+        question: "What is the most dangerous constructor anti-pattern?",
+        options: [
+          "Hidden side effects (network/files/jobs) during object creation",
+          "Assigning validated fields",
+          "Using type hints in method signatures",
+        ],
+        correctIndex: 0,
+        explanation: "Hidden side effects make creation nondeterministic and hard to test or retry safely.",
+      },
+      {
+        question: "Which refactor most improves testability?",
+        options: [
+          "Move side effects from __init__ into explicit methods with injected dependencies",
+          "Add more print statements in __init__",
+          "Instantiate global singletons in __init__",
+        ],
+        correctIndex: 0,
+        explanation: "Explicit lifecycle methods plus DI isolate side effects and simplify deterministic tests.",
+      },
+      {
+        question: "Interview prompt: your constructor is slow in production. Best first move?",
+        options: [
+          "Measure constructor responsibilities and split runtime work from validation",
+          "Ignore because creation is one-time",
+          "Increase timeout and keep architecture unchanged",
+        ],
+        correctIndex: 0,
+        explanation: "Diagnose and separate concerns first; latency fixes without design fixes usually regress.",
+      },
+    ],
+  },
+  "py-o2": {
+    durationLabel: MODULE_TIME_LABEL,
     outcomes: [
-      "Use inheritance when shared behavior is stable.",
-      "Override methods safely while preserving contracts.",
-      "Prefer composition if subclass branching gets deep.",
+      "Use inheritance only when subtype contracts are stable.",
+      "Detect Liskov-style contract breaks early.",
+      "Choose composition when behavior variants multiply.",
     ],
-    concepts: "Polymorphism lets callers use one interface while concrete types provide behavior. Keep base class contracts explicit and avoid fragile inheritance trees.",
-    pitfall: "Subclass methods changing parameter or return expectations without documenting the contract break.",
-    interviewHook: "Describe when you would choose composition over inheritance for maintainability.",
-    tryGuidance: "Use the branch-style interactive and predict which implementation path executes for each input.",
-  }),
-  "py-o3": buildPythonExtendedModule({
-    title: "Dunder Methods & Operator Overloading",
-    outcomes: ["Implement `__repr__`, equality, and ordering semantics intentionally.","Avoid surprising operator overload behavior.","Keep overloaded types predictable and testable."],
-    concepts: "Dunder methods define protocol behavior. Overload only when semantics are natural and consistent with user expectation.",
-    pitfall: "Overloading operators with side effects that violate intuitive behavior.",
-    interviewHook: "Explain why readability and predictability are more important than clever operator tricks.",
-    tryGuidance: "Use the fold/transform interactive and compare expected vs actual results after each operation.",
-  }),
-  "py-o4": buildPythonExtendedModule({
-    title: "Decorators & Context Managers",
-    outcomes: ["Use decorators for cross-cutting concerns like logging and retries.","Use context managers for deterministic setup/teardown.","Preserve function signatures and metadata when wrapping."],
-    concepts: "Decorators wrap call behavior; context managers control resource lifecycle. Both are abstraction tools for reducing repeated boilerplate.",
-    pitfall: "Decorator wrappers dropping function metadata or swallowing exceptions.",
-    interviewHook: "Walk through a safe retry decorator and a context-managed file/database operation.",
-    tryGuidance: "In the argument-binding interactive, trace what args/kwargs the wrapper receives and forwards.",
-  }),
+    learnMarkdown: `## Outcomes
+
+- Model reusable behavior without creating fragile subclass trees.
+- Explain polymorphism as contract compatibility, not syntax trivia.
+- Refactor inheritance misuse into composition patterns.
+
+## Core model
+
+Inheritance is a **substitutability promise**. If a subclass cannot be used wherever the base class is expected, your abstraction is broken.
+
+## Anti-pattern drill: Inheritance for code reuse only
+
+### Bad
+
+Teams subclass a base class just to reuse utility methods, then override core behavior with different preconditions.
+
+### Failure modes
+
+- Base APIs become ambiguous.
+- Callers rely on behavior that silently changes per subclass.
+- New subclasses require defensive branching everywhere.
+
+### Refactor target
+
+- Extract shared utilities into collaborators.
+- Keep base interface narrow and explicit.
+- Use composition (`Strategy`, policy objects) for behavior variants.
+
+## Production scenario
+
+A pricing pipeline uses `BasePricer.compute(order)`; one subclass expects net price, another gross price. Results diverge silently across markets.
+
+Fix by introducing explicit pricing policies and normalized input contracts.
+
+## Interview framing
+
+High-signal answers compare inheritance vs composition with maintainability, discoverability, and contract safety tradeoffs.`,
+    video: PYTHON_VIDEO_FALLBACKS["py-o2"],
+    videoFallbackMarkdown: `## Guided deep dive
+
+After the clip, sketch one inheritance tree from memory and annotate where contracts differ. Then redesign one branch using composition.`,
+    tryGuidance: "In the interactive, predict dispatch path and then state whether the chosen path preserves the base contract.",
+    knowledgeCheck: [
+      { question: "When is inheritance justified?", options: ["When subtype behavior preserves the base contract", "Whenever two classes share any code", "When subclass count is expected to explode"], correctIndex: 0, explanation: "Inheritance is about substitutability; shared code alone is insufficient." },
+      { question: "Best signal of a broken hierarchy?", options: ["Callers need type checks/branching to use subclasses safely", "Base class has docstrings", "Methods return values"], correctIndex: 0, explanation: "If callers branch on subtype, polymorphism likely failed." },
+      { question: "First refactor for fragile deep trees?", options: ["Extract behavior strategies and compose them", "Add more inheritance layers", "Rename classes only"], correctIndex: 0, explanation: "Composition localizes variation without expanding brittle hierarchies." },
+    ],
+  },
+  "py-o3": {
+    durationLabel: MODULE_TIME_LABEL,
+    outcomes: [
+      "Implement dunder methods with predictable semantics.",
+      "Avoid operator overloads that surprise readers.",
+      "Define equality/hash/order contracts that remain consistent.",
+    ],
+    learnMarkdown: `## Outcomes
+
+- Use dunder protocols intentionally rather than decoratively.
+- Avoid semantic traps in equality, hashing, and ordering.
+- Make custom objects safe for dict/set usage and debugging.
+
+## Core model
+
+Dunder methods are **protocol contracts**. Overloading should preserve user expectations from built-in types.
+
+## Anti-pattern drill: Clever but misleading operators
+
+### Bad
+
+`__add__` mutates left operand or triggers I/O; `__eq__` compares one field while `__hash__` uses another.
+
+### Failure modes
+
+- Bugs in caches/sets due to unstable hashing semantics.
+- Non-obvious side effects during arithmetic-looking code.
+- Impossible debugging when `repr` is vague.
+
+### Refactor target
+
+- Keep operators pure and side-effect free.
+- Keep `__eq__` and `__hash__` consistent.
+- Implement informative `__repr__` for debugging and logs.
+
+## Production scenario
+
+A feature key object is used as dict key. Equality says two keys match, but hash differs because timestamp included in hash only. Cache miss rates spike.
+
+Fix by aligning equality/hash fields and adding property-based tests.
+
+## Interview framing
+
+Mature answers emphasize predictability, protocol consistency, and testing invariants over syntactic cleverness.`,
+    video: PYTHON_VIDEO_FALLBACKS["py-o3"],
+    videoFallbackMarkdown: `## Guided deep dive
+
+Watch the clip and then implement `__repr__`, `__eq__`, and `__hash__` for one toy class. Add tests proving equality/hash consistency.`,
+    tryGuidance: "Use the interactive to compare expected vs observed behavior after overloaded operations. Flag any semantic surprise as a design bug.",
+    knowledgeCheck: [
+      { question: "What must remain consistent for dict/set keys?", options: ["Objects considered equal must produce equal hashes", "Hash can change after insertion", "Only repr matters"], correctIndex: 0, explanation: "Hash/equality consistency is required for hash-table correctness." },
+      { question: "Which overload is usually unsafe?", options: ["Operator overloads with hidden side effects", "__repr__ returning readable output", "__len__ returning count"], correctIndex: 0, explanation: "Side-effectful operators violate reader expectations and create subtle bugs." },
+      { question: "Best debugging support for custom types?", options: ["A precise, unambiguous __repr__ plus protocol tests", "Randomized __str__ for variety", "Disable equality to avoid mistakes"], correctIndex: 0, explanation: "Readable representation and invariant tests shorten incident/debug loops." },
+    ],
+  },
+  "py-o4": {
+    durationLabel: MODULE_TIME_LABEL,
+    outcomes: [
+      "Use decorators for cross-cutting concerns without obscuring behavior.",
+      "Use context managers for deterministic setup/teardown.",
+      "Preserve signatures/metadata and error propagation semantics.",
+    ],
+    learnMarkdown: `## Outcomes
+
+- Build wrappers that remain observable and debuggable in production.
+- Prevent resource leaks with explicit context-manager boundaries.
+- Explain retry/logging/tracing tradeoffs in interviews and code reviews.
+
+## Core model
+
+Decorators transform call behavior; context managers transform **resource lifecycle**. Both are powerful and easy to misuse when abstraction hides operational risk.
+
+## Anti-pattern drill: Black-box decorator
+
+### Bad
+
+A retry decorator catches all exceptions, retries blindly, drops traceback context, and returns fallback values silently.
+
+### Failure modes
+
+- Incidents become invisible (errors swallowed).
+- Non-idempotent operations repeat and corrupt state.
+- Observability tools show wrapper name, not original function.
+
+### Refactor target
+
+- Retry only on known transient errors.
+- Preserve metadata with `functools.wraps`.
+- Log attempts with context and re-raise terminal failures.
+
+## Anti-pattern drill: Manual resource cleanup
+
+Using `open()/close()` patterns scattered across early returns leads to leaks.
+
+Use context managers to guarantee teardown even during exceptions.
+
+## Interview framing
+
+Strong answers discuss idempotency, exception taxonomy, observability, and safe retry boundaries.`,
+    video: PYTHON_VIDEO_FALLBACKS["py-o4"],
+    videoFallbackMarkdown: `## Guided deep dive
+
+After watching, write one safe retry decorator policy and one context-managed resource workflow. Explicitly state which exceptions are retriable and why.`,
+    tryGuidance: "In the interactive, trace incoming args/kwargs and error paths through the wrapper. Verify metadata preservation and exception behavior.",
+    knowledgeCheck: [
+      { question: "What is the highest-risk decorator mistake?", options: ["Swallowing exceptions and hiding failure semantics", "Using functools.wraps", "Adding structured logs"], correctIndex: 0, explanation: "Hidden failures break reliability and incident response." },
+      { question: "Why prefer context managers for resources?", options: ["They guarantee teardown across normal and exceptional paths", "They speed up CPU-heavy loops", "They replace all try/except usage"], correctIndex: 0, explanation: "Deterministic cleanup is the primary value." },
+      { question: "When should retries be avoided?", options: ["On non-idempotent operations without safeguards", "On transient network errors", "When backoff is configured"], correctIndex: 0, explanation: "Blind retries can duplicate side effects and corrupt state." },
+    ],
+  },
   "py-d1": {
     durationLabel: MODULE_TIME_LABEL,
     outcomes: [
@@ -4232,6 +4890,70 @@ Sketch **two** curves: train error vs complexity, test error vs complexity. Mark
   },
 };
 
+
+function ensureMinimumChecks(checks, lessonTitle) {
+  const base = Array.isArray(checks) ? checks.slice() : [];
+  const fillers = [
+    {
+      question: `For ${lessonTitle}, what is the most reliable first step when behavior seems unclear?`,
+      options: [
+        "Write a tiny reproducible example and test observed behavior",
+        "Assume your intuition is correct and keep coding",
+        "Skip verification and ask for code review first",
+      ],
+      correctIndex: 0,
+      explanation: "Small, explicit repros prevent assumption-driven bugs and speed debugging.",
+    },
+    {
+      question: "What is the strongest interview signal for technical maturity?",
+      options: [
+        "Explain tradeoffs, failure modes, and validation strategy",
+        "List APIs from memory without context",
+        "Avoid discussing edge cases",
+      ],
+      correctIndex: 0,
+      explanation: "Mature answers show judgment under ambiguity, not syntax recall alone.",
+    },
+    {
+      question: "Which action improves retention the most after this lesson?",
+      options: [
+        "Teach the concept back using one concrete production scenario",
+        "Reread headings only",
+        "Move on without practice",
+      ],
+      correctIndex: 0,
+      explanation: "Active retrieval + scenario transfer improves long-term recall.",
+    },
+  ];
+  while (base.length < 3) base.push(fillers[base.length % fillers.length]);
+  return base;
+}
+
+function buildPythonTutorPrompts(lesson) {
+  return {
+    preTry: `Pre-Try for ${lesson.title}: give me 2 likely edge cases, one failure mode to watch for, and a 4-step predict→verify drill before I touch the interactive.`,
+    postFail: `I missed checks on ${lesson.title}. Diagnose whether my errors are conceptual, procedural, or careless. Then give me a targeted 6-minute recovery drill with one mini-question and rubric.`,
+    weeklyRecap: `Weekly recap for Python: based on ${lesson.title} and related topics, summarize my top 3 error patterns, one habit to fix each, and a spaced-practice plan for the next 7 days.`,
+  };
+}
+
+function withPythonAssessmentAndTutor(spec, lesson) {
+  return {
+    ...spec,
+    knowledgeCheck: ensureMinimumChecks(spec.knowledgeCheck, lesson.title),
+    freeResponsePrompt: spec.freeResponsePrompt || {
+      prompt: `In 3–5 sentences for ${lesson.title}: explain one key tradeoff, diagnose one realistic failure mode, and propose one concrete test/assertion you would add in production.`,
+      rubric: [
+        "Names one concrete tradeoff with when/why",
+        "Diagnoses a plausible failure mode",
+        "Proposes one test/assertion tied to the failure mode",
+        "Uses clear, interview-ready language",
+      ],
+    },
+    tutorPrompts: spec.tutorPrompts || buildPythonTutorPrompts(lesson),
+  };
+}
+
 /**
  * @param {{ id: string, title: string, duration?: string, hasViz?: boolean }} lesson
  * @param {{ id: string, title: string }} course
@@ -4239,12 +4961,18 @@ Sketch **two** curves: train error vs complexity, test error vs complexity. Mark
  */
 export function getResolvedLessonModule(lesson, course) {
   const spec = LESSON_MODULES[lesson.id];
-  if (spec) return spec;
+  if (spec) {
+    const resolved = {
+      ...spec,
+      durationLabel: lesson.duration || spec.durationLabel || MODULE_TIME_LABEL,
+    };
+    return course.id === "python" ? withPythonAssessmentAndTutor(resolved, lesson) : resolved;
+  }
 
   const pythonVideo = course.id === "python" ? (PYTHON_VIDEO_FALLBACKS[lesson.id] || null) : null;
 
-  return {
-    durationLabel: MODULE_TIME_LABEL,
+  const fallbackSpec = {
+    durationLabel: lesson.duration || MODULE_TIME_LABEL,
     outcomes: [
       `Explain **${lesson.title}** in two sentences`,
       "Connect the idea to a product or pipeline failure mode",
@@ -4260,4 +4988,40 @@ export function getResolvedLessonModule(lesson, course) {
       : "No primary visualization is mapped for this lesson yet. Use **Practice** questions and the tutor to simulate the same predict→verify loop.",
     knowledgeCheck: FALLBACK_CHECKS,
   };
+
+  return course.id === "python" ? withPythonAssessmentAndTutor(fallbackSpec, lesson) : fallbackSpec;
+}
+
+
+/**
+ * Non-throwing integrity checks for Python lesson metadata.
+ * Returns a list of issues so callers can decide whether to log/alert.
+ */
+export function auditPythonLessonIntegrity(curriculum, visualizations) {
+  const issues = [];
+  const pythonCourse = (curriculum || []).find((c) => c.id === "python");
+  if (!pythonCourse) return issues;
+
+  const lessonList = (pythonCourse.topics || []).flatMap((t) => t.lessons || []);
+  for (const lesson of lessonList) {
+    const hasMappedViz = Boolean(visualizations?.[lesson.id]);
+    if (!lesson.hasViz && hasMappedViz) {
+      issues.push({
+        type: "hasViz_mismatch",
+        lessonId: lesson.id,
+        message: `Lesson ${lesson.id} hasViz=false but has a mapped visualization.`,
+      });
+    }
+
+    const spec = LESSON_MODULES[lesson.id];
+    if (spec?.video === null && PYTHON_VIDEO_FALLBACKS[lesson.id]) {
+      issues.push({
+        type: "video_mismatch",
+        lessonId: lesson.id,
+        message: `Lesson ${lesson.id} sets video=null despite available Python video fallback.`,
+      });
+    }
+  }
+
+  return issues;
 }

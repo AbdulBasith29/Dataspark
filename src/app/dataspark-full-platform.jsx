@@ -44,7 +44,8 @@ import MLSystemPipeline from "../visualizations/MLSystemPipeline.jsx";
 import FeatureStoreViz from "../visualizations/FeatureStoreViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import LessonModule from "../components/platform/LessonModule.jsx";
-import { getResolvedLessonModule } from "../data/lesson-modules.js";
+import { getResolvedLessonModule, auditPythonLessonIntegrity } from "../data/lesson-modules.js";
+import { LVS_EVENT_NAMES, buildLvsMetadata, buildPythonProgressArtifacts, trackLvsEvent } from "../lib/analytics.js";
 import { PYTHON_QUESTIONS } from "../data/questions-python.js";
 import { STATISTICS_QUESTIONS } from "../data/questions-statistics.js";
 import { DS, dsGlassCard } from "../lib/ds-platform-tokens.js";
@@ -136,7 +137,7 @@ const CURRICULUM = [
         lessons: [
           { id: "py-o1", title: "Classes, Objects & __init__", duration: "18 min", hasViz: true },
           { id: "py-o2", title: "Inheritance & Polymorphism", duration: "15 min", hasViz: true },
-          { id: "py-o3", title: "Dunder Methods & Operator Overloading", duration: "12 min", hasViz: false },
+          { id: "py-o3", title: "Dunder Methods & Operator Overloading", duration: "12 min", hasViz: true },
           { id: "py-o4", title: "Decorators & Context Managers", duration: "15 min", hasViz: true },
         ]
       },
@@ -147,7 +148,7 @@ const CURRICULUM = [
           { id: "py-d1", title: "NumPy Arrays & Vectorization", duration: "20 min", hasViz: true },
           { id: "py-d2", title: "Pandas Series & DataFrames", duration: "25 min", hasViz: true },
           { id: "py-d3", title: "GroupBy, Merge, Pivot", duration: "20 min", hasViz: true },
-          { id: "py-d4", title: "Handling Missing Data", duration: "12 min", hasViz: false },
+          { id: "py-d4", title: "Handling Missing Data", duration: "12 min", hasViz: true },
           { id: "py-d5", title: "Performance: Vectorize Don't Loop", duration: "15 min", hasViz: true },
         ]
       }
@@ -944,11 +945,11 @@ const VISUALIZATIONS = {
   "py-o2": BranchRouter,
   "py-o3": FoldMachine,
   "py-o4": ArgumentBinder,
-  "py-d1": FeatureScaling,
-  "py-d2": WindowFunctions,
+  "py-d1": PythonMutabilityViz,
+  "py-d2": HashLab,
   "py-d3": SQLJoins,
-  "py-d4": HypothesisTesting,
-  "py-d5": BatchVsStreaming,
+  "py-d4": TracebackTheater,
+  "py-d5": FoldMachine,
   "sd-p1": BatchVsStreaming,
   "sd-p2": ETLPipeline,
   "sd-p3": StreamingEnginesTrinity,
@@ -958,6 +959,11 @@ const VISUALIZATIONS = {
   "sd-m3": BatchVsStreaming,
   "sd-m4": RecSysCollaborativeFiltering,
 };
+
+const PYTHON_INTEGRITY_ISSUES = auditPythonLessonIntegrity(CURRICULUM, VISUALIZATIONS);
+if (PYTHON_INTEGRITY_ISSUES.length > 0 && typeof console !== "undefined") {
+  console.warn("[DataSpark] Python lesson integrity issues detected", PYTHON_INTEGRITY_ISSUES);
+}
 
 const ML_VIZ_FALLBACK = [
   BiasVarianceViz,
@@ -1062,6 +1068,12 @@ export default function DataSparkPlatform() {
   }, [view]);
 
   const completedLessons = Object.keys(progress).filter(k => progress[k] === "done").length;
+  const pythonLessonIds = CURRICULUM.find((c) => c.id === "python")?.topics?.flatMap((t) => t.lessons.map((l) => l.id)) || [];
+  const completedPythonLessonIds = pythonLessonIds.filter((id) => progress[id] === "done");
+  const pythonArtifacts = buildPythonProgressArtifacts({
+    completedLessonIds: completedPythonLessonIds,
+    totalPythonLessons: pythonLessonIds.length,
+  });
 
   const submitPracticeAnswer = useCallback(async () => {
     if (!activeQuestion || !userAnswer.trim()) return;
@@ -1147,6 +1159,15 @@ export default function DataSparkPlatform() {
             </div>
           ))}
         </div>
+        {pythonArtifacts.unlockedSkills.length > 0 || pythonArtifacts.readinessMilestones.length > 0 ? (
+          <div style={{ marginTop: 18, padding: "14px 16px", border: `1px solid ${DS.border}`, borderRadius: DS.radiusMd, background: "rgba(255,255,255,0.02)", maxWidth: 760, marginLeft: "auto", marginRight: "auto" }}>
+            <div style={{ fontSize: 10, color: DS.ind, fontFamily: "var(--ds-mono), monospace", letterSpacing: "0.12em", marginBottom: 8 }}>PYTHON PROGRESS ARTIFACTS</div>
+            <div style={{ fontSize: 13, color: DS.t2, marginBottom: 8 }}>Completion: {pythonArtifacts.completionRate}%</div>
+            {pythonArtifacts.unlockedSkills.length > 0 && <div style={{ fontSize: 13, color: DS.t3, marginBottom: 6 }}>Skills unlocked: {pythonArtifacts.unlockedSkills.join(" · ")}</div>}
+            {pythonArtifacts.readinessMilestones.length > 0 && <div style={{ fontSize: 13, color: DS.t3 }}>Readiness milestones: {pythonArtifacts.readinessMilestones.join(" · ")}</div>}
+          </div>
+        ) : null}
+
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16, paddingBottom: 72 }}>
@@ -1249,7 +1270,7 @@ export default function DataSparkPlatform() {
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveLesson(lesson); setView("lesson"); } }}
-                        onClick={() => { setActiveLesson(lesson); setView("lesson"); }}
+                        onClick={() => { setActiveLesson(lesson); setView("lesson"); trackLvsEvent({ eventName: LVS_EVENT_NAMES.lessonStart, page: "lesson", metadata: buildLvsMetadata({ courseId: c.id, lessonId: lesson.id, lessonTitle: lesson.title, stage: "start" }) }); }}
                         style={{
                           ...dsGlassCard({ padding: "14px 16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "border-color 0.2s, box-shadow 0.2s" }),
                         }}
@@ -1350,6 +1371,22 @@ export default function DataSparkPlatform() {
         backLabel={`â† Back to ${activeCourse.title}`}
         onMarkComplete={() => {
           setProgress((p) => ({ ...p, [activeLesson.id]: "done" }));
+          trackLvsEvent({
+            eventName: LVS_EVENT_NAMES.lessonComplete,
+            page: "lesson",
+            metadata: buildLvsMetadata({
+              courseId: activeCourse.id,
+              lessonId: activeLesson.id,
+              lessonTitle: activeLesson.title,
+              stage: "complete",
+              passed: true,
+              artifact: {
+                unlockedSkills: pythonArtifacts.unlockedSkills,
+                readinessMilestones: pythonArtifacts.readinessMilestones,
+                completionRate: pythonArtifacts.completionRate,
+              },
+            }),
+          });
           setView("course");
         }}
         onAskTutor={() => setChatbotCourse(activeCourse)}
