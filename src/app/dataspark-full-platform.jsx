@@ -940,6 +940,15 @@ const VISUALIZATIONS = {
   "py-c3": ArgumentBinder,
   "py-c4": FoldMachine,
   "py-c5": TracebackTheater,
+  "py-o1": VariableBindingLab,
+  "py-o2": BranchRouter,
+  "py-o3": FoldMachine,
+  "py-o4": ArgumentBinder,
+  "py-d1": FeatureScaling,
+  "py-d2": WindowFunctions,
+  "py-d3": SQLJoins,
+  "py-d4": HypothesisTesting,
+  "py-d5": BatchVsStreaming,
   "sd-p1": BatchVsStreaming,
   "sd-p2": ETLPipeline,
   "sd-p3": StreamingEnginesTrinity,
@@ -1035,6 +1044,23 @@ export default function DataSparkPlatform() {
 
   const totalLessons = CURRICULUM.reduce((a, c) => a + c.topics.reduce((b, t) => b + t.lessons.length, 0), 0);
   const totalQuestions = CURRICULUM.reduce((a, c) => a + c.questions.length, 0);
+  useEffect(() => {
+    window.history.pushState({ dsView: view }, "");
+  }, [view]);
+
+  useEffect(() => {
+    const onPop = (event) => {
+      const nextView = event?.state?.dsView;
+      if (nextView && ["home", "course", "lesson", "question"].includes(nextView)) {
+        setView(nextView);
+      } else if (view !== "home") {
+        setView("home");
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [view]);
+
   const completedLessons = Object.keys(progress).filter(k => progress[k] === "done").length;
 
   const submitPracticeAnswer = useCallback(async () => {
