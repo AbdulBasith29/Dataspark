@@ -960,11 +960,6 @@ const VISUALIZATIONS = {
   "sd-m4": RecSysCollaborativeFiltering,
 };
 
-const PYTHON_INTEGRITY_ISSUES = auditPythonLessonIntegrity(CURRICULUM, VISUALIZATIONS);
-if (PYTHON_INTEGRITY_ISSUES.length > 0 && typeof console !== "undefined") {
-  console.warn("[DataSpark] Python lesson integrity issues detected", PYTHON_INTEGRITY_ISSUES);
-}
-
 const ML_VIZ_FALLBACK = [
   BiasVarianceViz,
   TrainValTestSplit,
@@ -1047,6 +1042,17 @@ export default function DataSparkPlatform() {
   const [evalLoading, setEvalLoading] = useState(false);
   const [evalError, setEvalError] = useState(null);
   const [evalResult, setEvalResult] = useState(null);
+
+  useEffect(() => {
+    try {
+      const issues = auditPythonLessonIntegrity(CURRICULUM, VISUALIZATIONS);
+      if (issues.length > 0 && typeof console !== "undefined") {
+        console.warn("[DataSpark] Python lesson integrity issues detected", issues);
+      }
+    } catch (err) {
+      console.error("[DataSpark] Python integrity audit failed", err);
+    }
+  }, []);
 
   const totalLessons = CURRICULUM.reduce((a, c) => a + c.topics.reduce((b, t) => b + t.lessons.length, 0), 0);
   const totalQuestions = CURRICULUM.reduce((a, c) => a + c.questions.length, 0);
