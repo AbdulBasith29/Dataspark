@@ -1,47 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import AIChatbot from "../chatbot/AIChatbot.jsx";
-import SQLJoins from "../visualizations/SQLJoins.jsx";
-import TrainValTestSplit from "../visualizations/TrainValTestSplit.jsx";
-import PythonMutabilityViz from "../visualizations/PythonMutabilityViz.jsx";
-import VariableBindingLab from "../visualizations/VariableBindingLab.jsx";
-import StringFormatAtelier from "../visualizations/StringFormatAtelier.jsx";
-import HashLab from "../visualizations/HashLab.jsx";
-import ComprehensionForge from "../visualizations/ComprehensionForge.jsx";
-import BranchRouter from "../visualizations/BranchRouter.jsx";
-import IteratorEngine from "../visualizations/IteratorEngine.jsx";
-import ArgumentBinder from "../visualizations/ArgumentBinder.jsx";
-import FoldMachine from "../visualizations/FoldMachine.jsx";
-import TracebackTheater from "../visualizations/TracebackTheater.jsx";
-import KMeansClustering from "../visualizations/KMeansClustering.jsx";
-import ConfusionMatrix from "../visualizations/ConfusionMatrix.jsx";
-import DecisionTree from "../visualizations/DecisionTree.jsx";
-import LinearRegression from "../visualizations/LinearRegression.jsx";
-import LogisticRegression from "../visualizations/LogisticRegression.jsx";
-import PCA from "../visualizations/PCA.jsx";
-import ROCCurve from "../visualizations/ROCCurve.jsx";
-import WindowFunctions from "../visualizations/WindowFunctions.jsx";
-import FeatureScaling from "../visualizations/FeatureScaling.jsx";
-import NeuralNetwork from "../visualizations/NeuralNetwork.jsx";
-import Attention from "../visualizations/Attention.jsx";
-import BackpropAnimation from "../visualizations/BackpropAnimation.jsx";
-import ActivationFunctions from "../visualizations/ActivationFunctions.jsx";
-import ConvolutionFilter from "../visualizations/ConvolutionFilter.jsx";
-import BayesTheorem from "../visualizations/BayesTheorem.jsx";
-import HypothesisTesting from "../visualizations/HypothesisTesting.jsx";
-import CrossValidation from "../visualizations/CrossValidation.jsx";
-import ABTestSimulator from "../visualizations/ABTestSimulator.jsx";
-import FunnelAnalysis from "../visualizations/FunnelAnalysis.jsx";
-import RegularizationEffect from "../visualizations/RegularizationEffect.jsx";
-import TimeSeriesDecomposition from "../visualizations/TimeSeriesDecomposition.jsx";
-import WordEmbeddings from "../visualizations/WordEmbeddings.jsx";
-import RecSysCollaborativeFiltering from "../visualizations/RecSysCollaborativeFiltering.jsx";
-import BatchVsStreaming from "../visualizations/BatchVsStreaming.jsx";
-import ETLPipeline from "../visualizations/ETLPipeline.jsx";
-import StreamingEnginesTrinity from "../visualizations/StreamingEnginesTrinity.jsx";
-import WarehouseStarSchema from "../visualizations/WarehouseStarSchema.jsx";
-import MLSystemPipeline from "../visualizations/MLSystemPipeline.jsx";
-import FeatureStoreViz from "../visualizations/FeatureStoreViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import LessonModule from "../components/platform/LessonModule.jsx";
 import { getResolvedLessonModule, auditPythonLessonIntegrity } from "../data/lesson-modules.js";
@@ -899,114 +858,11 @@ const BiasVarianceViz = () => {
   );
 };
 
-const VISUALIZATIONS = {
-  "st-p1": BayesTheorem,
-  "st-i1": HypothesisTesting,
-  "st-a1": ABTestSimulator,
-  "st-p2": NormalDistViz,
-  "dl-f1": NeuralNetwork,
-  "dl-f2": BackpropAnimation,
-  "dl-f3": ActivationFunctions,
-  "dl-f4": GradientDescentViz,
-  "dl-a1": ConvolutionFilter,
-  "dl-f5": RegularizationEffect,
-  "ml-f2": BiasVarianceViz,
-  "ml-f3": TrainValTestSplit,
-  "ml-f5": FeatureScaling,
-  "ml-s1": LinearRegression,
-  "ml-s2": LogisticRegression,
-  "ml-s3": DecisionTree,
-  "ml-u1": KMeansClustering,
-  "ml-u3": PCA,
-  "ml-e1": ConfusionMatrix,
-  "ml-e2": ROCCurve,
-  "ml-e3": CrossValidation,
-  "st-f2": NormalDistViz,
-  "sq-b2": SQLJoins,
-  "sq-a1": WindowFunctions,
-  "ga-f2": WordEmbeddings,
-  "ga-f3": Attention,
-  "ps-e1": ABTestSimulator,
-  "ps-m4": FunnelAnalysis,
-  "sp-t1": TimeSeriesDecomposition,
-  "sp-r1": RecSysCollaborativeFiltering,
-  "sp-n2": WordEmbeddings,
-  "py-b1": VariableBindingLab,
-  "py-b2": StringFormatAtelier,
-  "py-b3": PythonMutabilityViz,
-  "py-b4": HashLab,
-  "py-b5": ComprehensionForge,
-  "py-c1": BranchRouter,
-  "py-c2": IteratorEngine,
-  "py-c3": ArgumentBinder,
-  "py-c4": FoldMachine,
-  "py-c5": TracebackTheater,
-  "py-o1": VariableBindingLab,
-  "py-o2": BranchRouter,
-  "py-o3": FoldMachine,
-  "py-o4": ArgumentBinder,
-  "py-d1": PythonMutabilityViz,
-  "py-d2": HashLab,
-  "py-d3": SQLJoins,
-  "py-d4": TracebackTheater,
-  "py-d5": FoldMachine,
-  "sd-p1": BatchVsStreaming,
-  "sd-p2": ETLPipeline,
-  "sd-p3": StreamingEnginesTrinity,
-  "sd-p4": WarehouseStarSchema,
-  "sd-m1": MLSystemPipeline,
-  "sd-m2": FeatureStoreViz,
-  "sd-m3": BatchVsStreaming,
-  "sd-m4": RecSysCollaborativeFiltering,
-};
+const VISUALIZATIONS = {};
 
-const ML_VIZ_FALLBACK = [
-  BiasVarianceViz,
-  TrainValTestSplit,
-  FeatureScaling,
-  LinearRegression,
-  LogisticRegression,
-  DecisionTree,
-  KMeansClustering,
-  PCA,
-  ConfusionMatrix,
-  ROCCurve,
-];
-
-function mlVizFallbackForLesson(lessonId) {
-  let h = 0;
-  for (let i = 0; i < lessonId.length; i++) h = (h * 31 + lessonId.charCodeAt(i)) | 0;
-  return ML_VIZ_FALLBACK[Math.abs(h) % ML_VIZ_FALLBACK.length];
-}
-
-const SD_VIZ_FALLBACK = [
-  BatchVsStreaming,
-  ETLPipeline,
-  StreamingEnginesTrinity,
-  WarehouseStarSchema,
-  MLSystemPipeline,
-  FeatureStoreViz,
-  RecSysCollaborativeFiltering,
-  FunnelAnalysis,
-];
-
-function sdVizFallbackForLesson(lessonId) {
-  let h = 0;
-  for (let i = 0; i < lessonId.length; i++) h = (h * 31 + lessonId.charCodeAt(i)) | 0;
-  return SD_VIZ_FALLBACK[Math.abs(h) % SD_VIZ_FALLBACK.length];
-}
-
-/** When a lesson is marked hasViz but has no bespoke component, show a course-appropriate interactive. */
+/** Temporary safety mode: disable visualizations to avoid route-level render crashes while isolating import-time module errors. */
 function resolveLessonVizComponent(lessonId, courseId, hasViz) {
-  const direct = VISUALIZATIONS[lessonId];
-  if (direct) return direct;
-  if (!hasViz) return null;
-  if (courseId === "statistics") return NormalDistViz;
-  if (courseId === "ml") return mlVizFallbackForLesson(lessonId);
-  if (courseId === "deep-learning") return GradientDescentViz;
-  if (courseId === "sql") return SQLJoins;
-  if (courseId === "python") return PythonMutabilityViz;
-  if (courseId === "system-design") return sdVizFallbackForLesson(lessonId);
+  const _unused = { lessonId, courseId, hasViz };
   return null;
 }
 
@@ -1666,5 +1522,4 @@ export default function DataSparkPlatform() {
     </div>
   );
 }
-
 
