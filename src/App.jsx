@@ -9,7 +9,7 @@ import PreviewPage from "./pages/PreviewPage.jsx";
 import { DS, dsGlassCard } from "./lib/ds-platform-tokens.js";
 import AppErrorBoundary from "./components/AppErrorBoundary.jsx";
 
-const DataSparkPlatform = lazy(() => import("./app/dataspark-platform.jsx"));
+const DataSparkPlatform = lazy(() => import("./app/dataspark-full-platform.jsx"));
 
 function PlatformLoadingFallback() {
   return (
