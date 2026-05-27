@@ -7,6 +7,7 @@ import TermsPage from "./pages/TermsPage.jsx";
 import ThankYouPage from "./pages/ThankYouPage.jsx";
 import PreviewPage from "./pages/PreviewPage.jsx";
 import { DS, dsGlassCard } from "./lib/ds-platform-tokens.js";
+import AppErrorBoundary from "./components/AppErrorBoundary.jsx";
 
 const DataSparkPlatform = lazy(() => import("./app/dataspark-full-platform.jsx"));
 
@@ -58,6 +59,7 @@ function RouteLoadingFallback() {
 
 export default function App() {
   return (
+    <AppErrorBoundary>
     <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Suspense fallback={<RouteLoadingFallback />}>
         <Routes>
@@ -73,5 +75,6 @@ export default function App() {
         </Routes>
       </Suspense>
     </BrowserRouter>
+    </AppErrorBoundary>
   );
 }
