@@ -89,3 +89,50 @@ export default function useLearnerIntent() {
 
   return { intent, setIntent, intentMeta };
 }
+
+/**
+ * INTENT_LESSON_FRAMING (DS-203) — per-intent framing for lesson intros/CTAs.
+ * `introBody` is a function of the lesson title so the framing names the lesson.
+ * `accent` is a plain string (hex or token value) resolved by the component,
+ * keeping this lib free of UI-token imports and safe to import anywhere.
+ */
+export const INTENT_LESSON_FRAMING = {
+  interview: {
+    introLabel: "Interview lens",
+    introBody: (t) =>
+      `Be ready to explain ${t} out loud — focus on tradeoffs and failure modes an interviewer will probe.`,
+    ctaLabel: "Practice explaining this",
+    accent: "#818CF8",
+  },
+  upskill: {
+    introLabel: "On-the-job lens",
+    introBody: (t) =>
+      `Map ${t} to a real pipeline you own — what would you change in your codebase after this?`,
+    ctaLabel: "Apply to your work",
+    accent: "#34D399",
+  },
+  foundational: {
+    introLabel: "Foundations lens",
+    introBody: (t) =>
+      `Take ${t} slow and build correct mental models before moving on — depth beats speed here.`,
+    ctaLabel: "Master the basics",
+    accent: "#FCD34D",
+  },
+};
+
+/**
+ * getLessonFraming — resolves the lesson framing for an intent id, with the
+ * introBody string already computed from the lesson title. Returns null when
+ * the intent id is falsy or unknown so callers can render nothing.
+ */
+export function getLessonFraming(intentId, lessonTitle) {
+  if (!intentId) return null;
+  const framing = INTENT_LESSON_FRAMING[intentId];
+  if (!framing) return null;
+  return {
+    introLabel: framing.introLabel,
+    introBody: framing.introBody(lessonTitle),
+    ctaLabel: framing.ctaLabel,
+    accent: framing.accent,
+  };
+}

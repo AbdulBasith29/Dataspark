@@ -5,6 +5,8 @@ import { SimpleMarkdown } from "../../lib/simple-markdown.jsx";
 import VizLabShell from "./VizLabShell.jsx";
 import AsyncActionButton from "../AsyncActionButton.jsx";
 import ConfidenceMeter from "./ConfidenceMeter.jsx";
+import IntentLessonIntro from "./IntentLessonIntro.jsx";
+import { buildDrillPrompt, recordCheckErrors } from "../../lib/adaptive-drills.js";
 import {
   LVS_EVENT_NAMES,
   buildConfidenceMetadata,
@@ -79,6 +81,8 @@ export default function LessonModule({
   onMarkComplete,
   onAskTutor,
   onOpenPractice,
+  intent,
+  onAskTutorWithPrompt,
 }) {
   const [answers, setAnswers] = useState(() => ({}));
   const [revealed, setRevealed] = useState({});
@@ -181,6 +185,27 @@ export default function LessonModule({
 
   const relatedPractice = Array.isArray(moduleSpec.relatedPractice) ? moduleSpec.relatedPractice : [];
 
+  // Adaptive drill: the specific checks the learner answered incorrectly.
+  const wrongChecks = checks
+    .map((q, i) => ({ q, i }))
+    .filter(({ q, i }) => answers[i] !== undefined && answers[i] !== q.correctIndex)
+    .map(({ q, i }) => ({
+      question: q.question,
+      chosen: q.options[answers[i]],
+      correct: q.options[q.correctIndex],
+    }));
+
+  const generateDrill = () => {
+    try {
+      recordCheckErrors({ courseId: course?.id, lessonId: lesson?.id, lessonTitle: lesson?.title, wrongChecks });
+    } catch {
+      // Recording errors must never block the drill.
+    }
+    const prompt = buildDrillPrompt({ lessonTitle: lesson?.title, wrongChecks, relatedPractice });
+    if (onAskTutorWithPrompt) onAskTutorWithPrompt(prompt);
+    else if (onAskTutor) onAskTutor();
+  };
+
   const durationBadge = moduleSpec.durationLabel || lesson.duration || "18–20 min";
 
   return (
@@ -237,6 +262,8 @@ export default function LessonModule({
           </ul>
         )}
       </div>
+
+      <IntentLessonIntro intent={intent} lessonTitle={lesson.title} onCta={onAskTutor} />
 
       {moduleSpec.tutorPrompts?.preTry && (
         <div style={{
@@ -468,6 +495,44 @@ export default function LessonModule({
         }}>
           <span style={{ fontFamily: "var(--ds-mono), monospace", fontSize: 10, fontWeight: 700, color: "#F87171", letterSpacing: "0.12em", textTransform: "uppercase", display: "block", marginBottom: 6 }}>Tutor tip · after a wrong answer</span>
           {moduleSpec.tutorPrompts.postFail}
+        </div>
+      )}
+
+      {hasWrongAnswer && (
+        <div style={{
+          marginBottom: 16,
+          padding: "14px 18px",
+          borderRadius: DS.radiusSm,
+          background: "rgba(129,140,248,0.07)",
+          border: `1px solid ${DS.ind}33`,
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+        }}>
+          <div style={{ fontSize: 13, color: DS.t2, lineHeight: 1.55, flex: "1 1 240px" }}>
+            <span style={{ fontFamily: "var(--ds-mono), monospace", fontSize: 10, fontWeight: 700, color: DS.ind, letterSpacing: "0.12em", textTransform: "uppercase", display: "block", marginBottom: 6 }}>Adaptive drill</span>
+            Turn the {wrongChecks.length} check{wrongChecks.length === 1 ? "" : "s"} you missed into a targeted tutor drill.
+          </div>
+          <button
+            type="button"
+            onClick={generateDrill}
+            style={{
+              background: `${DS.ind}1e`,
+              border: `1px solid ${DS.ind}55`,
+              borderRadius: DS.radiusSm,
+              padding: "10px 18px",
+              color: DS.t1,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: "var(--ds-sans), sans-serif",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Generate my drill →
+          </button>
         </div>
       )}
 

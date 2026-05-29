@@ -1,22 +1,17 @@
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import { DS, dsGlassCard } from "../lib/ds-platform-tokens.js";
-import { LVS_EVENT_NAMES } from "../lib/analytics.js";
+import { loadLvsDashboardData } from "../lib/lvs-queries.js";
 
 /**
  * Learning Value Score (LVS) dashboard.
  *
- * DATA SOURCING NOTE
- * ------------------
- * In analytics.js, `safeLogClientEvent` / `trackLvsEvent` persist events ONLY to
- * the Supabase `event_logs` table over the network — there is no local mirror.
- * A dashboard cannot read from Supabase synchronously in-browser without a query,
- * so this page reads defensively from a localStorage sink under `ds_lvs_events`.
- *
- * Integrator TODO (do NOT change here — owned by analytics.js): for this dashboard
- * to populate from real client activity, `trackLvsEvent` should also mirror each
- * event into localStorage["ds_lvs_events"] as a JSON array of:
- *   { eventName, page, metadata, ts }
- * The reader below tolerates several reasonable shapes so it stays robust.
+ * DATA SOURCING (DS-202)
+ * ----------------------
+ * Data is sourced through the server-side query layer in `src/lib/lvs-queries.js`.
+ * `loadLvsDashboardData()` prefers live aggregation over the Supabase `event_logs`
+ * table and transparently falls back to the localStorage mirror (`ds_lvs_events`)
+ * written by `trackLvsEvent` in analytics.js. The active source is shown as a
+ * badge in the header. Any failure degrades to the friendly empty state.
  */
 
 const SANS = "var(--ds-sans), sans-serif";
@@ -28,161 +23,6 @@ const LS_KEY = "ds_lvs_events";
 /* ------------------------------------------------------------------ */
 /* Pure helpers                                                        */
 /* ------------------------------------------------------------------ */
-
-/** Read + parse LVS events from the localStorage sink. Always returns []. */
-export function loadEvents() {
-  if (typeof window === "undefined" || !window.localStorage) return [];
-  let raw;
-  try {
-    raw = window.localStorage.getItem(LS_KEY);
-  } catch {
-    return [];
-  }
-  if (!raw) return [];
-
-  let parsed;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return [];
-  }
-
-  // Tolerate either a bare array or an object wrapping `{ events: [...] }`.
-  const list = Array.isArray(parsed)
-    ? parsed
-    : Array.isArray(parsed?.events)
-    ? parsed.events
-    : [];
-
-  return list.filter((e) => e && typeof e === "object");
-}
-
-/** Normalize one event into { eventName, metadata } regardless of shape. */
-function normalizeEvent(e) {
-  const eventName = e.eventName || e.event_name || e.name || null;
-  const metadata = e.metadata || e.meta || {};
-  return { eventName, metadata: metadata && typeof metadata === "object" ? metadata : {} };
-}
-
-function lessonKeyOf(meta) {
-  return meta.lesson_id || meta.lessonId || "(unknown lesson)";
-}
-
-function lessonTitleOf(meta) {
-  return meta.lesson_title || meta.lessonTitle || null;
-}
-
-/**
- * Aggregate raw events into per-lesson rows.
- * Returns array of:
- *   { lessonId, lessonTitle, starts, completions, completionRate,
- *     checkTotal, checkPassed, checkPassRate, confidenceDeltaAvg,
- *     confidenceSamples, tutorRecoveries }
- */
-export function aggregateByLesson(events) {
-  const map = new Map();
-
-  const ensure = (key, meta) => {
-    if (!map.has(key)) {
-      map.set(key, {
-        lessonId: key,
-        lessonTitle: lessonTitleOf(meta),
-        starts: 0,
-        completions: 0,
-        checkTotal: 0,
-        checkPassed: 0,
-        confidenceDeltaSum: 0,
-        confidenceSamples: 0,
-        tutorRecoveries: 0,
-        _usedTutorInRun: false,
-      });
-    }
-    const row = map.get(key);
-    if (!row.lessonTitle && lessonTitleOf(meta)) row.lessonTitle = lessonTitleOf(meta);
-    return row;
-  };
-
-  for (const rawEvent of events) {
-    const { eventName, metadata } = normalizeEvent(rawEvent);
-    if (!eventName) continue;
-    const key = lessonKeyOf(metadata);
-    const row = ensure(key, metadata);
-
-    switch (eventName) {
-      case LVS_EVENT_NAMES.lessonStart: {
-        row.starts += 1;
-        row._usedTutorInRun = false; // reset per-run tutor tracking
-        if (metadata.used_tutor === true || metadata.usedTutor === true) {
-          row._usedTutorInRun = true;
-        }
-        break;
-      }
-      case LVS_EVENT_NAMES.tutorPromptUsed: {
-        row._usedTutorInRun = true;
-        break;
-      }
-      case LVS_EVENT_NAMES.checkSubmit: {
-        row.checkTotal += 1;
-        if (metadata.passed === true) row.checkPassed += 1;
-        break;
-      }
-      case LVS_EVENT_NAMES.lessonComplete: {
-        row.completions += 1;
-        // Tutor-assisted recovery: this run completed AND the tutor was used.
-        const usedTutor =
-          row._usedTutorInRun ||
-          metadata.used_tutor === true ||
-          metadata.usedTutor === true;
-        if (usedTutor) row.tutorRecoveries += 1;
-        row._usedTutorInRun = false;
-        break;
-      }
-      case LVS_EVENT_NAMES.confidenceDelta: {
-        const delta =
-          typeof metadata.delta === "number"
-            ? metadata.delta
-            : typeof metadata.confidence_after === "number" &&
-              typeof metadata.confidence_before === "number"
-            ? metadata.confidence_after - metadata.confidence_before
-            : null;
-        if (delta != null) {
-          row.confidenceDeltaSum += delta;
-          row.confidenceSamples += 1;
-        }
-        break;
-      }
-      case LVS_EVENT_NAMES.confidenceRated: {
-        // Some pipelines emit before/after on a single rated event.
-        if (
-          typeof metadata.confidence_after === "number" &&
-          typeof metadata.confidence_before === "number"
-        ) {
-          row.confidenceDeltaSum += metadata.confidence_after - metadata.confidence_before;
-          row.confidenceSamples += 1;
-        }
-        break;
-      }
-      default:
-        break;
-    }
-  }
-
-  return Array.from(map.values())
-    .map((r) => ({
-      lessonId: r.lessonId,
-      lessonTitle: r.lessonTitle,
-      starts: r.starts,
-      completions: r.completions,
-      completionRate: r.starts > 0 ? (r.completions / r.starts) * 100 : 0,
-      checkTotal: r.checkTotal,
-      checkPassed: r.checkPassed,
-      checkPassRate: r.checkTotal > 0 ? (r.checkPassed / r.checkTotal) * 100 : 0,
-      confidenceSamples: r.confidenceSamples,
-      confidenceDeltaAvg: r.confidenceSamples > 0 ? r.confidenceDeltaSum / r.confidenceSamples : 0,
-      tutorRecoveries: r.tutorRecoveries,
-    }))
-    .sort((a, b) => b.starts - a.starts || a.lessonId.localeCompare(b.lessonId));
-}
 
 function rateColor(pct) {
   if (pct >= 70) return DS.grn;
@@ -265,39 +105,100 @@ function StatCard({ label, value, accent }) {
   );
 }
 
+function SourceBadge({ source }) {
+  const live = source === "live";
+  const color = live ? DS.grn : DS.t3;
+  const label = live ? "live" : "local";
+  const detail = live ? "Supabase" : "this browser";
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        fontFamily: MONO,
+        fontSize: 10.5,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        color,
+        border: `1px solid ${color}`,
+        borderRadius: 999,
+        padding: "3px 10px",
+        background: "rgba(255,255,255,0.02)",
+      }}
+      title={`Data source: ${detail}`}
+    >
+      <span
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: 999,
+          background: color,
+          display: "inline-block",
+        }}
+      />
+      {label} · {detail}
+    </span>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /* Page                                                                */
 /* ------------------------------------------------------------------ */
 
+const EMPTY_SUMMARY = {
+  totalStarts: 0,
+  totalCompletions: 0,
+  overallCompletionRate: 0,
+  avgConfidenceDelta: null,
+  overallCheckPassRate: 0,
+};
+
 export default function LvsDashboard() {
-  const events = useMemo(() => loadEvents(), []);
-  const rows = useMemo(() => aggregateByLesson(events), [events]);
+  const [loading, setLoading] = useState(true);
+  const [source, setSource] = useState("local");
+  const [rawCount, setRawCount] = useState(0);
+  const [rows, setRows] = useState([]);
+  const [summary, setSummary] = useState(EMPTY_SUMMARY);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const data = await loadLvsDashboardData();
+        if (!active) return;
+        setRows(Array.isArray(data?.rows) ? data.rows : []);
+        setSummary(data?.summary || EMPTY_SUMMARY);
+        setSource(data?.source === "live" ? "live" : "local");
+        setRawCount(Array.isArray(data?.events) ? data.events.length : 0);
+      } catch {
+        if (!active) return;
+        setRows([]);
+        setSummary(EMPTY_SUMMARY);
+        setSource("local");
+        setRawCount(0);
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const isEmpty = rows.length === 0;
 
-  const totals = useMemo(() => {
-    let starts = 0;
-    let completions = 0;
-    let checkTotal = 0;
-    let checkPassed = 0;
-    let confidenceDeltaSum = 0;
-    let confidenceSamples = 0;
-    for (const r of rows) {
-      starts += r.starts;
-      completions += r.completions;
-      checkTotal += r.checkTotal;
-      checkPassed += r.checkPassed;
-      confidenceDeltaSum += r.confidenceDeltaAvg * r.confidenceSamples;
-      confidenceSamples += r.confidenceSamples;
-    }
-    return {
-      lessonsStarted: starts,
-      completed: completions,
-      completionRate: starts > 0 ? (completions / starts) * 100 : 0,
-      avgConfidenceDelta: confidenceSamples > 0 ? confidenceDeltaSum / confidenceSamples : 0,
-      checkPassRate: checkTotal > 0 ? (checkPassed / checkTotal) * 100 : 0,
-    };
-  }, [rows]);
+  // The query layer returns rates as ratios (0–1) and confidence delta as a
+  // raw number (or null). The presentation helpers below expect percentages
+  // (0–100), so normalize here while keeping the existing visuals intact.
+  const totals = {
+    lessonsStarted: summary.totalStarts,
+    completed: summary.totalCompletions,
+    completionRate: (summary.overallCompletionRate || 0) * 100,
+    avgConfidenceDelta:
+      typeof summary.avgConfidenceDelta === "number" ? summary.avgConfidenceDelta : 0,
+    checkPassRate: (summary.overallCheckPassRate || 0) * 100,
+  };
 
   const th = {
     textAlign: "left",
@@ -336,15 +237,24 @@ export default function LvsDashboard() {
         <header style={{ marginBottom: 28 }}>
           <div
             style={{
-              fontFamily: MONO,
-              fontSize: 11,
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              color: DS.ind,
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
               marginBottom: 10,
             }}
           >
-            Analytics
+            <div
+              style={{
+                fontFamily: MONO,
+                fontSize: 11,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                color: DS.ind,
+              }}
+            >
+              Analytics
+            </div>
+            {!loading && <SourceBadge source={source} />}
           </div>
           <h1
             style={{
@@ -401,11 +311,13 @@ export default function LvsDashboard() {
             })}
           >
             <div style={{ color: DS.t2, fontSize: 14, fontWeight: 600 }}>
-              No learning events captured yet — complete a lesson to populate the dashboard.
+              {loading
+                ? "Loading learning events…"
+                : "No learning events captured yet — complete a lesson to populate the dashboard."}
             </div>
             <div style={{ color: DS.t3, fontSize: 12.5, marginTop: 8, lineHeight: 1.6 }}>
-              The cards above show placeholder zeros. Once LVS events are mirrored into
-              local storage, this page aggregates them per lesson automatically.
+              The cards above show placeholder zeros. LVS events are aggregated from
+              Supabase when available, falling back to this browser's local mirror.
             </div>
           </div>
         )}
@@ -465,51 +377,56 @@ export default function LvsDashboard() {
                     <td style={numCell}>0</td>
                   </tr>
                 ) : (
-                  rows.map((r) => (
-                    <tr key={r.lessonId}>
-                      <td style={td}>
-                        <div style={{ fontWeight: 700, color: DS.t1 }}>
-                          {r.lessonTitle || r.lessonId}
-                        </div>
-                        {r.lessonTitle && (
-                          <div style={{ fontFamily: MONO, fontSize: 11, color: DS.dim, marginTop: 3 }}>
-                            {r.lessonId}
+                  rows.map((r) => {
+                    const completionPct = (r.completionRate || 0) * 100;
+                    const checkPassPct = (r.checkPassRate || 0) * 100;
+                    const hasConfidence = typeof r.avgConfidenceDelta === "number";
+                    return (
+                      <tr key={r.lessonId}>
+                        <td style={td}>
+                          <div style={{ fontWeight: 700, color: DS.t1 }}>
+                            {r.lessonTitle || r.lessonId}
                           </div>
-                        )}
-                      </td>
-                      <td style={numCell}>{r.starts}</td>
-                      <td style={numCell}>{r.completions}</td>
-                      <td style={{ ...td, minWidth: 120 }}>
-                        <span style={{ color: rateColor(r.completionRate), fontFamily: MONO, fontSize: 12.5 }}>
-                          {fmtPct(r.completionRate)}
-                        </span>
-                        <RateBar pct={r.completionRate} />
-                      </td>
-                      <td style={{ ...td, minWidth: 120 }}>
-                        {r.checkTotal > 0 ? (
-                          <>
-                            <span
-                              style={{ color: rateColor(r.checkPassRate), fontFamily: MONO, fontSize: 12.5 }}
-                            >
-                              {fmtPct(r.checkPassRate)}
-                            </span>
-                            <RateBar pct={r.checkPassRate} />
-                          </>
-                        ) : (
-                          <span style={{ color: DS.dim, fontFamily: MONO, fontSize: 12 }}>—</span>
-                        )}
-                      </td>
-                      <td
-                        style={{
-                          ...numCell,
-                          color: r.confidenceSamples === 0 ? DS.dim : r.confidenceDeltaAvg >= 0 ? DS.grn : LOW,
-                        }}
-                      >
-                        {r.confidenceSamples === 0 ? "—" : fmtDelta(r.confidenceDeltaAvg)}
-                      </td>
-                      <td style={numCell}>{r.tutorRecoveries}</td>
-                    </tr>
-                  ))
+                          {r.lessonTitle && r.lessonTitle !== r.lessonId && (
+                            <div style={{ fontFamily: MONO, fontSize: 11, color: DS.dim, marginTop: 3 }}>
+                              {r.lessonId}
+                            </div>
+                          )}
+                        </td>
+                        <td style={numCell}>{r.starts}</td>
+                        <td style={numCell}>{r.completions}</td>
+                        <td style={{ ...td, minWidth: 120 }}>
+                          <span style={{ color: rateColor(completionPct), fontFamily: MONO, fontSize: 12.5 }}>
+                            {fmtPct(completionPct)}
+                          </span>
+                          <RateBar pct={completionPct} />
+                        </td>
+                        <td style={{ ...td, minWidth: 120 }}>
+                          {r.checkSubmits > 0 ? (
+                            <>
+                              <span
+                                style={{ color: rateColor(checkPassPct), fontFamily: MONO, fontSize: 12.5 }}
+                              >
+                                {fmtPct(checkPassPct)}
+                              </span>
+                              <RateBar pct={checkPassPct} />
+                            </>
+                          ) : (
+                            <span style={{ color: DS.dim, fontFamily: MONO, fontSize: 12 }}>—</span>
+                          )}
+                        </td>
+                        <td
+                          style={{
+                            ...numCell,
+                            color: !hasConfidence ? DS.dim : r.avgConfidenceDelta >= 0 ? DS.grn : LOW,
+                          }}
+                        >
+                          {!hasConfidence ? "—" : fmtDelta(r.avgConfidenceDelta)}
+                        </td>
+                        <td style={numCell}>{r.tutorRecoveries}</td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -517,7 +434,8 @@ export default function LvsDashboard() {
         </section>
 
         <div style={{ color: DS.dim, fontSize: 11.5, fontFamily: MONO, marginTop: 18 }}>
-          source: localStorage["{LS_KEY}"] · {events.length} raw event{events.length === 1 ? "" : "s"}
+          source: {source === "live" ? "Supabase event_logs" : `localStorage["${LS_KEY}"]`} ·{" "}
+          {rawCount} raw event{rawCount === 1 ? "" : "s"}
         </div>
       </div>
     </div>

@@ -1041,6 +1041,7 @@ export default function DataSparkPlatform() {
   const [activeLesson, setActiveLesson] = useState(null);
   const [activeQuestion, setActiveQuestion] = useState(null);
   const [chatbotCourse, setChatbotCourse] = useState(null);
+  const [chatbotSeed, setChatbotSeed] = useState("");
   const [userAnswer, setUserAnswer] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [showModel, setShowModel] = useState(false);
@@ -1486,8 +1487,10 @@ export default function DataSparkPlatform() {
           setProgress((p) => ({ ...p, [activeLesson.id]: "done" }));
           setView("course");
         }}
-        onAskTutor={() => setChatbotCourse(activeCourse)}
+        onAskTutor={() => { setChatbotSeed(""); setChatbotCourse(activeCourse); }}
         onOpenPractice={() => { setCourseTab("practice"); setView("course"); }}
+        intent={intent}
+        onAskTutorWithPrompt={(prompt) => { setChatbotSeed(prompt || ""); setChatbotCourse(activeCourse); }}
       />
     );
   };
@@ -1771,7 +1774,7 @@ export default function DataSparkPlatform() {
         {view === "question" && renderQuestion()}
       </main>
 
-      {chatbotCourse && <AIChatbot course={chatbotCourse} onClose={() => setChatbotCourse(null)} />}
+      {chatbotCourse && <AIChatbot course={chatbotCourse} seedInput={chatbotSeed} onClose={() => { setChatbotCourse(null); setChatbotSeed(""); }} />}
     </div>
   );
 }
