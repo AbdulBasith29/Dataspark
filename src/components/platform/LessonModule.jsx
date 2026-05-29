@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DS, dsGlassCard } from "../../lib/ds-platform-tokens.js";
 import { renderInlineMarkdown } from "../../lib/inline-markdown.jsx";
 import { SimpleMarkdown } from "../../lib/simple-markdown.jsx";
@@ -23,6 +23,177 @@ const sectionLabel = {
   textTransform: "uppercase",
   marginBottom: 10,
 };
+
+const TARGET_TAG_PATTERN = /(?:#|\/\/)?\s*ds-target:([a-zA-Z0-9_-]+)/;
+
+function parseTargetedCodeSnippet(codeSnippet = "") {
+  return codeSnippet.split("\n").map((rawLine, index) => {
+    const match = rawLine.match(TARGET_TAG_PATTERN);
+    const targetId = match?.[1] || null;
+    const displayLine = rawLine.replace(TARGET_TAG_PATTERN, "").replace(/\s+$/, "");
+    return { lineNumber: index + 1, displayLine, targetId };
+  });
+}
+
+function InterviewGraphStage({ graph, stage, branchPath, selectedTarget, selectedChoice, onTargetClick, onChoiceSelect, accent }) {
+  if (!graph || !stage) return null;
+  const codeLines = parseTargetedCodeSnippet(stage.code_snippet);
+  const choices = Array.isArray(stage.choices) ? stage.choices : [];
+  const isClickTarget = stage.type === "click_target";
+  const isScenarioChoice = stage.type === "scenaro_choice" || stage.type === "scenario_choice";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+        {branchPath.map((stageId, index) => {
+          const pathStage = graph.stages?.[stageId];
+          return (
+            <span
+              key={`${stageId}-${index}`}
+              style={{
+                fontSize: 10,
+                padding: "5px 9px",
+                borderRadius: 999,
+                background: index === branchPath.length - 1 ? `${accent}22` : "rgba(255,255,255,0.04)",
+                border: `1px solid ${index === branchPath.length - 1 ? `${accent}66` : DS.border}`,
+                color: index === branchPath.length - 1 ? accent : DS.t3,
+                fontFamily: "var(--ds-mono), monospace",
+                fontWeight: 700,
+                letterSpacing: "0.07em",
+                textTransform: "uppercase",
+              }}
+            >
+              {index + 1}. {pathStage?.badge || pathStage?.title || stageId}
+            </span>
+          );
+        })}
+      </div>
+
+      <div>
+        <div style={{ ...sectionLabel, color: accent, marginBottom: 6 }}>{stage.title}</div>
+        {stage.prompt && (
+          <p style={{ margin: 0, color: DS.t2, fontSize: 14, lineHeight: 1.7 }}>
+            {stage.prompt}
+          </p>
+        )}
+      </div>
+
+      {stage.code_snippet && (
+        <pre
+          style={{
+            margin: 0,
+            padding: "14px 0",
+            overflowX: "auto",
+            borderRadius: 12,
+            border: `1px solid ${DS.border}`,
+            background: "rgba(2,6,23,0.72)",
+            color: DS.t1,
+            fontSize: 13,
+            lineHeight: 1.65,
+            fontFamily: "var(--ds-mono), monospace",
+          }}
+        >
+          {codeLines.map(({ lineNumber, displayLine, targetId }) => {
+            const isSelected = selectedTarget === targetId && Boolean(targetId);
+            const clickable = isClickTarget && Boolean(targetId);
+            return (
+              <button
+                key={`${stage.id}-${lineNumber}`}
+                type="button"
+                disabled={!clickable}
+                onClick={() => clickable && onTargetClick(targetId)}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "42px 1fr",
+                  width: "100%",
+                  border: "none",
+                  borderLeft: isSelected ? `3px solid ${accent}` : "3px solid transparent",
+                  background: isSelected ? `${accent}1c` : "transparent",
+                  color: DS.t1,
+                  cursor: clickable ? "crosshair" : "default",
+                  font: "inherit",
+                  lineHeight: "inherit",
+                  textAlign: "left",
+                  padding: "0 14px 0 0",
+                }}
+                aria-label={clickable ? `Flag line ${lineNumber}` : undefined}
+              >
+                <span style={{ color: DS.dim, userSelect: "none", textAlign: "right", paddingRight: 12 }}>{lineNumber}</span>
+                <code>{displayLine || " "}</code>
+              </button>
+            );
+          })}
+        </pre>
+      )}
+
+      {isClickTarget && !selectedTarget && (
+        <div style={{ color: DS.t3, fontSize: 13, fontFamily: "var(--ds-mono), monospace" }}>
+          Click the exact faulty line before the interviewer reveals the next decision point.
+        </div>
+      )}
+
+      {selectedTarget && stage.validationCopy?.[selectedTarget] && (
+        <div style={{
+          padding: "12px 14px",
+          borderRadius: DS.radiusSm,
+          border: `1px solid ${accent}33`,
+          background: `${accent}0d`,
+          color: DS.t2,
+          fontSize: 13,
+          lineHeight: 1.6,
+        }}>
+          {stage.validationCopy[selectedTarget]}
+        </div>
+      )}
+
+      {isScenarioChoice && choices.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {choices.map((choice) => {
+            const isSelected = selectedChoice === choice.id;
+            return (
+              <button
+                key={choice.id}
+                type="button"
+                onClick={() => onChoiceSelect(choice.id)}
+                style={{
+                  textAlign: "left",
+                  padding: "12px 14px",
+                  borderRadius: DS.radiusSm,
+                  border: `1px solid ${isSelected ? `${accent}66` : DS.border}`,
+                  background: isSelected ? `${accent}12` : "rgba(255,255,255,0.02)",
+                  color: DS.t2,
+                  fontSize: 14,
+                  lineHeight: 1.5,
+                  cursor: "pointer",
+                  fontFamily: "var(--ds-sans), sans-serif",
+                }}
+              >
+                <span style={{ fontFamily: "var(--ds-mono), monospace", color: DS.dim, marginRight: 8 }}>{choice.id.toUpperCase()}.</span>
+                <strong style={{ color: DS.t1 }}>{choice.label}</strong>
+                {choice.description && <span style={{ display: "block", marginTop: 4, color: DS.t3 }}>{choice.description}</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {stage.rationale && (
+        <div style={{
+          padding: "13px 15px",
+          borderRadius: DS.radiusSm,
+          border: `1px solid ${stage.terminal ? `${DS.grn}44` : DS.border}`,
+          background: stage.terminal ? `${DS.grn}0d` : "rgba(255,255,255,0.03)",
+          color: DS.t2,
+          fontSize: 13,
+          lineHeight: 1.7,
+        }}>
+          <strong style={{ color: stage.terminal ? DS.grn : DS.t1 }}>Interviewer rationale: </strong>
+          {stage.rationale}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function SectionCard({ title, badge, children, accent, borderAccent }) {
   return (
@@ -89,6 +260,45 @@ export default function LessonModule({
   const [freeResponse, setFreeResponse] = useState("");
   const [confidenceBefore, setConfidenceBefore] = useState(null);
   const [confidenceAfter, setConfidenceAfter] = useState(null);
+  const [currentStageId, setCurrentStageId] = useState(null);
+  const [branchPath, setBranchPath] = useState([]);
+  const [clickedTargets, setClickedTargets] = useState({});
+  const [graphChoices, setGraphChoices] = useState({});
+
+  const interviewGraph = moduleSpec?.interviewGraph || null;
+  const graphInitialStageId = interviewGraph?.initialStageId || null;
+
+  useEffect(() => {
+    setCurrentStageId(graphInitialStageId);
+    setBranchPath(graphInitialStageId ? [graphInitialStageId] : []);
+    setClickedTargets({});
+    setGraphChoices({});
+  }, [lesson?.id, graphInitialStageId]);
+
+  const activeGraphStage = currentStageId ? interviewGraph?.stages?.[currentStageId] : null;
+  const selectedTarget = currentStageId ? clickedTargets[currentStageId] : null;
+  const selectedGraphChoice = currentStageId ? graphChoices[currentStageId] : null;
+  const passedInterviewGraph = !interviewGraph || Boolean(activeGraphStage?.terminal);
+
+  const advanceInterviewGraph = (inputId) => {
+    if (!activeGraphStage) return;
+    const nextStageId = activeGraphStage.branches?.[inputId] || activeGraphStage.branches?.default;
+    if (!nextStageId || !interviewGraph?.stages?.[nextStageId]) return;
+    setCurrentStageId(nextStageId);
+    setBranchPath((path) => [...path, nextStageId]);
+  };
+
+  const handleTargetClick = (targetId) => {
+    if (!activeGraphStage) return;
+    setClickedTargets((state) => ({ ...state, [activeGraphStage.id]: targetId }));
+    advanceInterviewGraph(targetId);
+  };
+
+  const handleGraphChoiceSelect = (choiceId) => {
+    if (!activeGraphStage) return;
+    setGraphChoices((state) => ({ ...state, [activeGraphStage.id]: choiceId }));
+    advanceInterviewGraph(choiceId);
+  };
 
   // Guard against null / undefined moduleSpec (e.g. during loading or bad data)
   if (!moduleSpec) {
@@ -118,7 +328,7 @@ export default function LessonModule({
   const hasFreeResponse = freeResponse.trim().length >= 20;
   // Complete requires both free-response (if enabled) and knowledge-check pass
   const freeResponseRequired = moduleSpec.freeResponseRequired !== false;
-  const canMarkComplete = passedCheck && (!freeResponseRequired || hasFreeResponse);
+  const canMarkComplete = passedCheck && passedInterviewGraph && (!freeResponseRequired || hasFreeResponse);
 
   // Derive attempt state for postFail panel: user has submitted at least one wrong answer
   const hasWrongAnswer = Object.entries(answers).some(([i, a]) => a !== checks[Number(i)]?.correctIndex);
@@ -347,8 +557,24 @@ export default function LessonModule({
         )}
       </SectionCard>
 
-      <SectionCard title="4 · Knowledge check" badge={`${checks.length} Q`} accent={course.accent} borderAccent={`${course.color}22`}>
-        {checks.length === 0 ? (
+      <SectionCard
+        title={interviewGraph ? "4 · Interview simulation" : "4 · Knowledge check"}
+        badge={interviewGraph ? `${branchPath.length} step${branchPath.length === 1 ? "" : "s"}` : `${checks.length} Q`}
+        accent={course.accent}
+        borderAccent={`${course.color}22`}
+      >
+        {interviewGraph ? (
+          <InterviewGraphStage
+            graph={interviewGraph}
+            stage={activeGraphStage}
+            branchPath={branchPath}
+            selectedTarget={selectedTarget}
+            selectedChoice={selectedGraphChoice}
+            onTargetClick={handleTargetClick}
+            onChoiceSelect={handleGraphChoiceSelect}
+            accent={course.accent}
+          />
+        ) : checks.length === 0 ? (
           <p style={{ color: DS.t3, fontSize: 14, margin: 0 }}>No checks for this module yet.</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>

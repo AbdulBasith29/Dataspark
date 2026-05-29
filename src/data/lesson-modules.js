@@ -451,44 +451,228 @@ Watch the clip only after you have answered Stage 1. Then rehearse the simulatio
       postFail: "Ask the tutor to replay only the stage you missed as a hostile interviewer. Require one follow-up about concurrency and one follow-up about production observability.",
       weeklyRecap: "Re-solve the same simulation in one week without seeing the options. If you cannot rebuild the wrapper from scratch, you recognized the answer but did not learn the mechanic.",
     },
-    knowledgeCheck: [
-      {
-        stage: "Stage 1 · Initial bug",
-        question: "The decorated feature-store loader works locally but later requests in a long-running worker immediately return None after earlier timeouts. What is the root cause and best fix?",
-        options: [
-          "The attempts counter is captured in the decorator factory closure and shared across all invocations; move retry state inside wrapper, preserve metadata with functools.wraps, and raise the terminal failure instead of returning None.",
-          "nonlocal attempts should become global attempts so all workers see the same counter and can coordinate retries across processes.",
-          "The wrapper needs an explicit user_id parameter instead of *args/**kwargs because argument forwarding prevents Python from resetting closure variables.",
-          "The sleep call should be moved before fn(*args, **kwargs), because backoff must happen before every first attempt to reset TimeoutError state.",
-        ],
-        correctIndex: 0,
-        explanation: "The factory frame is created once at decoration time, so attempts is one shared closure cell for the decorated function. Per-call retry state belongs inside wrapper. Returning None is also catastrophic because downstream code may treat missing features as valid data; terminal failures should be explicit.",
+    interviewGraph: {
+      initialStageId: "stage_1_click_fault",
+      stages: {
+        stage_1_click_fault: {
+          id: "stage_1_click_fault",
+          type: "click_target",
+          badge: "Stage 1 target",
+          title: "Stage 1 · Flag the hidden state leak",
+          prompt: "Before you get multiple choice options, click the exact line that creates long-lived shared state across production requests.",
+          code_snippet: `import time
+
+class FeatureStoreTimeout(TimeoutError):
+    pass
+
+def retry(max_attempts=3):
+    attempts = 0  # ds-target:shared_attempts_cell
+
+    def decorator(fn):
+        def wrapper(*args, **kwargs):
+            nonlocal attempts  # ds-target:nonlocal_symptom
+            while attempts < max_attempts:
+                try:
+                    return fn(*args, **kwargs)
+                except FeatureStoreTimeout:
+                    attempts += 1
+                    time.sleep(1)  # ds-target:fixed_sleep_symptom
+            return None  # ds-target:silent_none_corruption
+        return wrapper
+
+    return decorator`,
+          validationCopy: {
+            shared_attempts_cell: "Correct target. The factory frame is created once at decoration time, so attempts is one closure cell shared by every invocation of the decorated function.",
+            nonlocal_symptom: "Close, but nonlocal is the symptom. It exposes the outer cell; it did not create the lifetime bug by itself.",
+            fixed_sleep_symptom: "This becomes the Stage 2 scale failure, but it is not why later calls immediately skip retries.",
+            silent_none_corruption: "This is catastrophic error handling, but the shared counter is what makes the terminal path trigger across future requests.",
+          },
+          branches: {
+            shared_attempts_cell: "stage_1_triage_choice",
+            nonlocal_symptom: "recovery_stage_1_closure",
+            fixed_sleep_symptom: "recovery_stage_1_closure",
+            silent_none_corruption: "recovery_stage_1_closure",
+            default: "recovery_stage_1_closure",
+          },
+        },
+        recovery_stage_1_closure: {
+          id: "recovery_stage_1_closure",
+          type: "scenaro_choice",
+          badge: "Recovery 1",
+          title: "Recovery · Separate the cause from the symptom",
+          prompt: "The interviewer stops you: 'You pointed at a bad line, but not the root memory lifetime. What object survives between calls?' Choose the repair that proves you understand decorator factory frames.",
+          code_snippet: `def retry(max_attempts=3):
+    attempts = 0
+    def decorator(fn):
+        def wrapper(*args, **kwargs):
+            nonlocal attempts
+            ...`,
+          choices: [
+            { id: "a", label: "Move attempts into wrapper", description: "Create per-invocation retry state and preserve the original function metadata with wraps." },
+            { id: "b", label: "Replace nonlocal with global", description: "Coordinate all requests through a single module-level retry counter." },
+            { id: "c", label: "Keep attempts outside but reset it on success", description: "Only successful calls clear the shared closure counter." },
+            { id: "d", label: "Add a lock around attempts", description: "Serialize access to the shared counter rather than changing its lifetime." },
+          ],
+          branches: {
+            a: "stage_2_concurrency_choice",
+            b: "recovery_stage_1_closure",
+            c: "recovery_stage_1_closure",
+            d: "recovery_stage_2_locking",
+          },
+          rationale: "The repair is per-call state. A global counter makes cross-request leakage worse; reset-on-success still fails under persistent dependency outages; locking protects the wrong abstraction.",
+        },
+        stage_1_triage_choice: {
+          id: "stage_1_triage_choice",
+          type: "scenaro_choice",
+          badge: "Stage 1 choice",
+          title: "Stage 1 · Triage the correct production fix",
+          prompt: "Now that you found the closure lifetime bug, choose the fix you would defend in code review.",
+          code_snippet: `from functools import wraps
+
+def retry(max_attempts=3, delay_seconds=1):
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            # where should retry state live?
+            ...`,
+          choices: [
+            { id: "a", label: "Per-call state + explicit terminal failure", description: "Put attempts/last_error inside wrapper, use wraps, and raise when retry budget is exhausted." },
+            { id: "b", label: "Global counter", description: "Share retry budget across workers so the whole service backs off together." },
+            { id: "c", label: "Return None on exhaustion", description: "Keep serving predictions even if features are missing." },
+            { id: "d", label: "Catch Exception broadly", description: "Treat every exception as transient because the feature store is flaky." },
+          ],
+          branches: {
+            a: "stage_2_concurrency_choice",
+            b: "recovery_stage_2_locking",
+            c: "recovery_stage_1_closure",
+            d: "recovery_stage_1_closure",
+          },
+          rationale: "The correct senior fix changes state lifetime and failure semantics together: per-call retry state prevents cross-request poisoning, and explicit terminal failure keeps downstream models from treating missing features as valid observations.",
+        },
+        stage_2_concurrency_choice: {
+          id: "stage_2_concurrency_choice",
+          type: "scenaro_choice",
+          badge: "Stage 2 scale",
+          title: "Stage 2 · Survive the Kubernetes thundering herd",
+          prompt: "Good. Your closure fix ships. During a feature-store brownout, 1,000 pods retry at the same one-second boundaries and crush the dependency. Which refactor addresses the systems failure without creating a new bottleneck?",
+          code_snippet: `def wrapper(*args, **kwargs):
+    for attempt in range(max_attempts):
+        try:
+            return fn(*args, **kwargs)
+        except FeatureStoreTimeout:
+            if attempt == max_attempts - 1:
+                raise
+            time.sleep(1)`,
+          choices: [
+            { id: "a", label: "Bounded exponential backoff with full jitter", description: "Use per-call state, transient-only exception taxonomy, injectable sleep/rng, and randomized bounded delays." },
+            { id: "b", label: "One module-level threading.Lock", description: "Let only one request execute the wrapped function during a brownout." },
+            { id: "c", label: "Process-wide attempts dictionary", description: "Key attempts by function name so all threads share progress." },
+            { id: "d", label: "Fixed sleep plus BaseException", description: "Catch everything and sleep exactly one second after every failure." },
+          ],
+          branches: {
+            a: "stage_3_architecture_choice",
+            b: "recovery_stage_2_locking",
+            c: "recovery_stage_2_locking",
+            d: "recovery_stage_2_locking",
+          },
+          rationale: "Fixed sleeps synchronize failure waves. Shared dictionaries and coarse locks reintroduce mutable shared state or head-of-line blocking. Full jitter decorrelates pods while preserving bounded retry budgets.",
+        },
+        recovery_stage_2_locking: {
+          id: "recovery_stage_2_locking",
+          type: "scenaro_choice",
+          badge: "Recovery 2",
+          title: "Recovery · Do not protect the wrong boundary",
+          prompt: "The interviewer pushes back: 'Your lock prevents races by serializing the service. What happens to p99 and nested decorated calls?' Choose the concurrency-safe design.",
+          code_snippet: `lock = threading.Lock()
+
+def wrapper(*args, **kwargs):
+    with lock:
+        return fn(*args, **kwargs)`,
+          choices: [
+            { id: "a", label: "Remove shared retry state and jitter the waits", description: "No shared counter, no global critical section, randomized bounded retry schedule." },
+            { id: "b", label: "Use RLock instead", description: "Permit recursive decorated calls while preserving one global bottleneck." },
+            { id: "c", label: "Increase max_attempts", description: "Give each request more chances during brownouts." },
+            { id: "d", label: "Move the lock into the database client", description: "Hide serialization one layer lower." },
+          ],
+          branches: {
+            a: "stage_3_architecture_choice",
+            b: "recovery_stage_2_locking",
+            c: "recovery_stage_2_locking",
+            d: "recovery_stage_2_locking",
+          },
+          rationale: "A lock can make a race disappear while making the product unusable. The principal move is to remove shared state from the hot path and decorrelate retries rather than serialize traffic.",
+        },
+        stage_3_architecture_choice: {
+          id: "stage_3_architecture_choice",
+          type: "scenaro_choice",
+          badge: "Stage 3 trade-off",
+          title: "Stage 3 · Choose the architecture under a sub-millisecond SLA",
+          prompt: "The platform now needs sync services, asyncio pipelines, retry metrics by function, and a sub-millisecond online inference budget. None of the choices is perfect; choose the strongest default for the latency-critical path.",
+          code_snippet: `# Constraint set:
+# - online wrapper budget: < 1 ms per record
+# - batch jobs need rich retry diagnostics
+# - asyncio migration is in flight
+# - audit needs metrics by function name`,
+          choices: [
+            { id: "a", label: "Explicit sync/async decorators + shared policy helpers", description: "Pre-bind metric labels, avoid per-call stack inspection, and use infrastructure/client retries when function context is not required." },
+            { id: "b", label: "One universal introspecting decorator", description: "Call inspect.signature and inspect.iscoroutinefunction on each invocation so one API handles everything." },
+            { id: "c", label: "Inline retries in every scoring function", description: "Eliminate wrapper overhead and let each team customize retry semantics." },
+            { id: "d", label: "Retry until success with a global lock", description: "Prioritize consistency by ensuring only one wrapped call runs at a time." },
+          ],
+          branches: {
+            a: "terminal_principal_tradeoff",
+            b: "recovery_stage_3_tradeoff",
+            c: "recovery_stage_3_tradeoff",
+            d: "recovery_stage_3_tradeoff",
+          },
+          rationale: "The strong default separates hot-path mechanics from policy. Explicit wrappers avoid runtime introspection cliffs while shared helpers keep retry budgets, metrics, and exception taxonomy consistent.",
+        },
+        recovery_stage_3_tradeoff: {
+          id: "recovery_stage_3_tradeoff",
+          type: "scenaro_choice",
+          badge: "Recovery 3",
+          title: "Recovery · Defend trade-offs, not magic",
+          prompt: "The interviewer rejects the perfect-wrapper fantasy. Pick the answer that names what you sacrifice on the latency-critical path.",
+          code_snippet: `# Senior rubric:
+# 1. What do you remove from the hot loop?
+# 2. Which observability do you keep?
+# 3. Where does retry policy live?
+# 4. How do sync and async callables avoid semantic drift?`,
+          choices: [
+            { id: "a", label: "Remove hot-loop introspection", description: "Keep low-cardinality metrics and shared policy helpers; move rich diagnostics to batch or cold paths." },
+            { id: "b", label: "Keep maximum introspection everywhere", description: "Optimize later if p99 gets bad." },
+            { id: "c", label: "Drop all metrics", description: "Meet latency by removing observability." },
+            { id: "d", label: "Promise exactly-once retries", description: "Guarantee correctness through decorator-level locking." },
+          ],
+          branches: {
+            a: "terminal_principal_tradeoff",
+            b: "recovery_stage_3_tradeoff",
+            c: "recovery_stage_3_tradeoff",
+            d: "recovery_stage_3_tradeoff",
+          },
+          rationale: "Principal engineers state what they give up. In this case, the online path sacrifices universal runtime magic and rich per-call introspection, while retaining bounded policy, low-cardinality metrics, and explicit sync/async semantics.",
+        },
+        terminal_principal_tradeoff: {
+          id: "terminal_principal_tradeoff",
+          type: "scenaro_choice",
+          badge: "Terminal",
+          title: "Simulation complete · Principal-level defense",
+          prompt: "You navigated the bug, the scale failure, and the architecture trade-off. Now summarize the invariants you refused to violate before marking the module complete.",
+          code_snippet: `# Non-negotiables:
+# - per-call retry state
+# - transient-only exception taxonomy
+# - bounded jittered backoff
+# - explicit sync/async semantics
+# - no stack inspection in the online hot loop
+# - metrics that distinguish dependency failure from code defects`,
+          choices: [],
+          branches: {},
+          terminal: true,
+          rationale: "This is the actual interview bar: you debugged the language-level closure leak, handled concurrency without coarse serialization, and chose a production architecture by making explicit latency, observability, and maintainability trade-offs.",
+        },
       },
-      {
-        stage: "Stage 2 · Scale crunch",
-        question: "After fixing per-call state, a feature-store brownout causes 1,000 Kubernetes workers to retry at exactly one-second intervals. Which refactor best addresses the production-scale failure without creating a new concurrency bottleneck?",
-        options: [
-          "Use bounded exponential backoff with full jitter, retry only transient exception types, inject sleep/randomness for deterministic tests, and keep all retry counters local to each wrapper invocation.",
-          "Protect the entire wrapped function with one module-level threading.Lock so only one request can hit the feature store at a time during a brownout.",
-          "Store attempts in a process-wide dictionary keyed by function name so every thread can share progress and avoid exceeding max_attempts globally.",
-          "Catch BaseException and sleep a fixed one second after every failure so KeyboardInterrupt, cancellations, and all dependency failures are handled uniformly.",
-        ],
-        correctIndex: 0,
-        explanation: "Fixed sleep synchronizes retries into a thundering herd. A coarse lock serializes unrelated work and risks head-of-line blocking. Process-wide dictionaries reintroduce shared mutable state and require cleanup. Bounded jittered backoff decorrelates pods while keeping retry budgets explicit.",
-      },
-      {
-        stage: "Stage 3 · Senior architecture",
-        question: "The wrapper must support sync services, asyncio pipelines, retry metrics by function, and a sub-millisecond online inference budget. Which architectural choice is the strongest default for the latency-critical path?",
-        options: [
-          "Use explicit @retry_sync and @retry_async decorators with shared policy helpers, pre-bound metric labels, no stack inspection in the hot loop, and infrastructure/client retries where function-level context is not required.",
-          "Use one universal decorator that calls inspect.signature and inspect.iscoroutinefunction on every invocation so the wrapper can dynamically adapt to any callable at runtime.",
-          "Push all retry logic into each model-scoring function body so the decorator layer disappears and every team can customize behavior independently.",
-          "Guarantee exactly-once semantics by retrying every failure until success and using a global lock to ensure only one wrapped call runs at a time.",
-        ],
-        correctIndex: 0,
-        explanation: "The senior default separates hot-path mechanics from policy. Explicit sync/async wrappers avoid per-call introspection overhead, shared helpers prevent policy drift, and pre-bound metrics preserve observability. The other options either hide latency cliffs, fragment reliability policy, or promise impossible exactly-once behavior.",
-      },
-    ],
+    },
+    knowledgeCheck: [],
   },
 
   "py-d1": {
