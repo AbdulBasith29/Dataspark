@@ -3,6 +3,16 @@ import { DS, dsGlassCard } from "../../lib/ds-platform-tokens.js";
 import { renderInlineMarkdown } from "../../lib/inline-markdown.jsx";
 import { SimpleMarkdown } from "../../lib/simple-markdown.jsx";
 import VizLabShell from "./VizLabShell.jsx";
+import AsyncActionButton from "../AsyncActionButton.jsx";
+import ConfidenceMeter from "./ConfidenceMeter.jsx";
+import IntentLessonIntro from "./IntentLessonIntro.jsx";
+import { buildDrillPrompt, recordCheckErrors } from "../../lib/adaptive-drills.js";
+import {
+  LVS_EVENT_NAMES,
+  buildConfidenceMetadata,
+  computeConfidenceDelta,
+  trackConfidence,
+} from "../../lib/analytics.js";
 
 const sectionLabel = {
   fontSize: 10,
@@ -70,9 +80,29 @@ export default function LessonModule({
   backLabel,
   onMarkComplete,
   onAskTutor,
+  onOpenPractice,
+  intent,
+  onAskTutorWithPrompt,
 }) {
   const [answers, setAnswers] = useState(() => ({}));
   const [revealed, setRevealed] = useState({});
+  const [freeResponse, setFreeResponse] = useState("");
+  const [confidenceBefore, setConfidenceBefore] = useState(null);
+  const [confidenceAfter, setConfidenceAfter] = useState(null);
+
+  // Guard against null / undefined moduleSpec (e.g. during loading or bad data)
+  if (!moduleSpec) {
+    return (
+      <div style={{ maxWidth: 860, margin: "0 auto", padding: "0 clamp(16px, 4vw, 28px)" }}>
+        <button type="button" onClick={onBack} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>
+          {backLabel}
+        </button>
+        <p style={{ color: DS.t3, fontSize: 14, marginTop: 40, textAlign: "center" }}>
+          Module content is loading — please try again in a moment.
+        </p>
+      </div>
+    );
+  }
 
   const checks = moduleSpec.knowledgeCheck || [];
   let correctCount = 0;
@@ -83,6 +113,98 @@ export default function LessonModule({
   const score = checks.length ? correctCount / checks.length : 1;
   const minCorrect = checks.length ? Math.max(1, Math.round(0.7 * checks.length)) : 0;
   const passedCheck = checks.length === 0 || correctCount >= minCorrect;
+
+  // Free-response gating: user must write ≥ 20 chars before marking complete
+  const hasFreeResponse = freeResponse.trim().length >= 20;
+  // Complete requires both free-response (if enabled) and knowledge-check pass
+  const freeResponseRequired = moduleSpec.freeResponseRequired !== false;
+  const canMarkComplete = passedCheck && (!freeResponseRequired || hasFreeResponse);
+
+  // Derive attempt state for postFail panel: user has submitted at least one wrong answer
+  const hasWrongAnswer = Object.entries(answers).some(([i, a]) => a !== checks[Number(i)]?.correctIndex);
+
+  // "Submitted / seen the answer" = learner has revealed at least one explanation.
+  const hasSeenAnswer = Object.values(revealed).some(Boolean);
+
+  // Diagnostic only — fire-and-forget, never block UX on analytics.
+  const fireConfidence = (stage, confidence) => {
+    try {
+      trackConfidence({
+        eventName: LVS_EVENT_NAMES.confidenceRated,
+        page: "lesson_module",
+        metadata: buildConfidenceMetadata({
+          courseId: course?.id,
+          lessonId: lesson?.id,
+          stage,
+          confidence,
+          correct: passedCheck,
+        }),
+      });
+    } catch {
+      // Analytics must never break the lesson experience.
+    }
+  };
+
+  const calibration =
+    confidenceBefore != null && confidenceAfter != null
+      ? computeConfidenceDelta({ before: confidenceBefore, after: confidenceAfter })
+      : null;
+
+  const handleConfidenceBefore = (v) => {
+    setConfidenceBefore(v);
+    fireConfidence("before_check", v);
+  };
+
+  const handleConfidenceAfter = (v) => {
+    setConfidenceAfter(v);
+    fireConfidence("after_answer", v);
+    if (confidenceBefore != null) {
+      try {
+        const result = computeConfidenceDelta({ before: confidenceBefore, after: v });
+        trackConfidence({
+          eventName: LVS_EVENT_NAMES.confidenceDelta,
+          page: "lesson_module",
+          metadata: {
+            ...buildConfidenceMetadata({
+              courseId: course?.id,
+              lessonId: lesson?.id,
+              stage: "delta",
+              correct: passedCheck,
+            }),
+            confidence_before: result.before,
+            confidence_after: result.after,
+            delta: result.delta,
+            calibration: result.calibration,
+          },
+        });
+      } catch {
+        // Analytics must never break the lesson experience.
+      }
+    }
+  };
+
+  const relatedPractice = Array.isArray(moduleSpec.relatedPractice) ? moduleSpec.relatedPractice : [];
+
+  // Adaptive drill: the specific checks the learner answered incorrectly.
+  const wrongChecks = checks
+    .map((q, i) => ({ q, i }))
+    .filter(({ q, i }) => answers[i] !== undefined && answers[i] !== q.correctIndex)
+    .map(({ q, i }) => ({
+      question: q.question,
+      chosen: q.options[answers[i]],
+      correct: q.options[q.correctIndex],
+    }));
+
+  const generateDrill = () => {
+    try {
+      recordCheckErrors({ courseId: course?.id, lessonId: lesson?.id, lessonTitle: lesson?.title, wrongChecks });
+    } catch {
+      // Recording errors must never block the drill.
+    }
+    const prompt = buildDrillPrompt({ lessonTitle: lesson?.title, wrongChecks, relatedPractice });
+    if (onAskTutorWithPrompt) onAskTutorWithPrompt(prompt);
+    else if (onAskTutor) onAskTutor();
+  };
 
   const durationBadge = moduleSpec.durationLabel || lesson.duration || "18–20 min";
 
@@ -140,6 +262,24 @@ export default function LessonModule({
           </ul>
         )}
       </div>
+
+      <IntentLessonIntro intent={intent} lessonTitle={lesson.title} onCta={onAskTutor} />
+
+      {moduleSpec.tutorPrompts?.preTry && (
+        <div style={{
+          marginBottom: 16,
+          padding: "14px 18px",
+          borderRadius: DS.radiusSm,
+          background: `${course.color}0d`,
+          border: `1px solid ${course.color}28`,
+          fontSize: 13,
+          color: DS.t2,
+          lineHeight: 1.65,
+        }}>
+          <span style={{ fontFamily: "var(--ds-mono), monospace", fontSize: 10, fontWeight: 700, color: course.accent, letterSpacing: "0.12em", textTransform: "uppercase", display: "block", marginBottom: 6 }}>Tutor tip · before you try</span>
+          {moduleSpec.tutorPrompts.preTry}
+        </div>
+      )}
 
       <SectionCard title="1 · Learn" badge="Read first" accent={course.accent} borderAccent={`${course.color}28`}>
         <SimpleMarkdown text={moduleSpec.learnMarkdown} accent={course.accent} />
@@ -212,6 +352,20 @@ export default function LessonModule({
           <p style={{ color: DS.t3, fontSize: 14, margin: 0 }}>No checks for this module yet.</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            {!hasSeenAnswer && (
+              <div style={{
+                padding: "12px 14px",
+                borderRadius: DS.radiusSm,
+                border: `1px solid ${DS.border}`,
+                background: "rgba(255,255,255,0.02)",
+              }}>
+                <ConfidenceMeter
+                  label="How confident are you before checking?"
+                  value={confidenceBefore ?? undefined}
+                  onChange={handleConfidenceBefore}
+                />
+              </div>
+            )}
             {checks.map((q, qi) => (
               <div key={qi} style={{ borderBottom: qi < checks.length - 1 ? `1px solid ${DS.border}` : "none", paddingBottom: qi < checks.length - 1 ? 20 : 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 600, color: DS.t1, marginBottom: 12, lineHeight: 1.5 }}>{q.question}</div>
@@ -290,33 +444,155 @@ export default function LessonModule({
               ({Math.round(score * 100)}%)
               {!passedCheck && ` — need ${minCorrect}/${checks.length} correct to mark complete`}
             </div>
+            {hasSeenAnswer && (
+              <div style={{
+                padding: "12px 14px",
+                borderRadius: DS.radiusSm,
+                border: `1px solid ${DS.border}`,
+                background: "rgba(255,255,255,0.02)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+              }}>
+                <ConfidenceMeter
+                  label="How confident now, after seeing the answer?"
+                  value={confidenceAfter ?? undefined}
+                  onChange={handleConfidenceAfter}
+                />
+                {calibration && (
+                  <div style={{
+                    fontSize: 12,
+                    color: DS.t3,
+                    fontFamily: "var(--ds-mono), monospace",
+                  }}>
+                    Confidence delta: {calibration.delta > 0 ? `+${calibration.delta}` : calibration.delta}
+                    {" · "}
+                    <span style={{
+                      color: calibration.calibration === "calibrated" ? DS.grn
+                        : calibration.calibration === "overconfident" ? "#FB923C"
+                        : "#FCD34D",
+                    }}>
+                      {calibration.calibration}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </SectionCard>
 
+      {hasWrongAnswer && moduleSpec.tutorPrompts?.postFail && (
+        <div style={{
+          marginBottom: 16,
+          padding: "14px 18px",
+          borderRadius: DS.radiusSm,
+          background: "rgba(248,113,113,0.07)",
+          border: "1px solid rgba(248,113,113,0.22)",
+          fontSize: 13,
+          color: DS.t2,
+          lineHeight: 1.65,
+        }}>
+          <span style={{ fontFamily: "var(--ds-mono), monospace", fontSize: 10, fontWeight: 700, color: "#F87171", letterSpacing: "0.12em", textTransform: "uppercase", display: "block", marginBottom: 6 }}>Tutor tip · after a wrong answer</span>
+          {moduleSpec.tutorPrompts.postFail}
+        </div>
+      )}
+
+      {hasWrongAnswer && (
+        <div style={{
+          marginBottom: 16,
+          padding: "14px 18px",
+          borderRadius: DS.radiusSm,
+          background: "rgba(129,140,248,0.07)",
+          border: `1px solid ${DS.ind}33`,
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+        }}>
+          <div style={{ fontSize: 13, color: DS.t2, lineHeight: 1.55, flex: "1 1 240px" }}>
+            <span style={{ fontFamily: "var(--ds-mono), monospace", fontSize: 10, fontWeight: 700, color: DS.ind, letterSpacing: "0.12em", textTransform: "uppercase", display: "block", marginBottom: 6 }}>Adaptive drill</span>
+            Turn the {wrongChecks.length} check{wrongChecks.length === 1 ? "" : "s"} you missed into a targeted tutor drill.
+          </div>
+          <button
+            type="button"
+            onClick={generateDrill}
+            style={{
+              background: `${DS.ind}1e`,
+              border: `1px solid ${DS.ind}55`,
+              borderRadius: DS.radiusSm,
+              padding: "10px 18px",
+              color: DS.t1,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: "var(--ds-sans), sans-serif",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Generate my drill →
+          </button>
+        </div>
+      )}
+
+      {moduleSpec.tutorPrompts?.weeklyRecap && (
+        <div style={{
+          marginBottom: 16,
+          padding: "14px 18px",
+          borderRadius: DS.radiusSm,
+          background: `${DS.grn}0d`,
+          border: `1px solid ${DS.grn}28`,
+          fontSize: 13,
+          color: DS.t2,
+          lineHeight: 1.65,
+        }}>
+          <span style={{ fontFamily: "var(--ds-mono), monospace", fontSize: 10, fontWeight: 700, color: DS.grn, letterSpacing: "0.12em", textTransform: "uppercase", display: "block", marginBottom: 6 }}>Weekly recap</span>
+          {moduleSpec.tutorPrompts.weeklyRecap}
+        </div>
+      )}
+
+      {freeResponseRequired && (
+        <SectionCard title="5 · Reflect" badge="Required" accent={course.accent} borderAccent={`${course.color}22`}>
+          <p style={{ margin: "0 0 10px", color: DS.t3, fontSize: 13, lineHeight: 1.6 }}>
+            Before marking complete, write a brief reflection (≥ 20 characters). How would you explain this concept to a teammate?
+          </p>
+          <textarea
+            value={freeResponse}
+            onChange={(e) => setFreeResponse(e.target.value)}
+            placeholder="Type your reflection here…"
+            style={{
+              width: "100%",
+              minHeight: 90,
+              background: "rgba(255,255,255,0.03)",
+              border: `1px solid ${hasFreeResponse ? `${DS.grn}55` : DS.border}`,
+              borderRadius: DS.radiusSm,
+              padding: 12,
+              color: DS.t1,
+              fontSize: 14,
+              resize: "vertical",
+              fontFamily: "var(--ds-sans), sans-serif",
+              lineHeight: 1.65,
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+          />
+          <div style={{ fontSize: 11, color: hasFreeResponse ? DS.grn : DS.dim, fontFamily: "var(--ds-mono), monospace", marginTop: 6 }}>
+            {freeResponse.trim().length} / 20 characters
+          </div>
+        </SectionCard>
+      )}
+
       <div style={{ display: "flex", gap: 10, marginBottom: 48, marginTop: 8, flexWrap: "wrap" }}>
-        <button
-          type="button"
-          disabled={!passedCheck}
-          onClick={onMarkComplete}
-          title={!passedCheck ? `Answer all questions; need at least ${minCorrect} correct` : undefined}
-          style={{
-            flex: 1,
-            minWidth: 220,
-            background: passedCheck ? DS.indB : "rgba(255,255,255,0.06)",
-            border: "none",
-            borderRadius: DS.radiusSm,
-            padding: "14px 0",
-            color: passedCheck ? "#fff" : DS.dim,
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: passedCheck ? "pointer" : "not-allowed",
-            fontFamily: "var(--ds-sans), sans-serif",
-            boxShadow: passedCheck ? DS.shadowCta : "none",
-          }}
+        <AsyncActionButton
+          onClick={async () => { onMarkComplete(); }}
+          disabled={!canMarkComplete}
+          style={{ flex: 1, minWidth: 220 }}
+          pendingLabel="Saving…"
+          successLabel="Done ✓"
         >
           Mark complete & continue →
-        </button>
+        </AsyncActionButton>
         <button
           type="button"
           onClick={onAskTutor}
@@ -335,6 +611,48 @@ export default function LessonModule({
           Ask tutor
         </button>
       </div>
+
+      {relatedPractice.length > 0 && (
+        <div style={{
+          ...dsGlassCard({ padding: "20px 22px", marginBottom: 48 }),
+          border: `1px solid ${DS.grn}28`,
+        }}>
+          <div style={{ ...sectionLabel, color: DS.grn }}>
+            You learned this — now validate it
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {relatedPractice.map((item, i) => {
+              const title = item?.title || item?.label || "Practice exercise";
+              const detail = item?.prompt || null;
+              return (
+                <button
+                  key={item?.id || i}
+                  type="button"
+                  onClick={() => { if (onOpenPractice) onOpenPractice(item); }}
+                  style={{
+                    textAlign: "left",
+                    padding: "12px 14px",
+                    borderRadius: DS.radiusSm,
+                    border: `1px solid ${DS.border}`,
+                    background: "rgba(255,255,255,0.02)",
+                    color: DS.t2,
+                    fontSize: 14,
+                    cursor: onOpenPractice ? "pointer" : "default",
+                    fontFamily: "var(--ds-sans), sans-serif",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <span style={{ fontFamily: "var(--ds-mono), monospace", color: DS.grn, marginRight: 8, fontSize: 12 }}>→</span>
+                  <strong style={{ color: DS.t1 }}>{title}</strong>
+                  {detail && (
+                    <span style={{ display: "block", color: DS.t3, fontSize: 13, marginTop: 4 }}>{detail}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
+import { DS } from "../lib/ds-platform-tokens.js";
 
-const P = { bg: "#020617", border: "rgba(255,255,255,0.06)", t1: "#F8FAFC", t2: "#E2E8F0", t3: "#94A3B8", indB: "#6366F1" };
+const P = { bg: DS.bg, border: DS.border, t1: DS.t1, t2: DS.t2, t3: DS.t3, indB: DS.indB };
 
 export default function PageShell({ title, children }) {
   return (

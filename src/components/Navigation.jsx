@@ -1,15 +1,16 @@
 import { useMemo } from "react";
+import { DS } from "../lib/ds-platform-tokens.js";
 
 const P = {
   bg: "rgba(2,6,23,0.96)",
-  border: "rgba(148,163,184,0.25)",
+  border: DS.border,
   chip: "rgba(15,23,42,0.9)",
   chipActive: "rgba(79,70,229,0.25)",
-  t1: "#F8FAFC",
-  t2: "#E2E8F0",
-  t3: "#94A3B8",
-  indB: "#6366F1",
-  grn: "#34D399",
+  t1: DS.t1,
+  t2: DS.t2,
+  t3: DS.t3,
+  indB: DS.indB,
+  grn: DS.grn,
 };
 
 export default function Navigation({
