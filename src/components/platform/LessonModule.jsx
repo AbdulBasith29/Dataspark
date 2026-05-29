@@ -35,7 +35,103 @@ function parseTargetedCodeSnippet(codeSnippet = "") {
   });
 }
 
-function InterviewGraphStage({ graph, stage, branchPath, selectedTarget, selectedChoice, onTargetClick, onChoiceSelect, accent }) {
+function buildDecisionArtifact({ graph, branchPath, clickedTargets, graphChoices, lessonTitle }) {
+  const pathStages = branchPath.map((stageId) => graph?.stages?.[stageId]).filter(Boolean);
+  const visited = new Set(branchPath);
+  const tierFor = (recoveryStageId, passLabel = "Tier 1 (Passed)") => (visited.has(recoveryStageId) ? "Tier 3 (Required Recovery Path Pivot)" : passLabel);
+
+  return {
+    title: `${lessonTitle || "Interview Simulation"} · Technical Decision Artifact`,
+    generatedAt: new Date().toISOString(),
+    performanceMatrix: [
+      { dimension: "Initial Problem-Solving Accuracy", result: tierFor("recovery_stage_1_closure") },
+      { dimension: "System Scaling & Concurrency Instinct", result: tierFor("recovery_stage_2_locking") },
+      { dimension: "Architectural Trade-Off Defense", result: tierFor("recovery_stage_3_tradeoff", "Principal Level (Passed)") },
+    ],
+    path: pathStages.map((stage, index) => ({
+      step: index + 1,
+      stageId: stage.id,
+      title: stage.title,
+      input: clickedTargets[stage.id] || graphChoices[stage.id] || null,
+    })),
+  };
+}
+
+function DecisionArtifactCard({ graph, branchPath, clickedTargets, graphChoices, lessonTitle, accent }) {
+  const artifact = buildDecisionArtifact({ graph, branchPath, clickedTargets, graphChoices, lessonTitle });
+  const artifactJson = JSON.stringify(artifact, null, 2);
+  const downloadHref = `data:application/json;charset=utf-8,${encodeURIComponent(artifactJson)}`;
+
+  return (
+    <div style={{
+      padding: "16px 18px",
+      borderRadius: DS.radiusMd,
+      border: `1px solid ${DS.grn}44`,
+      background: `${DS.grn}0d`,
+      display: "flex",
+      flexDirection: "column",
+      gap: 12,
+    }}>
+      <div>
+        <div style={{ ...sectionLabel, color: DS.grn, marginBottom: 6 }}>Evaluation portfolio</div>
+        <div style={{ color: DS.t1, fontSize: 16, fontWeight: 800, marginBottom: 4 }}>Technical Decision Artifact</div>
+        <p style={{ margin: 0, color: DS.t3, fontSize: 13, lineHeight: 1.6 }}>
+          Download this path-specific diagnostic before you leave the module. It records where you passed cleanly and where the interviewer forced a recovery pivot.
+        </p>
+      </div>
+
+      <div style={{ display: "grid", gap: 8 }}>
+        {artifact.performanceMatrix.map((row) => (
+          <div
+            key={row.dimension}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "minmax(0, 1fr) auto",
+              gap: 12,
+              alignItems: "center",
+              padding: "10px 12px",
+              borderRadius: DS.radiusSm,
+              border: `1px solid ${DS.border}`,
+              background: "rgba(255,255,255,0.03)",
+            }}
+          >
+            <span style={{ color: DS.t2, fontSize: 13, lineHeight: 1.4 }}>{row.dimension}</span>
+            <span style={{
+              color: row.result.includes("Recovery") ? "#FCD34D" : DS.grn,
+              fontSize: 11,
+              fontFamily: "var(--ds-mono), monospace",
+              fontWeight: 700,
+              textAlign: "right",
+            }}>
+              {row.result}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <a
+        href={downloadHref}
+        download={`${(lessonTitle || "dataspark").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-decision-artifact.json`}
+        style={{
+          alignSelf: "flex-start",
+          background: `${accent}22`,
+          border: `1px solid ${accent}66`,
+          borderRadius: DS.radiusSm,
+          padding: "10px 14px",
+          color: DS.t1,
+          fontSize: 13,
+          fontWeight: 700,
+          textDecoration: "none",
+          fontFamily: "var(--ds-sans), sans-serif",
+        }}
+      >
+        Download artifact →
+      </a>
+    </div>
+  );
+}
+
+function InterviewGraphStage({ graph, stage, branchPath, clickedTargets, graphChoices, selectedTarget, selectedChoice, onTargetClick, onChoiceSelect, accent, lessonTitle }) {
   if (!graph || !stage) return null;
   const codeLines = parseTargetedCodeSnippet(stage.code_snippet);
   const choices = Array.isArray(stage.choices) ? stage.choices : [];
@@ -190,6 +286,17 @@ function InterviewGraphStage({ graph, stage, branchPath, selectedTarget, selecte
           <strong style={{ color: stage.terminal ? DS.grn : DS.t1 }}>Interviewer rationale: </strong>
           {stage.rationale}
         </div>
+      )}
+
+      {stage.terminal && (
+        <DecisionArtifactCard
+          graph={graph}
+          branchPath={branchPath}
+          clickedTargets={clickedTargets}
+          graphChoices={graphChoices}
+          lessonTitle={lessonTitle}
+          accent={accent}
+        />
       )}
     </div>
   );
@@ -568,11 +675,14 @@ export default function LessonModule({
             graph={interviewGraph}
             stage={activeGraphStage}
             branchPath={branchPath}
+            clickedTargets={clickedTargets}
+            graphChoices={graphChoices}
             selectedTarget={selectedTarget}
             selectedChoice={selectedGraphChoice}
             onTargetClick={handleTargetClick}
             onChoiceSelect={handleGraphChoiceSelect}
             accent={course.accent}
+            lessonTitle={lesson.title}
           />
         ) : checks.length === 0 ? (
           <p style={{ color: DS.t3, fontSize: 14, margin: 0 }}>No checks for this module yet.</p>
