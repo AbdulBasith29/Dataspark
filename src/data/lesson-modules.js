@@ -549,6 +549,8 @@ If there is no exact tag match, ask the **AI tutor**: “Give me a 5-minute dril
  *   videoFallbackMarkdown: string,
  *   tryGuidance: string,
  *   knowledgeCheck: CheckQ[],
+ *   freeResponseRequired?: boolean,
+ *   tutorPrompts?: { preTry?: string, postFail?: string, weeklyRecap?: string },
  * }} LessonModuleSpec */
 
 /** @type {Record<string, LessonModuleSpec>} */
