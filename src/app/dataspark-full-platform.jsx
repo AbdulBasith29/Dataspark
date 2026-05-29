@@ -174,6 +174,16 @@ const CURRICULUM = [
     description: "The language of data. From basic queries to advanced window functions, CTEs, and query optimization.",
     topics: [
       {
+        id: "sql-revision",
+        title: "Rapid Revision & Foundations",
+        lessons: [
+          { id: "sql-found-01", title: "SQL Order of Execution", duration: "12 min", hasViz: false },
+          { id: "sql-found-02", title: "Three-Valued Logic of NULL", duration: "12 min", hasViz: false },
+          { id: "sql-found-03", title: "GROUP BY & Aggregations", duration: "12 min", hasViz: false },
+          { id: "sql-found-04", title: "Subqueries vs Basic Joins", duration: "12 min", hasViz: false },
+        ]
+      },
+      {
         id: "sql-basics",
         title: "SQL Fundamentals",
         lessons: [

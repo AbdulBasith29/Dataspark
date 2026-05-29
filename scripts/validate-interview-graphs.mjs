@@ -1,6 +1,6 @@
 import { LESSON_MODULES } from "../src/data/lesson-modules.js";
 
-const TARGET_TAG_PATTERN = /(?:#|\/\/)?\s*ds-target:([a-zA-Z0-9_-]+)/g;
+const TARGET_TAG_PATTERN = /(?:#|--|\/\/)?\s*ds-target:([a-zA-Z0-9_-]+)/g;
 const ALLOWED_STAGE_TYPES = new Set(["click_target", "scenaro_choice", "scenario_choice"]);
 
 function collectTargetTags(codeSnippet = "") {

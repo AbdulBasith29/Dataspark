@@ -4708,6 +4708,693 @@ This module still ships a full **written** walkthrough and the mutability lab �
 
   ...PYTHON_EXTENDED_MODULES,
 
+  "sql-found-01": {
+    durationLabel: "12 min",
+    outcomes: [
+      "Explain SQL logical execution order without relying on top-to-bottom reading.",
+      "Fix alias-in-WHERE and HAVING misuse under interview pressure.",
+      "Choose WHERE vs HAVING based on correctness and early-filter performance.",
+    ],
+    learnMarkdown: `## Rapid revision: SQL does not execute top-to-bottom
+
+Your eyes read SELECT, FROM, WHERE. The database reasons in a logical order: FROM/JOIN, WHERE, GROUP BY, HAVING, SELECT, then ORDER BY/LIMIT.
+
+That is why a SELECT alias does not exist when WHERE runs. WHERE filters individual rows before SELECT creates aliases. HAVING filters grouped buckets after aggregation.
+
+## Interview muscle memory
+
+- Use WHERE for row-level filters before aggregation.
+- Use HAVING for aggregate filters after GROUP BY.
+- If you need a SELECT alias in a filter, wrap the query in a subquery/CTE or repeat the expression where the dialect permits it.
+- Prefer filtering early in WHERE when the predicate is row-level; it reduces rows before grouping and usually lowers compute cost.`,
+    video: null,
+    videoFallbackMarkdown: `## 3-minute execution-order drill
+
+Say this sequence out loud until it is automatic: FROM/JOIN -> WHERE -> GROUP BY -> HAVING -> SELECT -> ORDER BY/LIMIT.
+
+Then explain why WHERE cannot see SELECT aliases but ORDER BY often can in many SQL dialects.`,
+    tryGuidance: "Run the interview simulation. First click the faulty SQL line, then survive the HAVING pivot and the WHERE-vs-HAVING trade-off.",
+    interviewGraph: {
+      initialStageId: "sql_order_alias_click",
+      artifactDimensions: [
+        { label: "Execution Order Recall", recoveryStageId: "sql_order_recovery_alias" },
+        { label: "HAVING vs WHERE Edge Case", recoveryStageId: "sql_order_recovery_having" },
+        { label: "Performance Filtering Instinct", recoveryStageId: "sql_order_recovery_tradeoff", passLabel: "Foundational Trade-Off Clear" },
+      ],
+      stages: {
+        sql_order_alias_click: {
+          id: "sql_order_alias_click",
+          type: "click_target",
+          badge: "Stage 1 target",
+          title: "Stage 1 · Alias used before it exists",
+          prompt: "This query looks readable, but it fails in most SQL engines. Click the exact line where the logical execution-order bug occurs.",
+          code_snippet: `SELECT
+  user_id,
+  total_amount * 0.10 AS platform_fee
+FROM orders
+WHERE platform_fee > 25 -- ds-target:alias_in_where
+ORDER BY platform_fee DESC;`,
+          validationCopy: {
+            alias_in_where: "Correct. WHERE runs before SELECT, so platform_fee has not been created yet when the row filter executes.",
+          },
+          branches: {
+            alias_in_where: "sql_order_fix_choice",
+          },
+        },
+        sql_order_recovery_alias: {
+          id: "sql_order_recovery_alias",
+          type: "scenario_choice",
+          badge: "Recovery 1",
+          title: "Recovery · Name the missing mental model",
+          prompt: "The interviewer asks why the alias is invisible. Which explanation is strongest?",
+          code_snippet: `-- Logical order:
+-- FROM/JOIN -> WHERE -> GROUP BY -> HAVING -> SELECT -> ORDER BY/LIMIT`,
+          choices: [
+            { id: "a", label: "WHERE runs before SELECT", description: "The alias is assigned after row-level filtering." },
+            { id: "b", label: "Aliases cannot contain underscores", description: "The name platform_fee violates no standard naming rule." },
+            { id: "c", label: "ORDER BY must be removed", description: "ORDER BY is not the reason WHERE fails." },
+            { id: "d", label: "WHERE only accepts literal constants", description: "WHERE can use expressions and columns, just not this SELECT alias yet." },
+          ],
+          branches: {
+            a: "sql_order_fix_choice",
+            b: "sql_order_recovery_alias",
+            c: "sql_order_recovery_alias",
+            d: "sql_order_recovery_alias",
+          },
+          rationale: "The fix begins with logical query processing order, not syntax superstition.",
+        },
+        sql_order_fix_choice: {
+          id: "sql_order_fix_choice",
+          type: "scenario_choice",
+          badge: "Stage 1 choice",
+          title: "Stage 1 · Choose the clean fix",
+          prompt: "Which rewrite is the most portable and explicit fix?",
+          code_snippet: `-- Goal: keep rows where total_amount * 0.10 > 25`,
+          choices: [
+            { id: "a", label: "Use a subquery/CTE", description: "Compute platform_fee first, then filter it in the outer query." },
+            { id: "b", label: "Move the predicate to HAVING without GROUP BY", description: "Some dialects reject this and it confuses row vs aggregate filtering." },
+            { id: "c", label: "Quote the alias in WHERE", description: "Quoting changes identifier parsing, not execution order." },
+            { id: "d", label: "Keep the query and rely on optimizer rewrite", description: "The parser still has to resolve the name before optimization." },
+          ],
+          branches: {
+            a: "sql_order_having_choice",
+            b: "sql_order_recovery_alias",
+            c: "sql_order_recovery_alias",
+            d: "sql_order_recovery_alias",
+          },
+          rationale: "A subquery or CTE creates a new scope where platform_fee is now a real column for the outer WHERE.",
+        },
+        sql_order_having_choice: {
+          id: "sql_order_having_choice",
+          type: "scenario_choice",
+          badge: "Stage 2 edge",
+          title: "Stage 2 · HAVING is filtering the wrong thing",
+          prompt: "The interviewer pivots to grouped revenue. Which clause belongs where?",
+          code_snippet: `SELECT customer_id, SUM(total_amount) AS revenue
+FROM orders
+GROUP BY customer_id
+HAVING status = 'completed' AND SUM(total_amount) > 1000;`,
+          choices: [
+            { id: "a", label: "WHERE status, HAVING revenue", description: "Filter completed rows before grouping; filter aggregate buckets after grouping." },
+            { id: "b", label: "Put both predicates in HAVING", description: "status is row-level and may be invalid or ambiguous after grouping." },
+            { id: "c", label: "Put both predicates in WHERE", description: "SUM(total_amount) does not exist before grouping." },
+            { id: "d", label: "Move status into SELECT only", description: "Displaying status does not filter rows and can break grouping." },
+          ],
+          branches: {
+            a: "sql_order_tradeoff_choice",
+            b: "sql_order_recovery_having",
+            c: "sql_order_recovery_having",
+            d: "sql_order_recovery_having",
+          },
+          rationale: "Row predicates belong in WHERE. Aggregate predicates belong in HAVING.",
+        },
+        sql_order_recovery_having: {
+          id: "sql_order_recovery_having",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery · Row filter vs bucket filter",
+          prompt: "Choose the rule that repairs the HAVING mistake.",
+          code_snippet: `-- WHERE sees rows.
+-- HAVING sees grouped buckets.`,
+          choices: [
+            { id: "a", label: "WHERE before GROUP BY, HAVING after GROUP BY", description: "status goes WHERE; SUM threshold goes HAVING." },
+            { id: "b", label: "HAVING always runs faster", description: "Late filters usually process more rows, not fewer." },
+            { id: "c", label: "WHERE can use aggregate aliases", description: "WHERE still runs before aggregation and SELECT aliases." },
+            { id: "d", label: "GROUP BY fixes all non-aggregated columns", description: "Grouping changes row grain; it does not decide predicate semantics." },
+          ],
+          branches: {
+            a: "sql_order_tradeoff_choice",
+            b: "sql_order_recovery_having",
+            c: "sql_order_recovery_having",
+            d: "sql_order_recovery_having",
+          },
+          rationale: "This is the core distinction interviewers expect: row filters before grouping, bucket filters after grouping.",
+        },
+        sql_order_tradeoff_choice: {
+          id: "sql_order_tradeoff_choice",
+          type: "scenario_choice",
+          badge: "Stage 3 trade-off",
+          title: "Stage 3 · Performance trade-off",
+          prompt: "Both versions can be made correct. Which design is usually better for row-level predicates on a large table?",
+          code_snippet: `-- Option 1: WHERE status = 'completed' before GROUP BY
+-- Option 2: conditional aggregation or late HAVING-style filtering after grouping`,
+          choices: [
+            { id: "a", label: "Filter early in WHERE", description: "Reduce rows before grouping when the predicate is truly row-level." },
+            { id: "b", label: "Filter late in HAVING", description: "Keep all rows through aggregation even when they cannot affect the result." },
+            { id: "c", label: "Always use CTEs for speed", description: "CTEs are readability tools; optimizer behavior depends on the engine." },
+            { id: "d", label: "Always use SELECT aliases", description: "Aliases improve readability but do not override logical execution order." },
+          ],
+          branches: {
+            a: "sql_order_terminal",
+            b: "sql_order_recovery_tradeoff",
+            c: "sql_order_recovery_tradeoff",
+            d: "sql_order_recovery_tradeoff",
+          },
+          rationale: "Early row filtering reduces the data volume entering GROUP BY and usually lowers memory/CPU pressure.",
+        },
+        sql_order_recovery_tradeoff: {
+          id: "sql_order_recovery_tradeoff",
+          type: "scenario_choice",
+          badge: "Recovery 3",
+          title: "Recovery · Correctness plus cost",
+          prompt: "The interviewer asks for the performance intuition. Pick the answer that explains both semantics and cost.",
+          code_snippet: `-- Big table: 500M orders
+-- Only 8% have status = 'completed'`,
+          choices: [
+            { id: "a", label: "WHERE reduces group input", description: "For row-level predicates, WHERE discards irrelevant rows before aggregation." },
+            { id: "b", label: "HAVING reduces scans", description: "HAVING cannot avoid reading/grouping rows needed to build the buckets." },
+            { id: "c", label: "ORDER BY fixes performance", description: "Sorting happens late and often adds cost." },
+            { id: "d", label: "SELECT aliases materialize indexes", description: "Aliases do not create physical storage or indexes." },
+          ],
+          branches: {
+            a: "sql_order_terminal",
+            b: "sql_order_recovery_tradeoff",
+            c: "sql_order_recovery_tradeoff",
+            d: "sql_order_recovery_tradeoff",
+          },
+          rationale: "A foundational answer ties logical order to data volume: filter rows as early as correctness allows.",
+        },
+        sql_order_terminal: {
+          id: "sql_order_terminal",
+          type: "scenario_choice",
+          badge: "Terminal",
+          title: "Revision complete · SQL execution order locked",
+          prompt: "You handled alias scope, HAVING semantics, and the early-filter trade-off.",
+          code_snippet: `-- Mental model:
+-- FROM/JOIN -> WHERE -> GROUP BY -> HAVING -> SELECT -> ORDER BY/LIMIT`,
+          choices: [],
+          branches: {},
+          terminal: true,
+          rationale: "The candidate-ready answer is simple: WHERE cannot see SELECT aliases because SELECT has not happened yet; HAVING is for aggregate buckets; WHERE is preferred for row-level filters because it reduces work before grouping.",
+        },
+      },
+    },
+    knowledgeCheck: [],
+  },
+
+  "sql-found-02": {
+    durationLabel: "12 min",
+    outcomes: [
+      "Predict UNKNOWN behavior in SQL three-valued logic.",
+      "Avoid NOT IN traps when subqueries can emit NULL.",
+      "Choose COALESCE, IFNULL, or CASE based on portability and semantic clarity.",
+    ],
+    learnMarkdown: `## Rapid revision: NULL means unknown, not empty
+
+SQL predicates can evaluate to TRUE, FALSE, or UNKNOWN. WHERE only keeps TRUE. This is why one hidden NULL inside a NOT IN subquery can make every comparison unknown and return zero rows.
+
+Use NOT EXISTS when checking absence against nullable subquery output. Use explicit CASE branches and ELSE clauses when NULL propagation would hide a business state.`,
+    video: null,
+    videoFallbackMarkdown: `## Drill
+
+Given values 1, 2, NULL, predict the output of IN, NOT IN, equality, and CASE expressions before running them.`,
+    tryGuidance: "Click the line where NULL poisons a NOT IN query, then handle CASE and null-replacement trade-offs.",
+    interviewGraph: {
+      initialStageId: "sql_null_not_in_click",
+      artifactDimensions: [
+        { label: "NULL Predicate Instinct", recoveryStageId: "sql_null_recovery_not_in" },
+        { label: "CASE ELSE Discipline", recoveryStageId: "sql_null_recovery_case" },
+        { label: "Null Replacement Trade-Off", recoveryStageId: "sql_null_recovery_tradeoff", passLabel: "Revision Trade-Off Clear" },
+      ],
+      stages: {
+        sql_null_not_in_click: {
+          id: "sql_null_not_in_click",
+          type: "click_target",
+          badge: "Stage 1 target",
+          title: "Stage 1 · NOT IN poisoned by NULL",
+          prompt: "This query unexpectedly returns zero customers. Click the line that introduces UNKNOWN into every NOT IN comparison.",
+          code_snippet: `SELECT customer_id
+FROM customers
+WHERE customer_id NOT IN (
+  SELECT customer_id -- ds-target:nullable_subquery_output
+  FROM chargebacks
+);`,
+          validationCopy: {
+            nullable_subquery_output: "Correct. If chargebacks.customer_id contains NULL, NOT IN can evaluate to UNKNOWN for every customer and WHERE keeps none of them.",
+          },
+          branches: {
+            nullable_subquery_output: "sql_null_fix_choice",
+          },
+        },
+        sql_null_recovery_not_in: {
+          id: "sql_null_recovery_not_in",
+          type: "scenario_choice",
+          badge: "Recovery 1",
+          title: "Recovery · Remember UNKNOWN",
+          prompt: "Which rule explains the empty result?",
+          code_snippet: `-- WHERE keeps TRUE only.
+-- FALSE and UNKNOWN are both filtered out.`,
+          choices: [
+            { id: "a", label: "NOT IN plus NULL can become UNKNOWN", description: "A nullable subquery can poison the anti-filter." },
+            { id: "b", label: "NOT IN means INNER JOIN", description: "NOT IN is a predicate, not a join operator." },
+            { id: "c", label: "NULL equals every value", description: "NULL equals nothing, not even another NULL under ordinary =." },
+            { id: "d", label: "Subqueries cannot return NULL", description: "They can unless constrained or filtered." },
+          ],
+          branches: { a: "sql_null_fix_choice", b: "sql_null_recovery_not_in", c: "sql_null_recovery_not_in", d: "sql_null_recovery_not_in" },
+          rationale: "Three-valued logic is the foundation: UNKNOWN is not TRUE, so WHERE drops it.",
+        },
+        sql_null_fix_choice: {
+          id: "sql_null_fix_choice",
+          type: "scenario_choice",
+          badge: "Stage 1 choice",
+          title: "Stage 1 · Choose the safe anti-join",
+          prompt: "What is the safest rewrite when the right-hand key may contain NULL?",
+          code_snippet: `-- Goal: customers with no chargebacks`,
+          choices: [
+            { id: "a", label: "Use NOT EXISTS", description: "Correlate on equality and avoid NULL poisoning." },
+            { id: "b", label: "Use NOT IN unchanged", description: "This preserves the bug when NULL is present." },
+            { id: "c", label: "Use = NULL", description: "Equality to NULL is UNKNOWN; use IS NULL for null checks." },
+            { id: "d", label: "Use COUNT(*) > 0", description: "That verifies presence, not absence, unless wrapped carefully." },
+          ],
+          branches: { a: "sql_null_case_choice", b: "sql_null_recovery_not_in", c: "sql_null_recovery_not_in", d: "sql_null_recovery_not_in" },
+          rationale: "NOT EXISTS is usually the clean absence check when nullability is possible.",
+        },
+        sql_null_case_choice: {
+          id: "sql_null_case_choice",
+          type: "scenario_choice",
+          badge: "Stage 2 edge",
+          title: "Stage 2 · CASE missing ELSE",
+          prompt: "The interviewer shows a feature flag computed with CASE. What is the hidden output for users who match no WHEN branch?",
+          code_snippet: `CASE
+  WHEN plan = 'pro' THEN 1
+  WHEN plan = 'team' THEN 1
+END AS paid_flag`,
+          choices: [
+            { id: "a", label: "NULL", description: "Without ELSE, unmatched CASE expressions return NULL." },
+            { id: "b", label: "0", description: "SQL does not infer false unless you write ELSE 0." },
+            { id: "c", label: "FALSE", description: "The expression returns the type implied by branches; no boolean default is guaranteed." },
+            { id: "d", label: "Empty string", description: "There is no implicit text fallback here." },
+          ],
+          branches: { a: "sql_null_tradeoff_choice", b: "sql_null_recovery_case", c: "sql_null_recovery_case", d: "sql_null_recovery_case" },
+          rationale: "CASE without ELSE returns NULL for non-matching rows, which can silently propagate into metrics.",
+        },
+        sql_null_recovery_case: {
+          id: "sql_null_recovery_case",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery · Make fallback explicit",
+          prompt: "Which rewrite is best for a binary paid flag?",
+          code_snippet: `-- Need a 1/0 paid_flag for downstream aggregation`,
+          choices: [
+            { id: "a", label: "Add ELSE 0", description: "Make unmatched plans explicit and aggregate-safe." },
+            { id: "b", label: "Leave NULL", description: "AVG/SUM/COUNT behavior can now diverge unintentionally." },
+            { id: "c", label: "Use = NULL", description: "This does not match NULL values." },
+            { id: "d", label: "Cast NULL to text", description: "Changing type does not fix missing semantics." },
+          ],
+          branches: { a: "sql_null_tradeoff_choice", b: "sql_null_recovery_case", c: "sql_null_recovery_case", d: "sql_null_recovery_case" },
+          rationale: "Revision-level SQL quality is often about making business defaults explicit.",
+        },
+        sql_null_tradeoff_choice: {
+          id: "sql_null_tradeoff_choice",
+          type: "scenario_choice",
+          badge: "Stage 3 trade-off",
+          title: "Stage 3 · COALESCE vs IFNULL vs CASE",
+          prompt: "Which null-handling choice is easiest to defend across SQL dialects and business logic reviews?",
+          code_snippet: `-- Need display_name fallback and a more complex paid/free classification`,
+          choices: [
+            { id: "a", label: "COALESCE for simple fallback, CASE for business rules", description: "Portable fallback plus explicit conditional logic when rules branch." },
+            { id: "b", label: "IFNULL everywhere", description: "Common but less portable and only handles simple fallback." },
+            { id: "c", label: "CASE for every null fallback", description: "Correct but verbose when COALESCE says exactly what you mean." },
+            { id: "d", label: "Never replace NULL", description: "Sometimes preserving unknown is right, but reports often need explicit display defaults." },
+          ],
+          branches: { a: "sql_null_terminal", b: "sql_null_recovery_tradeoff", c: "sql_null_recovery_tradeoff", d: "sql_null_recovery_tradeoff" },
+          rationale: "Use the simplest construct that preserves meaning: COALESCE for fallback, CASE for branching semantics.",
+        },
+        sql_null_recovery_tradeoff: {
+          id: "sql_null_recovery_tradeoff",
+          type: "scenario_choice",
+          badge: "Recovery 3",
+          title: "Recovery · Pick clarity over cleverness",
+          prompt: "What principle should guide null replacement?",
+          code_snippet: `-- NULL can mean unknown, not applicable, missing ingestion, or intentionally blank`,
+          choices: [
+            { id: "a", label: "Preserve meaning first", description: "Choose COALESCE/CASE only after naming what NULL means for the metric." },
+            { id: "b", label: "Replace all NULLs with zero", description: "Zero is a value and can corrupt averages/revenue." },
+            { id: "c", label: "Ignore NULL semantics", description: "That is how NOT IN and CASE bugs ship." },
+            { id: "d", label: "Prefer vendor-specific syntax", description: "Portability matters in interview and platform code." },
+          ],
+          branches: { a: "sql_null_terminal", b: "sql_null_recovery_tradeoff", c: "sql_null_recovery_tradeoff", d: "sql_null_recovery_tradeoff" },
+          rationale: "Null handling is a semantic decision before it is a syntax decision.",
+        },
+        sql_null_terminal: {
+          id: "sql_null_terminal",
+          type: "scenario_choice",
+          badge: "Terminal",
+          title: "Revision complete · NULL traps defused",
+          prompt: "You handled NOT IN, CASE fallback, and null-replacement trade-offs.",
+          code_snippet: `-- Use NOT EXISTS for nullable anti-joins.
+-- Add ELSE when NULL is not an acceptable business state.
+-- Use COALESCE for simple fallback; CASE for explicit branching.`,
+          choices: [],
+          branches: {},
+          terminal: true,
+          rationale: "The interview-ready answer names UNKNOWN and then chooses explicit, portable SQL that preserves business meaning.",
+        },
+      },
+    },
+    knowledgeCheck: [],
+  },
+
+  "sql-found-03": {
+    durationLabel: "12 min",
+    outcomes: [
+      "Respect GROUP BY grain and non-aggregated column rules.",
+      "Explain COUNT(*), COUNT(1), and COUNT(column) under NULLs.",
+      "Choose between raw-table aggregation and pre-grouped subqueries based on cost and grain clarity.",
+    ],
+    learnMarkdown: `## Rapid revision: GROUP BY changes the row grain
+
+After GROUP BY, each output row represents a bucket. Non-aggregated selected columns must be part of that bucket definition in standard SQL.
+
+COUNT(*) and COUNT(1) count rows. COUNT(column) counts non-NULL values in that column. That single difference causes many interview mistakes.`,
+    video: null,
+    videoFallbackMarkdown: `## Drill
+
+For three rows with values 10, NULL, 20, predict COUNT(*), COUNT(1), COUNT(value), SUM(value), and AVG(value).`,
+    tryGuidance: "Click the non-aggregated column that violates GROUP BY, then handle COUNT null semantics and aggregation cost.",
+    interviewGraph: {
+      initialStageId: "sql_group_click",
+      artifactDimensions: [
+        { label: "GROUP BY Grain Control", recoveryStageId: "sql_group_recovery_grain" },
+        { label: "COUNT Null Semantics", recoveryStageId: "sql_group_recovery_count" },
+        { label: "Aggregation Cost Awareness", recoveryStageId: "sql_group_recovery_tradeoff", passLabel: "Aggregation Trade-Off Clear" },
+      ],
+      stages: {
+        sql_group_click: {
+          id: "sql_group_click",
+          type: "click_target",
+          badge: "Stage 1 target",
+          title: "Stage 1 · Non-aggregated column leaks grain",
+          prompt: "This query fails in strict SQL engines. Click the selected column that is neither grouped nor aggregated.",
+          code_snippet: `SELECT
+  customer_id,
+  customer_name, -- ds-target:ungrouped_column
+  SUM(total_amount) AS revenue
+FROM orders
+GROUP BY customer_id;`,
+          validationCopy: {
+            ungrouped_column: "Correct. Once grouped by customer_id, customer_name must either be functionally guaranteed by the engine, included in GROUP BY, or aggregated intentionally.",
+          },
+          branches: { ungrouped_column: "sql_group_fix_choice" },
+        },
+        sql_group_recovery_grain: {
+          id: "sql_group_recovery_grain",
+          type: "scenario_choice",
+          badge: "Recovery 1",
+          title: "Recovery · State the grain",
+          prompt: "What should you say before fixing the query?",
+          code_snippet: `-- Output grain: one row per customer_id`,
+          choices: [
+            { id: "a", label: "Every selected field must match the output grain", description: "Group it, aggregate it, or prove functional dependency." },
+            { id: "b", label: "GROUP BY sorts rows", description: "Grouping buckets rows; sorting is ORDER BY." },
+            { id: "c", label: "SUM makes all columns valid", description: "Aggregating one column does not aggregate the others." },
+            { id: "d", label: "Primary keys never matter", description: "Functional dependency can matter, but do not assume it blindly." },
+          ],
+          branches: { a: "sql_group_fix_choice", b: "sql_group_recovery_grain", c: "sql_group_recovery_grain", d: "sql_group_recovery_grain" },
+          rationale: "Interviewers listen for grain awareness before syntax patches.",
+        },
+        sql_group_fix_choice: {
+          id: "sql_group_fix_choice",
+          type: "scenario_choice",
+          badge: "Stage 1 choice",
+          title: "Stage 1 · Fix the grouped query",
+          prompt: "Which fix is safest when customer_name comes from a customers dimension table?",
+          code_snippet: `-- orders(customer_id, total_amount)
+-- customers(customer_id, customer_name)`,
+          choices: [
+            { id: "a", label: "Join dimension then group both id and name", description: "Keep the output grain explicit and portable." },
+            { id: "b", label: "Select customer_name without grouping", description: "Strict engines reject it; permissive engines may choose arbitrary values." },
+            { id: "c", label: "Use MAX(customer_name) without thinking", description: "Can be okay if dependency is true, but hides data-quality issues." },
+            { id: "d", label: "Drop GROUP BY", description: "That collapses the entire table to one aggregate row." },
+          ],
+          branches: { a: "sql_group_count_choice", b: "sql_group_recovery_grain", c: "sql_group_recovery_grain", d: "sql_group_recovery_grain" },
+          rationale: "Grouping both key and descriptor is the clean revision-level answer when joining a stable dimension.",
+        },
+        sql_group_count_choice: {
+          id: "sql_group_count_choice",
+          type: "scenario_choice",
+          badge: "Stage 2 edge",
+          title: "Stage 2 · COUNT and NULL",
+          prompt: "A group has 10 rows and only 6 non-NULL refund_amount values. What do these counts return?",
+          code_snippet: `COUNT(*) AS rows_count,
+COUNT(1) AS one_count,
+COUNT(refund_amount) AS refund_count`,
+          choices: [
+            { id: "a", label: "10, 10, 6", description: "COUNT(column) ignores NULL; COUNT(*) and COUNT(1) count rows." },
+            { id: "b", label: "10, 6, 6", description: "COUNT(1) does not inspect refund_amount." },
+            { id: "c", label: "6, 6, 6", description: "COUNT(*) includes rows even when columns are NULL." },
+            { id: "d", label: "10, 10, 10", description: "COUNT(refund_amount) skips NULL values." },
+          ],
+          branches: { a: "sql_group_tradeoff_choice", b: "sql_group_recovery_count", c: "sql_group_recovery_count", d: "sql_group_recovery_count" },
+          rationale: "COUNT(column) is a non-null count; COUNT(*) and COUNT(1) are row counts.",
+        },
+        sql_group_recovery_count: {
+          id: "sql_group_recovery_count",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery · Count the right thing",
+          prompt: "Which expression measures whether any row exists in the group, regardless of NULL columns?",
+          code_snippet: `-- Some metric columns are NULL for half the rows`,
+          choices: [
+            { id: "a", label: "COUNT(*)", description: "Counts rows in the group." },
+            { id: "b", label: "COUNT(nullable_metric)", description: "Counts only non-NULL metric values." },
+            { id: "c", label: "SUM(nullable_metric)", description: "Sums values and ignores NULL; it is not a row count." },
+            { id: "d", label: "AVG(nullable_metric)", description: "Averages non-NULL values; not existence." },
+          ],
+          branches: { a: "sql_group_tradeoff_choice", b: "sql_group_recovery_count", c: "sql_group_recovery_count", d: "sql_group_recovery_count" },
+          rationale: "Pick COUNT(*) when you mean rows; COUNT(column) when you mean populated values.",
+        },
+        sql_group_tradeoff_choice: {
+          id: "sql_group_tradeoff_choice",
+          type: "scenario_choice",
+          badge: "Stage 3 trade-off",
+          title: "Stage 3 · Aggregating raw facts vs pre-grouping",
+          prompt: "Dashboards repeatedly compute daily revenue from a billion-row raw events table. What is the best foundational design move?",
+          code_snippet: `-- Every dashboard runs:
+-- SELECT event_date, SUM(revenue) FROM raw_events GROUP BY event_date`,
+          choices: [
+            { id: "a", label: "Pre-group to the dashboard grain", description: "Materialize or model daily revenue once, with clear freshness guarantees." },
+            { id: "b", label: "Always aggregate raw events live", description: "Simple but repeatedly expensive at scale." },
+            { id: "c", label: "Remove GROUP BY", description: "Incorrect output grain." },
+            { id: "d", label: "Use COUNT(*) instead of SUM", description: "That changes the metric." },
+          ],
+          branches: { a: "sql_group_terminal", b: "sql_group_recovery_tradeoff", c: "sql_group_recovery_tradeoff", d: "sql_group_recovery_tradeoff" },
+          rationale: "Pre-grouping aligns compute with repeated query grain and makes freshness/correctness explicit.",
+        },
+        sql_group_recovery_tradeoff: {
+          id: "sql_group_recovery_tradeoff",
+          type: "scenario_choice",
+          badge: "Recovery 3",
+          title: "Recovery · Aggregate once when grain repeats",
+          prompt: "What is the trade-off of pre-grouped tables?",
+          code_snippet: `-- Faster dashboard queries
+-- Additional storage and freshness management`,
+          choices: [
+            { id: "a", label: "Trade storage/freshness complexity for lower repeated compute", description: "This is the normal analytics-engineering trade-off." },
+            { id: "b", label: "No trade-off", description: "Materialized aggregates add maintenance and freshness questions." },
+            { id: "c", label: "Always less correct", description: "They can be correct if modeled and tested at the right grain." },
+            { id: "d", label: "Only useful for small tables", description: "They are most valuable when raw scans are expensive." },
+          ],
+          branches: { a: "sql_group_terminal", b: "sql_group_recovery_tradeoff", c: "sql_group_recovery_tradeoff", d: "sql_group_recovery_tradeoff" },
+          rationale: "Foundational SQL design is grain plus cost: precompute repeated grains, but document freshness and lineage.",
+        },
+        sql_group_terminal: {
+          id: "sql_group_terminal",
+          type: "scenario_choice",
+          badge: "Terminal",
+          title: "Revision complete · Aggregation fundamentals locked",
+          prompt: "You handled grouped grain, COUNT null semantics, and pre-aggregation trade-offs.",
+          code_snippet: `-- GROUP BY defines output grain.
+-- COUNT(*) counts rows; COUNT(column) counts non-NULL values.
+-- Pre-group repeated dashboard grains when raw scans are too costly.`,
+          choices: [],
+          branches: {},
+          terminal: true,
+          rationale: "The strong candidate states grain first, picks the right count expression, and explains aggregation cost without over-engineering.",
+        },
+      },
+    },
+    knowledgeCheck: [],
+  },
+
+  "sql-found-04": {
+    durationLabel: "12 min",
+    outcomes: [
+      "Spot row-by-row correlated subquery performance traps.",
+      "Predict join fan-out when the right-hand side is one-to-many.",
+      "Choose EXISTS vs INNER JOIN when verifying presence.",
+    ],
+    learnMarkdown: `## Rapid revision: joins change row counts
+
+A correlated subquery in SELECT may execute conceptually once per outer row. Optimizers can sometimes decorrelate it, but you should not rely on magic when a simple grouped join expresses the intent clearly.
+
+A LEFT JOIN does not guarantee one output row per left row. If the right table has multiple matches, it duplicates the left row.`,
+    video: null,
+    videoFallbackMarkdown: `## Drill
+
+For each join, write the expected output grain before writing SELECT. Then predict whether one-to-many matches will duplicate rows.`,
+    tryGuidance: "Click the correlated subquery that creates row-by-row work, then handle join fan-out and EXISTS trade-offs.",
+    interviewGraph: {
+      initialStageId: "sql_join_click",
+      artifactDimensions: [
+        { label: "Row-by-Row Subquery Detection", recoveryStageId: "sql_join_recovery_subquery" },
+        { label: "Join Fan-Out Awareness", recoveryStageId: "sql_join_recovery_fanout" },
+        { label: "EXISTS vs JOIN Trade-Off", recoveryStageId: "sql_join_recovery_tradeoff", passLabel: "Presence-Check Trade-Off Clear" },
+      ],
+      stages: {
+        sql_join_click: {
+          id: "sql_join_click",
+          type: "click_target",
+          badge: "Stage 1 target",
+          title: "Stage 1 · Correlated subquery drain",
+          prompt: "This query works on 1,000 users but drags on 10M. Click the row-by-row subquery pattern.",
+          code_snippet: `SELECT
+  u.user_id,
+  (SELECT COUNT(*) FROM orders o WHERE o.user_id = u.user_id) AS order_count -- ds-target:correlated_select_subquery
+FROM users u;`,
+          validationCopy: {
+            correlated_select_subquery: "Correct. The subquery is correlated to each user row; many engines can optimize some cases, but the written shape invites row-by-row work.",
+          },
+          branches: { correlated_select_subquery: "sql_join_fix_choice" },
+        },
+        sql_join_recovery_subquery: {
+          id: "sql_join_recovery_subquery",
+          type: "scenario_choice",
+          badge: "Recovery 1",
+          title: "Recovery · Look for outer references",
+          prompt: "What makes a subquery correlated?",
+          code_snippet: `WHERE o.user_id = u.user_id`,
+          choices: [
+            { id: "a", label: "It references the outer query", description: "u.user_id comes from the outer users row." },
+            { id: "b", label: "It contains COUNT(*)", description: "Aggregates are not inherently correlated." },
+            { id: "c", label: "It is inside SELECT", description: "Location matters for shape, but the outer reference is the defining feature." },
+            { id: "d", label: "It uses an alias", description: "Aliases are normal; correlation is cross-scope reference." },
+          ],
+          branches: { a: "sql_join_fix_choice", b: "sql_join_recovery_subquery", c: "sql_join_recovery_subquery", d: "sql_join_recovery_subquery" },
+          rationale: "The mental grep is simple: does the inner query depend on the current outer row?",
+        },
+        sql_join_fix_choice: {
+          id: "sql_join_fix_choice",
+          type: "scenario_choice",
+          badge: "Stage 1 choice",
+          title: "Stage 1 · Rewrite to set-based aggregation",
+          prompt: "Which rewrite expresses the count at set level?",
+          code_snippet: `-- Need order_count per user`,
+          choices: [
+            { id: "a", label: "Pre-aggregate orders then LEFT JOIN", description: "One row per user_id in the aggregate, then join to users." },
+            { id: "b", label: "Run the subquery twice", description: "More repeated work." },
+            { id: "c", label: "Use CROSS JOIN", description: "Likely creates a cartesian explosion." },
+            { id: "d", label: "Remove COUNT", description: "Does not answer the metric." },
+          ],
+          branches: { a: "sql_join_fanout_choice", b: "sql_join_recovery_subquery", c: "sql_join_recovery_subquery", d: "sql_join_recovery_subquery" },
+          rationale: "A grouped subquery/CTE gives the join a stable one-row-per-user grain.",
+        },
+        sql_join_fanout_choice: {
+          id: "sql_join_fanout_choice",
+          type: "scenario_choice",
+          badge: "Stage 2 edge",
+          title: "Stage 2 · LEFT JOIN duplicates rows",
+          prompt: "You LEFT JOIN users to user_devices, but some users have 3 devices. What happens to one user row?",
+          code_snippet: `SELECT u.user_id, d.device_id
+FROM users u
+LEFT JOIN user_devices d ON d.user_id = u.user_id;`,
+          choices: [
+            { id: "a", label: "It can become 3 rows", description: "LEFT JOIN preserves unmatched users, but matched one-to-many rows still fan out." },
+            { id: "b", label: "It always stays 1 row", description: "Only true if the right side is one-to-one at the join key." },
+            { id: "c", label: "It drops users with no devices", description: "That would be INNER JOIN behavior." },
+            { id: "d", label: "It errors automatically", description: "SQL usually permits fan-out unless constraints or query logic prevent it." },
+          ],
+          branches: { a: "sql_join_tradeoff_choice", b: "sql_join_recovery_fanout", c: "sql_join_recovery_fanout", d: "sql_join_recovery_fanout" },
+          rationale: "LEFT JOIN controls unmatched-left preservation, not right-side cardinality.",
+        },
+        sql_join_recovery_fanout: {
+          id: "sql_join_recovery_fanout",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery · State both table grains",
+          prompt: "How do you prevent accidental metric inflation from a one-to-many right table?",
+          code_snippet: `-- users grain: one row per user
+-- user_devices grain: one row per user-device`,
+          choices: [
+            { id: "a", label: "Pre-aggregate or dedupe the right side", description: "Make the right side one row per join key before joining if that is the desired grain." },
+            { id: "b", label: "Use SELECT DISTINCT blindly", description: "Can hide bugs and drop legitimate duplicates." },
+            { id: "c", label: "Switch to RIGHT JOIN", description: "Changes preservation side, not fan-out." },
+            { id: "d", label: "Ignore row counts", description: "Fan-out is exactly how metrics inflate." },
+          ],
+          branches: { a: "sql_join_tradeoff_choice", b: "sql_join_recovery_fanout", c: "sql_join_recovery_fanout", d: "sql_join_recovery_fanout" },
+          rationale: "Write table grains before the join; then align the right side to the intended output grain.",
+        },
+        sql_join_tradeoff_choice: {
+          id: "sql_join_tradeoff_choice",
+          type: "scenario_choice",
+          badge: "Stage 3 trade-off",
+          title: "Stage 3 · EXISTS vs INNER JOIN",
+          prompt: "You only need users who have at least one completed order. You do not need order columns. Which pattern is usually clearest?",
+          code_snippet: `-- Presence verification only`,
+          choices: [
+            { id: "a", label: "EXISTS semi-join", description: "Expresses presence without duplicating users when multiple orders match." },
+            { id: "b", label: "INNER JOIN raw orders", description: "Can duplicate users unless deduped or grouped." },
+            { id: "c", label: "LEFT JOIN then no filter", description: "Keeps users without orders too." },
+            { id: "d", label: "Correlated SELECT count", description: "Computes more than needed for a yes/no presence check." },
+          ],
+          branches: { a: "sql_join_terminal", b: "sql_join_recovery_tradeoff", c: "sql_join_recovery_tradeoff", d: "sql_join_recovery_tradeoff" },
+          rationale: "EXISTS communicates semi-join intent and avoids accidental fan-out in the result.",
+        },
+        sql_join_recovery_tradeoff: {
+          id: "sql_join_recovery_tradeoff",
+          type: "scenario_choice",
+          badge: "Recovery 3",
+          title: "Recovery · Presence is not projection",
+          prompt: "When is INNER JOIN still appropriate?",
+          code_snippet: `-- Need columns from both users and orders`,
+          choices: [
+            { id: "a", label: "When you need matched right-side data", description: "JOIN is right for projection; EXISTS is clean for presence." },
+            { id: "b", label: "Never", description: "INNER JOIN is fundamental when you need matched rows/columns." },
+            { id: "c", label: "Only if tables are tiny", description: "Correctness and grain matter independent of size." },
+            { id: "d", label: "When you want no duplicates", description: "JOIN can duplicate under one-to-many unless controlled." },
+          ],
+          branches: { a: "sql_join_terminal", b: "sql_join_recovery_tradeoff", c: "sql_join_recovery_tradeoff", d: "sql_join_recovery_tradeoff" },
+          rationale: "The trade-off is semantic: EXISTS for yes/no filtering, JOIN when you need columns or matched row combinations.",
+        },
+        sql_join_terminal: {
+          id: "sql_join_terminal",
+          type: "scenario_choice",
+          badge: "Terminal",
+          title: "Revision complete · Join fundamentals locked",
+          prompt: "You handled correlated work, join fan-out, and EXISTS vs JOIN semantics.",
+          code_snippet: `-- Watch for outer references in subqueries.
+-- LEFT JOIN can still multiply rows.
+-- EXISTS is usually cleanest for presence checks.`,
+          choices: [],
+          branches: {},
+          terminal: true,
+          rationale: "The candidate-ready answer states table grain, predicts fan-out, and chooses EXISTS when only presence matters.",
+        },
+      },
+    },
+    knowledgeCheck: [],
+  },
+
   "ml-f2": {
     durationLabel: MODULE_TIME_LABEL,
     outcomes: [

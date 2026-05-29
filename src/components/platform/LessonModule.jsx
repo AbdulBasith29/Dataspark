@@ -24,7 +24,7 @@ const sectionLabel = {
   marginBottom: 10,
 };
 
-const TARGET_TAG_PATTERN = /(?:#|\/\/)?\s*ds-target:([a-zA-Z0-9_-]+)/;
+const TARGET_TAG_PATTERN = /(?:#|--|\/\/)?\s*ds-target:([a-zA-Z0-9_-]+)/;
 
 function parseTargetedCodeSnippet(codeSnippet = "") {
   return codeSnippet.split("\n").map((rawLine, index) => {
@@ -40,14 +40,19 @@ function buildDecisionArtifact({ graph, branchPath, clickedTargets, graphChoices
   const visited = new Set(branchPath);
   const tierFor = (recoveryStageId, passLabel = "Tier 1 (Passed)") => (visited.has(recoveryStageId) ? "Tier 3 (Required Recovery Path Pivot)" : passLabel);
 
+  const dimensions = graph?.artifactDimensions || [
+    { label: "Initial Problem-Solving Accuracy", recoveryStageId: "recovery_stage_1_closure" },
+    { label: "System Scaling & Concurrency Instinct", recoveryStageId: "recovery_stage_2_locking" },
+    { label: "Architectural Trade-Off Defense", recoveryStageId: "recovery_stage_3_tradeoff", passLabel: "Principal Level (Passed)" },
+  ];
+
   return {
     title: `${lessonTitle || "Interview Simulation"} · Technical Decision Artifact`,
     generatedAt: new Date().toISOString(),
-    performanceMatrix: [
-      { dimension: "Initial Problem-Solving Accuracy", result: tierFor("recovery_stage_1_closure") },
-      { dimension: "System Scaling & Concurrency Instinct", result: tierFor("recovery_stage_2_locking") },
-      { dimension: "Architectural Trade-Off Defense", result: tierFor("recovery_stage_3_tradeoff", "Principal Level (Passed)") },
-    ],
+    performanceMatrix: dimensions.map((dimension) => ({
+      dimension: dimension.label,
+      result: tierFor(dimension.recoveryStageId, dimension.passLabel || "Tier 1 (Passed)"),
+    })),
     path: pathStages.map((stage, index) => ({
       step: index + 1,
       stageId: stage.id,
