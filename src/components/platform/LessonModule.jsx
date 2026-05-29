@@ -368,6 +368,25 @@ export default function LessonModule({
             )}
             {checks.map((q, qi) => (
               <div key={qi} style={{ borderBottom: qi < checks.length - 1 ? `1px solid ${DS.border}` : "none", paddingBottom: qi < checks.length - 1 ? 20 : 0 }}>
+                {q.stage && (
+                  <div style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    marginBottom: 8,
+                    padding: "4px 9px",
+                    borderRadius: 999,
+                    border: `1px solid ${course.color}33`,
+                    background: `${course.color}10`,
+                    color: course.accent,
+                    fontSize: 10,
+                    fontFamily: "var(--ds-mono), monospace",
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                  }}>
+                    {q.stage}
+                  </div>
+                )}
                 <div style={{ fontSize: 15, fontWeight: 600, color: DS.t1, marginBottom: 12, lineHeight: 1.5 }}>{q.question}</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {q.options.map((opt, oi) => {

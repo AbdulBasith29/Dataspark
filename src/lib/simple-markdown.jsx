@@ -51,6 +51,36 @@ export function SimpleMarkdown({ text, accent }) {
       i += 1;
       continue;
     }
+    if (line.startsWith("```")) {
+      const language = line.slice(3).trim();
+      i += 1;
+      const codeLines = [];
+      while (i < lines.length && !lines[i].startsWith("```")) {
+        codeLines.push(lines[i]);
+        i += 1;
+      }
+      if (i < lines.length && lines[i].startsWith("```")) i += 1;
+      out.push(
+        <pre
+          key={key++}
+          style={{
+            margin: "0 0 18px",
+            padding: "14px 16px",
+            overflowX: "auto",
+            borderRadius: 12,
+            border: `1px solid ${DS.border}`,
+            background: "rgba(2,6,23,0.72)",
+            color: DS.t1,
+            fontSize: 13,
+            lineHeight: 1.65,
+            fontFamily: "var(--ds-mono), monospace",
+          }}
+        >
+          <code data-language={language || undefined}>{codeLines.join("\n")}</code>
+        </pre>,
+      );
+      continue;
+    }
     if (line.startsWith("- ")) {
       const items = [];
       while (i < lines.length && lines[i].startsWith("- ")) {

@@ -5,6 +5,7 @@
 
 export const MODULE_TIME_LABEL = "18–20 min";
 const MD_CODE_TICK = "`";
+const MD_CODE_FENCE = "```";
 
 const FALLBACK_CHECKS = [
   {
@@ -297,64 +298,199 @@ Watch the clip and then implement \`__repr__\`, ${MD_CODE_TICK}__eq__${MD_CODE_T
     ],
   },
   "py-o4": {
-    durationLabel: MODULE_TIME_LABEL,
+    durationLabel: "28–35 min",
     outcomes: [
-      "Use decorators for cross-cutting concerns without obscuring behavior.",
-      "Use context managers for deterministic setup/teardown.",
-      "Preserve signatures/metadata and error propagation semantics.",
+      "Diagnose decorator bugs by simulating definition-time rebinding, closure capture, and wrapper call state.",
+      "Refactor retry wrappers for concurrency pressure: per-call state, jittered exponential backoff, and lock boundaries.",
+      "Defend a senior architecture choice when strict reliability, observability, and sub-millisecond latency conflict.",
     ],
-    learnMarkdown: `## Outcomes
+    learnMarkdown: `## Progressive interview simulation: Stateful decorators in data streams
 
-- Build wrappers that remain observable and debuggable in production.
-- Prevent resource leaks with explicit context-manager boundaries.
-- Explain retry/logging/tracing tradeoffs in interviews and code reviews.
+This module is no longer a passive lesson. Treat it as a three-round staff-level interview: first you debug the language mechanic, then you survive production scale, then you defend an imperfect architecture under business constraints.
 
-## Core model
+## Stage 1 · The initial bug: scoping and mechanics
 
-Decorators transform call behavior; context managers transform **resource lifecycle**. Both are powerful and easy to misuse when abstraction hides operational risk.
+### Production prompt
 
-## Anti-pattern drill: Black-box decorator
+Your feature platform wraps flaky feature-store reads with a retry decorator. It passes local tests because developers call it once per process. In production, a long-running worker handles many users and silently stops retrying after earlier failures.
 
-### Bad
+${MD_CODE_FENCE}python
+import time
 
-A retry decorator catches all exceptions, retries blindly, drops traceback context, and returns fallback values silently.
+class FeatureStoreTimeout(TimeoutError):
+    pass
 
-### Failure modes
+def retry(max_attempts=3):
+    attempts = 0
 
-- Incidents become invisible (errors swallowed).
-- Non-idempotent operations repeat and corrupt state.
-- Observability tools show wrapper name, not original function.
+    def decorator(fn):
+        def wrapper(*args, **kwargs):
+            nonlocal attempts
+            while attempts < max_attempts:
+                try:
+                    return fn(*args, **kwargs)
+                except FeatureStoreTimeout:
+                    attempts += 1
+                    time.sleep(1)
+            return None  # downstream model treats this as "no features"
+        return wrapper
 
-### Refactor target
+    return decorator
 
-- Retry only on known transient errors.
-- Preserve metadata with ${MD_CODE_TICK}functools.wraps${MD_CODE_TICK}.
-- Log attempts with context and re-raise terminal failures.
+@retry(max_attempts=3)
+def load_features(user_id):
+    raise FeatureStoreTimeout(f"feature store timeout for {user_id}")
+${MD_CODE_FENCE}
 
-## Anti-pattern drill: Manual resource cleanup
+### Multiple-choice triage
 
-Using ${MD_CODE_TICK}open()/close()${MD_CODE_TICK} patterns scattered across early returns leads to leaks.
+Pick the root cause and fix in the Stage 1 check below before you keep reading. The interviewer is not asking whether decorators are useful; they are asking whether you can mentally execute decorator factories, closure cells, and name rebinding.
 
-Use context managers to guarantee teardown even during exceptions.
+### Mastery rationale
 
-## Interview framing
+${MD_CODE_TICK}retry(max_attempts=3)${MD_CODE_TICK} runs once at definition/import time and returns ${MD_CODE_TICK}decorator${MD_CODE_TICK}. Then Python rebinds ${MD_CODE_TICK}load_features = decorator(load_features)${MD_CODE_TICK}. Because ${MD_CODE_TICK}attempts${MD_CODE_TICK} lives in the outer factory frame, the wrapper closes over one shared cell for the lifetime of that decorated function. Every request shares the same counter, and the terminal ${MD_CODE_TICK}return None${MD_CODE_TICK} converts an availability incident into silent model corruption.
 
-Strong answers discuss idempotency, exception taxonomy, observability, and safe retry boundaries.`,
+The fix is not "use nonlocal correctly". The fix is to put retry state inside the invocation boundary, preserve metadata with ${MD_CODE_TICK}functools.wraps${MD_CODE_TICK}, and re-raise the terminal exception so the serving layer can trigger fallback, circuit breaking, or an explicit 5xx.
+
+${MD_CODE_FENCE}python
+from functools import wraps
+import time
+
+def retry(max_attempts=3, delay_seconds=1):
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            last_error = None
+            for attempt in range(max_attempts):
+                try:
+                    return fn(*args, **kwargs)
+                except FeatureStoreTimeout as exc:
+                    last_error = exc
+                    if attempt < max_attempts - 1:
+                        time.sleep(delay_seconds)
+            raise RuntimeError(f"{fn.__name__} exhausted retries") from last_error
+        return wrapper
+    return decorator
+${MD_CODE_FENCE}
+
+## Stage 2 · The scale crunch: concurrency and systems
+
+### System escalation
+
+Excellent, your fix solved the closure leak. However, Kubernetes now runs 1,000 workers at 10k events/sec. A feature-store brownout causes every worker to retry at exactly one-second intervals. The database sees synchronized retry waves, p99 latency explodes, and autoscaling makes it worse.
+
+### Escalated refactor challenge
+
+The right move is not to slap a global lock around the call. A global lock serializes unrelated users, creates head-of-line blocking, and can deadlock if the wrapped function calls another decorated function that tries to acquire the same lock. You need per-call retry state, bounded waiting, jittered exponential backoff, and a clear exception policy.
+
+A production-grade synchronous retry core should look more like this:
+
+${MD_CODE_FENCE}python
+from functools import wraps
+import random
+import time
+
+def retry_transient(max_attempts=3, base_delay=0.05, cap_delay=1.0,
+                    exceptions=(FeatureStoreTimeout,), sleep=time.sleep,
+                    rng=random.random):
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            for attempt in range(max_attempts):
+                try:
+                    return fn(*args, **kwargs)
+                except exceptions:
+                    if attempt == max_attempts - 1:
+                        raise
+                    exponential = min(cap_delay, base_delay * (2 ** attempt))
+                    delay = rng() * exponential  # full jitter
+                    sleep(delay)
+        return wrapper
+    return decorator
+${MD_CODE_FENCE}
+
+### Architectural defense
+
+Naive concurrency fixes fail because they optimize one symptom while damaging the system boundary. Shared counters create data races; coarse locks protect state by destroying throughput; fixed sleeps create thundering herds; catching ${MD_CODE_TICK}Exception${MD_CODE_TICK} retries programmer bugs, cancellation, and non-idempotent side effects. The senior answer narrows shared mutable state to zero, makes time injectable for deterministic tests, uses jitter to decorrelate retries across pods, and refuses to retry operations that cannot safely be repeated.
+
+## Stage 3 · The senior metric: architecture under conflicting constraints
+
+### Ambiguous constraint
+
+Now the platform team mandates this wrapper across batch, streaming, and online inference. But the online path has a sub-millisecond per-record wrapper budget, audit requires retry metrics by function name, and some pipelines are migrating to ${MD_CODE_TICK}asyncio${MD_CODE_TICK}. You cannot have maximal introspection, maximal correctness, and minimal overhead simultaneously.
+
+### Trade-off choice
+
+A principal-level candidate does not pretend there is one perfect decorator. They choose an operating model:
+
+- **A. Universal runtime-introspecting decorator** — easiest API and best observability, but stack/signature inspection and coroutine detection can add overhead and hide performance cliffs.
+- **B. Two explicit decorators: ${MD_CODE_TICK}@retry_sync${MD_CODE_TICK} and ${MD_CODE_TICK}@retry_async${MD_CODE_TICK}** — less magical and faster on hot paths, but duplicate policy plumbing and push more responsibility to callers.
+- **C. Generated wrappers at registration time** — strongest latency profile after warmup, but harder to debug, harder to review, and more complex to type/test.
+- **D. Push retries to infrastructure/client layer** — removes Python wrapper overhead and centralizes policy, but loses function-level context unless tracing and idempotency keys are designed carefully.
+
+### Enterprise rationale
+
+A lead architect evaluates the blast radius first: is this online inference, offline backfill, or human-triggered analytics? On the online path, favor explicit sync/async decorators or infrastructure-level retries with low-cardinality metrics and no stack-frame inspection in the hot loop. In batch, richer wrapper metadata and structured logging may be worth the overhead because debuggability dominates tail latency. Across all paths, the non-negotiables are idempotency policy, bounded retry budgets, cancellation propagation for async work, testable time/randomness injection, and metrics that distinguish transient dependency failure from code defects.`,
     video: PYTHON_VIDEO_FALLBACKS["py-o4"],
     videoFallbackMarkdown: `## Guided deep dive
 
-After watching, write one safe retry decorator policy and one context-managed resource workflow. Explicitly state which exceptions are retriable and why.`,
-    tryGuidance: "In the interactive, trace incoming args/kwargs and error paths through the wrapper. Verify metadata preservation and exception behavior.",
+Watch the clip only after you have answered Stage 1. Then rehearse the simulation aloud as if an interviewer is interrupting you every three minutes:
+
+1. Explain when ${MD_CODE_TICK}retry(max_attempts=3)${MD_CODE_TICK} executes and what object ${MD_CODE_TICK}load_features${MD_CODE_TICK} points to after decoration.
+2. Patch the per-call state bug without swallowing the terminal exception.
+3. Add jittered exponential backoff and state why a global lock is the wrong concurrency primitive.
+4. Defend either explicit sync/async decorators or infrastructure-level retries under the sub-millisecond SLA.`,
+    tryGuidance: "Use the Decorator Forge to trace wrapping order first, then run the three-stage knowledge check as an interview simulation: answer Stage 1, pretend the interviewer accepts it, then survive the Stage 2 and Stage 3 pivots without changing your earlier invariants.",
     relatedPractice: [
-      { label: "Fix a black-box retry decorator", prompt: "Rewrite this retry decorator so it only retries known transient exceptions, preserves the wrapped function metadata with functools.wraps, logs each attempt with context, and re-raises terminal failures." },
-      { label: "Leak-proof a resource", prompt: "Take this open()/close() code with early returns and convert it into a context manager that guarantees teardown on both normal and exception paths; prove it with a test that raises mid-block." },
+      { label: "Live-code the retry wrapper", prompt: "Implement a retry decorator with per-call state, functools.wraps, bounded jittered exponential backoff, injectable sleep/rng for tests, and a terminal re-raise policy. Then explain why it is safe under concurrent calls." },
+      { label: "Design the async migration", prompt: "Design sync and async retry wrappers for a feature pipeline. Preserve cancellation semantics, avoid duplicated policy logic where reasonable, and explain what observability you keep out of the hot path." },
+      { label: "Defend the architecture", prompt: "Given a sub-millisecond online inference SLA and audit requirements for retry metrics, choose between runtime introspection, explicit decorators, generated wrappers, and infrastructure retries. Provide a trade-off matrix." },
     ],
+    tutorPrompts: {
+      preTry: "Do not read this like a textbook. Before answering each stage, say out loud: what state exists, who owns it, how long it lives, and what happens when 1,000 workers execute it together.",
+      postFail: "Ask the tutor to replay only the stage you missed as a hostile interviewer. Require one follow-up about concurrency and one follow-up about production observability.",
+      weeklyRecap: "Re-solve the same simulation in one week without seeing the options. If you cannot rebuild the wrapper from scratch, you recognized the answer but did not learn the mechanic.",
+    },
     knowledgeCheck: [
-      { question: "What is the highest-risk decorator mistake?", options: ["Swallowing exceptions and hiding failure semantics", "Using functools.wraps", "Adding structured logs"], correctIndex: 0, explanation: "Hidden failures break reliability and incident response." },
-      { question: "Why prefer context managers for resources?", options: ["They guarantee teardown across normal and exceptional paths", "They speed up CPU-heavy loops", "They replace all try/except usage"], correctIndex: 0, explanation: "Deterministic cleanup is the primary value." },
-      { question: "When should retries be avoided?", options: ["On non-idempotent operations without safeguards", "On transient network errors", "When backoff is configured"], correctIndex: 0, explanation: "Blind retries can duplicate side effects and corrupt state." },
+      {
+        stage: "Stage 1 · Initial bug",
+        question: "The decorated feature-store loader works locally but later requests in a long-running worker immediately return None after earlier timeouts. What is the root cause and best fix?",
+        options: [
+          "The attempts counter is captured in the decorator factory closure and shared across all invocations; move retry state inside wrapper, preserve metadata with functools.wraps, and raise the terminal failure instead of returning None.",
+          "nonlocal attempts should become global attempts so all workers see the same counter and can coordinate retries across processes.",
+          "The wrapper needs an explicit user_id parameter instead of *args/**kwargs because argument forwarding prevents Python from resetting closure variables.",
+          "The sleep call should be moved before fn(*args, **kwargs), because backoff must happen before every first attempt to reset TimeoutError state.",
+        ],
+        correctIndex: 0,
+        explanation: "The factory frame is created once at decoration time, so attempts is one shared closure cell for the decorated function. Per-call retry state belongs inside wrapper. Returning None is also catastrophic because downstream code may treat missing features as valid data; terminal failures should be explicit.",
+      },
+      {
+        stage: "Stage 2 · Scale crunch",
+        question: "After fixing per-call state, a feature-store brownout causes 1,000 Kubernetes workers to retry at exactly one-second intervals. Which refactor best addresses the production-scale failure without creating a new concurrency bottleneck?",
+        options: [
+          "Use bounded exponential backoff with full jitter, retry only transient exception types, inject sleep/randomness for deterministic tests, and keep all retry counters local to each wrapper invocation.",
+          "Protect the entire wrapped function with one module-level threading.Lock so only one request can hit the feature store at a time during a brownout.",
+          "Store attempts in a process-wide dictionary keyed by function name so every thread can share progress and avoid exceeding max_attempts globally.",
+          "Catch BaseException and sleep a fixed one second after every failure so KeyboardInterrupt, cancellations, and all dependency failures are handled uniformly.",
+        ],
+        correctIndex: 0,
+        explanation: "Fixed sleep synchronizes retries into a thundering herd. A coarse lock serializes unrelated work and risks head-of-line blocking. Process-wide dictionaries reintroduce shared mutable state and require cleanup. Bounded jittered backoff decorrelates pods while keeping retry budgets explicit.",
+      },
+      {
+        stage: "Stage 3 · Senior architecture",
+        question: "The wrapper must support sync services, asyncio pipelines, retry metrics by function, and a sub-millisecond online inference budget. Which architectural choice is the strongest default for the latency-critical path?",
+        options: [
+          "Use explicit @retry_sync and @retry_async decorators with shared policy helpers, pre-bound metric labels, no stack inspection in the hot loop, and infrastructure/client retries where function-level context is not required.",
+          "Use one universal decorator that calls inspect.signature and inspect.iscoroutinefunction on every invocation so the wrapper can dynamically adapt to any callable at runtime.",
+          "Push all retry logic into each model-scoring function body so the decorator layer disappears and every team can customize behavior independently.",
+          "Guarantee exactly-once semantics by retrying every failure until success and using a global lock to ensure only one wrapped call runs at a time.",
+        ],
+        correctIndex: 0,
+        explanation: "The senior default separates hot-path mechanics from policy. Explicit sync/async wrappers avoid per-call introspection overhead, shared helpers prevent policy drift, and pre-bound metrics preserve observability. The other options either hide latency cliffs, fragment reliability policy, or promise impossible exactly-once behavior.",
+      },
     ],
   },
+
   "py-d1": {
     durationLabel: MODULE_TIME_LABEL,
     outcomes: [
