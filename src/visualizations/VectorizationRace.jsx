@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { DS } from "../lib/ds-platform-tokens.js";
+import useReducedMotion from "../lib/use-reduced-motion.js";
 
 // ── timing data ───────────────────────────────────────────────────────────────
 const SIZES = [
@@ -146,7 +147,7 @@ function ModeTab({ active, onClick, label, hint }) {
 }
 
 // ── log-scale bar ─────────────────────────────────────────────────────────────
-function TimingBar({ label, timeMs, maxLogTime, color }) {
+function TimingBar({ label, timeMs, maxLogTime, color, reduceMotion }) {
   const MIN_LOG = 0; // log10(1ms) baseline
   const logVal  = Math.log10(Math.max(timeMs, 0.001));
   const pct     = Math.max(4, ((logVal - MIN_LOG) / (Math.log10(maxLogTime) - MIN_LOG)) * 100);
@@ -160,7 +161,7 @@ function TimingBar({ label, timeMs, maxLogTime, color }) {
       <div style={{ height: 14, borderRadius: 4, background: "rgba(255,255,255,0.04)", overflow: "hidden" }}>
         <div style={{
           height: "100%", width: `${pct}%`, background: color, borderRadius: 4,
-          transition: "width 0.6s cubic-bezier(0.16,1,0.3,1)",
+          transition: reduceMotion ? "none" : "width 0.6s cubic-bezier(0.16,1,0.3,1)",
         }} />
       </div>
     </div>
@@ -168,13 +169,21 @@ function TimingBar({ label, timeMs, maxLogTime, color }) {
 }
 
 // ── loop row counter with growing result list ─────────────────────────────────
-function LoopRowCounter({ running, totalRows, animDurationMs, onDone }) {
+function LoopRowCounter({ running, totalRows, animDurationMs, onDone, reduceMotion }) {
   const [row, setRow] = useState(0);
   const rafRef   = useRef(null);
   const startRef = useRef(null);
 
   useEffect(() => {
     if (!running) { setRow(0); return; }
+
+    // Reduced motion: jump straight to the finished state, no RAF loop.
+    if (reduceMotion) {
+      setRow(totalRows);
+      onDone && onDone();
+      return;
+    }
+
     startRef.current = performance.now();
 
     const tick = (now) => {
@@ -189,7 +198,7 @@ function LoopRowCounter({ running, totalRows, animDurationMs, onDone }) {
     };
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [running, totalRows, animDurationMs, onDone]);
+  }, [running, totalRows, animDurationMs, onDone, reduceMotion]);
 
   const pct = totalRows > 0 ? (row / totalRows) * 100 : 0;
 
@@ -206,7 +215,7 @@ function LoopRowCounter({ running, totalRows, animDurationMs, onDone }) {
         <div style={{
           height: "100%", width: `${pct}%`,
           background: "linear-gradient(90deg, #F87171, #FB923C)",
-          borderRadius: 4, transition: "width 0.1s linear",
+          borderRadius: 4, transition: reduceMotion ? "none" : "width 0.1s linear",
         }} />
       </div>
       {running && row > 0 && (
@@ -228,7 +237,7 @@ function LoopRowCounter({ running, totalRows, animDurationMs, onDone }) {
 }
 
 // ── vectorized single-tick panel ──────────────────────────────────────────────
-function VecPanel({ racing, done, n }) {
+function VecPanel({ racing, done, n, reduceMotion }) {
   return (
     <div style={{ marginTop: 10 }}>
       {!racing && !done && (
@@ -249,7 +258,7 @@ function VecPanel({ racing, done, n }) {
               width: done ? "100%" : "30%",
               background: "linear-gradient(90deg, #34D399, #10B981)",
               borderRadius: 4,
-              transition: done ? "width 0.12s ease" : "none",
+              transition: done && !reduceMotion ? "width 0.12s ease" : "none",
             }} />
           </div>
           {done && (
@@ -271,6 +280,7 @@ function VecPanel({ racing, done, n }) {
 
 // ── Tab 1: Race ───────────────────────────────────────────────────────────────
 function RaceTab() {
+  const reduceMotion = useReducedMotion();
   const [sizeIdx, setSizeIdx] = useState(0);
   const [opIdx,   setOpIdx]   = useState(0);
   const [racing,  setRacing]  = useState(false);
@@ -295,6 +305,13 @@ function RaceTab() {
 
   function startRace() {
     reset();
+    if (reduceMotion) {
+      // Reduced motion: skip the staged timers, show the finished race at once.
+      // LoopRowCounter calls onDone synchronously, so just flip racing + vecDone.
+      setRacing(true);
+      setVecDone(true);
+      return;
+    }
     setTimeout(() => {
       setRacing(true);
       // Vectorized finishes proportionally early — at least 150 ms into animation
@@ -381,6 +398,7 @@ function RaceTab() {
               totalRows={size.n}
               animDurationMs={loopAnimMs}
               onDone={() => setLoopDone(true)}
+              reduceMotion={reduceMotion}
             />
           </div>
         </div>
@@ -398,7 +416,7 @@ function RaceTab() {
             )}
           </div>
           <CodeBlock code={op.vec} good />
-          <VecPanel racing={racing} done={vecDone} n={size.n} />
+          <VecPanel racing={racing} done={vecDone} n={size.n} reduceMotion={reduceMotion} />
         </div>
       </div>
 
@@ -408,8 +426,8 @@ function RaceTab() {
           <SectionLabel>Time comparison — log scale</SectionLabel>
           {done && <SpeedupBadge speedup={speedup} />}
         </div>
-        <TimingBar label="Loop"        timeMs={size.loopMs} maxLogTime={maxLog} color="linear-gradient(90deg, #F87171, #FB923C)" />
-        <TimingBar label="Vectorized"  timeMs={size.vecMs}  maxLogTime={maxLog} color="linear-gradient(90deg, #34D399, #10B981)" />
+        <TimingBar label="Loop"        timeMs={size.loopMs} maxLogTime={maxLog} color="linear-gradient(90deg, #F87171, #FB923C)" reduceMotion={reduceMotion} />
+        <TimingBar label="Vectorized"  timeMs={size.vecMs}  maxLogTime={maxLog} color="linear-gradient(90deg, #34D399, #10B981)" reduceMotion={reduceMotion} />
         <div style={{ marginTop: 6, fontSize: 10, color: DS.dim, fontFamily: "var(--ds-mono), monospace" }}>
           Bar widths proportional to log₁₀(time) — each step = 10× difference
         </div>
@@ -448,6 +466,7 @@ function RaceTab() {
 
 // ── Tab 2: Anti-patterns ──────────────────────────────────────────────────────
 function AntiPatternsTab() {
+  const reduceMotion = useReducedMotion();
   const [expanded, setExpanded] = useState(null);
 
   return (
@@ -525,12 +544,14 @@ function AntiPatternsTab() {
                     timeMs={ap.badMs}
                     maxLogTime={ap.badMs * 1.5}
                     color="linear-gradient(90deg, #F87171, #FB923C)"
+                    reduceMotion={reduceMotion}
                   />
                   <TimingBar
                     label="Fixed approach"
                     timeMs={ap.goodMs}
                     maxLogTime={ap.badMs * 1.5}
                     color="linear-gradient(90deg, #34D399, #10B981)"
+                    reduceMotion={reduceMotion}
                   />
                   <div style={{ fontSize: 10, color: DS.dim, fontFamily: "var(--ds-mono), monospace", marginTop: 4 }}>
                     {fmtMs(ap.badMs)} vs {fmtMs(ap.goodMs)} — bar width = log₁₀(time)

@@ -4,6 +4,13 @@ import { renderInlineMarkdown } from "../../lib/inline-markdown.jsx";
 import { SimpleMarkdown } from "../../lib/simple-markdown.jsx";
 import VizLabShell from "./VizLabShell.jsx";
 import AsyncActionButton from "../AsyncActionButton.jsx";
+import ConfidenceMeter from "./ConfidenceMeter.jsx";
+import {
+  LVS_EVENT_NAMES,
+  buildConfidenceMetadata,
+  computeConfidenceDelta,
+  trackConfidence,
+} from "../../lib/analytics.js";
 
 const sectionLabel = {
   fontSize: 10,
@@ -71,10 +78,13 @@ export default function LessonModule({
   backLabel,
   onMarkComplete,
   onAskTutor,
+  onOpenPractice,
 }) {
   const [answers, setAnswers] = useState(() => ({}));
   const [revealed, setRevealed] = useState({});
   const [freeResponse, setFreeResponse] = useState("");
+  const [confidenceBefore, setConfidenceBefore] = useState(null);
+  const [confidenceAfter, setConfidenceAfter] = useState(null);
 
   // Guard against null / undefined moduleSpec (e.g. during loading or bad data)
   if (!moduleSpec) {
@@ -108,6 +118,68 @@ export default function LessonModule({
 
   // Derive attempt state for postFail panel: user has submitted at least one wrong answer
   const hasWrongAnswer = Object.entries(answers).some(([i, a]) => a !== checks[Number(i)]?.correctIndex);
+
+  // "Submitted / seen the answer" = learner has revealed at least one explanation.
+  const hasSeenAnswer = Object.values(revealed).some(Boolean);
+
+  // Diagnostic only — fire-and-forget, never block UX on analytics.
+  const fireConfidence = (stage, confidence) => {
+    try {
+      trackConfidence({
+        eventName: LVS_EVENT_NAMES.confidenceRated,
+        page: "lesson_module",
+        metadata: buildConfidenceMetadata({
+          courseId: course?.id,
+          lessonId: lesson?.id,
+          stage,
+          confidence,
+          correct: passedCheck,
+        }),
+      });
+    } catch {
+      // Analytics must never break the lesson experience.
+    }
+  };
+
+  const calibration =
+    confidenceBefore != null && confidenceAfter != null
+      ? computeConfidenceDelta({ before: confidenceBefore, after: confidenceAfter })
+      : null;
+
+  const handleConfidenceBefore = (v) => {
+    setConfidenceBefore(v);
+    fireConfidence("before_check", v);
+  };
+
+  const handleConfidenceAfter = (v) => {
+    setConfidenceAfter(v);
+    fireConfidence("after_answer", v);
+    if (confidenceBefore != null) {
+      try {
+        const result = computeConfidenceDelta({ before: confidenceBefore, after: v });
+        trackConfidence({
+          eventName: LVS_EVENT_NAMES.confidenceDelta,
+          page: "lesson_module",
+          metadata: {
+            ...buildConfidenceMetadata({
+              courseId: course?.id,
+              lessonId: lesson?.id,
+              stage: "delta",
+              correct: passedCheck,
+            }),
+            confidence_before: result.before,
+            confidence_after: result.after,
+            delta: result.delta,
+            calibration: result.calibration,
+          },
+        });
+      } catch {
+        // Analytics must never break the lesson experience.
+      }
+    }
+  };
+
+  const relatedPractice = Array.isArray(moduleSpec.relatedPractice) ? moduleSpec.relatedPractice : [];
 
   const durationBadge = moduleSpec.durationLabel || lesson.duration || "18–20 min";
 
@@ -253,6 +325,20 @@ export default function LessonModule({
           <p style={{ color: DS.t3, fontSize: 14, margin: 0 }}>No checks for this module yet.</p>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            {!hasSeenAnswer && (
+              <div style={{
+                padding: "12px 14px",
+                borderRadius: DS.radiusSm,
+                border: `1px solid ${DS.border}`,
+                background: "rgba(255,255,255,0.02)",
+              }}>
+                <ConfidenceMeter
+                  label="How confident are you before checking?"
+                  value={confidenceBefore ?? undefined}
+                  onChange={handleConfidenceBefore}
+                />
+              </div>
+            )}
             {checks.map((q, qi) => (
               <div key={qi} style={{ borderBottom: qi < checks.length - 1 ? `1px solid ${DS.border}` : "none", paddingBottom: qi < checks.length - 1 ? 20 : 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 600, color: DS.t1, marginBottom: 12, lineHeight: 1.5 }}>{q.question}</div>
@@ -331,6 +417,40 @@ export default function LessonModule({
               ({Math.round(score * 100)}%)
               {!passedCheck && ` — need ${minCorrect}/${checks.length} correct to mark complete`}
             </div>
+            {hasSeenAnswer && (
+              <div style={{
+                padding: "12px 14px",
+                borderRadius: DS.radiusSm,
+                border: `1px solid ${DS.border}`,
+                background: "rgba(255,255,255,0.02)",
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+              }}>
+                <ConfidenceMeter
+                  label="How confident now, after seeing the answer?"
+                  value={confidenceAfter ?? undefined}
+                  onChange={handleConfidenceAfter}
+                />
+                {calibration && (
+                  <div style={{
+                    fontSize: 12,
+                    color: DS.t3,
+                    fontFamily: "var(--ds-mono), monospace",
+                  }}>
+                    Confidence delta: {calibration.delta > 0 ? `+${calibration.delta}` : calibration.delta}
+                    {" · "}
+                    <span style={{
+                      color: calibration.calibration === "calibrated" ? DS.grn
+                        : calibration.calibration === "overconfident" ? "#FB923C"
+                        : "#FCD34D",
+                    }}>
+                      {calibration.calibration}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </SectionCard>
@@ -426,6 +546,48 @@ export default function LessonModule({
           Ask tutor
         </button>
       </div>
+
+      {relatedPractice.length > 0 && (
+        <div style={{
+          ...dsGlassCard({ padding: "20px 22px", marginBottom: 48 }),
+          border: `1px solid ${DS.grn}28`,
+        }}>
+          <div style={{ ...sectionLabel, color: DS.grn }}>
+            You learned this — now validate it
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {relatedPractice.map((item, i) => {
+              const title = item?.title || item?.label || "Practice exercise";
+              const detail = item?.prompt || null;
+              return (
+                <button
+                  key={item?.id || i}
+                  type="button"
+                  onClick={() => { if (onOpenPractice) onOpenPractice(item); }}
+                  style={{
+                    textAlign: "left",
+                    padding: "12px 14px",
+                    borderRadius: DS.radiusSm,
+                    border: `1px solid ${DS.border}`,
+                    background: "rgba(255,255,255,0.02)",
+                    color: DS.t2,
+                    fontSize: 14,
+                    cursor: onOpenPractice ? "pointer" : "default",
+                    fontFamily: "var(--ds-sans), sans-serif",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <span style={{ fontFamily: "var(--ds-mono), monospace", color: DS.grn, marginRight: 8, fontSize: 12 }}>→</span>
+                  <strong style={{ color: DS.t1 }}>{title}</strong>
+                  {detail && (
+                    <span style={{ display: "block", color: DS.t3, fontSize: 13, marginTop: 4 }}>{detail}</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

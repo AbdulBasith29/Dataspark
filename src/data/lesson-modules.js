@@ -145,6 +145,10 @@ Watch the clip, then run this 10-minute audit on one class from your code:
 3. Move one side effect behind an explicit method.
 4. Add one test that instantiates without network access.`,
     tryGuidance: "Use the interactive to trace object state transitions. After each step, label whether behavior is constructor-safe or should be moved to an explicit lifecycle method.",
+    relatedPractice: [
+      { label: "Split a god constructor", prompt: "Refactor this god constructor into a pure __init__ (assignment + validation only) plus an explicit connect()/warmup() method, and inject the DB client as a dependency." },
+      { label: "Test without the network", prompt: "Write a unit test that instantiates this class with zero network or file access, then explain which responsibilities you had to move out of __init__ to make that possible." },
+    ],
     knowledgeCheck: [
       {
         question: "What is the most dangerous constructor anti-pattern?",
@@ -227,6 +231,10 @@ High-signal answers compare inheritance vs composition with maintainability, dis
 
 After the clip, sketch one inheritance tree from memory and annotate where contracts differ. Then redesign one branch using composition.`,
     tryGuidance: "In the interactive, predict dispatch path and then state whether the chosen path preserves the base contract.",
+    relatedPractice: [
+      { label: "Hunt a Liskov violation", prompt: "Given this subclass tree, find one method where a subclass strengthens preconditions or weakens postconditions, then rewrite the caller to show how the substitutability promise breaks." },
+      { label: "Inheritance to composition", prompt: "Convert this 'subclass for code reuse' hierarchy into composition using a Strategy/policy object, and explain what each call site no longer has to branch on." },
+    ],
     knowledgeCheck: [
       { question: "When is inheritance justified?", options: ["When subtype behavior preserves the base contract", "Whenever two classes share any code", "When subclass count is expected to explode"], correctIndex: 0, explanation: "Inheritance is about substitutability; shared code alone is insufficient." },
       { question: "Best signal of a broken hierarchy?", options: ["Callers need type checks/branching to use subclasses safely", "Base class has docstrings", "Methods return values"], correctIndex: 0, explanation: "If callers branch on subtype, polymorphism likely failed." },
@@ -337,6 +345,10 @@ Strong answers discuss idempotency, exception taxonomy, observability, and safe 
 
 After watching, write one safe retry decorator policy and one context-managed resource workflow. Explicitly state which exceptions are retriable and why.`,
     tryGuidance: "In the interactive, trace incoming args/kwargs and error paths through the wrapper. Verify metadata preservation and exception behavior.",
+    relatedPractice: [
+      { label: "Fix a black-box retry decorator", prompt: "Rewrite this retry decorator so it only retries known transient exceptions, preserves the wrapped function metadata with functools.wraps, logs each attempt with context, and re-raises terminal failures." },
+      { label: "Leak-proof a resource", prompt: "Take this open()/close() code with early returns and convert it into a context manager that guarantees teardown on both normal and exception paths; prove it with a test that raises mid-block." },
+    ],
     knowledgeCheck: [
       { question: "What is the highest-risk decorator mistake?", options: ["Swallowing exceptions and hiding failure semantics", "Using functools.wraps", "Adding structured logs"], correctIndex: 0, explanation: "Hidden failures break reliability and incident response." },
       { question: "Why prefer context managers for resources?", options: ["They guarantee teardown across normal and exceptional paths", "They speed up CPU-heavy loops", "They replace all try/except usage"], correctIndex: 0, explanation: "Deterministic cleanup is the primary value." },
@@ -381,6 +393,10 @@ Show correctness on a tiny fixture first, then vectorize, then benchmark. Explai
 
 Finish with a short note: what improved, why it improved, and where memory ownership mattered.`,
     tryGuidance: "In the interactive, predict shape, dtype, and view/copy behavior before each step. Run it, then reconcile prediction vs observed output.",
+    relatedPractice: [
+      { label: "Catch a silent broadcast", prompt: "Combine a (5000, 1) and a (1, 12) array, write the expected output shape next to the expression, then state whether the (5000, 12) result is the business intent or an accidental cross-product bug." },
+      { label: "View vs copy audit", prompt: "Slice an array to get a view, mutate it, and observe the parent change; then add an explicit .copy() at the ownership boundary and explain when each behavior is correct." },
+    ],
     knowledgeCheck: [
       {
         question: "What should you verify before relying on broadcasting between shapes (5000, 1) and (1, 12)?",
@@ -439,6 +455,10 @@ Load a messy CSV, snapshot dtypes/nulls/row count, perform one filter and one ex
 
 Close by writing a mini data contract: required columns, expected dtype families, and null thresholds.`,
     tryGuidance: "Before each interactive step, predict row count and dtype/null changes. After execution, explain any mismatch as a contract violation or expected behavior.",
+    relatedPractice: [
+      { label: "Kill the chained assignment", prompt: "Rewrite this chained-assignment update into an explicit .loc[mask, col] = value form, then explain what mutation ambiguity the original code risked." },
+      { label: "Snapshot a data contract", prompt: "For a messy CSV, snapshot dtypes, null rates, and row count before and after one transform, then write a mini data contract asserting required columns, dtype families, and null thresholds." },
+    ],
     knowledgeCheck: [
       { question: "Why prefer explicit .loc assignments in production pandas code?", options: ["They clarify mutation intent and reduce ambiguous chained-assignment behavior.","They are always the fastest possible operation.","They automatically enforce relational constraints."], correctIndex: 0, explanation: "Deterministic, reviewable mutation semantics matter more than micro-optimizations." },
       { question: "Why is dtype drift dangerous when code still runs?", options: ["Operations can change meaning silently, producing wrong business conclusions.","Pandas will always raise compile-time errors.","Drift only changes plotting style."], correctIndex: 0, explanation: "Silent semantic errors are the real risk; assertions catch them." },
@@ -468,6 +488,10 @@ Discuss a QA checklist: uniqueness assertions, row-count deltas, and reconciliat
 
 Create two toy tables with duplicate keys, predict merge row count, run merge, fix fan-out via dedupe/pre-agg policy, then group and pivot results while reconciling totals.`,
     tryGuidance: "In the interactive, say the grain out loud at every stage (e.g., one row per customer-day), then verify whether joins/groupings changed it as predicted.",
+    relatedPractice: [
+      { label: "Reproduce a join fan-out", prompt: "Build two toy tables with non-unique join keys, predict the post-merge row count, run the merge to confirm the fan-out, then fix it with a dedupe or pre-aggregation policy." },
+      { label: "Reconcile a pivot", prompt: "Group then pivot a dataset and prove the pivot totals reconcile back to the pre-pivot aggregate; state the grain at each stage out loud." },
+    ],
     knowledgeCheck: [
       { question: "What most often causes inflated metrics after a merge?", options: ["Non-unique join keys multiplying rows.","Using left join instead of right join.","Pivoting before filtering."], correctIndex: 0, explanation: "Duplicate-key fan-out is the classic double-counting failure mode." },
       { question: "Why define grain before groupby logic?", options: ["Aggregate correctness depends on what each row represents.","Pandas requires grain metadata to run.","Grain only affects chart formatting."], correctIndex: 0, explanation: "Without grain clarity, outputs can be plausible but wrong." },
@@ -497,6 +521,10 @@ Mature answers discuss bias, explainability, and monitoring thresholds — not o
 
 Profile null rates by column and segment, apply three policies on one important field (drop, statistical fill, domain sentinel), recompute a KPI under each, then justify one monitored policy choice.`,
     tryGuidance: "Use each interactive branch as a policy fork: predict row-count, null-rate, and downstream metric impact before selecting a strategy.",
+    relatedPractice: [
+      { label: "Compare null policies on a KPI", prompt: "Pick one important field, apply drop / statistical fill / domain sentinel separately, recompute the same KPI under each, and justify which policy you would monitor in production and why." },
+      { label: "Classify the missingness", prompt: "Profile null rates by column and segment, then label each gap as unknown, inapplicable, delayed ingestion, or pipeline failure, and explain how that label changes the right policy." },
+    ],
     knowledgeCheck: [
       { question: "Why is blanket zero-fill risky?", options: ["Zero may represent a real value and distort business meaning when substituted for unknowns.","Pandas blocks zero-filled columns.","Zero always causes runtime errors."], correctIndex: 0, explanation: "Imputation must preserve semantics, not just remove nulls." },
       { question: "Best first step for null handling?", options: ["Identify missingness mechanism and business context.","Apply median fill globally.","Drop every row with any null."], correctIndex: 0, explanation: "Policy quality depends on cause and decision context." },
@@ -520,12 +548,28 @@ Vectorized rewrites can raise memory usage via temporary arrays. Good engineerin
 
 ## Interview framing
 
-Tell a concrete before/after story with numbers, mechanism, and one tradeoff you accepted or mitigated.`,
+Tell a concrete before/after story with numbers, mechanism, and one tradeoff you accepted or mitigated.
+
+## When NOT to vectorize
+
+Vectorization is a default, not a religion. Walk this decision tree before rewriting a loop.
+
+- **Tiny N or one-off scripts.** If the data is small or the script runs once, a plain ${MD_CODE_TICK}for${MD_CODE_TICK} loop is clearer and the speed difference is noise. Optimize the reader's time, not the CPU's.
+- **Complex stateful logic.** When each step depends on prior results (path-dependent rules, early exits, accumulating side effects), a loop expresses intent honestly. Forcing it into ${MD_CODE_TICK}np.where${MD_CODE_TICK} chains or masked passes often produces unreadable code that hides bugs.
+- **Readability for juniors.** On a shared codebase, a loop a teammate can debug at 2am beats a dense one-liner only you understand. Clarity is a maintenance cost you pay every review.
+- **Caching beats premature optimization.** If the real cost is recomputation, ${MD_CODE_TICK}functools.lru_cache${MD_CODE_TICK} or memoizing an expensive call removes the work entirely — safer and bigger than micro-tuning a loop body.
+- **Memory cost outweighs speed.** Vectorized rewrites materialize big intermediate arrays. If a temporary doubles peak memory and risks an OOM, a streaming or chunked loop that trades a little CPU for bounded memory is the correct engineering call.
+
+Rule of thumb: profile first, then vectorize only the dominant cost where the speed win clears the readability and memory bill.`,
     video: { youtubeId: "0A5x5x9N7YQ", title: "Vectorization vs Loops in Python", channel: "Krish Naik", startSeconds: 0 },
     videoFallbackMarkdown: `## Deep dive fallback
 
 Implement a row-wise baseline transform, profile it, rewrite with vectorized/batched operations, re-measure runtime and memory, then summarize baseline vs optimized metrics and tradeoffs.`,
     tryGuidance: "In the interactive, classify each step before running it: Python iteration, vectorized native execution, or I/O-bound. Compare prediction to observed runtime behavior.",
+    relatedPractice: [
+      { label: "Profile before you rewrite", prompt: "Profile a row-wise baseline transform, identify the dominant cost, then vectorize only that hotspot and report before/after runtime and peak memory." },
+      { label: "Defend keeping the loop", prompt: "Given a small-N, stateful transform, write the loop version and argue why vectorizing it would hurt readability or memory more than it helps runtime." },
+    ],
     knowledgeCheck: [
       { question: "What should happen before any performance rewrite?", options: ["Profile to locate the true bottleneck.","Replace all loops immediately.","Tune comments and variable names for speed."], correctIndex: 0, explanation: "Measurement prevents wasted optimization effort." },
       { question: "Why can a vectorized rewrite still be a poor production choice?", options: ["It may increase memory pressure or reduce maintainability despite CPU gains.","Vectorized code cannot be tested.","Vectorized code is numerically random."], correctIndex: 0, explanation: "Performance decisions are multi-objective, not CPU-only." },
@@ -533,6 +577,58 @@ Implement a row-wise baseline transform, profile it, rewrite with vectorized/bat
     ],
   },
 };
+
+/**
+ * Identity-based cluster milestones: career-framed "you can now…" statements
+ * keyed by cluster id. Used to render progression as professional capability,
+ * not just completion percentage.
+ */
+export const PYTHON_CLUSTER_MILESTONES = {
+  "py-basics": {
+    title: "Python Foundations",
+    completionStatement: "You can now debug aliasing and mutation bugs by reasoning about name→object bindings, and defend type-and-format choices the way a senior reviews a junior's first pull request.",
+    skills: [
+      "Trace a ghost-mutation bug to a shared reference instead of guessing",
+      "Choose dict/set/Counter for an ETL task and justify the O(1) lookup story",
+      "Reject f-strings in SQL and logging, reaching for parameterized queries and lazy %-format",
+    ],
+  },
+  "py-control": {
+    title: "Control Flow and Iteration",
+    completionStatement: "You can now structure branching, looping, and error handling so a teammate predicts every code path, and you spot the comprehension or generator that turns an O(n^2) loop into a readable one-pass.",
+    skills: [
+      "Replace nested branches with guard clauses and early returns reviewers trust",
+      "Pick generators over lists when memory and laziness matter, and explain why",
+      "Scope try/except to the narrowest failing operation instead of swallowing everything",
+    ],
+  },
+  "py-oop": {
+    title: "Object-Oriented Python",
+    completionStatement: "You can now review production class designs and justify inheritance-vs-composition tradeoffs in a code review.",
+    skills: [
+      "Audit constructors for hidden side effects and push them into explicit lifecycle methods",
+      "Spot Liskov violations in subclass trees before they ship as silent contract breaks",
+      "Read a decorator stack and predict its runtime order, metadata, and exception behavior",
+    ],
+  },
+  "py-data": {
+    title: "Data Wrangling with NumPy and Pandas",
+    completionStatement: "You can now own a data-cleaning pipeline end to end — defending grain, null policy, and vectorization choices with measurements instead of slogans in a design review.",
+    skills: [
+      "State table grain before a merge and predict join fan-out before it inflates a metric",
+      "Choose a null policy by business meaning and quantify its KPI impact",
+      "Decide when NOT to vectorize, weighing memory and readability against CPU wins",
+    ],
+  },
+};
+
+/**
+ * @param {string} clusterId - one of "py-basics", "py-control", "py-oop", "py-data"
+ * @returns {{ title: string, completionStatement: string, skills: string[] } | null}
+ */
+export function getClusterMilestone(clusterId) {
+  return PYTHON_CLUSTER_MILESTONES[clusterId] || null;
+}
 
 export const LESSON_MODULES = {
   "py-b1": {

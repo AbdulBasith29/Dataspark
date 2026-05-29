@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { DS } from "../lib/ds-platform-tokens.js";
+import useReducedMotion from "../lib/use-reduced-motion.js";
 
 /**
  * GroupByMergeForge — Interactive visualization for "GroupBy, Merge, Pivot"
@@ -176,6 +177,7 @@ function applyAgg(values, agg) {
 }
 
 function GroupByTab() {
+  const reduceMotion = useReducedMotion();
   const [gbKey, setGbKey] = useState("user_id");
   const [agg,   setAgg  ] = useState("sum");
 
@@ -263,7 +265,7 @@ function GroupByTab() {
                 <tr key={row.tx_id} style={{
                   background: bg,
                   borderBottom: `1px solid ${isBanded ? bdr : DS.border}`,
-                  transition: "background 0.3s",
+                  transition: reduceMotion ? "none" : "background 0.3s",
                 }}>
                   {["tx_id", "user_id", "event_type", "date", "value"].map(col => (
                     <td key={col} style={{
@@ -301,7 +303,7 @@ function GroupByTab() {
               return (
                 <tr key={r.key} style={{
                   background: bg, borderBottom: `1px solid ${bdr}`,
-                  transition: "background 0.3s",
+                  transition: reduceMotion ? "none" : "background 0.3s",
                 }}>
                   <td style={{ ...TD_BASE, color: DS.t1, fontWeight: 700 }}>{r.key}</td>
                   <td style={{ ...TD_BASE, color: DS.t3 }}>{r.count}</td>
@@ -572,6 +574,7 @@ const PIVOT_MODES = [
 ];
 
 function PivotTab() {
+  const reduceMotion = useReducedMotion();
   const [mode, setMode] = useState("pivot_table");
 
   const { dates, events, pivotMap, maxVal } = useMemo(() => {
@@ -686,7 +689,7 @@ function PivotTab() {
                           background: val != null ? cellBg(val) : "transparent",
                           color: val != null ? cellColor(val) : DS.dim,
                           fontWeight: 700, textAlign: "right",
-                          transition: "background 0.3s",
+                          transition: reduceMotion ? "none" : "background 0.3s",
                         }}>
                           {val != null ? val : <span style={{ color: DS.dim, fontStyle: "italic" }}>NaN</span>}
                         </td>

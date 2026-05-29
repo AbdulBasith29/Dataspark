@@ -50,11 +50,15 @@ import VectorizationRace from "../visualizations/VectorizationRace.jsx";
 import GroupByMergeForge from "../visualizations/GroupByMergeForge.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import LessonModule from "../components/platform/LessonModule.jsx";
-import { getResolvedLessonModule, auditPythonLessonIntegrity } from "../data/lesson-modules.js";
+import { getResolvedLessonModule, auditPythonLessonIntegrity, PYTHON_CLUSTER_MILESTONES } from "../data/lesson-modules.js";
 import { PYTHON_QUESTIONS } from "../data/questions-python.js";
 import { STATISTICS_QUESTIONS } from "../data/questions-statistics.js";
 import { DS, dsGlassCard } from "../lib/ds-platform-tokens.js";
 import { trackLvsEvent, buildLvsMetadata, LVS_EVENT_NAMES, buildPythonProgressArtifacts } from "../lib/analytics.js";
+import useLearnerIntent from "../lib/use-learner-intent.js";
+import IntentSelector from "../components/platform/IntentSelector.jsx";
+import ProgressArtifactCard from "../components/platform/ProgressArtifactCard.jsx";
+import LiveRegion from "../components/platform/LiveRegion.jsx";
 
 const PlatformLogo = () => (
   <svg width="26" height="26" viewBox="0 0 40 40" fill="none" style={{ display: "block", flexShrink: 0 }}>
@@ -1046,6 +1050,15 @@ export default function DataSparkPlatform() {
   const [evalLoading, setEvalLoading] = useState(false);
   const [evalError, setEvalError] = useState(null);
   const [evalResult, setEvalResult] = useState(null);
+  const { intent, setIntent } = useLearnerIntent();
+
+  // Screen-reader announcement for the current view (DS-101 accessibility).
+  const liveMessage =
+    view === "lesson" && activeLesson ? `Lesson opened: ${activeLesson.title}`
+    : view === "course" && activeCourse ? `Course opened: ${activeCourse.title}`
+    : view === "question" && activeQuestion ? `Practice question opened: ${activeQuestion.title}`
+    : view === "home" ? "Home"
+    : "";
 
   const totalLessons = CURRICULUM.reduce((a, c) => a + c.topics.reduce((b, t) => b + t.lessons.length, 0), 0);
   const totalQuestions = CURRICULUM.reduce((a, c) => a + c.questions.length, 0);
@@ -1179,6 +1192,13 @@ export default function DataSparkPlatform() {
         </div>
       </div>
 
+      <div style={{ ...dsGlassCard({ padding: "14px 18px", marginBottom: 20 }), display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <div style={{ fontSize: 12, color: DS.t3, fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>
+          What brings you here?
+        </div>
+        <IntentSelector intent={intent} onSelect={setIntent} compact />
+      </div>
+
       {(() => {
         const pythonCourse = CURRICULUM.find((c) => c.id === "python");
         const pythonLessonCount = pythonCourse
@@ -1192,6 +1212,17 @@ export default function DataSparkPlatform() {
           totalPythonLessons: pythonLessonCount,
         });
         if (artifacts.unlockedSkills.length === 0 && artifacts.readinessMilestones.length === 0) return null;
+        const donePy = new Set(completedPythonIds);
+        const CLUSTER_LESSONS = {
+          "py-basics": ["py-b1", "py-b2", "py-b3", "py-b4", "py-b5"],
+          "py-control": ["py-c1", "py-c2", "py-c3", "py-c4", "py-c5"],
+          "py-oop": ["py-o1", "py-o2", "py-o3", "py-o4"],
+          "py-data": ["py-d1", "py-d2", "py-d3", "py-d4", "py-d5"],
+        };
+        const clusterNarratives = Object.entries(CLUSTER_LESSONS)
+          .filter(([, ids]) => ids.every((id) => donePy.has(id)))
+          .map(([cid]) => PYTHON_CLUSTER_MILESTONES?.[cid])
+          .filter(Boolean);
         return (
           <div style={{ ...dsGlassCard({ padding: "16px 20px", marginBottom: 20, border: `1px solid rgba(59,130,246,0.25)` }) }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: "#60A5FA", fontFamily: "var(--ds-mono), monospace", letterSpacing: "0.12em", marginBottom: 10, textTransform: "uppercase" }}>
@@ -1221,6 +1252,24 @@ export default function DataSparkPlatform() {
                 </div>
               </div>
             )}
+            {clusterNarratives.length > 0 && (
+              <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${DS.border}`, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace" }}>You can now</div>
+                {clusterNarratives.map((c) => (
+                  <div key={c.title} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                    <span aria-hidden="true" style={{ color: DS.grn, fontWeight: 700, lineHeight: 1.5 }}>✓</span>
+                    <span style={{ fontSize: 13, color: DS.t2, lineHeight: 1.5, fontFamily: "var(--ds-sans), sans-serif" }}>{c.completionStatement}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ marginTop: 16 }}>
+              <ProgressArtifactCard
+                completionRate={artifacts.completionRate}
+                unlockedSkills={artifacts.unlockedSkills}
+                readinessMilestones={artifacts.readinessMilestones}
+              />
+            </div>
           </div>
         );
       })()}
@@ -1438,6 +1487,7 @@ export default function DataSparkPlatform() {
           setView("course");
         }}
         onAskTutor={() => setChatbotCourse(activeCourse)}
+        onOpenPractice={() => { setCourseTab("practice"); setView("course"); }}
       />
     );
   };
@@ -1607,6 +1657,7 @@ export default function DataSparkPlatform() {
 
   return (
     <div style={{ minHeight: "100vh", background: DS.bg, color: DS.t1, fontFamily: "var(--ds-sans), system-ui, sans-serif", position: "relative" }}>
+      <LiveRegion message={liveMessage} />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
         :root { --ds-sans: 'Manrope', system-ui, sans-serif; --ds-mono: 'JetBrains Mono', monospace; }
@@ -1664,6 +1715,22 @@ export default function DataSparkPlatform() {
             }}
           >
             Landing
+          </Link>
+          <Link
+            to="/platform/insights"
+            style={{
+              fontSize: 11,
+              color: DS.t3,
+              textDecoration: "none",
+              fontFamily: "var(--ds-mono), monospace",
+              fontWeight: 600,
+              padding: "6px 10px",
+              borderRadius: 8,
+              border: `1px solid ${DS.border}`,
+              flexShrink: 0,
+            }}
+          >
+            Insights
           </Link>
         </div>
 

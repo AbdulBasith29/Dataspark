@@ -10,6 +10,7 @@ import { DS, dsGlassCard } from "./lib/ds-platform-tokens.js";
 import AppErrorBoundary from "./components/AppErrorBoundary.jsx";
 
 const DataSparkPlatform = lazy(() => import("./app/dataspark-full-platform.jsx"));
+const LvsDashboard = lazy(() => import("./pages/LvsDashboard.jsx"));
 
 function PlatformLoadingFallback() {
   return (
@@ -35,6 +36,14 @@ export default function App() {
             element={(
               <Suspense fallback={<PlatformLoadingFallback />}>
                 <DataSparkPlatform />
+              </Suspense>
+            )}
+          />
+          <Route
+            path="/platform/insights"
+            element={(
+              <Suspense fallback={<PlatformLoadingFallback />}>
+                <LvsDashboard />
               </Suspense>
             )}
           />

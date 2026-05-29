@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { DS } from "../lib/ds-platform-tokens.js";
+import useReducedMotion from "../lib/use-reduced-motion.js";
 
 const INITIAL_DATA = [
   { user_id: 101, event_type: "click",    timestamp: "2024-01-15 09:00", value: 23 },
@@ -137,6 +138,7 @@ function CodeLine({ code }) {
 }
 
 function DataTable({ rows, cols, newCols = [], filteredSet = null, originalIndex = null }) {
+  const reduceMotion = useReducedMotion();
   const totalShown = filteredSet ? rows.filter(r => !filteredSet.has(r._uid)).length : rows.length;
   const hasFilter = filteredSet && filteredSet.size > 0;
 
@@ -180,7 +182,7 @@ function DataTable({ rows, cols, newCols = [], filteredSet = null, originalIndex
                   opacity: dimmed ? 0.25 : 1,
                   textDecoration: dimmed ? "line-through" : "none",
                   background: i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent",
-                  transition: "opacity 0.3s",
+                  transition: reduceMotion ? "none" : "opacity 0.3s",
                 }}>
                   <td style={{
                     padding: "5px 10px", color: DS.dim, fontSize: 11,
@@ -225,6 +227,7 @@ function buildInitialState() {
 }
 
 function Tab1DataFrame() {
+  const reduceMotion = useReducedMotion();
   const [appliedOps, setAppliedOps] = useState([]);
 
   const state = useMemo(() => {
@@ -285,7 +288,7 @@ function Tab1DataFrame() {
                   color: alreadyApplied ? DS.dim : DS.t2,
                   ...MONO, fontSize: 11, cursor: alreadyApplied ? "default" : "pointer",
                   opacity: alreadyApplied ? 0.5 : 1,
-                  transition: "all 0.2s",
+                  transition: reduceMotion ? "none" : "all 0.2s",
                 }}
               >
                 <div style={{ fontWeight: 700, color: alreadyApplied ? DS.dim : DS.ind, marginBottom: 2 }}>{op.label}</div>
@@ -357,6 +360,7 @@ const DTYPE_COLOR = {
 };
 
 function Tab2IndexDtypes() {
+  const reduceMotion = useReducedMotion();
   const [dtypes, setDtypes] = useState({ ...INITIAL_DTYPES });
   const [indexMode, setIndexMode] = useState("default"); // default | user_id
   const [showIndexRepr, setShowIndexRepr] = useState(false);
@@ -372,12 +376,15 @@ function Tab2IndexDtypes() {
 
   const convertTimestamp = () => {
     setDtypes(prev => ({ ...prev, timestamp: "datetime64[ns]" }));
+    // Reduced motion: skip the transient highlight pulse, keep the dtype change.
+    if (reduceMotion) { setHighlightedDtype(null); return; }
     setHighlightedDtype("timestamp");
     setTimeout(() => setHighlightedDtype(null), 1800);
   };
 
   const convertValueFloat = () => {
     setDtypes(prev => ({ ...prev, value: "float64" }));
+    if (reduceMotion) { setHighlightedDtype(null); return; }
     setHighlightedDtype("value");
     setTimeout(() => setHighlightedDtype(null), 1800);
   };
@@ -409,7 +416,7 @@ function Tab2IndexDtypes() {
                 return (
                   <tr key={col} style={{
                     background: isHighlighted ? `${DS.ind}22` : i % 2 === 0 ? "rgba(255,255,255,0.01)" : "transparent",
-                    transition: "background 0.4s",
+                    transition: reduceMotion ? "none" : "background 0.4s",
                   }}>
                     <td style={{ padding: "6px 8px", color: DS.t2, borderBottom: `1px solid ${DS.border}22` }}>{col}</td>
                     <td style={{ padding: "6px 8px", borderBottom: `1px solid ${DS.border}22` }}>
@@ -418,7 +425,7 @@ function Tab2IndexDtypes() {
                         background: `${DTYPE_COLOR[dtype] || DS.t3}15`,
                         borderRadius: 5, padding: "2px 7px", fontSize: 11, fontWeight: 700,
                         border: isHighlighted ? `1px solid ${DS.ind}66` : "1px solid transparent",
-                        transition: "border 0.4s",
+                        transition: reduceMotion ? "none" : "border 0.4s",
                       }}>
                         {dtype}
                       </span>
@@ -476,7 +483,7 @@ function Tab2IndexDtypes() {
                     color: indexMode === "user_id" ? DS.ind : DS.t3,
                     border: `1px solid ${indexMode === "user_id" ? `${DS.ind}44` : DS.border}`,
                     fontWeight: 600,
-                    transition: "all 0.3s",
+                    transition: reduceMotion ? "none" : "all 0.3s",
                   }}>
                     {label}
                   </span>

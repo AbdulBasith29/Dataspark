@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { DS } from "../lib/ds-platform-tokens.js";
+import useReducedMotion from "../lib/use-reduced-motion.js";
 
 // ─── Scenarios for Tab 1 ──────────────────────────────────────────────────────
 
@@ -100,6 +101,7 @@ function ModeTab({ active, onClick, label, hint }) {
 }
 
 function SmallPill({ active, onClick, children }) {
+  const reduceMotion = useReducedMotion();
   return (
     <button type="button" onClick={onClick} style={{
       padding: "5px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700, cursor: "pointer",
@@ -107,7 +109,7 @@ function SmallPill({ active, onClick, children }) {
       border: active ? `1px solid ${DS.ind}` : `1px solid ${DS.border}`,
       background: active ? `${DS.ind}1e` : "rgba(255,255,255,0.02)",
       color: active ? DS.t1 : DS.t2,
-      transition: "all 0.15s ease",
+      transition: reduceMotion ? "none" : "all 0.15s ease",
     }}>
       {children}
     </button>
@@ -358,6 +360,7 @@ const REFACTORED_LINES = [
 ];
 
 function ConstructorAuditTab() {
+  const reduceMotion = useReducedMotion();
   const [classifications, setClassifications] = useState({});
   const [revealed, setRevealed] = useState(false);
 
@@ -415,7 +418,7 @@ function ConstructorAuditTab() {
             background: revealed
               ? correct === totalLines ? DS.grn : "#FCD34D"
               : DS.ind,
-            transition: "width 0.3s ease",
+            transition: reduceMotion ? "none" : "width 0.3s ease",
           }} />
         </div>
       </div>
@@ -452,7 +455,7 @@ function ConstructorAuditTab() {
                   ? isCorrect ? "rgba(52,211,153,0.08)" : "rgba(252,165,165,0.08)"
                   : cat ? cat.bg : "rgba(255,255,255,0.015)",
                 padding: "10px 12px",
-                transition: "all 0.2s ease",
+                transition: reduceMotion ? "none" : "all 0.2s ease",
               }}
             >
               {/* Code line */}
@@ -480,7 +483,7 @@ function ConstructorAuditTab() {
                         background: isActive ? c.bg : "rgba(255,255,255,0.02)",
                         color: isActive ? c.color : DS.t3,
                         opacity: revealed && !isActive ? 0.4 : 1,
-                        transition: "all 0.15s ease",
+                        transition: reduceMotion ? "none" : "all 0.15s ease",
                       }}
                     >
                       {c.label}
@@ -528,7 +531,7 @@ function ConstructorAuditTab() {
             border: allClassified ? `1px solid ${DS.ind}` : `1px solid ${DS.border}`,
             background: allClassified ? `${DS.ind}1e` : "rgba(255,255,255,0.02)",
             color: allClassified ? DS.t1 : DS.dim,
-            transition: "all 0.15s ease",
+            transition: reduceMotion ? "none" : "all 0.15s ease",
           }}
         >
           {revealed ? "Answers shown" : allClassified ? "Reveal answers" : `Classify all ${totalLines - classified} remaining lines first`}

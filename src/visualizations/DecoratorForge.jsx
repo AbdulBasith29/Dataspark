@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { DS } from "../lib/ds-platform-tokens.js";
+import useReducedMotion from "../lib/use-reduced-motion.js";
 
 /**
  * DecoratorForge — two-tab interactive for "Decorators & Context Managers" (py-o4).
@@ -345,7 +346,7 @@ const STATUS_STYLES = {
   skipped: { bg: "rgba(71,85,105,0.12)", border: DS.border, color: DS.dim, dot: DS.dim },
 };
 
-function TraceStep({ num, who, action, status, whoColor }) {
+function TraceStep({ num, who, action, status, whoColor, reduceMotion }) {
   const s = STATUS_STYLES[status] || STATUS_STYLES.pending;
   return (
     <div
@@ -357,7 +358,7 @@ function TraceStep({ num, who, action, status, whoColor }) {
         borderRadius: 10,
         border: `1px solid ${s.border}`,
         background: s.bg,
-        transition: "all 0.2s",
+        transition: reduceMotion ? "none" : "all 0.2s",
       }}
     >
       <div
@@ -557,6 +558,7 @@ function buildTrace(stack, simulateFail) {
 // ──────────────────────────────────────────────────────────────
 
 function DecoratorLayers() {
+  const reduceMotion = useReducedMotion();
   const [stack, setStack] = useState([]); // ids in application order (innermost first)
   const [simulateFail, setSimulateFail] = useState(false);
   const [activeStep, setActiveStep] = useState(null); // null = show all
@@ -785,7 +787,7 @@ function DecoratorLayers() {
                   style={{ cursor: "pointer" }}
                   onClick={() => setActiveStep(activeStep === i ? null : i)}
                 >
-                  <TraceStep {...step} />
+                  <TraceStep {...step} reduceMotion={reduceMotion} />
                 </div>
               ))}
             </div>
@@ -819,7 +821,7 @@ function DecoratorLayers() {
 // Tab 2 — Context manager lifecycle
 // ──────────────────────────────────────────────────────────────
 
-function TimelineNode({ phase, color, label, detail, isException, isActive, connector }) {
+function TimelineNode({ phase, color, label, detail, isException, isActive, connector, reduceMotion }) {
   const borderColor = isException ? "#FCA5A5" : isActive ? color : DS.border;
   const bgColor = isException
     ? "rgba(252,165,165,0.08)"
@@ -835,7 +837,7 @@ function TimelineNode({ phase, color, label, detail, isException, isActive, conn
           borderRadius: 12,
           border: `1px solid ${borderColor}`,
           background: bgColor,
-          transition: "all 0.2s",
+          transition: reduceMotion ? "none" : "all 0.2s",
         }}
       >
         <div
@@ -928,6 +930,7 @@ function TimelineNode({ phase, color, label, detail, isException, isActive, conn
 }
 
 function ContextManagerLifecycle() {
+  const reduceMotion = useReducedMotion();
   const [scenarioId, setScenarioId] = useState("db");
   const [exceptionPath, setExceptionPath] = useState(false);
 
@@ -1187,6 +1190,7 @@ function ContextManagerLifecycle() {
               detail={scenario.enterDetail}
               isActive
               connector="normal"
+              reduceMotion={reduceMotion}
             />
             <TimelineNode
               phase="BODY"
@@ -1196,6 +1200,7 @@ function ContextManagerLifecycle() {
               isException={exceptionPath}
               isActive
               connector={exceptionPath ? "exception" : "normal"}
+              reduceMotion={reduceMotion}
             />
             <TimelineNode
               phase="EXIT"
@@ -1211,6 +1216,7 @@ function ContextManagerLifecycle() {
               isException={exceptionPath}
               isActive
               connector={null}
+              reduceMotion={reduceMotion}
             />
           </div>
 

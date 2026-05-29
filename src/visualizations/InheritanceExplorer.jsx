@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import useReducedMotion from "../lib/use-reduced-motion.js";
 import { DS } from "../lib/ds-platform-tokens.js";
 
 // ─── Shared ──────────────────────────────────────────────────────────────────
@@ -73,6 +74,7 @@ const TREE_LINES = [
 ];
 
 function MROTracer() {
+  const reduceMotion = useReducedMotion();
   const [instance, setInstance] = useState("S3BatchSource");
   const [method, setMethod] = useState("run");
   const [animStep, setAnimStep] = useState(-1);
@@ -83,12 +85,23 @@ function MROTracer() {
 
   function runTrace() {
     if (running) return;
+    // Reduced motion: reveal the whole resolved chain instantly, no stepping.
+    if (reduceMotion) {
+      setAnimStep(steps.length - 1);
+      setRunning(false);
+      return;
+    }
     setAnimStep(-1);
     setRunning(true);
   }
 
   useEffect(() => {
     if (!running) return;
+    if (reduceMotion) {
+      setAnimStep(steps.length - 1);
+      setRunning(false);
+      return;
+    }
     if (animStep < steps.length - 1) {
       // Stop early once we find the resolver — but animate one more frame to show "FOUND"
       timerRef.current = setTimeout(() => {
@@ -98,7 +111,7 @@ function MROTracer() {
       setRunning(false);
     }
     return () => clearTimeout(timerRef.current);
-  }, [running, animStep, steps.length, resolvedIdx]);
+  }, [running, animStep, steps.length, resolvedIdx, reduceMotion]);
 
   // Reset animation when selections change
   useEffect(() => {
@@ -186,7 +199,7 @@ function MROTracer() {
                 background: animStep >= idx ? (idx === resolvedIdx ? "rgba(52,211,153,0.15)" : "rgba(255,255,255,0.04)") : "transparent",
                 border: `1px solid ${animStep >= idx ? (idx === resolvedIdx ? `${DS.grn}55` : DS.border) : "transparent"}`,
                 color: stepColor(idx),
-                transition: "all 0.3s ease",
+                transition: reduceMotion ? "none" : "all 0.3s ease",
               }}>
                 {idx + 1}. {cls}
               </span>
@@ -205,7 +218,7 @@ function MROTracer() {
               padding: "7px 10px", borderRadius: 8,
               background: stepBg(idx),
               border: `1px solid ${animStep >= idx ? (idx === resolvedIdx ? `${DS.grn}33` : DS.border) : "transparent"}`,
-              transition: "all 0.35s ease",
+              transition: reduceMotion ? "none" : "all 0.35s ease",
               opacity: animStep < idx ? 0.25 : 1,
             }}>
               <span style={{
@@ -402,6 +415,7 @@ function DFTable({ rows, highlight }) {
 }
 
 function PolymorphismDemo() {
+  const reduceMotion = useReducedMotion();
   const [ran, setRan] = useState(false);
   const [selected, setSelected] = useState(null);
 
@@ -457,7 +471,7 @@ function PolymorphismDemo() {
                 ? (t.lsp ? "rgba(252,165,165,0.06)" : "rgba(52,211,153,0.06)")
                 : "rgba(255,255,255,0.015)",
               border: `1px solid ${t.lsp ? "#FCA5A566" : (selected === t.name ? `${DS.grn}55` : DS.border)}`,
-              transition: "all 0.2s ease",
+              transition: reduceMotion ? "none" : "all 0.2s ease",
             }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                 <span style={{

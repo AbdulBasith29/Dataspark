@@ -39,6 +39,8 @@ export const LVS_EVENT_NAMES = {
   checkSubmit: "lvs_check_submit",
   tutorPromptUsed: "lvs_tutor_prompt_used",
   weeklyRecapViewed: "lvs_weekly_recap_viewed",
+  confidenceRated: "lvs_confidence_rated",
+  confidenceDelta: "lvs_confidence_delta",
 };
 
 export function buildLvsMetadata({
@@ -69,16 +71,85 @@ export function buildLvsMetadata({
   };
 }
 
+/** localStorage key the in-browser LVS dashboard reads from. */
+export const LVS_LOCAL_KEY = "ds_lvs_events";
+const LVS_LOCAL_CAP = 500;
+
+/**
+ * Mirror an LVS event into localStorage so the client-side dashboard
+ * (src/pages/LvsDashboard.jsx) has data to render — the Supabase sink is
+ * write-only from the browser's perspective. Best-effort, never throws.
+ */
+export function mirrorLvsEventLocally({ eventName, page, metadata }) {
+  if (typeof window === "undefined" || !window.localStorage) return;
+  try {
+    const raw = window.localStorage.getItem(LVS_LOCAL_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    const list = Array.isArray(parsed)
+      ? parsed
+      : Array.isArray(parsed?.events)
+        ? parsed.events
+        : [];
+    list.push({ event_name: eventName, page: page || null, metadata: metadata || null, ts: Date.now() });
+    window.localStorage.setItem(LVS_LOCAL_KEY, JSON.stringify(list.slice(-LVS_LOCAL_CAP)));
+  } catch {
+    // localStorage may be unavailable, full, or disabled — never block UX.
+  }
+}
+
 export async function trackLvsEvent({ eventName, page, metadata }) {
-  return safeLogClientEvent({
-    eventName,
-    page,
-    metadata: {
-      ...(metadata || {}),
-      category: metadata?.category || "engagement",
-      product_area: metadata?.product_area || "learning_value_score",
-    },
-  });
+  const enriched = {
+    ...(metadata || {}),
+    category: metadata?.category || "engagement",
+    product_area: metadata?.product_area || "learning_value_score",
+  };
+  mirrorLvsEventLocally({ eventName, page, metadata: enriched });
+  return safeLogClientEvent({ eventName, page, metadata: enriched });
+}
+
+/**
+ * Build metadata for a confidence-diagnostics event. Mirrors the shape style
+ * of buildLvsMetadata so events stay queryable alongside the rest of LVS.
+ */
+export function buildConfidenceMetadata({ courseId, lessonId, stage, confidence, correct } = {}) {
+  return {
+    category: "engagement",
+    product_area: "learning_value_score",
+    course_id: courseId || null,
+    lesson_id: lessonId || null,
+    stage: stage || null,
+    confidence: typeof confidence === "number" ? confidence : null,
+    correct: typeof correct === "boolean" ? correct : null,
+  };
+}
+
+/**
+ * Compare a learner's confidence (1–5) before vs. after seeing the answer.
+ *
+ * Calibration rule (on the 1–5 scale, midpoint 3):
+ *  - High confidence (>= 4) that DROPS after seeing the answer (after < before)
+ *    => "overconfident" (they were surer than they should have been).
+ *  - Low confidence (<= 2) that RISES after seeing the answer (after > before)
+ *    => "underconfident" (they knew it better than they felt).
+ *  - Otherwise => "calibrated".
+ */
+export function computeConfidenceDelta({ before, after } = {}) {
+  const b = typeof before === "number" ? before : null;
+  const a = typeof after === "number" ? after : null;
+  const delta = b != null && a != null ? a - b : null;
+
+  let calibration = "calibrated";
+  if (b != null && a != null) {
+    if (b >= 4 && a < b) calibration = "overconfident";
+    else if (b <= 2 && a > b) calibration = "underconfident";
+  }
+
+  return { before: b, after: a, delta, calibration };
+}
+
+/** Thin wrapper over the same logging path that trackLvsEvent uses. */
+export async function trackConfidence({ eventName, page, metadata }) {
+  return trackLvsEvent({ eventName, page, metadata });
 }
 
 export function buildPythonProgressArtifacts({ completedLessonIds = [], totalPythonLessons = 0 } = {}) {
