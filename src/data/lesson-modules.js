@@ -77,6 +77,18 @@ const PYTHON_VIDEO_FALLBACKS = {
   "py-o4": { youtubeId: "FsAPt_9Bf3U", title: "Python Decorators and Context Managers", channel: "Corey Schafer", startSeconds: 0 },
 };
 
+function fallbackDeepDive(lesson) {
+  return `## Deep dive until a curated clip ships
+
+Turn this into an active exercise:
+
+1. Open the **Practice** tab and pick **one** question tagged near this topic.
+2. Before you write a solution, **predict** the shape of the output (rows/columns or model behavior).
+3. Solve, then **diff** your prediction vs reality — that gap is what to rehearse aloud.
+
+If there is no exact tag match, ask the **AI tutor**: "Give me a 5-minute drill on ${lesson.title} with a rubric."`;
+}
+
 const PYTHON_EXTENDED_MODULES = {
   "py-o1": {
     durationLabel: MODULE_TIME_LABEL,
