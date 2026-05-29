@@ -44,7 +44,7 @@ import MLSystemPipeline from "../visualizations/MLSystemPipeline.jsx";
 import FeatureStoreViz from "../visualizations/FeatureStoreViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import LessonModule from "../components/platform/LessonModule.jsx";
-import { getResolvedLessonModule } from "../data/lesson-modules.js";
+import { getResolvedLessonModule, auditPythonLessonIntegrity } from "../data/lesson-modules.js";
 import { PYTHON_QUESTIONS } from "../data/questions-python.js";
 import { STATISTICS_QUESTIONS } from "../data/questions-statistics.js";
 import { DS, dsGlassCard } from "../lib/ds-platform-tokens.js";
@@ -1048,6 +1048,17 @@ export default function DataSparkPlatform() {
   useEffect(() => {
     window.history.pushState({ dsView: view }, "");
   }, [view]);
+
+  useEffect(() => {
+    try {
+      const issues = auditPythonLessonIntegrity(CURRICULUM, VISUALIZATIONS);
+      if (issues.length > 0) {
+        console.warn("[DataSpark] Python lesson integrity issues:", issues);
+      }
+    } catch {
+      // Audit is non-blocking — never let it crash the platform.
+    }
+  }, []);
 
   useEffect(() => {
     const onPop = (event) => {
