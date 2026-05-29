@@ -48,6 +48,7 @@ import { getResolvedLessonModule } from "../data/lesson-modules.js";
 import { PYTHON_QUESTIONS } from "../data/questions-python.js";
 import { STATISTICS_QUESTIONS } from "../data/questions-statistics.js";
 import { DS, dsGlassCard } from "../lib/ds-platform-tokens.js";
+import { trackLvsEvent, buildLvsMetadata, LVS_EVENT_NAMES, buildPythonProgressArtifacts } from "../lib/analytics.js";
 
 const PlatformLogo = () => (
   <svg width="26" height="26" viewBox="0 0 40 40" fill="none" style={{ display: "block", flexShrink: 0 }}>
@@ -1063,6 +1064,20 @@ export default function DataSparkPlatform() {
 
   const completedLessons = Object.keys(progress).filter(k => progress[k] === "done").length;
 
+  useEffect(() => {
+    if (view === "lesson" && activeLesson && activeCourse) {
+      try {
+        trackLvsEvent({
+          eventName: LVS_EVENT_NAMES.lessonStart,
+          page: "/platform",
+          metadata: buildLvsMetadata({ courseId: activeCourse.id, lessonId: activeLesson.id }),
+        });
+      } catch {
+        // Never block UX on analytics failures.
+      }
+    }
+  }, [view, activeLesson, activeCourse]);
+
   const submitPracticeAnswer = useCallback(async () => {
     if (!activeQuestion || !userAnswer.trim()) return;
     setSubmitted(true);
@@ -1148,6 +1163,52 @@ export default function DataSparkPlatform() {
           ))}
         </div>
       </div>
+
+      {(() => {
+        const pythonCourse = CURRICULUM.find((c) => c.id === "python");
+        const pythonLessonCount = pythonCourse
+          ? pythonCourse.topics.reduce((a, t) => a + t.lessons.length, 0)
+          : 0;
+        const completedPythonIds = pythonCourse
+          ? pythonCourse.topics.flatMap((t) => t.lessons.map((l) => l.id)).filter((id) => progress[id] === "done")
+          : [];
+        const artifacts = buildPythonProgressArtifacts({
+          completedLessonIds: completedPythonIds,
+          totalPythonLessons: pythonLessonCount,
+        });
+        if (artifacts.unlockedSkills.length === 0 && artifacts.readinessMilestones.length === 0) return null;
+        return (
+          <div style={{ ...dsGlassCard({ padding: "16px 20px", marginBottom: 20, border: `1px solid rgba(59,130,246,0.25)` }) }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#60A5FA", fontFamily: "var(--ds-mono), monospace", letterSpacing: "0.12em", marginBottom: 10, textTransform: "uppercase" }}>
+              Python Progress &mdash; {artifacts.completionRate}% complete
+            </div>
+            {artifacts.unlockedSkills.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Unlocked skills</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {artifacts.unlockedSkills.map((skill) => (
+                    <span key={skill} style={{ fontSize: 10, padding: "4px 10px", borderRadius: 999, background: "rgba(59,130,246,0.12)", color: "#60A5FA", fontFamily: "var(--ds-mono), monospace", fontWeight: 600, border: "1px solid rgba(59,130,246,0.3)" }}>
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {artifacts.readinessMilestones.length > 0 && (
+              <div>
+                <div style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Milestones reached</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {artifacts.readinessMilestones.map((m) => (
+                    <span key={m} style={{ fontSize: 10, padding: "4px 10px", borderRadius: 999, background: "rgba(52,211,153,0.12)", color: DS.grn, fontFamily: "var(--ds-mono), monospace", fontWeight: 600, border: "1px solid rgba(52,211,153,0.3)" }}>
+                      {m}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16, paddingBottom: 72 }}>
         {CURRICULUM.map((course) => {
@@ -1349,6 +1410,15 @@ export default function DataSparkPlatform() {
         onBack={() => setView("course")}
         backLabel={`â† Back to ${activeCourse.title}`}
         onMarkComplete={() => {
+          try {
+            trackLvsEvent({
+              eventName: LVS_EVENT_NAMES.lessonComplete,
+              page: "/platform",
+              metadata: buildLvsMetadata({ courseId: activeCourse.id, lessonId: activeLesson.id, passed: true }),
+            });
+          } catch {
+            // Never block UX on analytics failures.
+          }
           setProgress((p) => ({ ...p, [activeLesson.id]: "done" }));
           setView("course");
         }}
