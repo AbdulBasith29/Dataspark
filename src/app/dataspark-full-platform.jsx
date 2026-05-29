@@ -47,6 +47,7 @@ import InheritanceExplorer from "../visualizations/InheritanceExplorer.jsx";
 import DecoratorForge from "../visualizations/DecoratorForge.jsx";
 import PandasDataLab from "../visualizations/PandasDataLab.jsx";
 import VectorizationRace from "../visualizations/VectorizationRace.jsx";
+import GroupByMergeForge from "../visualizations/GroupByMergeForge.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import LessonModule from "../components/platform/LessonModule.jsx";
 import { getResolvedLessonModule, auditPythonLessonIntegrity } from "../data/lesson-modules.js";
@@ -951,6 +952,7 @@ const VISUALIZATIONS = {
   "py-o4": DecoratorForge,
   "py-d1": FeatureScaling,
   "py-d2": PandasDataLab,
+  "py-d3": GroupByMergeForge,
   "py-d5": VectorizationRace,
   "sd-p1": BatchVsStreaming,
   "sd-p2": ETLPipeline,
