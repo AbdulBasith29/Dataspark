@@ -42,6 +42,11 @@ import StreamingEnginesTrinity from "../visualizations/StreamingEnginesTrinity.j
 import WarehouseStarSchema from "../visualizations/WarehouseStarSchema.jsx";
 import MLSystemPipeline from "../visualizations/MLSystemPipeline.jsx";
 import FeatureStoreViz from "../visualizations/FeatureStoreViz.jsx";
+import ClassObjectLab from "../visualizations/ClassObjectLab.jsx";
+import InheritanceExplorer from "../visualizations/InheritanceExplorer.jsx";
+import DecoratorForge from "../visualizations/DecoratorForge.jsx";
+import PandasDataLab from "../visualizations/PandasDataLab.jsx";
+import VectorizationRace from "../visualizations/VectorizationRace.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import LessonModule from "../components/platform/LessonModule.jsx";
 import { getResolvedLessonModule, auditPythonLessonIntegrity } from "../data/lesson-modules.js";
@@ -941,15 +946,12 @@ const VISUALIZATIONS = {
   "py-c3": ArgumentBinder,
   "py-c4": FoldMachine,
   "py-c5": TracebackTheater,
-  "py-o1": VariableBindingLab,
-  "py-o2": BranchRouter,
-  "py-o3": FoldMachine,
-  "py-o4": ArgumentBinder,
+  "py-o1": ClassObjectLab,
+  "py-o2": InheritanceExplorer,
+  "py-o4": DecoratorForge,
   "py-d1": FeatureScaling,
-  "py-d2": WindowFunctions,
-  "py-d3": SQLJoins,
-  "py-d4": HypothesisTesting,
-  "py-d5": BatchVsStreaming,
+  "py-d2": PandasDataLab,
+  "py-d5": VectorizationRace,
   "sd-p1": BatchVsStreaming,
   "sd-p2": ETLPipeline,
   "sd-p3": StreamingEnginesTrinity,
