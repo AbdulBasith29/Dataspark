@@ -2,6 +2,7 @@ import { useState } from "react";
 import { DS } from "../lib/ds-platform-tokens.js";
 
 const ACCENT = "#F59E0B";
+const AMBER = "#F59E0B";
 const GREEN = "#10B981";
 const RED = "#F87171";
 const BLUE = "#0EA5E9";
@@ -135,8 +136,6 @@ const STEPS = [
   },
 ];
 
-// Use ACCENT reference since it's defined at file scope; need the amber hex here
-const AMBER = "#F59E0B";
 
 const DRILL_QUESTIONS = [
   {
