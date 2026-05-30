@@ -142,6 +142,7 @@ function InterviewGraphStage({ graph, stage, branchPath, clickedTargets, graphCh
   const choices = Array.isArray(stage.choices) ? stage.choices : [];
   const isClickTarget = stage.type === "click_target";
   const isScenarioChoice = stage.type === "scenaro_choice" || stage.type === "scenario_choice";
+  const hasAnswered = Boolean(selectedTarget || selectedChoice);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -278,7 +279,7 @@ function InterviewGraphStage({ graph, stage, branchPath, clickedTargets, graphCh
         </div>
       )}
 
-      {stage.rationale && (
+      {stage.rationale && (stage.terminal || hasAnswered) && (
         <div style={{
           padding: "13px 15px",
           borderRadius: DS.radiusSm,

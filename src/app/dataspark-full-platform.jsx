@@ -48,6 +48,10 @@ import DecoratorForge from "../visualizations/DecoratorForge.jsx";
 import PandasDataLab from "../visualizations/PandasDataLab.jsx";
 import VectorizationRace from "../visualizations/VectorizationRace.jsx";
 import GroupByMergeForge from "../visualizations/GroupByMergeForge.jsx";
+import SQLOrderOfExecution from "../visualizations/SQLOrderOfExecution.jsx";
+import SQLNullLogic from "../visualizations/SQLNullLogic.jsx";
+import SQLGroupByViz from "../visualizations/SQLGroupByViz.jsx";
+import SQLSubqueryVsJoin from "../visualizations/SQLSubqueryVsJoin.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import LessonModule from "../components/platform/LessonModule.jsx";
 import { getResolvedLessonModule, auditPythonLessonIntegrity, PYTHON_CLUSTER_MILESTONES } from "../data/lesson-modules.js";
@@ -177,10 +181,10 @@ const CURRICULUM = [
         id: "sql-revision",
         title: "Rapid Revision & Foundations",
         lessons: [
-          { id: "sql-found-01", title: "SQL Order of Execution", duration: "12 min", hasViz: false },
-          { id: "sql-found-02", title: "Three-Valued Logic of NULL", duration: "12 min", hasViz: false },
-          { id: "sql-found-03", title: "GROUP BY & Aggregations", duration: "12 min", hasViz: false },
-          { id: "sql-found-04", title: "Subqueries vs Basic Joins", duration: "12 min", hasViz: false },
+          { id: "sql-found-01", title: "SQL Order of Execution", duration: "12 min", hasViz: true },
+          { id: "sql-found-02", title: "Three-Valued Logic of NULL", duration: "12 min", hasViz: true },
+          { id: "sql-found-03", title: "GROUP BY & Aggregations", duration: "12 min", hasViz: true },
+          { id: "sql-found-04", title: "Subqueries vs Basic Joins", duration: "12 min", hasViz: true },
         ]
       },
       {
@@ -976,6 +980,10 @@ const VISUALIZATIONS = {
   "sd-m2": FeatureStoreViz,
   "sd-m3": BatchVsStreaming,
   "sd-m4": RecSysCollaborativeFiltering,
+  "sql-found-01": SQLOrderOfExecution,
+  "sql-found-02": SQLNullLogic,
+  "sql-found-03": SQLGroupByViz,
+  "sql-found-04": SQLSubqueryVsJoin,
 };
 
 const ML_VIZ_FALLBACK = [
