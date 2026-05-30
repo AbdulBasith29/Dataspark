@@ -188,24 +188,13 @@ const CURRICULUM = [
         ]
       },
       {
-        id: "sql-basics",
-        title: "SQL Fundamentals",
-        lessons: [
-          { id: "sq-b1", title: "SELECT, WHERE, ORDER BY", duration: "12 min", hasViz: false },
-          { id: "sq-b2", title: "JOINs Visualized: INNER, LEFT, RIGHT, FULL", duration: "20 min", hasViz: true },
-          { id: "sq-b3", title: "GROUP BY & Aggregation Functions", duration: "15 min", hasViz: true },
-          { id: "sq-b4", title: "HAVING vs WHERE: When to Filter", duration: "10 min", hasViz: true },
-          { id: "sq-b5", title: "Subqueries & Correlated Subqueries", duration: "18 min", hasViz: true },
-        ]
-      },
-      {
         id: "sql-advanced",
         title: "Advanced SQL",
         lessons: [
           { id: "sq-a1", title: "Window Functions: ROW_NUMBER, RANK, DENSE_RANK", duration: "22 min", hasViz: true },
           { id: "sq-a2", title: "LAG, LEAD & Running Calculations", duration: "18 min", hasViz: true },
           { id: "sq-a3", title: "CTEs & Recursive Queries", duration: "20 min", hasViz: true },
-          { id: "sq-a4", title: "PIVOT, UNPIVOT & Conditional Aggregation", duration: "15 min", hasViz: false },
+          { id: "sq-a4", title: "PIVOT, UNPIVOT & Conditional Aggregation", duration: "15 min", hasViz: true },
           { id: "sq-a5", title: "Query Optimization & EXPLAIN Plans", duration: "25 min", hasViz: true },
         ]
       },
@@ -213,7 +202,7 @@ const CURRICULUM = [
         id: "sql-design",
         title: "Database Design",
         lessons: [
-          { id: "sq-d1", title: "Normalization: 1NF â†’ 3NF â†’ BCNF", duration: "20 min", hasViz: true },
+          { id: "sq-d1", title: "Normalization: 1NF → 3NF → BCNF", duration: "20 min", hasViz: true },
           { id: "sq-d2", title: "Indexing Strategies", duration: "18 min", hasViz: true },
           { id: "sq-d3", title: "Star Schema vs Snowflake Schema", duration: "15 min", hasViz: true },
           { id: "sq-d4", title: "OLTP vs OLAP: Choosing the Right DB", duration: "12 min", hasViz: true },
