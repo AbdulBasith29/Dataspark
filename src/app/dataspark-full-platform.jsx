@@ -52,6 +52,15 @@ import SQLOrderOfExecution from "../visualizations/SQLOrderOfExecution.jsx";
 import SQLNullLogic from "../visualizations/SQLNullLogic.jsx";
 import SQLGroupByViz from "../visualizations/SQLGroupByViz.jsx";
 import SQLSubqueryVsJoin from "../visualizations/SQLSubqueryVsJoin.jsx";
+import SQLWindowFunctionsViz from "../visualizations/SQLWindowFunctionsViz.jsx";
+import SQLLagLeadViz from "../visualizations/SQLLagLeadViz.jsx";
+import SQLCteExplorer from "../visualizations/SQLCteExplorer.jsx";
+import SQLPivotViz from "../visualizations/SQLPivotViz.jsx";
+import SQLExplainPlanViz from "../visualizations/SQLExplainPlanViz.jsx";
+import SQLNormalizationViz from "../visualizations/SQLNormalizationViz.jsx";
+import SQLIndexingViz from "../visualizations/SQLIndexingViz.jsx";
+import SQLStarSnowflakeViz from "../visualizations/SQLStarSnowflakeViz.jsx";
+import SQLOltpOlapViz from "../visualizations/SQLOltpOlapViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import LessonModule from "../components/platform/LessonModule.jsx";
 import { getResolvedLessonModule, auditPythonLessonIntegrity, PYTHON_CLUSTER_MILESTONES } from "../data/lesson-modules.js";
@@ -973,6 +982,15 @@ const VISUALIZATIONS = {
   "sql-found-02": SQLNullLogic,
   "sql-found-03": SQLGroupByViz,
   "sql-found-04": SQLSubqueryVsJoin,
+  "sq-a1": SQLWindowFunctionsViz,
+  "sq-a2": SQLLagLeadViz,
+  "sq-a3": SQLCteExplorer,
+  "sq-a4": SQLPivotViz,
+  "sq-a5": SQLExplainPlanViz,
+  "sq-d1": SQLNormalizationViz,
+  "sq-d2": SQLIndexingViz,
+  "sq-d3": SQLStarSnowflakeViz,
+  "sq-d4": SQLOltpOlapViz,
 };
 
 const ML_VIZ_FALLBACK = [

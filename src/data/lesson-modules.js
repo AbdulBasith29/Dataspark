@@ -5479,7 +5479,1994 @@ Sketch **two** curves: train error vs complexity, test error vs complexity. Mark
       },
     ],
   },
+
+  "sq-a1": {
+    durationLabel: "14 min",
+    outcomes: [
+      "Explain exactly how ties are handled by ROW_NUMBER, RANK, and DENSE_RANK without confusing them under pressure.",
+      "Spot when a PARTITION BY is missing or wrong and predict the resulting rank bleed across groups.",
+      "Choose the correct ranking function based on whether gaps or non-determinism matter for the use case.",
+    ],
+    learnMarkdown: `## Ranking functions: the same, until ties appear
+
+ROW_NUMBER(), RANK(), and DENSE_RANK() all assign an integer to each row based on ORDER BY. With no ties, all three produce identical output. The difference only surfaces when two or more rows share the same ORDER BY value.
+
+- **ROW_NUMBER()** — always unique. Ties broken arbitrarily by the engine. Never two rows with the same number.
+- **RANK()** — tied rows share the same rank. The next rank *skips* positions equal to the number of tied rows. Result: gaps (1, 2, 2, 4 — rank 3 vanishes).
+- **DENSE_RANK()** — tied rows share the same rank. Next rank is always rank + 1. No gaps ever (1, 2, 2, 3).
+
+## PARTITION BY is not optional for grouped ranking
+
+Without PARTITION BY the function ranks across the entire result set. Add \`PARTITION BY region\` and ranks reset to 1 at every region boundary. Forgetting this is the #1 source of wrong ranking answers in interviews.
+
+## Interview mental model
+
+Ask: "Do I need unique row IDs (ROW_NUMBER), honest gap-showing rank (RANK), or consecutive tier labels (DENSE_RANK)?" Then ask: "Does rank need to reset per group?" If yes, add PARTITION BY.`,
+    video: null,
+    videoFallbackMarkdown: `## 3-minute ranking drill
+
+Write the output sequence for 5 rows where rows 2 and 3 tie, using each function. Expected:
+- ROW_NUMBER: 1 2 3 4 5 (order of ties arbitrary)
+- RANK: 1 2 2 4 5
+- DENSE_RANK: 1 2 2 3 4
+
+Then add a PARTITION BY and trace how the sequence resets.`,
+    tryGuidance: "Open the Window Functions viz, toggle between functions with ties visible, and observe which ranks skip and which stay dense.",
+    interviewGraph: {
+      initialStageId: "wf_rank_click",
+      artifactDimensions: [
+        { label: "Tie Semantics Recall",      recoveryStageId: "wf_rank_recovery_ties" },
+        { label: "PARTITION BY Scope",         recoveryStageId: "wf_rank_recovery_partition" },
+        { label: "Function Selection Instinct", recoveryStageId: "wf_rank_recovery_choice", passLabel: "Ranking Function Mastery" },
+      ],
+      stages: {
+        wf_rank_click: {
+          id: "wf_rank_click",
+          type: "click_target",
+          badge: "Stage 1 target",
+          title: "Stage 1 · Wrong ranking function loses tie semantics",
+          prompt: "The analyst wants the top 3 distinct salary tiers per department. Click the line that uses the wrong function and will silently produce incorrect tier labels when ties exist.",
+          code_snippet: `SELECT
+  employee_id,
+  department,
+  salary,
+  RANK() OVER (         -- ds-target:wrong_rank_fn
+    PARTITION BY department
+    ORDER BY salary DESC
+  ) AS tier
+FROM employees
+WHERE tier <= 3;`,
+          validationCopy: {
+            wrong_rank_fn: "Correct. RANK() creates gaps: two employees tied for tier 2 produce ranks 2, 2, 4. Tier 3 never appears, so WHERE tier <= 3 misses the real third tier. DENSE_RANK() is needed for consecutive tier labels.",
+          },
+          branches: {
+            wrong_rank_fn: "wf_rank_fix_choice",
+          },
+        },
+        wf_rank_recovery_ties: {
+          id: "wf_rank_recovery_ties",
+          type: "scenario_choice",
+          badge: "Recovery 1",
+          title: "Recovery · Tie handling rules",
+          prompt: "The interviewer asks you to state the tie rule for each function. Which answer is complete and correct?",
+          code_snippet: `-- 5 rows: salaries [9000, 8000, 8000, 7000, 6000]`,
+          choices: [
+            { id: "a", label: "ROW_NUMBER unique; RANK gaps; DENSE_RANK no gaps", description: "All three rules stated precisely." },
+            { id: "b", label: "RANK and DENSE_RANK are identical", description: "RANK creates gaps; DENSE_RANK never does — they are not identical on ties." },
+            { id: "c", label: "ROW_NUMBER ties resolved alphabetically by name", description: "ROW_NUMBER tie-breaking order is undefined unless you add a tiebreaker column to ORDER BY." },
+            { id: "d", label: "DENSE_RANK skips numbers like RANK", description: "DENSE_RANK is specifically designed to avoid skipping numbers." },
+          ],
+          branches: {
+            a: "wf_rank_fix_choice",
+            b: "wf_rank_recovery_ties",
+            c: "wf_rank_recovery_ties",
+            d: "wf_rank_recovery_ties",
+          },
+          rationale: "The canonical three-sentence answer: ROW_NUMBER always unique; RANK shares rank and skips; DENSE_RANK shares rank and never skips.",
+        },
+        wf_rank_fix_choice: {
+          id: "wf_rank_fix_choice",
+          type: "scenario_choice",
+          badge: "Stage 1 fix",
+          title: "Stage 1 · Apply the correct function",
+          prompt: "Which replacement produces consecutive tier labels 1-3 even when ties exist, and correctly surfaces all employees in the top 3 tiers?",
+          code_snippet: `-- Requirement: top 3 DISTINCT salary tiers per department`,
+          choices: [
+            { id: "a", label: "Replace RANK() with DENSE_RANK()", description: "DENSE_RANK produces 1, 2, 2, 3 — no gaps, all tiers present." },
+            { id: "b", label: "Replace RANK() with ROW_NUMBER()", description: "ROW_NUMBER is unique — two employees with the same salary get different tiers, breaking the tier semantics." },
+            { id: "c", label: "Add ORDER BY salary ASC inside OVER()", description: "Reversing order changes which tier is #1, it does not fix the gap problem." },
+            { id: "d", label: "Remove PARTITION BY so ranks are global", description: "Removing PARTITION BY ranks everyone together, breaking department-level tier logic." },
+          ],
+          branches: {
+            a: "wf_partition_choice",
+            b: "wf_rank_recovery_ties",
+            c: "wf_rank_recovery_ties",
+            d: "wf_rank_recovery_ties",
+          },
+          rationale: "DENSE_RANK is the correct fix: it handles ties gracefully by sharing ranks without introducing gaps in the tier sequence.",
+        },
+        wf_partition_choice: {
+          id: "wf_partition_choice",
+          type: "scenario_choice",
+          badge: "Stage 2 partition",
+          title: "Stage 2 · PARTITION BY scope bleed",
+          prompt: "The analyst forgets PARTITION BY. What does the ranking column now contain?",
+          code_snippet: `SELECT employee_id, department, salary,
+  DENSE_RANK() OVER (ORDER BY salary DESC) AS tier
+FROM employees;
+-- departments: Engineering (5 rows), Marketing (3 rows)`,
+          choices: [
+            { id: "a", label: "Ranks reset to 1 per department bucket", description: "Without PARTITION BY there are no buckets — ranking spans all rows globally." },
+            { id: "b", label: "Ranks run globally across all departments — Engineering and Marketing share the same sequence", description: "The rank reflects salary order over the entire table, ignoring departments." },
+            { id: "c", label: "Each row gets rank = 1 because there is no group context", description: "The function still ranks all rows; it just treats the whole table as one partition." },
+            { id: "d", label: "The query errors because PARTITION BY is required with DENSE_RANK", description: "PARTITION BY is optional — omitting it uses the whole result set as one implicit partition." },
+          ],
+          branches: {
+            a: "wf_rank_recovery_partition",
+            b: "wf_rank_fn_choice",
+            c: "wf_rank_recovery_partition",
+            d: "wf_rank_recovery_partition",
+          },
+          rationale: "Without PARTITION BY the window spans the entire result set. Ranks bleed across departments and do not reset.",
+        },
+        wf_rank_recovery_partition: {
+          id: "wf_rank_recovery_partition",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery · PARTITION BY mental model",
+          prompt: "Restore the correct mental model for PARTITION BY.",
+          code_snippet: `-- PARTITION BY divides rows into independent windows.
+-- The function restarts for each partition.`,
+          choices: [
+            { id: "a", label: "PARTITION BY resets the ranking counter at each group boundary", description: "Exactly — each partition is ranked independently from 1." },
+            { id: "b", label: "PARTITION BY is equivalent to GROUP BY", description: "GROUP BY collapses rows into one; PARTITION BY keeps all rows but scopes the function." },
+            { id: "c", label: "PARTITION BY filters rows like WHERE", description: "PARTITION BY divides rows into windows; it does not remove rows from the result." },
+            { id: "d", label: "Without PARTITION BY the function returns NULL", description: "Without PARTITION BY the whole table is treated as one partition — the function still runs." },
+          ],
+          branches: {
+            a: "wf_rank_fn_choice",
+            b: "wf_rank_recovery_partition",
+            c: "wf_rank_recovery_partition",
+            d: "wf_rank_recovery_partition",
+          },
+          rationale: "PARTITION BY is the scoping operator for window functions. It does not remove rows; it restarts the window logic per group.",
+        },
+        wf_rank_fn_choice: {
+          id: "wf_rank_fn_choice",
+          type: "scenario_choice",
+          badge: "Stage 3 choice",
+          title: "Stage 3 · Choose the function for the use case",
+          prompt: "You need a deterministic unique row number for pagination (OFFSET/FETCH) where ties must not land on the same page twice. Which function is safest?",
+          code_snippet: `-- Table: 10M product reviews, sorted by rating DESC
+-- Need: stable page-by-page navigation, no duplicate row IDs`,
+          choices: [
+            { id: "a", label: "ROW_NUMBER() with a tiebreaker in ORDER BY", description: "Add review_id as a tiebreaker to make ROW_NUMBER deterministic and unique." },
+            { id: "b", label: "DENSE_RANK() alone", description: "DENSE_RANK ties share the same number — two rows with the same rank can land on two different pages inconsistently." },
+            { id: "c", label: "RANK() alone", description: "RANK gaps can create empty pages and the shared rank on ties breaks deterministic pagination." },
+            { id: "d", label: "No window function needed — use OFFSET/LIMIT directly", description: "Without a stable sort key, OFFSET/LIMIT pagination is non-deterministic on ties." },
+          ],
+          branches: {
+            a: "wf_rank_terminal",
+            b: "wf_rank_recovery_choice",
+            c: "wf_rank_recovery_choice",
+            d: "wf_rank_recovery_choice",
+          },
+          rationale: "ROW_NUMBER with a stable tiebreaker (e.g., primary key) guarantees each row gets a unique sequential integer — essential for offset-based pagination.",
+        },
+        wf_rank_recovery_choice: {
+          id: "wf_rank_recovery_choice",
+          type: "scenario_choice",
+          badge: "Recovery 3",
+          title: "Recovery · Pagination stability requirement",
+          prompt: "Why is ROW_NUMBER with a tiebreaker the canonical pagination solution?",
+          code_snippet: `-- Safe pattern:
+-- ROW_NUMBER() OVER (ORDER BY rating DESC, review_id ASC)`,
+          choices: [
+            { id: "a", label: "It guarantees every row has a unique sequential integer, making OFFSET math exact", description: "The tiebreaker eliminates non-determinism — every page boundary is stable." },
+            { id: "b", label: "It is the only window function that works in WHERE", description: "Window functions are not usable directly in WHERE; wrap in a subquery or CTE regardless of which function you choose." },
+            { id: "c", label: "Tiebreakers slow down the query so they should be avoided", description: "A tiebreaker column typically uses an already-indexed primary key — the overhead is minimal." },
+            { id: "d", label: "DENSE_RANK works equally well for pagination", description: "DENSE_RANK assigns the same number to tied rows — two rows on page boundary can swap between pages." },
+          ],
+          branches: {
+            a: "wf_rank_terminal",
+            b: "wf_rank_recovery_choice",
+            c: "wf_rank_recovery_choice",
+            d: "wf_rank_recovery_choice",
+          },
+          rationale: "Pagination requires a strictly unique, deterministic row number. ROW_NUMBER + tiebreaker is the industry-standard pattern.",
+        },
+        wf_rank_terminal: {
+          id: "wf_rank_terminal",
+          type: "scenario_choice",
+          badge: "Terminal",
+          title: "Revision complete · Ranking functions locked",
+          prompt: "You navigated tie semantics, PARTITION BY scoping, and function selection for pagination.",
+          code_snippet: `-- ROW_NUMBER: unique, use tiebreaker for stability
+-- RANK:       gaps on ties (1, 2, 2, 4)
+-- DENSE_RANK: no gaps on ties (1, 2, 2, 3)
+-- PARTITION BY resets the window per group`,
+          choices: [],
+          branches: {},
+          terminal: true,
+          rationale: "The candidate-ready answer covers all three: ROW_NUMBER for unique IDs, RANK for honest competition gaps, DENSE_RANK for consecutive tier labels. Always ask about PARTITION BY scope.",
+        },
+      },
+    },
+    knowledgeCheck: [],
+  },
+
+  "sq-a2": {
+    durationLabel: "13 min",
+    outcomes: [
+      "Identify when an ORDER BY clause is missing from a window function and explain why that causes an error or undefined results.",
+      "Distinguish between a running total (UNBOUNDED PRECEDING) and a moving average (N PRECEDING) window frame.",
+      "Write correct ROWS BETWEEN syntax for both patterns without looking it up.",
+    ],
+    learnMarkdown: `## ORDER BY inside OVER() is not optional for navigational functions
+
+LAG(), LEAD(), and any function using a ROWS BETWEEN frame require an \`ORDER BY\` clause *inside* the \`OVER()\` clause. Omitting it produces either a compile error (most engines) or non-deterministic results. This is the single most common window-function bug in interviews.
+
+\`\`\`sql
+-- Wrong: no ORDER BY
+LAG(revenue) OVER (PARTITION BY region)
+
+-- Correct
+LAG(revenue, 1) OVER (PARTITION BY region ORDER BY sale_date)
+\`\`\`
+
+## Running total vs moving average — the frame is everything
+
+| Pattern | Frame clause | Effect |
+|---------|-------------|--------|
+| Running SUM | \`ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW\` | Grows from first row to current |
+| 7-day moving AVG | \`ROWS BETWEEN 6 PRECEDING AND CURRENT ROW\` | Fixed 7-row window |
+
+## Interview trap: early rows in a moving average
+
+When fewer than N rows precede the current row, the engine uses whatever rows exist. Row 1 averages over only itself. Explicitly handle or document this boundary behavior in your answer.`,
+    video: null,
+    videoFallbackMarkdown: `## Quick frame drill
+
+Without looking: write the OVER() clause for a running total and for a 30-day moving average. Say aloud why ORDER BY cannot be omitted and what UNBOUNDED PRECEDING means versus 29 PRECEDING.`,
+    tryGuidance: "Open the LAG/LEAD viz, switch between running SUM and moving AVG, and trace how NULL appears at window boundaries.",
+    interviewGraph: {
+      initialStageId: "lag_orderby_click",
+      artifactDimensions: [
+        { label: "ORDER BY Requirement",    recoveryStageId: "lag_orderby_recovery" },
+        { label: "Frame Syntax Recall",      recoveryStageId: "lag_frame_recovery" },
+        { label: "Running vs Moving Choice", recoveryStageId: "lag_calc_recovery", passLabel: "Window Frame Mastery" },
+      ],
+      stages: {
+        lag_orderby_click: {
+          id: "lag_orderby_click",
+          type: "click_target",
+          badge: "Stage 1 target",
+          title: "Stage 1 · Missing ORDER BY in window frame",
+          prompt: "This query is supposed to compute the previous day's revenue using LAG. Click the line that contains the critical omission causing undefined or erroneous behavior.",
+          code_snippet: `SELECT
+  sale_date,
+  revenue,
+  LAG(revenue, 1) OVER (  -- ds-target:missing_order_by
+    PARTITION BY region
+  ) AS prev_day_rev
+FROM daily_sales;`,
+          validationCopy: {
+            missing_order_by: "Correct. LAG() needs ORDER BY inside OVER() to know which row is 'previous'. Without it the engine cannot define row order within the partition — result is non-deterministic or an error.",
+          },
+          branches: {
+            missing_order_by: "lag_orderby_fix_choice",
+          },
+        },
+        lag_orderby_recovery: {
+          id: "lag_orderby_recovery",
+          type: "scenario_choice",
+          badge: "Recovery 1",
+          title: "Recovery · Why ORDER BY is mandatory here",
+          prompt: "The interviewer asks you to explain why ORDER BY inside OVER() is required for LAG(). Which answer is strongest?",
+          code_snippet: `-- OVER() defines the window; ORDER BY inside it
+-- determines row sequence within that window.`,
+          choices: [
+            { id: "a", label: "LAG needs row order to know which row is 'previous' within the partition", description: "Without ORDER BY the concept of 'previous row' is undefined." },
+            { id: "b", label: "ORDER BY is needed to sort the final output", description: "ORDER BY inside OVER() scopes to the window frame, not the result-set sort order." },
+            { id: "c", label: "PARTITION BY already provides the ordering", description: "PARTITION BY divides rows into groups; it does not order rows within those groups." },
+            { id: "d", label: "LAG is only valid without PARTITION BY, not with it", description: "LAG works both with and without PARTITION BY; ORDER BY is always required." },
+          ],
+          branches: {
+            a: "lag_orderby_fix_choice",
+            b: "lag_orderby_recovery",
+            c: "lag_orderby_recovery",
+            d: "lag_orderby_recovery",
+          },
+          rationale: "LAG/LEAD are positional functions — they traverse rows by position in the ORDER BY sequence. Without ORDER BY the position is undefined.",
+        },
+        lag_orderby_fix_choice: {
+          id: "lag_orderby_fix_choice",
+          type: "scenario_choice",
+          badge: "Stage 1 fix",
+          title: "Stage 1 · Write the correct OVER clause",
+          prompt: "Which OVER clause correctly computes the previous day's revenue per region?",
+          code_snippet: `LAG(revenue, 1) OVER ( ??? ) AS prev_day_rev`,
+          choices: [
+            { id: "a", label: "OVER (PARTITION BY region ORDER BY sale_date)", description: "Resets the window per region and orders by date — previous row is the previous date in that region." },
+            { id: "b", label: "OVER (ORDER BY region, sale_date)", description: "ORDER BY region inside OVER does not partition — it treats the whole table as one window sorted by region then date." },
+            { id: "c", label: "OVER (PARTITION BY sale_date ORDER BY revenue)", description: "Partitioning by date groups rows on the same date — LAG would look at a different row on the same date, not the previous date." },
+            { id: "d", label: "OVER ()", description: "Empty OVER() has no ORDER BY — LAG remains undefined." },
+          ],
+          branches: {
+            a: "lag_frame_choice",
+            b: "lag_orderby_recovery",
+            c: "lag_orderby_recovery",
+            d: "lag_orderby_recovery",
+          },
+          rationale: "PARTITION BY region scopes the window; ORDER BY sale_date defines row sequence. Together they make 'previous day within region' unambiguous.",
+        },
+        lag_frame_choice: {
+          id: "lag_frame_choice",
+          type: "scenario_choice",
+          badge: "Stage 2 frame",
+          title: "Stage 2 · Running total vs moving average frame",
+          prompt: "The analyst now wants a 7-day moving average of revenue (not a running total). Which ROWS BETWEEN clause is correct?",
+          code_snippet: `AVG(revenue) OVER (
+  ORDER BY sale_date
+  ROWS BETWEEN ??? AND CURRENT ROW
+) AS revenue_7d_avg`,
+          choices: [
+            { id: "a", label: "ROWS BETWEEN 6 PRECEDING AND CURRENT ROW", description: "Current row + 6 rows before = exactly 7 rows (when history exists)." },
+            { id: "b", label: "ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW", description: "This is a running average, not a fixed-window moving average — the denominator grows every row." },
+            { id: "c", label: "ROWS BETWEEN 7 PRECEDING AND CURRENT ROW", description: "7 PRECEDING + CURRENT ROW = 8 rows total, not 7." },
+            { id: "d", label: "ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING", description: "This is a centered 3-row window — not a trailing 7-day window." },
+          ],
+          branches: {
+            a: "lag_calc_choice",
+            b: "lag_frame_recovery",
+            c: "lag_frame_recovery",
+            d: "lag_frame_recovery",
+          },
+          rationale: "A trailing N-day window uses N-1 PRECEDING AND CURRENT ROW. For 7 days: 6 PRECEDING AND CURRENT ROW.",
+        },
+        lag_frame_recovery: {
+          id: "lag_frame_recovery",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery · Frame arithmetic",
+          prompt: "Fix the frame arithmetic. If you want exactly 30 rows ending at the current row, which clause do you write?",
+          code_snippet: `-- Window of 30 rows: current + 29 before it`,
+          choices: [
+            { id: "a", label: "ROWS BETWEEN 29 PRECEDING AND CURRENT ROW", description: "29 preceding rows + current row = 30 rows total." },
+            { id: "b", label: "ROWS BETWEEN 30 PRECEDING AND CURRENT ROW", description: "30 preceding + current = 31 rows total — one too many." },
+            { id: "c", label: "ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW", description: "Unbounded is a running total — the window grows indefinitely." },
+            { id: "d", label: "ROWS BETWEEN CURRENT ROW AND 29 FOLLOWING", description: "FOLLOWING looks forward, not backward — this would be a leading window, not a trailing one." },
+          ],
+          branches: {
+            a: "lag_calc_choice",
+            b: "lag_frame_recovery",
+            c: "lag_frame_recovery",
+            d: "lag_frame_recovery",
+          },
+          rationale: "N-day trailing window = N-1 PRECEDING AND CURRENT ROW. Always subtract 1 because CURRENT ROW counts as one of the N rows.",
+        },
+        lag_calc_choice: {
+          id: "lag_calc_choice",
+          type: "scenario_choice",
+          badge: "Stage 3 trade-off",
+          title: "Stage 3 · Running total vs moving average — when to use each",
+          prompt: "A finance dashboard needs both the all-time cumulative revenue and the 30-day smoothed trend line. Which column definitions are correct?",
+          code_snippet: `SELECT
+  sale_date,
+  revenue,
+  ??? AS cumulative_rev,
+  ??? AS trend_30d
+FROM daily_sales;`,
+          choices: [
+            { id: "a", label: "SUM UNBOUNDED PRECEDING for cumulative; AVG 29 PRECEDING for trend", description: "Running total grows from the beginning; moving average captures a fixed recent window." },
+            { id: "b", label: "Both use UNBOUNDED PRECEDING", description: "UNBOUNDED PRECEDING for AVG produces a running average, not a fixed 30-day window." },
+            { id: "c", label: "Both use 29 PRECEDING", description: "SUM with 29 PRECEDING gives a 30-day rolling sum, not an all-time cumulative total." },
+            { id: "d", label: "Use LAG(revenue, 30) for the trend line", description: "LAG(30) returns the revenue exactly 30 rows back — it is not an average or a trend." },
+          ],
+          branches: {
+            a: "lag_terminal",
+            b: "lag_calc_recovery",
+            c: "lag_calc_recovery",
+            d: "lag_calc_recovery",
+          },
+          rationale: "Cumulative and moving calculations use different frames. UNBOUNDED PRECEDING is for running totals; N PRECEDING is for fixed rolling windows.",
+        },
+        lag_calc_recovery: {
+          id: "lag_calc_recovery",
+          type: "scenario_choice",
+          badge: "Recovery 3",
+          title: "Recovery · Match pattern to frame",
+          prompt: "Match the business requirement to the correct ROWS BETWEEN frame.",
+          code_snippet: `-- A: All-time revenue since first row
+-- B: Average of last 7 rows only`,
+          choices: [
+            { id: "a", label: "A → UNBOUNDED PRECEDING AND CURRENT ROW; B → 6 PRECEDING AND CURRENT ROW", description: "Running total uses unbounded start; 7-row moving average uses 6 preceding." },
+            { id: "b", label: "A → 6 PRECEDING AND CURRENT ROW; B → UNBOUNDED PRECEDING", description: "These are swapped — unbounded is for cumulative, not fixed window." },
+            { id: "c", label: "Both → CURRENT ROW AND UNBOUNDED FOLLOWING", description: "FOLLOWING looks forward — this would be a future-looking window, not historical." },
+            { id: "d", label: "A → UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING; B → 6 PRECEDING AND 6 FOLLOWING", description: "UNBOUNDED FOLLOWING includes future rows — inappropriate for a cumulative running total on streaming or date-ordered data." },
+          ],
+          branches: {
+            a: "lag_terminal",
+            b: "lag_calc_recovery",
+            c: "lag_calc_recovery",
+            d: "lag_calc_recovery",
+          },
+          rationale: "The two canonical frames: UNBOUNDED PRECEDING for running totals; N-1 PRECEDING for N-row trailing windows.",
+        },
+        lag_terminal: {
+          id: "lag_terminal",
+          type: "scenario_choice",
+          badge: "Terminal",
+          title: "Revision complete · LAG/LEAD and window frames locked",
+          prompt: "You correctly identified the missing ORDER BY, fixed the frame arithmetic, and distinguished running totals from moving averages.",
+          code_snippet: `-- LAG/LEAD: ORDER BY required inside OVER()
+-- Running total: SUM() OVER (ORDER BY d ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+-- Moving avg:   AVG() OVER (ORDER BY d ROWS BETWEEN N-1 PRECEDING AND CURRENT ROW)`,
+          choices: [],
+          branches: {},
+          terminal: true,
+          rationale: "Candidate-ready answers: ORDER BY inside OVER() is mandatory for positional functions; UNBOUNDED PRECEDING = cumulative; N-1 PRECEDING = fixed rolling window. Early rows in a rolling window use a shorter effective window.",
+        },
+      },
+    },
+    knowledgeCheck: [],
+  },
+
+  "sq-a3": {
+    durationLabel: "15 min",
+    outcomes: [
+      "Explain the difference between a CTE that is inlined by the optimizer versus one that is explicitly materialized, and why this matters for performance.",
+      "Identify the base case and recursive step in a recursive CTE and predict the termination condition.",
+      "Rewrite an over-eager early-filter CTE pattern and a broken recursive base case without help.",
+    ],
+    learnMarkdown: `## CTEs: readability tool or performance trap?
+
+A WITH clause CTE is primarily a readability and scoping tool. Most engines (PostgreSQL, BigQuery, Snowflake) inline CTEs by default — the optimizer expands them into the main query, and they are NOT guaranteed to be executed only once or stored as a temp table.
+
+**Interview trap:** "Can I use a CTE to cache an expensive subquery?" — Only if the engine materializes it. PostgreSQL 12+ materializes CTEs with \`WITH ... AS MATERIALIZED (...)\`. Other engines vary. Don't assume.
+
+## Recursive CTEs — three-part structure
+
+\`\`\`sql
+WITH RECURSIVE cte AS (
+  -- 1. Base case (anchor): non-recursive start
+  SELECT id, name, 0 AS depth FROM employees WHERE manager_id IS NULL
+  UNION ALL
+  -- 2. Recursive step: references the CTE
+  SELECT e.id, e.name, c.depth + 1
+  FROM employees e JOIN cte c ON e.manager_id = c.id
+)
+SELECT * FROM cte;
+\`\`\`
+
+Common bugs: forgetting \`RECURSIVE\` keyword, missing base case, or a recursive step that never returns zero rows (infinite loop).
+
+## Mental model
+
+A recursive CTE is like a loop: anchor runs once, recursive step runs until empty. If the recursive step can always find new rows, the engine hits a depth limit and errors.`,
+    video: null,
+    videoFallbackMarkdown: `## Quick CTE drill
+
+Write a 2-step CTE chain from memory: one CTE that filters orders, a second that aggregates them. Then write the 3-line structure of a recursive CTE (base case, UNION ALL, recursive step). Say aloud what causes infinite recursion.`,
+    tryGuidance: "Open the CTE Explorer viz, click each step to trace the transformation chain, then switch to the Recursive CTE tab to trace the org tree.",
+    interviewGraph: {
+      initialStageId: "cte_materialize_choice",
+      artifactDimensions: [
+        { label: "CTE Materialization Semantics", recoveryStageId: "cte_materialize_recovery" },
+        { label: "Recursive Base Case Correctness", recoveryStageId: "cte_recursive_recovery" },
+        { label: "Termination Condition Reasoning",  recoveryStageId: "cte_terminate_recovery", passLabel: "CTE & Recursive Query Mastery" },
+      ],
+      stages: {
+        cte_materialize_choice: {
+          id: "cte_materialize_choice",
+          type: "scenario_choice",
+          badge: "Stage 1 choice",
+          title: "Stage 1 · CTE over-eager materialization",
+          prompt: "A teammate wraps an expensive 500M-row aggregation in a CTE, expecting it to execute only once and be reused. Which statement is most accurate?",
+          code_snippet: `WITH expensive_agg AS (
+  SELECT customer_id, SUM(amount) AS ltv
+  FROM orders                        -- 500M rows
+  GROUP BY customer_id
+)
+SELECT * FROM expensive_agg WHERE ltv > 1000
+UNION ALL
+SELECT * FROM expensive_agg WHERE ltv <= 1000;`,
+          choices: [
+            { id: "a", label: "CTEs are guaranteed to execute once and cache the result", description: "This is a common myth. Most engines inline CTEs — expensive_agg may run twice, once per reference." },
+            { id: "b", label: "By default most engines inline CTEs; the aggregation may run twice", description: "Without explicit MATERIALIZED keyword (Postgres 12+), the optimizer may inline and re-execute the CTE." },
+            { id: "c", label: "UNION ALL prevents the optimizer from inlining CTEs", description: "UNION ALL is a set operation on the outer query; it does not affect CTE materialization behavior." },
+            { id: "d", label: "Referencing a CTE twice always forces materialization in all engines", description: "Only some engines (e.g., SQL Server in certain versions) materialize on multiple references; behavior varies." },
+          ],
+          branches: {
+            a: "cte_materialize_recovery",
+            b: "cte_early_filter_choice",
+            c: "cte_materialize_recovery",
+            d: "cte_materialize_recovery",
+          },
+          rationale: "CTEs are NOT a caching mechanism by default. The safe approach is to use a temp table or MATERIALIZED hint when caching is needed.",
+        },
+        cte_materialize_recovery: {
+          id: "cte_materialize_recovery",
+          type: "scenario_choice",
+          badge: "Recovery 1",
+          title: "Recovery · CTE inlining vs materialization",
+          prompt: "How do you guarantee that an expensive CTE runs only once in PostgreSQL 12+?",
+          code_snippet: `-- Default: optimizer may inline and re-run
+WITH cte AS (SELECT ...)
+
+-- Force materialization:
+WITH cte AS MATERIALIZED (SELECT ...)`,
+          choices: [
+            { id: "a", label: "Use WITH cte AS MATERIALIZED (...) to force a single execution", description: "MATERIALIZED keyword tells the planner to store the result rather than inline." },
+            { id: "b", label: "Reference the CTE only once", description: "Single reference is a hint that may help, but the optimizer can still inline. MATERIALIZED is the explicit guarantee." },
+            { id: "c", label: "Wrap the CTE in a second CTE", description: "Nesting CTEs does not prevent inlining — the optimizer flattens nested CTEs too." },
+            { id: "d", label: "Add DISTINCT inside the CTE", description: "DISTINCT deduplicates rows; it has no effect on whether the CTE is materialized." },
+          ],
+          branches: {
+            a: "cte_early_filter_choice",
+            b: "cte_materialize_recovery",
+            c: "cte_materialize_recovery",
+            d: "cte_materialize_recovery",
+          },
+          rationale: "MATERIALIZED is the explicit keyword (Postgres 12+). For engines without it, a temporary table or subquery with OFFSET 0 hack can force materialization.",
+        },
+        cte_early_filter_choice: {
+          id: "cte_early_filter_choice",
+          type: "scenario_choice",
+          badge: "Stage 2 early filter",
+          title: "Stage 2 · Over-eager early filter in CTE chain",
+          prompt: "A CTE chain filters to status = 'active' in step 1. Step 2 later needs both active and inactive rows for a cohort comparison. What went wrong?",
+          code_snippet: `WITH step1 AS (
+  SELECT * FROM users WHERE status = 'active'  -- filters too early
+),
+step2 AS (
+  SELECT user_id, COUNT(*) AS events
+  FROM events
+  JOIN step1 USING (user_id)        -- inactive users lost forever
+  GROUP BY user_id
+)
+SELECT * FROM step2;`,
+          choices: [
+            { id: "a", label: "The WHERE in step1 eliminates inactive users before step2 can include them", description: "Once filtered out in step1, inactive users cannot be recovered in downstream CTEs." },
+            { id: "b", label: "JOIN USING is not portable SQL", description: "JOIN USING is standard SQL supported by all major engines — not the issue here." },
+            { id: "c", label: "step2 should use a LEFT JOIN instead", description: "A LEFT JOIN would help recover missing rows from step1, but the root cause is the premature filter in step1." },
+            { id: "d", label: "CTEs cannot be JOINed to other tables", description: "CTEs can be used anywhere a table reference is valid, including JOINs." },
+          ],
+          branches: {
+            a: "cte_recursive_click",
+            b: "cte_materialize_recovery",
+            c: "cte_materialize_recovery",
+            d: "cte_materialize_recovery",
+          },
+          rationale: "Push row-level filters as late as correctness allows. Filtering too early in a CTE truncates data for all downstream steps.",
+        },
+        cte_recursive_click: {
+          id: "cte_recursive_click",
+          type: "click_target",
+          badge: "Stage 3 target",
+          title: "Stage 3 · Broken recursive CTE base case",
+          prompt: "This recursive CTE is supposed to traverse an employee hierarchy starting from the CEO (manager_id IS NULL). Click the line that contains the base-case error that causes the recursion to return zero rows.",
+          code_snippet: `WITH RECURSIVE org AS (
+  SELECT id, name, manager_id, 0 AS depth
+  FROM employees
+  WHERE manager_id = 0         -- ds-target:wrong_base_case
+  UNION ALL
+  SELECT e.id, e.name, e.manager_id, o.depth + 1
+  FROM employees e
+  JOIN org o ON e.manager_id = o.id
+)
+SELECT * FROM org;`,
+          validationCopy: {
+            wrong_base_case: "Correct. The base case uses manager_id = 0 but root employees have manager_id IS NULL (no manager). The anchor returns zero rows, so the recursive step never fires and the CTE returns nothing.",
+          },
+          branches: {
+            wrong_base_case: "cte_terminate_choice",
+          },
+        },
+        cte_recursive_recovery: {
+          id: "cte_recursive_recovery",
+          type: "scenario_choice",
+          badge: "Recovery 3",
+          title: "Recovery · Base case and termination",
+          prompt: "State the two rules that a correctly structured recursive CTE must satisfy.",
+          code_snippet: `-- A recursive CTE has two required parts:
+-- 1. Base case (anchor)
+-- 2. Recursive step (references the CTE itself)`,
+          choices: [
+            { id: "a", label: "Base case returns initial rows; recursive step adds rows until none match", description: "The anchor seeds the result set; recursion continues until the recursive step returns an empty set." },
+            { id: "b", label: "The base case must use DISTINCT to prevent loops", description: "DISTINCT does not prevent infinite recursion — the termination condition comes from the JOIN logic." },
+            { id: "c", label: "UNION instead of UNION ALL prevents duplicates and automatically terminates", description: "UNION removes duplicates but does not guarantee termination — you can still loop with UNION if the graph has cycles." },
+            { id: "d", label: "The recursive step must reference a different table than the base case", description: "Both the base case and recursive step typically reference the same table (e.g., employees); the difference is the JOIN predicate." },
+          ],
+          branches: {
+            a: "cte_terminate_choice",
+            b: "cte_recursive_recovery",
+            c: "cte_recursive_recovery",
+            d: "cte_recursive_recovery",
+          },
+          rationale: "Anchor seeds the result; recursive step joins the CTE to itself. Termination happens when the recursive step finds no new rows.",
+        },
+        cte_terminate_choice: {
+          id: "cte_terminate_choice",
+          type: "scenario_choice",
+          badge: "Stage 3 termination",
+          title: "Stage 3 · Termination and infinite recursion risk",
+          prompt: "A recursive CTE traverses a directed graph of account relationships. Some accounts link to each other in a cycle (A → B → A). What happens and how do you prevent it?",
+          code_snippet: `-- Graph: A → B → A (cycle)
+-- Recursive step: JOIN cte ON next_id = cte.current_id`,
+          choices: [
+            { id: "a", label: "The engine recurses forever until it hits the max-depth limit and errors; use a visited-path array or depth limit to break cycles", description: "Cycle detection via array_agg path or a max depth guard is the standard fix." },
+            { id: "b", label: "The engine detects cycles automatically and stops", description: "Standard SQL engines do not auto-detect cycles — you must guard against them explicitly." },
+            { id: "c", label: "UNION ALL prevents revisiting the same row twice", description: "UNION ALL appends all rows including duplicates — it does not deduplicate or break cycles." },
+            { id: "d", label: "Add WHERE depth < 100 to the base case", description: "The depth guard should be on the recursive step (WHERE o.depth + 1 < 100), not the base case." },
+          ],
+          branches: {
+            a: "cte_terminal",
+            b: "cte_terminate_recovery",
+            c: "cte_terminate_recovery",
+            d: "cte_terminate_recovery",
+          },
+          rationale: "Cycles in recursive CTEs cause infinite recursion. The standard techniques are: depth column with WHERE depth < N guard, or a visited-path array to detect when a node has been seen before.",
+        },
+        cte_terminate_recovery: {
+          id: "cte_terminate_recovery",
+          type: "scenario_choice",
+          badge: "Recovery 3",
+          title: "Recovery · Cycle guard pattern",
+          prompt: "Which guard correctly limits recursion depth and prevents runaway queries?",
+          code_snippet: `WITH RECURSIVE cte AS (
+  SELECT id, name, 0 AS depth FROM nodes WHERE parent_id IS NULL
+  UNION ALL
+  SELECT n.id, n.name, c.depth + 1
+  FROM nodes n JOIN cte c ON n.parent_id = c.id
+  WHERE ???        -- cycle guard goes here
+)`,
+          choices: [
+            { id: "a", label: "WHERE c.depth + 1 < 50", description: "Caps the recursion at 50 levels. Recursive step stops generating rows once depth reaches 50." },
+            { id: "b", label: "WHERE n.id != c.id", description: "Only prevents a node from being its own direct parent — does not catch longer cycles like A → B → A." },
+            { id: "c", label: "WHERE depth = 0", description: "depth = 0 would only include rows at depth 0 in the recursive step — stopping recursion on the first iteration." },
+            { id: "d", label: "LIMIT 1000 in the final SELECT", description: "LIMIT on the outer SELECT truncates output rows; it does not limit or terminate the recursion itself." },
+          ],
+          branches: {
+            a: "cte_terminal",
+            b: "cte_terminate_recovery",
+            c: "cte_terminate_recovery",
+            d: "cte_terminate_recovery",
+          },
+          rationale: "Depth guard in the recursive step WHERE clause is the simplest cycle protection. For true cycle detection use an array path column and check NOT (n.id = ANY(path)).",
+        },
+        cte_terminal: {
+          id: "cte_terminal",
+          type: "scenario_choice",
+          badge: "Terminal",
+          title: "Revision complete · CTEs and recursive queries locked",
+          prompt: "You identified CTE inlining semantics, early-filter scoping, base-case errors, and cycle guard patterns.",
+          code_snippet: `-- CTEs: inlined by default; use MATERIALIZED to cache
+-- Early filters in CTEs truncate data for all downstream steps
+-- Recursive CTE: base case seeds; recursive step runs until empty
+-- Cycle guard: WHERE depth + 1 < N in the recursive step`,
+          choices: [],
+          branches: {},
+          terminal: true,
+          rationale: "Candidate-ready answers: CTEs are not cached by default; over-filtering in CTEs truncates downstream data; recursive CTEs need a correct base case and a cycle guard for graph traversal.",
+        },
+      },
+    },
+    knowledgeCheck: [],
+  },
+
+  "sq-a4": {
+    durationLabel: "14 min",
+    outcomes: [
+      "Translate any row-to-column transformation into portable SUM(CASE WHEN ...) syntax.",
+      "Explain when PIVOT keyword syntax is appropriate and what its portability limits are.",
+      "Identify static vs dynamic pivot scenarios and choose the right implementation strategy.",
+    ],
+    learnMarkdown: `## Rapid revision: PIVOT & conditional aggregation
+
+A pivot turns distinct values in one column into separate output columns. The portable way to do this in any SQL dialect is conditional aggregation:
+
+\`\`\`sql
+SELECT
+  month,
+  SUM(CASE WHEN product = 'Widget' THEN revenue ELSE 0 END) AS Widget,
+  SUM(CASE WHEN product = 'Gadget' THEN revenue ELSE 0 END) AS Gadget
+FROM sales
+GROUP BY month;
+\`\`\`
+
+The CASE expression selects the revenue for one product per row and returns 0 for all others. SUM collapses the group.
+
+## PIVOT keyword (dialect-specific)
+
+SQL Server, Snowflake, and BigQuery support a PIVOT clause that does the same thing with less boilerplate. PostgreSQL and MySQL do not.
+
+\`\`\`sql
+-- SQL Server / Snowflake
+SELECT month, [Widget], [Gadget]
+FROM sales
+PIVOT (SUM(revenue) FOR product IN ([Widget], [Gadget])) AS pvt;
+\`\`\`
+
+## Interview muscle memory
+
+- Default to CASE-based aggregation in cross-dialect interviews.
+- Both PIVOT and CASE require static column lists — dynamic value sets need dynamic SQL or a BI layer.
+- UNPIVOT (or UNION ALL with literals) reverses the operation: wide table back to narrow.`,
+    video: null,
+    videoFallbackMarkdown: `## 3-minute pivot drill
+
+Write a CASE-based pivot for a table with columns (year, quarter, sales). Produce columns: year, Q1, Q2, Q3, Q4.
+
+Then explain what changes are needed if the quarters are stored as 1, 2, 3, 4 (integers) instead of 'Q1', 'Q2', etc.`,
+    tryGuidance: "Run the interview simulation. Click the CASE pivot query that uses COUNT instead of SUM, then handle the dynamic vs static pivot trade-off.",
+    interviewGraph: {
+      initialStageId: "pivot_wrong_agg_click",
+      artifactDimensions: [
+        { label: "CASE Aggregation Precision", recoveryStageId: "pivot_recovery_agg" },
+        { label: "PIVOT Portability Awareness", recoveryStageId: "pivot_recovery_portability" },
+        { label: "Dynamic vs Static Pivot Trade-Off", recoveryStageId: "pivot_recovery_dynamic", passLabel: "Pivot Trade-Off Clear" },
+      ],
+      stages: {
+        pivot_wrong_agg_click: {
+          id: "pivot_wrong_agg_click",
+          type: "click_target",
+          badge: "Stage 1 target",
+          title: "Stage 1 · Wrong aggregation in a CASE pivot",
+          prompt: "The analyst wants total revenue per product per month, but the query returns wrong numbers. Click the exact line with the aggregation bug.",
+          code_snippet: `SELECT
+  month,
+  COUNT(CASE WHEN product = 'Widget' THEN revenue END) AS Widget, -- ds-target:wrong_agg
+  COUNT(CASE WHEN product = 'Gadget' THEN revenue END) AS Gadget,
+  COUNT(CASE WHEN product = 'Donut'  THEN revenue END) AS Donut
+FROM sales
+GROUP BY month;`,
+          validationCopy: {
+            wrong_agg: "Correct. COUNT counts how many rows match, not the sum of revenue. The fix is SUM(CASE WHEN product = 'Widget' THEN revenue ELSE 0 END).",
+          },
+          branches: {
+            wrong_agg: "pivot_portability_choice",
+          },
+        },
+        pivot_recovery_agg: {
+          id: "pivot_recovery_agg",
+          type: "scenario_choice",
+          badge: "Recovery 1",
+          title: "Recovery · Choose the right aggregation",
+          prompt: "The query uses COUNT inside CASE. What is the impact on a month that has 3 Widget rows with revenues 100, 200, 300?",
+          code_snippet: `-- COUNT(CASE WHEN product = 'Widget' THEN revenue END)
+-- vs
+-- SUM(CASE WHEN product = 'Widget' THEN revenue ELSE 0 END)`,
+          choices: [
+            { id: "a", label: "COUNT returns 3, SUM returns 600 — different answers for different business needs", description: "COUNT answers 'how many Widget rows', SUM answers 'total Widget revenue'." },
+            { id: "b", label: "COUNT and SUM always return the same value", description: "COUNT returns row count; SUM returns the sum of values. They are different." },
+            { id: "c", label: "COUNT returns 600, SUM returns 3", description: "COUNT returns the number of non-NULL values (3), SUM returns the total (600)." },
+            { id: "d", label: "Both return NULL when no rows match", description: "SUM of an empty group returns NULL; COUNT returns 0." },
+          ],
+          branches: {
+            a: "pivot_portability_choice",
+            b: "pivot_recovery_agg",
+            c: "pivot_recovery_agg",
+            d: "pivot_recovery_agg",
+          },
+          rationale: "COUNT inside CASE counts matching rows. SUM inside CASE totals matching values. The goal (revenue total) requires SUM.",
+        },
+        pivot_portability_choice: {
+          id: "pivot_portability_choice",
+          type: "scenario_choice",
+          badge: "Stage 2 portability",
+          title: "Stage 2 · The interviewer asks about PIVOT syntax",
+          prompt: "Your team wants to switch from CASE-based aggregation to the PIVOT keyword. What is the most important portability caveat to raise?",
+          code_snippet: `-- CASE version (universal):
+SUM(CASE WHEN product = 'Widget' THEN revenue ELSE 0 END)
+
+-- PIVOT version (dialect-specific):
+PIVOT (SUM(revenue) FOR product IN ([Widget]))`,
+          choices: [
+            { id: "a", label: "PIVOT is not supported in PostgreSQL or MySQL", description: "PostgreSQL and MySQL lack native PIVOT — you must use CASE there." },
+            { id: "b", label: "PIVOT always runs slower than CASE", description: "Performance depends on the engine; PIVOT is syntactic sugar in engines that support it." },
+            { id: "c", label: "CASE cannot handle NULL revenue values", description: "CASE with ELSE 0 handles NULLs correctly." },
+            { id: "d", label: "PIVOT requires an index on the pivoted column", description: "PIVOT does not require an index; it is a query-shape change, not an access-path requirement." },
+          ],
+          branches: {
+            a: "pivot_dynamic_choice",
+            b: "pivot_recovery_portability",
+            c: "pivot_recovery_portability",
+            d: "pivot_recovery_portability",
+          },
+          rationale: "PIVOT is supported in SQL Server, Azure Synapse, Snowflake, BigQuery — but not in PostgreSQL or MySQL. Always name the dialect when recommending PIVOT.",
+        },
+        pivot_recovery_portability: {
+          id: "pivot_recovery_portability",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery · Name a database that lacks PIVOT",
+          prompt: "The interviewer asks you to name a widely-used database that does NOT support the PIVOT keyword.",
+          code_snippet: `-- Engines with PIVOT: SQL Server, Snowflake, BigQuery, Azure Synapse
+-- Engines without: ???`,
+          choices: [
+            { id: "a", label: "PostgreSQL", description: "Correct — PostgreSQL has no native PIVOT. Use CASE or the crosstab() extension." },
+            { id: "b", label: "SQL Server", description: "SQL Server introduced PIVOT in 2005 and supports it natively." },
+            { id: "c", label: "Snowflake", description: "Snowflake supports PIVOT natively." },
+            { id: "d", label: "BigQuery", description: "BigQuery added PIVOT support in 2021." },
+          ],
+          branches: {
+            a: "pivot_dynamic_choice",
+            b: "pivot_recovery_portability",
+            c: "pivot_recovery_portability",
+            d: "pivot_recovery_portability",
+          },
+          rationale: "PostgreSQL is the most common example without native PIVOT. MySQL also lacks it.",
+        },
+        pivot_dynamic_choice: {
+          id: "pivot_dynamic_choice",
+          type: "scenario_choice",
+          badge: "Stage 3 trade-off",
+          title: "Stage 3 · Dynamic pivot trade-off",
+          prompt: "The product catalog grows weekly and now has 300 products. Both PIVOT and CASE require you to list product names statically. What is the correct solution?",
+          code_snippet: `-- Problem: new products appear weekly
+-- Static list breaks immediately
+PIVOT (SUM(revenue) FOR product IN ([Widget], [Gadget], ...300 products))`,
+          choices: [
+            { id: "a", label: "Dynamic SQL: query distinct products first, then build the CASE/PIVOT list at runtime", description: "Dynamic SQL (EXECUTE/sp_executesql) generates the column list from live data." },
+            { id: "b", label: "Add a product column to the WHERE clause", description: "Filtering products does not create dynamic columns." },
+            { id: "c", label: "Create 300 separate queries and UNION them", description: "UNION produces rows, not new columns. This would not pivot the data." },
+            { id: "d", label: "Use COUNT instead of SUM to avoid listing products", description: "The aggregation function does not determine whether columns are dynamic." },
+          ],
+          branches: {
+            a: "pivot_terminal",
+            b: "pivot_recovery_dynamic",
+            c: "pivot_recovery_dynamic",
+            d: "pivot_recovery_dynamic",
+          },
+          rationale: "Static pivot lists require maintenance every time the dimension changes. Dynamic SQL reads the live values and constructs the expression at query time.",
+        },
+        pivot_recovery_dynamic: {
+          id: "pivot_recovery_dynamic",
+          type: "scenario_choice",
+          badge: "Recovery 3",
+          title: "Recovery · Dynamic pivot pattern",
+          prompt: "Which tool or technique handles pivot columns that are not known at query-write time?",
+          code_snippet: `-- Step 1: discover column values
+SELECT DISTINCT product FROM sales;
+
+-- Step 2: build and execute dynamic SQL`,
+          choices: [
+            { id: "a", label: "Dynamic SQL (EXECUTE with a built string) or a BI tool that pivots at render time", description: "Both are correct for different use cases." },
+            { id: "b", label: "A materialized view with fixed columns", description: "A fixed materialized view still requires manual column changes when new products appear." },
+            { id: "c", label: "DISTINCT in the PIVOT IN clause", description: "PIVOT IN does not accept subqueries in most dialects — you must list values explicitly." },
+            { id: "d", label: "A FULL OUTER JOIN on all products", description: "FULL JOIN changes row grain, not column width." },
+          ],
+          branches: {
+            a: "pivot_terminal",
+            b: "pivot_recovery_dynamic",
+            c: "pivot_recovery_dynamic",
+            d: "pivot_recovery_dynamic",
+          },
+          rationale: "Dynamic SQL builds the PIVOT or CASE column list at execution time from a data query. BI layers (Looker, Power BI) can also pivot at render time, which is often the cleaner production solution.",
+        },
+        pivot_terminal: {
+          id: "pivot_terminal",
+          type: "scenario_choice",
+          badge: "Terminal",
+          title: "Revision complete · Pivot mastered",
+          prompt: "You identified the wrong aggregation, named the portability limits of PIVOT, and solved the dynamic column problem.",
+          code_snippet: `-- Interview-ready summary:
+-- Use SUM(CASE WHEN ...) for portability
+-- Use PIVOT keyword in dialects that support it (name them)
+-- Use dynamic SQL or a BI layer when column values are not static`,
+          choices: [],
+          branches: {},
+          terminal: true,
+          rationale: "The candidate-ready answer covers: CASE is universal; PIVOT is dialect-specific (SQL Server/Snowflake/BigQuery yes, Postgres/MySQL no); dynamic columns require dynamic SQL or a BI rendering layer.",
+        },
+      },
+    },
+    knowledgeCheck: [],
+  },
+
+  "sq-a5": {
+    durationLabel: "16 min",
+    outcomes: [
+      "Read an EXPLAIN plan and identify Seq Scan, Index Scan, and Hash Join nodes.",
+      "Choose between single-column and composite indexes based on query predicate order.",
+      "Articulate join order and index selection as interviewer-facing trade-off decisions.",
+    ],
+    learnMarkdown: `## Rapid revision: EXPLAIN and query optimization
+
+Every SQL engine has a planner that chooses how to execute your query. Use EXPLAIN (or EXPLAIN ANALYZE in Postgres) to see the plan.
+
+\`\`\`sql
+EXPLAIN SELECT * FROM orders WHERE customer_id = 'C42';
+\`\`\`
+
+## Key plan nodes
+
+- **Seq Scan** — reads every row. Cost is proportional to table size. Unavoidable if no useful index exists.
+- **Index Scan** — follows a B-tree to matching rows. Fast for high-selectivity predicates (few rows match).
+- **Index Only Scan** — satisfies the query entirely from the index without touching the heap.
+- **Hash Join** — builds a hash table on the smaller input, then probes with the larger input. Scales well when the build side fits in memory.
+- **Sort** — materializes and sorts rows for ORDER BY or Merge Join. Appears in cost when no pre-sorted index exists.
+
+## Interview muscle memory
+
+- Always check EXPLAIN before assuming a query is slow.
+- Composite indexes work left-to-right: \`(customer_id, created_at)\` supports predicates on \`customer_id\` alone or on both columns, but NOT on \`created_at\` alone.
+- High estimated rows under a Seq Scan node = primary optimization target.`,
+    video: null,
+    videoFallbackMarkdown: `## 3-minute plan drill
+
+Given EXPLAIN output showing Seq Scan cost=45000 and Hash Join cost=200, answer:
+1. Which node is the bottleneck?
+2. What index would convert the Seq Scan to an Index Scan?
+3. Does adding LIMIT 10 help before or after the Seq Scan runs?`,
+    tryGuidance: "Click the subquery pattern that forces a full scan on every outer row, then handle index selection and join-order trade-offs.",
+    interviewGraph: {
+      initialStageId: "explain_corr_click",
+      artifactDimensions: [
+        { label: "Plan Node Recognition", recoveryStageId: "explain_recovery_seqscan" },
+        { label: "Index Selection Instinct", recoveryStageId: "explain_recovery_index" },
+        { label: "Join Order Trade-Off", recoveryStageId: "explain_recovery_joinorder", passLabel: "Optimization Trade-Off Clear" },
+      ],
+      stages: {
+        explain_corr_click: {
+          id: "explain_corr_click",
+          type: "click_target",
+          badge: "Stage 1 target",
+          title: "Stage 1 · Spot the correlated subquery forcing a full scan",
+          prompt: "This query returns correct results but EXPLAIN shows a Seq Scan executed millions of times. Click the line that causes row-by-row re-evaluation.",
+          code_snippet: `SELECT
+  o.order_id,
+  o.customer_id,
+  (SELECT SUM(oi.amount)          -- ds-target:corr_subq
+   FROM order_items oi
+   WHERE oi.order_id = o.order_id  -- references outer row each time
+  ) AS total_amount
+FROM orders o
+WHERE o.created_at >= '2024-01-01';`,
+          validationCopy: {
+            corr_subq: "Correct. This correlated subquery re-executes for each outer row. EXPLAIN will show a Seq Scan or Index Scan inside the subquery repeated N times — one per orders row.",
+          },
+          branches: {
+            corr_subq: "explain_index_choice",
+          },
+        },
+        explain_recovery_seqscan: {
+          id: "explain_recovery_seqscan",
+          type: "scenario_choice",
+          badge: "Recovery 1",
+          title: "Recovery · Identify the Seq Scan consequence",
+          prompt: "EXPLAIN shows cost=0.00..45000.00 on a Seq Scan node. The table has 5 million rows. What does this tell you?",
+          code_snippet: `Seq Scan on orders  (cost=0.00..45000.00 rows=5000000)
+  Filter: (created_at >= '2024-01-01')`,
+          choices: [
+            { id: "a", label: "The engine is reading every row in orders before applying the filter", description: "Seq Scan + Filter means all rows are read; matching rows are kept." },
+            { id: "b", label: "The query has a syntax error that prevents index use", description: "Seq Scan is a valid execution choice, not a syntax problem." },
+            { id: "c", label: "The optimizer decided this is cheaper than an index scan", description: "Possible for very low-selectivity queries, but not the typical interview answer." },
+            { id: "d", label: "EXPLAIN always shows Seq Scan regardless of indexes", description: "EXPLAIN reflects the actual plan chosen, including index usage." },
+          ],
+          branches: {
+            a: "explain_index_choice",
+            b: "explain_recovery_seqscan",
+            c: "explain_recovery_seqscan",
+            d: "explain_recovery_seqscan",
+          },
+          rationale: "Seq Scan reads the full table heap. For selective predicates on large tables this is the primary bottleneck to address.",
+        },
+        explain_index_choice: {
+          id: "explain_index_choice",
+          type: "scenario_choice",
+          badge: "Stage 2 index",
+          title: "Stage 2 · Choose the right index for two predicates",
+          prompt: "The query filters on both customer_id (equality) and created_at (range). Which index design is most efficient?",
+          code_snippet: `SELECT customer_id, SUM(amount)
+FROM orders
+WHERE customer_id = 'C42'        -- equality
+  AND created_at >= '2024-01-01' -- range
+GROUP BY customer_id;`,
+          choices: [
+            { id: "a", label: "Composite index: (customer_id, created_at)", description: "Equality column first, range column second — classic composite index design." },
+            { id: "b", label: "Two separate indexes: one on customer_id, one on created_at", description: "The planner can bitmap-AND two indexes but a composite is usually cheaper." },
+            { id: "c", label: "Composite index: (created_at, customer_id)", description: "Wrong order. The range predicate on created_at at position 0 prevents efficient use on customer_id." },
+            { id: "d", label: "No index needed — LIMIT 10 is fast enough", description: "LIMIT does not help if a Seq Scan must produce all rows before limiting." },
+          ],
+          branches: {
+            a: "explain_joinorder_choice",
+            b: "explain_recovery_index",
+            c: "explain_recovery_index",
+            d: "explain_recovery_index",
+          },
+          rationale: "The composite index rule: put equality predicates first, range predicates last. The planner can jump to the customer_id bucket and then range-scan created_at within it.",
+        },
+        explain_recovery_index: {
+          id: "explain_recovery_index",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery · Column order in a composite index",
+          prompt: "Why does (customer_id, created_at) work better than (created_at, customer_id) for the query above?",
+          code_snippet: `-- Index B-tree nodes are sorted left-to-right
+-- (customer_id, created_at):
+--   First level: jump to customer_id='C42' bucket
+--   Second level: range-scan created_at >= '2024-01-01' within that bucket`,
+          choices: [
+            { id: "a", label: "Equality predicate on the leading column narrows the search space before the range scan", description: "Correct — jumping to a single customer bucket first is the key insight." },
+            { id: "b", label: "created_at is always larger than customer_id in byte size", description: "Column ordering in indexes is about predicate type, not byte size." },
+            { id: "c", label: "The planner ignores indexes with range predicates at any position", description: "The planner uses composite indexes even with range predicates — position matters." },
+            { id: "d", label: "Both orders are equivalent; the planner reverses them automatically", description: "The planner does not reorder composite index columns." },
+          ],
+          branches: {
+            a: "explain_joinorder_choice",
+            b: "explain_recovery_index",
+            c: "explain_recovery_index",
+            d: "explain_recovery_index",
+          },
+          rationale: "Equality-first in a composite index means the B-tree search can find the exact bucket for customer_id='C42' before scanning the date range within it.",
+        },
+        explain_joinorder_choice: {
+          id: "explain_joinorder_choice",
+          type: "scenario_choice",
+          badge: "Stage 3 trade-off",
+          title: "Stage 3 · Join order and Hash Join sizing",
+          prompt: "EXPLAIN shows a Hash Join between orders (5M rows) and customers (50K rows). Which table should be the build (inner) side of the Hash Join?",
+          code_snippet: `Hash Join
+  ->  Hash  (build side)
+        ->  ???  -- which table goes here?
+  ->  ???  (probe side, streamed)`,
+          choices: [
+            { id: "a", label: "customers (50K rows) as build side — smaller table fits in memory", description: "The hash table is built from the smaller relation to minimize memory use." },
+            { id: "b", label: "orders (5M rows) as build side — more rows means a better hash distribution", description: "More rows in the hash table increases memory pressure and spill risk." },
+            { id: "c", label: "It never matters — the planner always picks the right side", description: "The planner usually picks correctly but you should verify with EXPLAIN ANALYZE." },
+            { id: "d", label: "Hash Join only works when both sides are the same size", description: "Hash Join works with any size ratio; smaller build side is just more efficient." },
+          ],
+          branches: {
+            a: "explain_terminal",
+            b: "explain_recovery_joinorder",
+            c: "explain_recovery_joinorder",
+            d: "explain_recovery_joinorder",
+          },
+          rationale: "Hash Join loads the build side into an in-memory hash table. Smaller build side = less memory, less chance of spill to disk.",
+        },
+        explain_recovery_joinorder: {
+          id: "explain_recovery_joinorder",
+          type: "scenario_choice",
+          badge: "Recovery 3",
+          title: "Recovery · Hash Join build vs probe",
+          prompt: "When a Hash Join spills to disk (work_mem exceeded), what happens to query performance?",
+          code_snippet: `-- Hash Join phases:
+-- Build: load smaller input into hash table in memory
+-- Probe: stream larger input and probe the hash table
+-- Spill: if build side exceeds work_mem, write to disk (batches)`,
+          choices: [
+            { id: "a", label: "Performance degrades significantly due to disk I/O for the spilled batches", description: "Disk spill for hash joins can cause 10x-100x slowdowns vs in-memory execution." },
+            { id: "b", label: "The planner automatically switches to a Merge Join when spills occur", description: "The planner chooses the join type at plan time, not at runtime spill time." },
+            { id: "c", label: "Spills only affect Hash Aggregate, not Hash Join", description: "Both Hash Join and Hash Aggregate can spill to disk when memory is exceeded." },
+            { id: "d", label: "Spills have no impact because SSDs are as fast as RAM", description: "Even NVMe SSDs are orders of magnitude slower than RAM for random I/O." },
+          ],
+          branches: {
+            a: "explain_terminal",
+            b: "explain_recovery_joinorder",
+            c: "explain_recovery_joinorder",
+            d: "explain_recovery_joinorder",
+          },
+          rationale: "Disk spills in hash operations are a common performance cliff. The fix is increasing work_mem (per-session budget) or ensuring the build side is the smaller relation.",
+        },
+        explain_terminal: {
+          id: "explain_terminal",
+          type: "scenario_choice",
+          badge: "Terminal",
+          title: "Revision complete · Query optimization locked",
+          prompt: "You identified the correlated subquery bottleneck, chose the right composite index order, and explained Hash Join sizing.",
+          code_snippet: `-- Interview-ready summary:
+-- Correlated subquery = per-row subplan = Seq Scan * N
+-- Composite index: equality columns first, range columns last
+-- Hash Join build side = smaller relation (fits in memory)
+-- EXPLAIN ANALYZE shows actual vs estimated rows`,
+          choices: [],
+          branches: {},
+          terminal: true,
+          rationale: "The three-part answer covers plan node recognition, composite index column order, and Hash Join memory management — the core query-optimization concepts tested in data engineering interviews.",
+        },
+      },
+    },
+    knowledgeCheck: [],
+  },
+
+  "sq-d1": {
+    durationLabel: "15 min",
+    outcomes: [
+      "Identify 1NF, 2NF, and 3NF violations given a table schema and functional dependencies.",
+      "Decompose a table to 3NF by separating partial and transitive dependencies.",
+      "Articulate the read-performance trade-off of normalization vs intentional denormalization.",
+    ],
+    learnMarkdown: `## Rapid revision: 1NF through 3NF
+
+Normalization removes update anomalies by ensuring each fact is stored in exactly one place.
+
+**1NF** — atomic values, no repeating groups, a primary key exists.
+
+**2NF** — 1NF plus no partial dependencies: every non-key column must depend on the WHOLE primary key, not just part of a composite key.
+
+\`\`\`
+BAD: PK = (order_id, product_id), but customer_name depends only on order_id
+FIX: Move customer_name to an Orders table keyed by order_id
+\`\`\`
+
+**3NF** — 2NF plus no transitive dependencies: non-key columns must not depend on other non-key columns.
+
+\`\`\`
+BAD: student_id -> dept -> dept_head (dept_head depends on dept, not student_id)
+FIX: Move dept_head to a Departments table keyed by dept
+\`\`\`
+
+## Interview muscle memory
+
+- Name the dependency, name the fix, name the table it moves to.
+- BCNF is stricter: every determinant must be a candidate key. Mention it if the interviewer pushes.
+- Normalization reduces write anomalies; star-schema denormalization improves analytics read speed. Both are valid — state the workload that drives the choice.`,
+    video: null,
+    videoFallbackMarkdown: `## 3-minute normalization drill
+
+Given table: Enrollment(student_id, course_id, student_name, instructor_id, instructor_office)
+
+1. Identify the primary key.
+2. Name one partial dependency.
+3. Name one transitive dependency.
+4. Sketch the 3NF decomposition.`,
+    tryGuidance: "Click the column causing a partial dependency in the 2NF-violating table, then handle the 3NF decomposition trade-off vs denormalization.",
+    interviewGraph: {
+      initialStageId: "norm_partial_dep_click",
+      artifactDimensions: [
+        { label: "Dependency Identification", recoveryStageId: "norm_recovery_partial" },
+        { label: "3NF Decomposition Skill", recoveryStageId: "norm_recovery_3nf" },
+        { label: "Normalization vs Denormalization Trade-Off", recoveryStageId: "norm_recovery_tradeoff", passLabel: "Schema Trade-Off Clear" },
+      ],
+      stages: {
+        norm_partial_dep_click: {
+          id: "norm_partial_dep_click",
+          type: "click_target",
+          badge: "Stage 1 target",
+          title: "Stage 1 · Spot the partial dependency",
+          prompt: "The table below violates 2NF. The primary key is (order_id, product_id). Click the column that causes the partial dependency.",
+          code_snippet: `CREATE TABLE order_lines (
+  order_id     INT,
+  product_id   INT,
+  customer_name VARCHAR(100), -- ds-target:partial_dep
+  quantity     INT,
+  unit_price   DECIMAL(10,2),
+  PRIMARY KEY (order_id, product_id)
+);
+-- customer_name is determined by order_id alone, not by (order_id, product_id)`,
+          validationCopy: {
+            partial_dep: "Correct. customer_name depends only on order_id, not on the full composite key (order_id, product_id). That is a partial dependency and a 2NF violation.",
+          },
+          branches: {
+            partial_dep: "norm_3nf_choice",
+          },
+        },
+        norm_recovery_partial: {
+          id: "norm_recovery_partial",
+          type: "scenario_choice",
+          badge: "Recovery 1",
+          title: "Recovery · Define partial dependency",
+          prompt: "Which statement correctly defines a partial dependency?",
+          code_snippet: `-- Table PK = (order_id, product_id)
+-- customer_name depends on order_id alone`,
+          choices: [
+            { id: "a", label: "A non-key column depends on only part of a composite primary key", description: "customer_name is determined by order_id, which is only part of (order_id, product_id)." },
+            { id: "b", label: "A column contains NULL in some rows", description: "NULL presence is not a normalization violation by itself." },
+            { id: "c", label: "A column depends on a non-key column (transitive)", description: "That describes a transitive dependency — a 3NF violation, not 2NF." },
+            { id: "d", label: "Two columns store the same data type", description: "Sharing a data type is not a dependency issue." },
+          ],
+          branches: {
+            a: "norm_3nf_choice",
+            b: "norm_recovery_partial",
+            c: "norm_recovery_partial",
+            d: "norm_recovery_partial",
+          },
+          rationale: "Partial dependency: part of the composite key determines a non-key column. Fix: extract that column into a table keyed by the partial key.",
+        },
+        norm_3nf_choice: {
+          id: "norm_3nf_choice",
+          type: "scenario_choice",
+          badge: "Stage 2 decompose",
+          title: "Stage 2 · Decompose to 3NF",
+          prompt: "After fixing the 2NF violation you notice another problem: in the Students table, dept_head depends on dept, and dept depends on student_id. Which decomposition achieves 3NF?",
+          code_snippet: `-- BEFORE (2NF — transitive dependency remains):
+-- students(student_id PK, student_name, dept, dept_head)
+-- dept_head -> dept -> student_id (transitive)`,
+          choices: [
+            { id: "a", label: "Create departments(dept PK, dept_head) and students(student_id PK, student_name, dept FK)", description: "dept_head moves to the departments table where dept is the PK." },
+            { id: "b", label: "Add dept_head as a second PK column in students", description: "Adding a column to the PK does not remove the dependency." },
+            { id: "c", label: "Delete dept_head entirely to simplify the schema", description: "The data must live somewhere; deleting it loses information." },
+            { id: "d", label: "Move student_name to the departments table", description: "student_name depends on student_id, not on dept — wrong table." },
+          ],
+          branches: {
+            a: "norm_tradeoff_choice",
+            b: "norm_recovery_3nf",
+            c: "norm_recovery_3nf",
+            d: "norm_recovery_3nf",
+          },
+          rationale: "The transitive chain dept_head -> dept -> student_id is broken by extracting dept_head into a departments table, so it is directly determined by its own PK (dept).",
+        },
+        norm_recovery_3nf: {
+          id: "norm_recovery_3nf",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery · Rule for 3NF decomposition",
+          prompt: "Pick the statement that correctly explains why dept_head must leave the students table.",
+          code_snippet: `-- students: student_id -> dept -> dept_head
+-- dept_head is NOT determined by student_id directly.
+-- It is determined by dept (a non-key column).`,
+          choices: [
+            { id: "a", label: "dept_head is transitively determined by student_id via a non-key column (dept)", description: "3NF requires non-key columns depend ONLY on the PK, not on another non-key column." },
+            { id: "b", label: "dept_head has too many characters to belong in the students table", description: "Column width is irrelevant to normalization." },
+            { id: "c", label: "dept_head is a repeating group that violates 1NF", description: "dept_head is a scalar value — not a repeating group." },
+            { id: "d", label: "dept_head should be moved to the enrollments table", description: "dept_head is a property of dept, not of student-course enrollment." },
+          ],
+          branches: {
+            a: "norm_tradeoff_choice",
+            b: "norm_recovery_3nf",
+            c: "norm_recovery_3nf",
+            d: "norm_recovery_3nf",
+          },
+          rationale: "3NF definition: non-key attributes may only depend on candidate keys. dept is not a candidate key of students, so dept_head must leave.",
+        },
+        norm_tradeoff_choice: {
+          id: "norm_tradeoff_choice",
+          type: "scenario_choice",
+          badge: "Stage 3 trade-off",
+          title: "Stage 3 · Normalization vs denormalization",
+          prompt: "Your 3NF schema has 6 tables. An analytics dashboard that reads customer + order + product data takes 800ms because it joins all 6 tables. The interviewer asks what you would do.",
+          code_snippet: `-- 3NF: minimal redundancy, clean writes
+-- Analytics query: 6-way JOIN, 800ms
+
+-- Trade-off options:
+-- A) Materialized view / wide denormalized table for reads
+-- B) Roll back all normalization
+-- C) Add more indexes to all FK columns
+-- D) Raise the join limit in the database config`,
+          choices: [
+            { id: "a", label: "Create a materialized view or wide denormalized read model for analytics, keep 3NF for writes", description: "This is the star-schema / CQRS pattern: normalized writes, denormalized reads." },
+            { id: "b", label: "Roll back to the unnormalized table to eliminate joins entirely", description: "Undoing all normalization reintroduces update anomalies across all write paths." },
+            { id: "c", label: "Add indexes to every foreign key column and nothing else", description: "Indexes help join speed but cannot eliminate the JOIN overhead for wide analytical queries." },
+            { id: "d", label: "Raise the join limit — databases are arbitrarily limited by default", description: "The join limit in most engines is high (>100); 6-way joins are not the limit, latency is the issue." },
+          ],
+          branches: {
+            a: "norm_terminal",
+            b: "norm_recovery_tradeoff",
+            c: "norm_recovery_tradeoff",
+            d: "norm_recovery_tradeoff",
+          },
+          rationale: "The textbook answer is CQRS / star schema: keep writes normalized (3NF eliminates anomalies), maintain a denormalized read model (wide table or materialized view) for analytics.",
+        },
+        norm_recovery_tradeoff: {
+          id: "norm_recovery_tradeoff",
+          type: "scenario_choice",
+          badge: "Recovery 3",
+          title: "Recovery · Name the pattern that combines both",
+          prompt: "What is the design pattern name for maintaining a normalized OLTP model for writes and a denormalized model for analytics reads?",
+          code_snippet: `-- Write path: normalized 3NF tables (INSERT/UPDATE safe)
+-- Read path: materialized wide table or star schema (fast SELECT)`,
+          choices: [
+            { id: "a", label: "CQRS (Command Query Responsibility Segregation) or star schema separation", description: "Both names are correct and are expected in data engineering interviews." },
+            { id: "b", label: "BCNF — Boyce-Codd Normal Form replaces both models", description: "BCNF is a stricter normalization form, not a read/write separation pattern." },
+            { id: "c", label: "Sharding — distribute rows to different servers", description: "Sharding addresses scale-out, not read/write model separation." },
+            { id: "d", label: "Indexing — add a covering index on all analytics columns", description: "Covering indexes help but do not fully replace a purpose-built denormalized read model for complex analytics." },
+          ],
+          branches: {
+            a: "norm_terminal",
+            b: "norm_recovery_tradeoff",
+            c: "norm_recovery_tradeoff",
+            d: "norm_recovery_tradeoff",
+          },
+          rationale: "CQRS and star schema are the interview-expected patterns. They acknowledge that normalization is right for writes and denormalization is right for analytics reads.",
+        },
+        norm_terminal: {
+          id: "norm_terminal",
+          type: "scenario_choice",
+          badge: "Terminal",
+          title: "Revision complete · Normalization locked",
+          prompt: "You spotted the partial dependency, decomposed to 3NF, and named the normalization vs denormalization trade-off.",
+          code_snippet: `-- Interview-ready summary:
+-- 2NF: no partial deps (non-key col depends on full composite PK)
+-- 3NF: no transitive deps (non-key col depends only on PK)
+-- Trade-off: 3NF for writes, materialized view / star schema for reads`,
+          choices: [],
+          branches: {},
+          terminal: true,
+          rationale: "The three-part candidate answer: identify the dependency type by name, state the decomposition, and acknowledge that denormalization is intentional and workload-driven for analytics.",
+        },
+      },
+    },
+    knowledgeCheck: [],
+  },
+
+  "sq-d2": {
+    durationLabel: "14 min",
+    outcomes: [
+      "Identify when a missing or wrong index causes a full-table scan and quantify the cost.",
+      "Choose between a single-column B-tree index and a composite index based on query shape.",
+      "Explain high-write and low-cardinality scenarios where adding an index hurts rather than helps.",
+    ],
+    learnMarkdown: `## Indexing strategy: the interview mental model
+
+An index trades write overhead for faster reads. Every INSERT, UPDATE, and DELETE must update all indexes on the table. Choose indexes deliberately.
+
+## B-tree index
+
+The default index type. Stores values in sorted order. Useful for:
+
+- Equality lookups: \`WHERE email = ?\`
+- Range scans: \`WHERE created_at BETWEEN ? AND ?\`
+- High-cardinality columns (many distinct values)
+
+## Composite index
+
+An index on multiple columns in a defined order: \`(email, created_at)\`.
+
+- Leading column must appear as an equality filter for the index to be used
+- Range column goes last
+- A composite index on (A, B) cannot efficiently serve a query filtering only on B
+
+## When NOT to index
+
+- **Low cardinality** — a \`status\` column with 3 values: the optimizer skips the index and does a full scan anyway
+- **High-write tables** — each write pays maintenance cost on every index
+- **Very small tables** — a full scan of 500 rows is faster than index I/O
+
+## Interview muscle memory
+
+Always ask: what is the query shape? What is the cardinality? What is the write frequency?`,
+    video: null,
+    videoFallbackMarkdown: `## 3-minute indexing drill
+
+Write down three scenarios: one where you add a B-tree index, one where you add a composite index, and one where you explicitly decide NOT to index.
+
+For each, state the column cardinality, the query pattern (equality vs range), and the write frequency. Practice explaining the trade-off in two sentences.`,
+    tryGuidance: "Click the unindexed foreign key column causing the full scan, then navigate the composite vs partial index decision and the high-write trade-off.",
+    interviewGraph: {
+      initialStageId: "sq_d2_fk_scan_click",
+      artifactDimensions: [
+        { label: "Index Selection Instinct", recoveryStageId: "sq_d2_recovery_index_type" },
+        { label: "Composite Index Column Order", recoveryStageId: "sq_d2_recovery_composite" },
+        { label: "Write-Penalty Trade-Off", recoveryStageId: "sq_d2_recovery_write_penalty", passLabel: "Indexing Trade-Off Clear" },
+      ],
+      stages: {
+        sq_d2_fk_scan_click: {
+          id: "sq_d2_fk_scan_click",
+          type: "click_target",
+          badge: "Stage 1 target",
+          title: "Stage 1 · Full scan through an unindexed FK join",
+          prompt: "This query joins two large tables. EXPLAIN shows a sequential scan on one column. Click the exact line causing the full-table scan.",
+          code_snippet: `SELECT u.name, COUNT(o.order_id) AS total_orders
+FROM users u
+JOIN orders o ON o.user_id = u.id  -- ds-target:unindexed_fk
+WHERE u.created_at >= '2024-01-01'
+GROUP BY u.name
+ORDER BY total_orders DESC
+LIMIT 20;`,
+          validationCopy: {
+            unindexed_fk: "Correct. orders.user_id is a foreign key with no index. The engine does a full scan of the orders table for every user row — O(n * m) instead of O(n log m).",
+          },
+          branches: {
+            unindexed_fk: "sq_d2_index_type_choice",
+          },
+        },
+        sq_d2_recovery_index_type: {
+          id: "sq_d2_recovery_index_type",
+          type: "scenario_choice",
+          badge: "Recovery 1",
+          title: "Recovery · Why is a FK join so expensive without an index?",
+          prompt: "The interviewer asks you to explain the scan cost. Which answer is most precise?",
+          code_snippet: `-- orders table: 50 M rows
+-- users table:  2 M rows
+-- JOIN ON orders.user_id = users.id`,
+          choices: [
+            { id: "a", label: "Without an index the engine reads the full orders table for every user", description: "Each of 2 M users triggers a full scan of 50 M order rows." },
+            { id: "b", label: "Foreign keys are always indexed automatically", description: "In PostgreSQL, MySQL (InnoDB), and most engines, FKs are NOT auto-indexed." },
+            { id: "c", label: "The query needs a LIMIT to avoid the scan", description: "LIMIT only affects output rows, not the JOIN scan cost." },
+            { id: "d", label: "GROUP BY causes the full scan", description: "GROUP BY aggregates after the JOIN — it does not cause the scan." },
+          ],
+          branches: {
+            a: "sq_d2_index_type_choice",
+            b: "sq_d2_recovery_index_type",
+            c: "sq_d2_recovery_index_type",
+            d: "sq_d2_recovery_index_type",
+          },
+          rationale: "Unindexed FK joins degrade quadratically. The interviewer wants to hear you quantify the cost.",
+        },
+        sq_d2_index_type_choice: {
+          id: "sq_d2_index_type_choice",
+          type: "scenario_choice",
+          badge: "Stage 1 choice",
+          title: "Stage 1 · Pick the right index for the FK join",
+          prompt: "You need to fix the scan on orders.user_id. The table also has a WHERE created_at filter. Which index strategy is best?",
+          code_snippet: `-- New requirement: queries always filter by user_id
+-- Some queries also add: AND created_at >= ?`,
+          choices: [
+            { id: "a", label: "Single B-tree on user_id only", description: "Fixes the join scan. Range queries on created_at still scan all user rows." },
+            { id: "b", label: "Composite (user_id, created_at)", description: "Fixes the join AND narrows the range scan in a single index." },
+            { id: "c", label: "Composite (created_at, user_id)", description: "Wrong column order — the range column must come after the equality column." },
+            { id: "d", label: "Index on user_id and a separate index on created_at", description: "The optimizer may pick one but cannot use both simultaneously for the combined predicate." },
+          ],
+          branches: {
+            a: "sq_d2_composite_order_choice",
+            b: "sq_d2_composite_order_choice",
+            c: "sq_d2_recovery_composite",
+            d: "sq_d2_recovery_composite",
+          },
+          rationale: "When a query filters equality on one column and range on another, a composite index with equality column first is optimal.",
+        },
+        sq_d2_recovery_composite: {
+          id: "sq_d2_recovery_composite",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery · Composite index column order",
+          prompt: "The interviewer asks why column order matters in a composite index. Which rule is correct?",
+          code_snippet: `-- Index A: (user_id, created_at)
+-- Index B: (created_at, user_id)
+-- Query:   WHERE user_id = ? AND created_at >= ?`,
+          choices: [
+            { id: "a", label: "Equality column first, range column last", description: "Index A is used efficiently; Index B skips user_id and does a range scan on all dates." },
+            { id: "b", label: "Range column first for faster date filtering", description: "The engine cannot use the equality column after the range column efficiently." },
+            { id: "c", label: "Column order does not matter", description: "Column order is the single most important decision in composite index design." },
+            { id: "d", label: "Always put the primary key first", description: "The primary key column is not necessarily part of every query predicate." },
+          ],
+          branches: {
+            a: "sq_d2_composite_order_choice",
+            b: "sq_d2_recovery_composite",
+            c: "sq_d2_recovery_composite",
+            d: "sq_d2_recovery_composite",
+          },
+          rationale: "The left-prefix rule: the index is only usable up to the first range or skipped column.",
+        },
+        sq_d2_composite_order_choice: {
+          id: "sq_d2_composite_order_choice",
+          type: "scenario_choice",
+          badge: "Stage 2 trade-off",
+          title: "Stage 2 · High-write table index penalty",
+          prompt: "A teammate wants to add five indexes to the orders table to speed up various analytics queries. The orders table receives 20 000 inserts per minute. What do you advise?",
+          code_snippet: `-- orders table: 20 000 inserts / min
+-- Proposed: 5 new indexes for analytics queries`,
+          choices: [
+            { id: "a", label: "Add all five — read speed matters most", description: "Each index adds write latency and CPU overhead on every INSERT." },
+            { id: "b", label: "Evaluate each index; prefer routing analytics to a warehouse replica", description: "Minimize index count on the hot OLTP table; serve analytics from a read replica or warehouse." },
+            { id: "c", label: "Add a single covering index for all five queries", description: "A covering index for five unrelated queries is likely too wide to be selective or efficient." },
+            { id: "d", label: "Drop the primary key to make inserts faster", description: "Removing the primary key breaks referential integrity and JOIN correctness." },
+          ],
+          branches: {
+            a: "sq_d2_recovery_write_penalty",
+            b: "sq_d2_write_penalty_tradeoff",
+            c: "sq_d2_recovery_write_penalty",
+            d: "sq_d2_recovery_write_penalty",
+          },
+          rationale: "Index maintenance cost is proportional to write volume. High-write OLTP tables demand careful index audits.",
+        },
+        sq_d2_recovery_write_penalty: {
+          id: "sq_d2_recovery_write_penalty",
+          type: "scenario_choice",
+          badge: "Recovery 3",
+          title: "Recovery · Quantify the write penalty",
+          prompt: "The interviewer asks how an index hurts writes. Which explanation is correct?",
+          code_snippet: `-- Every INSERT must:
+-- 1. Write the new row to the heap / clustered index
+-- 2. Update each secondary index's B-tree`,
+          choices: [
+            { id: "a", label: "Each index requires an additional B-tree update on every write", description: "N indexes means N additional tree-update operations per INSERT/UPDATE/DELETE." },
+            { id: "b", label: "Indexes only slow down UPDATE, not INSERT", description: "All write operations — INSERT, UPDATE, DELETE — pay index maintenance cost." },
+            { id: "c", label: "Indexes cause table locks during writes", description: "Modern engines use row-level locking; the overhead is CPU and I/O, not table locks." },
+            { id: "d", label: "The optimizer disables indexes during bulk loads automatically", description: "Some tools allow this as an option, but it is not automatic behavior." },
+          ],
+          branches: {
+            a: "sq_d2_write_penalty_tradeoff",
+            b: "sq_d2_recovery_write_penalty",
+            c: "sq_d2_recovery_write_penalty",
+            d: "sq_d2_recovery_write_penalty",
+          },
+          rationale: "The candidate-ready answer: each index is an additional data structure that every write must maintain.",
+        },
+        sq_d2_write_penalty_tradeoff: {
+          id: "sq_d2_write_penalty_tradeoff",
+          type: "scenario_choice",
+          badge: "Stage 3 trade-off",
+          title: "Stage 3 · Low-cardinality anti-pattern",
+          prompt: "A column `status` has three values: pending, active, cancelled. Your colleague adds a B-tree index on it. Will the optimizer use it?",
+          code_snippet: `-- users table: 10 M rows
+-- status: 'pending' (5%), 'active' (80%), 'cancelled' (15%)
+-- Query: WHERE status = 'active'`,
+          choices: [
+            { id: "a", label: "Yes — equality queries always use indexes", description: "The optimizer estimates 8 M rows match. Random I/O for 80% of the table is slower than a full scan." },
+            { id: "b", label: "The optimizer may skip the index because selectivity is too low", description: "When a predicate matches a large fraction of rows, a sequential scan is cheaper than random index I/O." },
+            { id: "c", label: "Only if the index is a covering index", description: "Covering index helps with column projection, but selectivity remains the core issue." },
+            { id: "d", label: "The index helps if the query uses LIMIT", description: "LIMIT reduces output rows but not the cost of evaluating 8 M matching rows via random I/O." },
+          ],
+          branches: {
+            a: "sq_d2_recovery_write_penalty",
+            b: "sq_d2_terminal",
+            c: "sq_d2_recovery_write_penalty",
+            d: "sq_d2_recovery_write_penalty",
+          },
+          rationale: "Low-cardinality columns are a classic interview gotcha. The optimizer knows when an index scan costs more than a full scan.",
+        },
+        sq_d2_terminal: {
+          id: "sq_d2_terminal",
+          type: "scenario_choice",
+          badge: "Terminal",
+          title: "Revision complete · Indexing strategy locked",
+          prompt: "You identified the unindexed FK, chose the correct composite column order, and articulated the write-penalty and low-cardinality anti-patterns.",
+          code_snippet: `-- Index decision checklist:
+-- 1. Cardinality high? (many distinct values)
+-- 2. Query shape: equality first, range second
+-- 3. Write frequency acceptable?
+-- 4. Can analytics move to a replica/warehouse?`,
+          choices: [],
+          branches: {},
+          terminal: true,
+          rationale: "The candidate-ready answer covers three axes: query shape (equality/range), cardinality (high vs low), and write frequency. Composite index column order is the precision detail interviewers test.",
+        },
+      },
+    },
+    knowledgeCheck: [],
+  },
+
+  "sq-d3": {
+    durationLabel: "13 min",
+    outcomes: [
+      "Explain the JOIN-count and storage trade-off between Star and Snowflake schemas.",
+      "Identify when over-normalization of a dimension table harms analytics query performance.",
+      "Choose the appropriate Slowly Changing Dimension (SCD) type for a given business requirement.",
+    ],
+    learnMarkdown: `## Star vs Snowflake: the interview trade-off
+
+Both schemas organize a data warehouse around a central **fact table** and surrounding **dimension tables**. The difference is how much the dimensions are normalized.
+
+## Star Schema
+
+Dimension tables are flat and denormalized. \`dim_product\` stores category, sub-category, and brand directly.
+
+- Fewer JOINs per query — simpler execution plans
+- Preferred for high-volume analytics (BigQuery, Redshift)
+- Trade-off: data redundancy in dimension tables
+
+## Snowflake Schema
+
+Dimension tables are normalized. \`dim_product\` references \`dim_category\` by FK.
+
+- More JOINs required for the same query
+- Reduced storage, easier to update category metadata
+- Trade-off: more complex queries, harder for BI tools
+
+## When to use each
+
+Use Star when: query performance is paramount and dimension tables are read-heavy.
+
+Use Snowflake when: dimension attributes change frequently (category renaming) or storage matters.
+
+## Slowly Changing Dimensions (SCD)
+
+- **Type 1**: Overwrite — no history, just current value
+- **Type 2**: New row with effective/expiry date — full history preserved
+- **Type 3**: Add a previous-value column — one step of history`,
+    video: null,
+    videoFallbackMarkdown: `## 3-minute schema drill
+
+Draw a 4-table Star Schema on paper: fact_sales in the center, dim_product, dim_customer, dim_date around it.
+
+Then convert dim_product to Snowflake by splitting it into dim_product and dim_category. Write the SQL query for "revenue by category" in both schemas and count the JOINs.`,
+    tryGuidance: "Click the over-normalized dimension table, then handle the star vs snowflake performance trade-off and the SCD Type 2 design choice.",
+    interviewGraph: {
+      initialStageId: "sq_d3_dim_click",
+      artifactDimensions: [
+        { label: "Schema Shape Recognition", recoveryStageId: "sq_d3_recovery_schema_shape" },
+        { label: "Star vs Snowflake Trade-Off", recoveryStageId: "sq_d3_recovery_star_snowflake" },
+        { label: "SCD Type Selection", recoveryStageId: "sq_d3_recovery_scd", passLabel: "Dimensional Modeling Clear" },
+      ],
+      stages: {
+        sq_d3_dim_click: {
+          id: "sq_d3_dim_click",
+          type: "click_target",
+          badge: "Stage 1 target",
+          title: "Stage 1 · Over-normalized dimension table",
+          prompt: "This warehouse query runs slower than expected. EXPLAIN shows multiple nested hash joins. Click the exact JOIN line that represents the over-normalized dimension causing the extra join depth.",
+          code_snippet: `SELECT c.category_name, SUM(f.revenue)
+FROM fact_sales f
+JOIN dim_product p   ON p.product_id   = f.product_id
+JOIN dim_category c  ON c.category_id  = p.category_id  -- ds-target:snowflake_join
+JOIN dim_sub_cat  sc ON sc.sub_cat_id  = p.sub_cat_id
+WHERE f.sale_date >= '2024-01-01'
+GROUP BY c.category_name;`,
+          validationCopy: {
+            snowflake_join: "Correct. dim_category was split out of dim_product (a Snowflake normalization). This adds a JOIN that a Star Schema would not require — the category_name would live directly on dim_product.",
+          },
+          branches: {
+            snowflake_join: "sq_d3_schema_choice",
+          },
+        },
+        sq_d3_recovery_schema_shape: {
+          id: "sq_d3_recovery_schema_shape",
+          type: "scenario_choice",
+          badge: "Recovery 1",
+          title: "Recovery · Star vs Snowflake shape",
+          prompt: "The interviewer asks you to name the schema type causing the extra JOIN. Which answer is correct?",
+          code_snippet: `-- fact_sales -> dim_product -> dim_category
+-- Three tables to answer one category question`,
+          choices: [
+            { id: "a", label: "Snowflake Schema — dimension tables are normalized into sub-dimensions", description: "The category was extracted into its own table, requiring an extra JOIN." },
+            { id: "b", label: "Star Schema — dimension tables are fully denormalized", description: "A Star Schema would have category on dim_product directly — no extra JOIN." },
+            { id: "c", label: "Third Normal Form — no schema type applies in warehouses", description: "3NF is an OLTP normalization form; warehouse schemas are described as Star or Snowflake." },
+            { id: "d", label: "Galaxy Schema — multiple fact tables", description: "A Galaxy/Constellation schema involves multiple fact tables, not normalized dimensions." },
+          ],
+          branches: {
+            a: "sq_d3_schema_choice",
+            b: "sq_d3_recovery_schema_shape",
+            c: "sq_d3_recovery_schema_shape",
+            d: "sq_d3_recovery_schema_shape",
+          },
+          rationale: "Snowflake schemas normalize dimension attributes into sub-tables at the cost of additional JOINs.",
+        },
+        sq_d3_schema_choice: {
+          id: "sq_d3_schema_choice",
+          type: "scenario_choice",
+          badge: "Stage 1 choice",
+          title: "Stage 1 · Recommend the schema refactor",
+          prompt: "The BI team runs 500 category-level aggregation queries per hour. Category names change roughly once a year. Which schema design do you recommend?",
+          code_snippet: `-- Current: Snowflake (dim_product -> dim_category)
+-- Category name changes: ~2 per year
+-- Analytics queries: 500 / hour`,
+          choices: [
+            { id: "a", label: "Keep Snowflake — updates are easier when category names change", description: "Correct for consistency, but 500 queries per hour is a strong argument for fewer JOINs." },
+            { id: "b", label: "Denormalize to Star — embed category on dim_product", description: "Removes the extra JOIN, simplifies 500 queries/hr. Rare updates are an acceptable trade-off." },
+            { id: "c", label: "Add a materialized view over the Snowflake schema", description: "Valid workaround but adds maintenance burden; simpler to denormalize the dimension." },
+            { id: "d", label: "Use a JSON column to store all category attributes", description: "JSON lookups inside aggregate queries are significantly slower and harder for the optimizer." },
+          ],
+          branches: {
+            a: "sq_d3_recovery_star_snowflake",
+            b: "sq_d3_scd_choice",
+            c: "sq_d3_scd_choice",
+            d: "sq_d3_recovery_star_snowflake",
+          },
+          rationale: "High query volume + infrequent updates = Star schema is the pragmatic choice.",
+        },
+        sq_d3_recovery_star_snowflake: {
+          id: "sq_d3_recovery_star_snowflake",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery · Articulate the performance trade-off",
+          prompt: "The interviewer pushes back: why is one extra JOIN such a big deal? Pick the most convincing answer.",
+          code_snippet: `-- 500 queries/hr × 200 M rows each
+-- Each extra JOIN = additional hash build + probe phase`,
+          choices: [
+            { id: "a", label: "Each JOIN adds a hash build and probe phase over potentially millions of rows", description: "At 200 M rows per query, each extra JOIN multiplies CPU and memory pressure." },
+            { id: "b", label: "JOINs increase network traffic between nodes in distributed systems", description: "True in some systems but not the primary concern for a single extra JOIN in most warehouses." },
+            { id: "c", label: "Extra JOINs prevent query caching", description: "Query caching is usually at the result level, not affected by JOIN count structurally." },
+            { id: "d", label: "JOINs require table locks in columnar warehouses", description: "Columnar warehouses are read-optimized and do not lock tables for SELECT queries." },
+          ],
+          branches: {
+            a: "sq_d3_scd_choice",
+            b: "sq_d3_recovery_star_snowflake",
+            c: "sq_d3_recovery_star_snowflake",
+            d: "sq_d3_recovery_star_snowflake",
+          },
+          rationale: "The precise answer: each JOIN requires building and probing a hash table — multiply that by query volume and row count.",
+        },
+        sq_d3_scd_choice: {
+          id: "sq_d3_scd_choice",
+          type: "scenario_choice",
+          badge: "Stage 2 design",
+          title: "Stage 2 · SCD Type: track customer segment history",
+          prompt: "A customer's segment can change (free → pro → enterprise). The business wants to know what segment a customer was in AT THE TIME of each sale. Which SCD type do you use?",
+          code_snippet: `-- dim_customer: customer_id, name, email, segment
+-- Question: was customer 4201 'pro' when they bought in Jan 2024?`,
+          choices: [
+            { id: "a", label: "SCD Type 1 — overwrite the segment column", description: "Type 1 loses history. You would never know the segment at time of sale." },
+            { id: "b", label: "SCD Type 2 — add a new row with effective_date and expiry_date", description: "Preserves full history. The fact table FK points to the correct dimension row for that point in time." },
+            { id: "c", label: "SCD Type 3 — add a prev_segment column", description: "Type 3 only tracks one step back. If a customer changed segment 3 times, history is lost." },
+            { id: "d", label: "Store all segment changes in a JSON array on the customer row", description: "JSON point-in-time lookups inside JOIN conditions are extremely slow at warehouse scale." },
+          ],
+          branches: {
+            a: "sq_d3_recovery_scd",
+            b: "sq_d3_scd_tradeoff",
+            c: "sq_d3_recovery_scd",
+            d: "sq_d3_recovery_scd",
+          },
+          rationale: "SCD Type 2 is the canonical answer for point-in-time historical analysis of slowly changing attributes.",
+        },
+        sq_d3_recovery_scd: {
+          id: "sq_d3_recovery_scd",
+          type: "scenario_choice",
+          badge: "Recovery 3",
+          title: "Recovery · SCD types compared",
+          prompt: "The interviewer asks you to distinguish the three SCD types. Which mapping is correct?",
+          code_snippet: `-- Type ?: overwrite old value (no history)
+-- Type ?: new row per change (full history, effective/expiry dates)
+-- Type ?: prev_value column (one step of history)`,
+          choices: [
+            { id: "a", label: "Type 1=overwrite, Type 2=new row, Type 3=prev column", description: "The canonical definition used in all data warehouse literature." },
+            { id: "b", label: "Type 1=new row, Type 2=overwrite, Type 3=prev column", description: "Types 1 and 2 are reversed here." },
+            { id: "c", label: "Type 2=overwrite, Type 3=new row, Type 1=prev column", description: "All three types are mapped incorrectly." },
+            { id: "d", label: "SCD types only apply to fact tables", description: "SCD types apply to dimension tables, not fact tables." },
+          ],
+          branches: {
+            a: "sq_d3_scd_tradeoff",
+            b: "sq_d3_recovery_scd",
+            c: "sq_d3_recovery_scd",
+            d: "sq_d3_recovery_scd",
+          },
+          rationale: "Type 1/2/3 are vocabulary every data engineering candidate must have ready.",
+        },
+        sq_d3_scd_tradeoff: {
+          id: "sq_d3_scd_tradeoff",
+          type: "scenario_choice",
+          badge: "Stage 3 trade-off",
+          title: "Stage 3 · SCD Type 2 cost",
+          prompt: "Your data engineer pushes back: SCD Type 2 multiplies dim_customer rows over time. What is the main operational cost and how do you manage it?",
+          code_snippet: `-- dim_customer before SCD Type 2: 5 M rows
+-- After 3 years of segment changes: 12 M rows`,
+          choices: [
+            { id: "a", label: "Row count grows; manage with is_current flag and expiry_date for efficient current-row lookups", description: "Standard mitigation: filter WHERE is_current = TRUE for current-state queries." },
+            { id: "b", label: "Use DELETE to remove old segment rows after 6 months", description: "Deleting history defeats the purpose of SCD Type 2." },
+            { id: "c", label: "Switch to SCD Type 1 once the table grows too large", description: "Switching loses all historical accuracy permanently." },
+            { id: "d", label: "Move dim_customer to a JSON document store", description: "JSON in a document store does not integrate with SQL warehouse JOINs efficiently." },
+          ],
+          branches: {
+            a: "sq_d3_terminal",
+            b: "sq_d3_recovery_scd",
+            c: "sq_d3_recovery_scd",
+            d: "sq_d3_recovery_scd",
+          },
+          rationale: "The production answer includes both the trade-off (row multiplication) and the management pattern (is_current, expiry_date).",
+        },
+        sq_d3_terminal: {
+          id: "sq_d3_terminal",
+          type: "scenario_choice",
+          badge: "Terminal",
+          title: "Revision complete · Dimensional modeling locked",
+          prompt: "You identified the Snowflake over-normalization, articulated the Star vs Snowflake JOIN trade-off, chose SCD Type 2 for point-in-time history, and managed its row-growth cost.",
+          code_snippet: `-- Mental model:
+-- Star: fewer JOINs, denormalized, fast analytics
+-- Snowflake: normalized, storage-efficient, more JOINs
+-- SCD Type 2: new row per change, is_current + expiry_date`,
+          choices: [],
+          branches: {},
+          terminal: true,
+          rationale: "Interviewers expect: Star vs Snowflake trade-off in one sentence, SCD Type 2 schema pattern, and awareness that row-multiplication is managed with is_current and effective/expiry dates.",
+        },
+      },
+    },
+    knowledgeCheck: [],
+  },
+
+  "sq-d4": {
+    durationLabel: "13 min",
+    outcomes: [
+      "Identify when an OLAP-style aggregate query is misrouted to an OLTP database and explain the blast radius.",
+      "Articulate the row-store vs columnar storage difference in terms of query performance.",
+      "Choose between a data warehouse and a data lake for a given analytics architecture scenario.",
+    ],
+    learnMarkdown: `## OLTP vs OLAP: the core distinction
+
+Interviewers use OLTP/OLAP to test whether you understand storage engine design, not just query syntax.
+
+## OLTP (Online Transaction Processing)
+
+- **Row-oriented storage**: all columns of a row are stored contiguously
+- Optimized for fast single-row reads and high-frequency writes
+- Normalized schema (3NF) prevents update anomalies
+- Examples: PostgreSQL, MySQL, Aurora
+
+## OLAP (Online Analytical Processing)
+
+- **Columnar storage**: each column stored separately on disk
+- Optimized for full-column scans and aggregations — reads only the needed columns
+- Denormalized star/snowflake schema reduces JOINs
+- Examples: BigQuery, Redshift, Snowflake, DuckDB
+
+## Why you cannot run OLAP queries on OLTP databases
+
+A \`SELECT SUM(revenue) FROM orders GROUP BY region\` on a 500 M row OLTP table:
+
+- Locks rows during the scan, blocking incoming writes
+- Row store reads all columns to extract only \`revenue\` and \`region\`
+- No partition pruning — scans everything
+
+## Data warehouse vs data lake
+
+- **Warehouse**: structured, schema-on-write, SQL query engine built-in, fast aggregations
+- **Data lake**: raw files (Parquet, ORC), schema-on-read, flexible, cheaper storage`,
+    video: null,
+    videoFallbackMarkdown: `## 3-minute OLTP vs OLAP drill
+
+Explain to a non-engineer why you cannot run a "monthly revenue by region" report directly on the production OLTP database.
+
+Then state what you would do instead and name at least one technology you would use for the analytics side.`,
+    tryGuidance: "Click the OLAP-style aggregation query running on the OLTP database, then navigate the data warehouse vs data lake architectural choice.",
+    interviewGraph: {
+      initialStageId: "sq_d4_olap_on_oltp_click",
+      artifactDimensions: [
+        { label: "OLTP vs OLAP Recognition", recoveryStageId: "sq_d4_recovery_oltp_olap" },
+        { label: "Columnar Storage Intuition", recoveryStageId: "sq_d4_recovery_columnar" },
+        { label: "Warehouse vs Lake Architecture", recoveryStageId: "sq_d4_recovery_arch", passLabel: "Analytics Architecture Clear" },
+      ],
+      stages: {
+        sq_d4_olap_on_oltp_click: {
+          id: "sq_d4_olap_on_oltp_click",
+          type: "click_target",
+          badge: "Stage 1 target",
+          title: "Stage 1 · OLAP aggregate on an OLTP database",
+          prompt: "A data analyst is running this query directly on the production PostgreSQL database. It is causing write timeouts for application users. Click the exact line that represents the OLAP-style operation incompatible with an OLTP database.",
+          code_snippet: `-- production_db (PostgreSQL, OLTP)
+SELECT
+  region,
+  SUM(amount) AS total_revenue,   -- ds-target:olap_aggregate
+  COUNT(DISTINCT customer_id) AS buyers
+FROM orders   -- 500 M rows, row-oriented
+GROUP BY region;`,
+          validationCopy: {
+            olap_aggregate: "Correct. SUM + GROUP BY across 500 M rows is an OLAP workload. Running it on a row-oriented OLTP database forces a full table scan, reads every column of every row, and holds shared locks that block writes.",
+          },
+          branches: {
+            olap_aggregate: "sq_d4_storage_choice",
+          },
+        },
+        sq_d4_recovery_oltp_olap: {
+          id: "sq_d4_recovery_oltp_olap",
+          type: "scenario_choice",
+          badge: "Recovery 1",
+          title: "Recovery · Why OLAP queries hurt OLTP databases",
+          prompt: "The interviewer asks you to explain the specific mechanism causing write timeouts. Which answer is most precise?",
+          code_snippet: `-- PostgreSQL row store: each row = all columns together on disk
+-- Full scan of 500 M rows = 500 M row reads`,
+          choices: [
+            { id: "a", label: "The aggregate holds a shared scan lock, consuming IOPS and blocking vacuum and autovacuum", description: "Full table scans in PostgreSQL can interfere with autovacuum and consume buffer pool, crowding out OLTP working set." },
+            { id: "b", label: "GROUP BY requires a table-level exclusive lock", description: "SELECT GROUP BY does not take an exclusive lock — it takes a weak shared lock, but the scan duration is the issue." },
+            { id: "c", label: "SUM is not supported in PostgreSQL", description: "SUM is fully supported; the problem is the workload mismatch, not missing functionality." },
+            { id: "d", label: "The query uses too many CPU cores", description: "CPU pressure is a symptom, not the primary architectural mismatch explanation." },
+          ],
+          branches: {
+            a: "sq_d4_storage_choice",
+            b: "sq_d4_recovery_oltp_olap",
+            c: "sq_d4_recovery_oltp_olap",
+            d: "sq_d4_recovery_oltp_olap",
+          },
+          rationale: "The precise mechanism: long scans hold shared locks, consume the buffer pool, and compete with OLTP write I/O.",
+        },
+        sq_d4_storage_choice: {
+          id: "sq_d4_storage_choice",
+          type: "scenario_choice",
+          badge: "Stage 1 choice",
+          title: "Stage 1 · Why columnar storage wins for SUM(revenue)",
+          prompt: "The interviewer asks why a columnar warehouse runs this query orders of magnitude faster. Which answer is technically correct?",
+          code_snippet: `-- Query only needs: amount, region
+-- orders table has 20 columns
+-- Row store: reads all 20 columns for each of 500 M rows
+-- Column store: reads only 2 column files`,
+          choices: [
+            { id: "a", label: "Columnar storage reads only the needed column files, skipping all other columns", description: "For SUM(amount) GROUP BY region, only 2 of 20 column files are read from disk." },
+            { id: "b", label: "Columnar storage keeps the entire table in memory", description: "Columnar stores do use compression and caching, but do not hold 500 M rows in RAM." },
+            { id: "c", label: "Columnar storage avoids GROUP BY entirely", description: "GROUP BY still executes — the gain is in I/O reduction, not avoiding aggregation." },
+            { id: "d", label: "Columnar storage uses hash indexes on every column", description: "Columnar stores primarily use partition pruning and compression, not per-column hash indexes." },
+          ],
+          branches: {
+            a: "sq_d4_arch_choice",
+            b: "sq_d4_recovery_columnar",
+            c: "sq_d4_recovery_columnar",
+            d: "sq_d4_recovery_columnar",
+          },
+          rationale: "The key insight: columnar I/O is proportional to columns selected, not total columns in the table.",
+        },
+        sq_d4_recovery_columnar: {
+          id: "sq_d4_recovery_columnar",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery · Columnar I/O model",
+          prompt: "The interviewer simplifies: a table has 30 columns and 1 B rows. The query aggregates 2 columns. How much data does each storage model read?",
+          code_snippet: `-- Row store:   reads all 30 columns × 1 B rows
+-- Column store: reads only 2 column files × 1 B rows`,
+          choices: [
+            { id: "a", label: "Row store: 30× more I/O than needed; Column store: only 2/30 of the data", description: "Columnar provides 15× I/O reduction for this query shape." },
+            { id: "b", label: "Both read the same amount of data from disk", description: "Row stores cannot skip columns mid-row without reading and discarding them." },
+            { id: "c", label: "Columnar is slower because it must reassemble rows for output", description: "Aggregates do not need to reassemble full rows — only the aggregate columns are needed." },
+            { id: "d", label: "Row store is faster because it reads sequential blocks", description: "Sequential I/O helps row stores, but reading 28 unneeded columns still wastes bandwidth." },
+          ],
+          branches: {
+            a: "sq_d4_arch_choice",
+            b: "sq_d4_recovery_columnar",
+            c: "sq_d4_recovery_columnar",
+            d: "sq_d4_recovery_columnar",
+          },
+          rationale: "The 2/30 fraction is the interview-ready way to illustrate columnar I/O savings.",
+        },
+        sq_d4_arch_choice: {
+          id: "sq_d4_arch_choice",
+          type: "scenario_choice",
+          badge: "Stage 2 architecture",
+          title: "Stage 2 · Data warehouse vs data lake",
+          prompt: "The company wants to run ad-hoc SQL analytics on structured sales data AND store raw clickstream event logs for future ML feature engineering. Which architecture fits best?",
+          code_snippet: `-- Requirement A: fast ad-hoc SQL on structured sales data
+-- Requirement B: cheap storage for raw JSON clickstream logs
+-- Requirement C: ML team may run custom Python jobs on logs`,
+          choices: [
+            { id: "a", label: "Data warehouse only — load everything into BigQuery/Redshift", description: "Loading raw JSON clickstream into a warehouse is expensive and inflexible for ML pipelines." },
+            { id: "b", label: "Data lake only — store everything as Parquet files in S3/GCS", description: "A lake handles raw storage well, but ad-hoc SQL on structured data lacks the query engine layer." },
+            { id: "c", label: "Lakehouse — structured data in a warehouse layer, raw data in object storage with a query engine overlay (e.g., Iceberg + Athena)", description: "Lakehouse combines warehouse SQL speed for structured data with lake flexibility for raw files." },
+            { id: "d", label: "Replicate everything into the OLTP database and add more indexes", description: "This is the anti-pattern we already identified — OLAP workloads do not belong on OLTP systems." },
+          ],
+          branches: {
+            a: "sq_d4_recovery_arch",
+            b: "sq_d4_recovery_arch",
+            c: "sq_d4_arch_tradeoff",
+            d: "sq_d4_recovery_arch",
+          },
+          rationale: "The lakehouse pattern (warehouse + data lake) is the modern answer to mixed structured/unstructured analytics requirements.",
+        },
+        sq_d4_recovery_arch: {
+          id: "sq_d4_recovery_arch",
+          type: "scenario_choice",
+          badge: "Recovery 3",
+          title: "Recovery · Warehouse vs lake distinction",
+          prompt: "The interviewer asks you to define the key difference between a data warehouse and a data lake in one axis. Which framing is most accurate?",
+          code_snippet: `-- Warehouse: schema-on-write, structured, SQL engine built-in
+-- Lake: schema-on-read, raw files, flexible format`,
+          choices: [
+            { id: "a", label: "Warehouse: schema-on-write, structured; Lake: schema-on-read, raw files", description: "The canonical distinction. Warehouses enforce schema at load time; lakes store raw data and apply schema at query time." },
+            { id: "b", label: "Warehouse: slower; Lake: always faster", description: "Warehouses are often faster for structured SQL aggregations; lakes win on raw storage cost and flexibility." },
+            { id: "c", label: "Warehouse: only for transactional data; Lake: only for analytics", description: "Both are analytics-oriented; the distinction is schema enforcement and storage cost, not use case exclusivity." },
+            { id: "d", label: "Lakes use SQL; Warehouses use custom query languages", description: "Modern warehouses (BigQuery, Redshift) and lake query engines (Athena, Spark SQL) both use standard SQL." },
+          ],
+          branches: {
+            a: "sq_d4_arch_tradeoff",
+            b: "sq_d4_recovery_arch",
+            c: "sq_d4_recovery_arch",
+            d: "sq_d4_recovery_arch",
+          },
+          rationale: "Schema-on-write vs schema-on-read is the single most useful distinguishing axis for interviews.",
+        },
+        sq_d4_arch_tradeoff: {
+          id: "sq_d4_arch_tradeoff",
+          type: "scenario_choice",
+          badge: "Stage 3 trade-off",
+          title: "Stage 3 · When to prefer a data lake over a warehouse",
+          prompt: "The ML team says they need to retrain models on 3 years of raw event logs in custom formats. Running this workload through the SQL warehouse is slow and expensive. What do you recommend?",
+          code_snippet: `-- 3 years × 500 GB/day = ~550 TB raw event logs
+-- ML training: Spark / PyTorch jobs on raw Parquet
+-- Analytics: daily revenue reports via SQL`,
+          choices: [
+            { id: "a", label: "Store raw logs in object storage (S3/GCS) as Parquet, use a warehouse only for curated/aggregated structured data", description: "Object storage is ~10× cheaper than warehouse storage. ML jobs run directly on Parquet without loading into a warehouse." },
+            { id: "b", label: "Load all 550 TB into the SQL warehouse and write ML jobs in SQL UDFs", description: "SQL UDFs cannot replace PyTorch/Spark training pipelines, and 550 TB in a warehouse is very expensive." },
+            { id: "c", label: "Delete logs older than 6 months to manage storage costs", description: "Deleting training data destroys ML reproducibility and removes business audit history." },
+            { id: "d", label: "Compress logs in the OLTP database using JSONB columns", description: "JSONB in PostgreSQL is unsuitable for 550 TB of event data or Spark training jobs." },
+          ],
+          branches: {
+            a: "sq_d4_terminal",
+            b: "sq_d4_recovery_arch",
+            c: "sq_d4_recovery_arch",
+            d: "sq_d4_recovery_arch",
+          },
+          rationale: "The production answer separates hot structured data (warehouse) from cold raw data (object storage), cutting storage cost and enabling ML workflows.",
+        },
+        sq_d4_terminal: {
+          id: "sq_d4_terminal",
+          type: "scenario_choice",
+          badge: "Terminal",
+          title: "Revision complete · OLTP vs OLAP architecture locked",
+          prompt: "You identified the OLAP anti-pattern on an OLTP database, explained columnar I/O savings, and chose the correct lakehouse architecture for mixed workloads.",
+          code_snippet: `-- Mental model:
+-- OLTP: row store, fast writes, normalized, short transactions
+-- OLAP: columnar, fast reads, denormalized, long scans
+-- Warehouse: schema-on-write, SQL, structured analytics
+-- Lake: schema-on-read, raw files, cheap storage, ML pipelines`,
+          choices: [],
+          branches: {},
+          terminal: true,
+          rationale: "The candidate-ready answer covers: row vs columnar I/O model, why OLAP on OLTP causes write contention, and warehouse vs lake as a schema-enforcement distinction — not a speed distinction.",
+        },
+      },
+    },
+    knowledgeCheck: [],
+  },
 };
+
+
 
 
 function ensureMinimumChecks(checks, lessonTitle) {
