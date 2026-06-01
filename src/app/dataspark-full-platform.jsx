@@ -61,6 +61,19 @@ import SQLNormalizationViz from "../visualizations/SQLNormalizationViz.jsx";
 import SQLIndexingViz from "../visualizations/SQLIndexingViz.jsx";
 import SQLStarSnowflakeViz from "../visualizations/SQLStarSnowflakeViz.jsx";
 import SQLOltpOlapViz from "../visualizations/SQLOltpOlapViz.jsx";
+import StatMeanMedianModeViz from "../visualizations/StatMeanMedianModeViz.jsx";
+import StatPercentileIQRViz from "../visualizations/StatPercentileIQRViz.jsx";
+import StatCorrelationViz from "../visualizations/StatCorrelationViz.jsx";
+import StatBinomialPoissonViz from "../visualizations/StatBinomialPoissonViz.jsx";
+import StatCLTViz from "../visualizations/StatCLTViz.jsx";
+import StatPValueViz from "../visualizations/StatPValueViz.jsx";
+import StatTestsViz from "../visualizations/StatTestsViz.jsx";
+import StatConfidenceIntervalViz from "../visualizations/StatConfidenceIntervalViz.jsx";
+import StatTypeErrorsViz from "../visualizations/StatTypeErrorsViz.jsx";
+import StatPowerAnalysisViz from "../visualizations/StatPowerAnalysisViz.jsx";
+import StatMultipleTestingViz from "../visualizations/StatMultipleTestingViz.jsx";
+import StatBootstrapViz from "../visualizations/StatBootstrapViz.jsx";
+import StatBayesFrequentistViz from "../visualizations/StatBayesFrequentistViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import LessonModule from "../components/platform/LessonModule.jsx";
 import { getResolvedLessonModule, auditPythonLessonIntegrity, PYTHON_CLUSTER_MILESTONES } from "../data/lesson-modules.js";
@@ -274,7 +287,7 @@ const CURRICULUM = [
           { id: "st-a1", title: "A/B Testing: Design to Decision", duration: "25 min", hasViz: true },
           { id: "st-a2", title: "Multiple Testing & Bonferroni Correction", duration: "12 min", hasViz: true },
           { id: "st-a3", title: "Bootstrap Methods", duration: "15 min", hasViz: true },
-          { id: "st-a4", title: "Bayesian vs Frequentist: The Debate", duration: "18 min", hasViz: false },
+          { id: "st-a4", title: "Bayesian vs Frequentist: The Debate", duration: "18 min", hasViz: true },
         ]
       }
     ],
@@ -991,6 +1004,19 @@ const VISUALIZATIONS = {
   "sq-d2": SQLIndexingViz,
   "sq-d3": SQLStarSnowflakeViz,
   "sq-d4": SQLOltpOlapViz,
+  "st-f1": StatMeanMedianModeViz,
+  "st-f3": StatPercentileIQRViz,
+  "st-f4": StatCorrelationViz,
+  "st-p3": StatBinomialPoissonViz,
+  "st-p4": StatCLTViz,
+  "st-i2": StatPValueViz,
+  "st-i3": StatTestsViz,
+  "st-i4": StatConfidenceIntervalViz,
+  "st-i5": StatTypeErrorsViz,
+  "st-i6": StatPowerAnalysisViz,
+  "st-a2": StatMultipleTestingViz,
+  "st-a3": StatBootstrapViz,
+  "st-a4": StatBayesFrequentistViz,
 };
 
 const ML_VIZ_FALLBACK = [

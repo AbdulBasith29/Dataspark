@@ -7464,6 +7464,4566 @@ GROUP BY region;`,
     },
     knowledgeCheck: [],
   },
+
+  // ── injected from stat_foundations_lessons.js ──
+  "st-f1": {
+  durationLabel: "15 min",
+  outcomes: [
+    "Distinguish mean, median, and mode and explain when each is the appropriate summary statistic",
+    "Identify how outliers distort the mean while leaving the median stable",
+    "Choose the right central tendency measure given a real data distribution",
+  ],
+  learnMarkdown: `## Mean, Median, Mode — and When Each Actually Matters
+
+Every dataset has a "center," but which center you choose to report can completely change the story you're telling. This is one of the most commonly misused concepts in data communication — and interviewers know it.
+
+## The Three Measures
+
+**Mean (arithmetic average)** — Sum all values, divide by count. Sensitive to every value in the dataset, which makes it mathematically useful (variance, regression, and most ML algorithms depend on it) but fragile in the presence of outliers.
+
+**Median** — Sort the values; take the middle one (or average of the two middle values for even-length datasets). It is robust: a single extreme value cannot move the median by more than one rank position.
+
+**Mode** — The most frequently occurring value. Most useful for categorical data (e.g., "what is the most common subscription tier?") and discrete distributions. For continuous data, mode is often not meaningful or unique.
+
+## The Salary Trap
+
+Imagine a nine-person startup: eight engineers earn between $42k–$85k, and the CEO earns $980k. The **mean salary** is roughly $170k — higher than any individual engineer's pay. The **median salary** is ~$58k, which actually reflects what a typical person at the company earns.
+
+Reporting the mean here isn't technically wrong — it's just misleading. A good data scientist knows to ask: "What question am I actually answering?"
+
+## Symmetric vs Skewed Distributions
+
+For a **symmetric distribution** (think bell curve), mean and median are nearly equal — either is a fine summary.
+
+For a **right-skewed distribution** (income, home prices, social media follower counts), the mean gets pulled upward by the long tail. The median stays near the bulk of the data and is the honest summary statistic.
+
+\`\`\`
+Right-skewed:  ▓▓▓▓▓▓▓▓▓▓░░░░░░░       ← most data here
+               ↑ median   ↑ mean        ← mean dragged right
+\`\`\`
+
+## Mode in Practice
+
+Mode shines for categorical variables: "which product category is most purchased?", "which error type fires most often?". For numeric data, it's most useful in **bimodal distributions** — when you see two peaks, the mode reveals that your "population" might actually be two sub-populations (e.g., two user segments with different behavior patterns).
+
+## Quick Decision Rule
+
+1. **Categorical data** → Mode
+2. **Skewed distribution or outliers present** → Median
+3. **Symmetric, no outliers, need algebraic properties** → Mean
+4. **Reporting to executives** → Median for typical-case framing; mean if you're computing budgets (mean × count = total)
+
+## Interview hook (answer like a senior)
+
+> "I always ask what question the metric is answering. Mean annual salary answers 'what is the total payroll divided by headcount' — useful for budgeting. Median annual salary answers 'what does a typical employee earn' — useful for recruiting messaging. They're both correct statistics for different questions. The mistake is using mean as if it answers the typical-employee question when the distribution is right-skewed."
+`,
+  video: null,
+  videoFallbackMarkdown: `## Video not yet available
+
+Work through the interactive **Mean/Median/Mode Explorer** below. Toggle the CEO outlier in and out of the salary dataset and watch the three statistics update in real time. Pay attention to which measure stays stable and which one jumps — that intuition is exactly what interviewers test.`,
+  tryGuidance: "Toggle the CEO outlier on and off. Notice how the mean jumps from ~$57k to over $150k while the median barely moves. Then switch to the 'Symmetric vs Skewed' tab and compare how close mean and median are when the distribution is balanced. Finally, open 'When to Use Which' and read through the decision flowchart — try to commit the three rules to memory.",
+  interviewGraph: {
+    initialStageId: "s1_click_mean_misuse",
+    artifactDimensions: [
+      { label: "Outlier robustness", recoveryStageId: "r1_outlier_robustness" },
+      { label: "Choosing the right measure", recoveryStageId: "r2_measure_choice", passLabel: "Correct measure selected" },
+    ],
+    stages: {
+      s1_click_mean_misuse: {
+        id: "s1_click_mean_misuse",
+        type: "click_target",
+        badge: "Stage 1",
+        title: "Stage 1 · Spot the misleading statistic",
+        prompt: "An analyst is summarizing employee compensation for a company with 8 engineers ($42k–$85k) and one CEO ($980k). Click the line in the report that contains the misleading summary statistic.",
+        code_snippet: `Company Compensation Summary — FY2024
+======================================
+Headcount: 9 employees
+Total payroll: $1,534,000
+Median salary: $58,000
+Average (mean) salary: $170,444  -- ds-target:mean_misleading
+Salary range: $42,000 – $980,000`,
+        validationCopy: {
+          mean_misleading: "Correct. The mean salary of $170k is technically accurate but misleading — it's higher than every engineer's pay. For a right-skewed distribution like this, the median ($58k) is the honest summary of what a typical employee earns.",
+        },
+        branches: { mean_misleading: "s2_ceo_joins" },
+      },
+      s2_ceo_joins: {
+        id: "s2_ceo_joins",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · CEO joins the dataset",
+        prompt: "The company hires a CEO at $2.4M. The mean jumps from $170k to $438k. The median moves from $58k to $62k. A journalist asks: 'What is the typical employee's salary?' Which statistic do you give them?",
+        code_snippet: `Before CEO hire:  mean=$170k  median=$58k
+After CEO hire:   mean=$438k  median=$62k
+                  ^^^^^^^^           ^^^^
+                  +157% change       +7% change`,
+        choices: [
+          { id: "a", label: "Median ($62k)", description: "Report the median — it accurately reflects what most employees earn and is not distorted by the CEO's extreme salary." },
+          { id: "b", label: "Mean ($438k)", description: "Report the mean — it is the standard average and the most commonly understood statistic." },
+          { id: "c", label: "Mode", description: "Report the mode — it shows the most common salary tier." },
+          { id: "d", label: "The range ($42k–$2.4M)", description: "Report the range — it gives the full picture of compensation spread." },
+        ],
+        branches: { a: "s3_mode_meaning", b: "r1_outlier_robustness", c: "r2_measure_choice", d: "r2_measure_choice" },
+        rationale: "The median is correct here. When a distribution is right-skewed due to an extreme outlier, the median is a robust measure of central tendency that reflects the typical case. The mean is distorted upward by the CEO's salary and would misrepresent what a 'typical' employee earns. The range and mode don't answer the 'typical salary' question.",
+      },
+      s3_mode_meaning: {
+        id: "s3_mode_meaning",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Interpreting the mode",
+        prompt: "A salary dataset shows that the mode is $45,000, appearing 4 times out of 50 employees. A colleague says 'the mode is useless for salary data — just ignore it.' How do you respond?",
+        code_snippet: `salary_counts = {
+  45000: 4,   # mode
+  52000: 3,
+  58000: 3,
+  63000: 2,
+  71000: 1,
+  ...
+}`,
+        choices: [
+          { id: "a", label: "Partially agree — mode has limited precision for continuous data, but $45k appearing 4× may reveal a salary band or job grade worth investigating", description: "Nuanced: acknowledge the limitation but surface the potential signal." },
+          { id: "b", label: "Agree — mode is only for categorical data and should never be used for salary", description: "Too absolute — mode can be a useful signal even in numeric data." },
+          { id: "c", label: "Disagree — mode is the most important statistic because it shows the most common value", description: "Overclaims — mode is one tool among many, not inherently most important." },
+          { id: "d", label: "Agree — with 50 employees and many unique salaries, the mode is statistically meaningless", description: "Mode with only 4/50 occurrences is weak, but 'meaningless' is too strong." },
+        ],
+        branches: { a: "s4_terminal", b: "r2_measure_choice", c: "r2_measure_choice", d: "r2_measure_choice" },
+        rationale: "Answer A is correct. Mode is generally weak for continuous data — tied modes or very low frequency modes are unreliable. But a repeated value in salary data often signals a formal salary band or job-level pay grade. A good analyst investigates the signal rather than dismissing it entirely.",
+      },
+      r1_outlier_robustness: {
+        id: "r1_outlier_robustness",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Outlier robustness",
+        prompt: "True or false: adding a single extreme outlier to a 50-person salary dataset will change the median by at most one rank position, regardless of how extreme the outlier is.",
+        code_snippet: `dataset (n=50): sorted values v[0] ... v[49]
+median = (v[24] + v[25]) / 2
+
+After adding outlier v[50]=10,000,000:
+sorted (n=51): v[0] ... v[49], v[50]
+new median = v[25]   # shifted by exactly 1 position`,
+        choices: [
+          { id: "a", label: "True — median can only shift by one rank when a single value is added", description: "Correct — this is exactly why median is called resistant to outliers." },
+          { id: "b", label: "False — a large enough outlier will eventually drag the median upward significantly", description: "Incorrect — the median's position is determined by rank, not magnitude." },
+          { id: "c", label: "It depends on whether the outlier is above or below the median", description: "Partially right that direction matters, but the magnitude of the outlier never matters for the median." },
+          { id: "d", label: "False — the median can shift multiple positions when an outlier is extreme", description: "Incorrect — only one observation is being added, so rank can shift by at most one." },
+        ],
+        branches: { a: "s3_mode_meaning", b: "r1_outlier_robustness", c: "r1_outlier_robustness", d: "r1_outlier_robustness" },
+        rationale: "True. The median is determined purely by rank order, not values. Adding one data point shifts the median's position by at most one rank — no matter how large or small the added value is. This rank-based robustness is why median is preferred for skewed or outlier-prone distributions.",
+      },
+      r2_measure_choice: {
+        id: "r2_measure_choice",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · Choosing the right measure",
+        prompt: "A product manager says: 'Our average session duration is 4.2 minutes.' You pull the data and find the distribution is heavily right-skewed (most users leave in under 1 minute; a few power users stay for 30+ minutes). What do you tell the PM?",
+        code_snippet: `session_duration distribution (n=10,000):
+  P10:  0.3 min
+  P25:  0.7 min
+  P50:  1.1 min   ← median
+  P75:  3.2 min
+  P90:  9.8 min
+  mean: 4.2 min   ← pulled up by power users`,
+        choices: [
+          { id: "a", label: "Report the median (1.1 min) as the typical session duration; the mean is inflated by power-user outliers", description: "Correct — for a right-skewed metric, median is the honest 'typical user' summary." },
+          { id: "b", label: "The mean is correct — 4.2 minutes is what matters for infrastructure planning", description: "Mean × count = total server-minutes, so mean is useful for capacity, but it does NOT represent the typical user." },
+          { id: "c", label: "Use mode — the most common session duration tells you the most about user behavior", description: "Mode is useful for discrete counts, but for a continuous metric like duration, median is more informative." },
+          { id: "d", label: "Report both mean and median and let the PM decide", description: "Reporting both is good practice, but a data scientist should also explain which one answers the PM's actual question." },
+        ],
+        branches: { a: "s3_mode_meaning", b: "r2_measure_choice", c: "r2_measure_choice", d: "r2_measure_choice" },
+        rationale: "Answer A is correct. When a metric is right-skewed (engagement time, revenue, LTV), the median is the honest 'typical user' summary. The mean is useful for resource-planning (mean × users = total load) but misleads when describing what a typical user experiences. Always match the statistic to the question being asked.",
+      },
+      s4_terminal: {
+        id: "s4_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Revision complete · Central tendency mastery check",
+        terminal: true,
+        prompt: "Final check: for a right-skewed income distribution (e.g., US household income), which single measure best minimizes the influence of extreme high-income values when describing the 'typical' household?",
+        code_snippet: `US Household Income (approximate):
+  mean:    ~$102,000   ← dragged up by top earners
+  median:  ~$70,800    ← middle of the distribution
+  mode:    ~$25,000    ← most common bracket (lowest)`,
+        choices: [
+          { id: "a", label: "Median — it is robust to outliers and reflects the household at the 50th percentile", description: "Correct. Median is unaffected by the magnitude of extreme values." },
+          { id: "b", label: "Mean — it incorporates all the data and is the most statistically powerful", description: "Mean is powerful but distorted by right-skew. It represents 'total income / households', not the typical household." },
+          { id: "c", label: "Mode — the most common income is the most representative", description: "For continuous income data, mode lands in the lowest bracket and understates what most middle-class households earn." },
+        ],
+        branches: { a: "s4_terminal", b: "s4_terminal", c: "s4_terminal" },
+        rationale: "Median is correct. For right-skewed distributions like income, the top earners pull the mean far above what most households experience. The median — the income level at which exactly half of households earn more and half earn less — is the honest summary of typical household income. This is why the U.S. Census and most economists report median household income, not mean.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "A startup has 9 employees. Eight engineers earn $45k–$80k; the CEO earns $1.2M. Which measure best represents the typical employee's salary?",
+      options: [
+        "Median — it is robust to the CEO's extreme salary",
+        "Mean — it uses all the data and is more statistically powerful",
+        "Mode — it shows the most common salary",
+      ],
+      correctIndex: 0,
+      explanation: "Median is correct. The CEO's $1.2M salary is an extreme outlier that pulls the mean far above what any engineer earns. The median, by contrast, is determined by rank order and barely changes when one extreme value is added. For right-skewed distributions, the median is the honest 'typical' summary.",
+    },
+    {
+      question: "You have a bimodal distribution of session durations — a large cluster at 1–2 minutes and another cluster at 10–12 minutes. Which statistic would reveal that there are two distinct user behavior patterns?",
+      options: [
+        "Mode — the two peaks each correspond to a mode, revealing the bimodal structure",
+        "Mean — it gives the average session duration across all users",
+        "Median — it identifies the middle value of all sessions",
+      ],
+      correctIndex: 0,
+      explanation: "Mode (or more precisely, identifying the two modes of the distribution) reveals the bimodal structure. The mean would land somewhere between the two clusters (~5–7 min) and not represent either group well. The median would similarly land in the gap between clusters. Bimodal distributions are a signal that you should segment your analysis — you likely have two different user populations.",
+    },
+  ],
+},
+
+"st-f2": {
+  durationLabel: "18 min",
+  outcomes: [
+    "Compute variance and standard deviation for both populations and samples, and explain why sample variance uses n-1",
+    "Interpret standard deviation as a measure of spread and use it to describe distribution shape",
+    "Apply standard deviation to real problems involving risk, consistency, and quality control",
+  ],
+  learnMarkdown: `## Variance, Standard Deviation & The Shape of Data
+
+If central tendency tells you where a dataset lives, **spread** tells you how much the data varies around that center. Two datasets can have identical means but wildly different behavior — and standard deviation is the number that captures that difference.
+
+## Variance: The Average Squared Deviation
+
+Variance measures how far, on average, each point is from the mean. We square the deviations for two reasons: to eliminate sign (positive and negative deviations cancel if not squared) and to penalize large deviations more heavily.
+
+\`\`\`
+Population variance:  σ² = Σ(xᵢ - μ)² / N
+Sample variance:      s² = Σ(xᵢ - x̄)² / (n-1)
+\`\`\`
+
+The units of variance are the square of the original units (e.g., dollars²), which is hard to interpret directly. That's why we usually report **standard deviation** (σ or s), the square root of variance — it's in the same units as the data.
+
+## Why n-1? Bessel's Correction
+
+When estimating the variance of a population from a sample, dividing by n underestimates the true variance. Intuitively: a sample tends to cluster around its own mean more than it clusters around the true population mean. Dividing by **n-1** inflates the estimate just enough to make it unbiased.
+
+In practice: use n-1 whenever you have a sample and want to estimate the population variance (which is almost always). Use n only if you truly have the full population.
+
+## Standard Deviation as a Ruler
+
+Standard deviation gives you a natural unit for measuring "how unusual" a data point is.
+
+- A value 1σ from the mean is typical (in a normal distribution, ~68% of data falls within ±1σ)
+- A value 2σ from the mean is noteworthy (~95% of data within ±2σ)
+- A value 3σ from the mean is rare (~99.7% within ±3σ)
+
+This "68-95-99.7 rule" is the foundation for z-scores, outlier detection, and control charts.
+
+## Reading Distribution Shape
+
+**Low σ**: Data clusters tightly around the mean → consistent, predictable
+**High σ**: Data is spread widely → high variability, less predictable
+
+\`\`\`
+Model A (σ=2):   ████████████████  tight cluster
+Model B (σ=8):   ████░░░░░░░░░░░░████  wide spread
+                 Same mean, very different risk
+\`\`\`
+
+For risk analysis, you need both the mean (expected value) and σ (uncertainty). A stock returning 5% mean with σ=20% is far riskier than a bond returning 3% with σ=2%.
+
+## Coefficient of Variation: Relative Spread
+
+When comparing spread across datasets with different scales, use the **coefficient of variation**: CV = σ / μ. This normalizes spread relative to the mean, making cross-scale comparisons fair.
+
+## When Std Dev Misleads
+
+Standard deviation assumes a roughly symmetric distribution. For heavily skewed data, IQR is a more robust measure of spread (just as median beats mean for center). Always plot your data before summarizing it.
+
+## Interview hook (answer like a senior)
+
+> "I think of standard deviation as the 'typical error' around the mean. When I see σ, I immediately ask: is this spread acceptable for my use case? For a manufacturing process, σ drives defect rates. For a recommendation model, σ in predicted scores affects ranking stability. I always report mean and σ together — one without the other is incomplete."
+`,
+  video: null,
+  videoFallbackMarkdown: `## Video not yet available
+
+Use the **Normal Distribution Visualizer** below to explore how changing standard deviation compresses or expands the bell curve. Drag the σ slider and notice how the curve height changes to maintain the same total area — that geometric fact is the foundation of probability.`,
+  tryGuidance: "Start by setting σ to a small value and observe the tall, tight bell curve — this represents a consistent process. Then increase σ and watch the curve flatten and widen. Notice how the 68-95-99.7 rule markers move with σ. Finally, try to remember the key insight: two distributions with the same mean but different σ are fundamentally different in terms of risk and predictability.",
+  interviewGraph: {
+    initialStageId: "s1_click_denominator",
+    artifactDimensions: [
+      { label: "Bessel's correction (n vs n-1)", recoveryStageId: "r1_bessels" },
+      { label: "Interpreting spread in context", recoveryStageId: "r2_spread_context", passLabel: "Applied σ correctly" },
+    ],
+    stages: {
+      s1_click_denominator: {
+        id: "s1_click_denominator",
+        type: "click_target",
+        badge: "Stage 1",
+        title: "Stage 1 · Spot the variance formula bug",
+        prompt: "A junior analyst wrote a function to compute sample variance. Click the line that contains the statistical error.",
+        code_snippet: `def sample_variance(data):
+    n = len(data)
+    mean = sum(data) / n
+    squared_diffs = [(x - mean)**2 for x in data]
+    return sum(squared_diffs) / n   -- ds-target:wrong_denom`,
+        validationCopy: {
+          wrong_denom: "Correct. Sample variance must divide by (n-1), not n. Dividing by n produces a biased estimator that systematically underestimates the population variance. This is called Bessel's correction — the fix is `sum(squared_diffs) / (n - 1)`.",
+        },
+        branches: { wrong_denom: "s2_consistency" },
+      },
+      s2_consistency: {
+        id: "s2_consistency",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Comparing model consistency",
+        prompt: "You're evaluating two recommendation models. Both achieve a mean RMSE of 0.42 across 30 evaluation runs. Model A has σ=0.02; Model B has σ=0.11. Which model do you prefer for production and why?",
+        code_snippet: `Model A:  mean_RMSE=0.42  σ=0.02  min=0.39  max=0.46
+Model B:  mean_RMSE=0.42  σ=0.11  min=0.21  max=0.63`,
+        choices: [
+          { id: "a", label: "Model A — lower σ means more consistent, predictable performance in production", description: "Correct. Consistent performance is critical for production systems." },
+          { id: "b", label: "Model B — its lower minimum (0.21) shows it can be better than Model A at its best", description: "Best-case performance is not what you deploy against — you need to understand the distribution of outcomes." },
+          { id: "c", label: "Either — they have the same mean RMSE so they are equivalent", description: "Wrong. Same mean, very different variance. Model B could perform 3× worse than Model A on a bad run." },
+          { id: "d", label: "Model B — higher variance means it's exploring more of the solution space", description: "Higher variance in eval metrics is instability, not exploration. That framing applies to training, not evaluation." },
+        ],
+        branches: { a: "s3_bessels_why", b: "r2_spread_context", c: "r2_spread_context", d: "r2_spread_context" },
+        rationale: "Model A is correct. In production, you care about the distribution of outcomes, not just the mean. Model B's σ=0.11 means its RMSE could plausibly hit 0.63 on a bad day (mean + ~2σ). Model A's tight σ=0.02 means you can predict its behavior reliably. All else equal, consistent performance beats high-variance performance.",
+      },
+      s3_bessels_why: {
+        id: "s3_bessels_why",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Why n-1?",
+        prompt: "An interviewer asks: 'Why do we divide by n-1 instead of n when computing sample variance? Give me the intuition.' Which answer is best?",
+        code_snippet: `# Demonstrating the bias
+import numpy as np
+
+population = np.random.normal(0, 10, size=10000)
+pop_var = np.var(population)              # true ≈ 100
+
+biased = []
+unbiased = []
+for _ in range(5000):
+    sample = np.random.choice(population, 30)
+    biased.append(np.var(sample, ddof=0))     # /n
+    unbiased.append(np.var(sample, ddof=1))   # /n-1
+
+# biased mean ≈ 97  ← underestimates
+# unbiased mean ≈ 100 ← hits the target`,
+        choices: [
+          { id: "a", label: "The sample clusters around its own mean, which is closer to the data than the true population mean — dividing by n-1 corrects for this underestimation", description: "Correct — the lost degree of freedom accounts for using x̄ (estimated from the data) instead of μ (the true mean)." },
+          { id: "b", label: "n-1 is used to make the formula symmetrical and aesthetically cleaner", description: "There is no aesthetic motivation — it is a statistical correction for bias." },
+          { id: "c", label: "n-1 gives a larger denominator, which makes the variance estimate more conservative and safe", description: "Partially right (it does increase the estimate), but the reason is unbiasedness, not conservatism." },
+          { id: "d", label: "It doesn't matter for large n — the difference between n and n-1 is negligible", description: "For large n this is practically true, but it's not 'why' we use n-1 — the statistical reason is bias correction regardless of sample size." },
+        ],
+        branches: { a: "s4_terminal", b: "r1_bessels", c: "r1_bessels", d: "r1_bessels" },
+        rationale: "Answer A is the best explanation. When we estimate variance using the sample mean x̄ (instead of the true μ), the deviations (xᵢ - x̄) are systematically smaller than (xᵢ - μ) would be — because x̄ is computed from the same data and minimizes those deviations. This 'uses up' one degree of freedom. Dividing by n-1 corrects for this underestimation, producing an unbiased estimator.",
+      },
+      r1_bessels: {
+        id: "r1_bessels",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Bessel's correction",
+        prompt: "You compute sample variance of 30 data points using /n. The result is 144. What is the unbiased sample variance (using /n-1)?",
+        code_snippet: `biased_var   = sum_sq_diffs / 30    = 144.0
+unbiased_var = sum_sq_diffs / 29    = ?
+
+sum_sq_diffs = 144.0 × 30 = 4320`,
+        choices: [
+          { id: "a", label: "148.97 (= 4320 / 29)", description: "Correct. Multiply back to get the sum of squared deviations, then divide by n-1=29." },
+          { id: "b", label: "140.0 (= 144 × 29/30)", description: "Incorrect — you need to divide by 29, not multiply by 29/30." },
+          { id: "c", label: "144.0 — the variance does not change because the data is the same", description: "The denominator changes, so the variance estimate changes. Only the sum of squared deviations is fixed." },
+          { id: "d", label: "288.0 (= 144 × 2)", description: "No mathematical basis for doubling the variance." },
+        ],
+        branches: { a: "s3_bessels_why", b: "r1_bessels", c: "r1_bessels", d: "r1_bessels" },
+        rationale: "Correct answer is 148.97. The sum of squared deviations is 144 × 30 = 4320. Dividing by n-1 = 29 gives 4320/29 ≈ 148.97. The unbiased sample variance is always slightly larger than the biased version, and the difference shrinks as n grows.",
+      },
+      r2_spread_context: {
+        id: "r2_spread_context",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · Interpreting spread",
+        prompt: "A stock has mean annual return 5% and σ=20%. A bond has mean annual return 3% and σ=2%. Which asset is riskier, and how do you quantify that risk?",
+        code_snippet: `Stock:  μ=5%  σ=20%  → CV = σ/μ = 4.0
+Bond:   μ=3%  σ=2%   → CV = σ/μ = 0.67
+
+# Within 1 year, stock could plausibly return:
+# μ ± 2σ = 5% ± 40%  →  range: -35% to +45%`,
+        choices: [
+          { id: "a", label: "Stock — its σ=20% means annual returns could plausibly swing ±40% (2σ), while the bond's σ=2% produces ±4% swings", description: "Correct. Higher σ = higher volatility = higher risk, despite the higher mean return." },
+          { id: "b", label: "Bond — its lower mean return means less reward, and less reward implies less risk", description: "Incorrect. Risk is measured by variance/volatility, not by return level. Lower return ≠ lower risk in general." },
+          { id: "c", label: "They are equally risky — risk depends only on the mean return", description: "Incorrect. Risk is about uncertainty (variance), not expected value. The stock is dramatically riskier." },
+          { id: "d", label: "Stock — its higher mean return proves it is riskier since return and risk are always correlated", description: "In this example the stock IS riskier, but saying 'higher return proves higher risk' is a coincidence not a rule." },
+        ],
+        branches: { a: "s3_bessels_why", b: "r2_spread_context", c: "r2_spread_context", d: "r2_spread_context" },
+        rationale: "The stock is riskier. Standard deviation directly quantifies price volatility — the stock's σ=20% means a return 2 standard deviations below the mean is 5% - 40% = -35%. That's a potential 35% loss in a year. The bond's ±4% swing is far less uncertain. Coefficient of variation (CV = σ/μ) lets you compare relative risk: stock CV=4.0 vs bond CV=0.67.",
+      },
+      s4_terminal: {
+        id: "s4_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Revision complete · Variance and std dev mastery",
+        terminal: true,
+        prompt: "Final check: a manufacturing process has spec limits of 10.0 ± 0.5 units. The process produces parts with mean=10.0 and σ=0.25. Approximately what percentage of parts will be outside the spec limits?",
+        code_snippet: `Spec limits: [9.5, 10.5]
+Process:     μ=10.0, σ=0.25
+
+Distance to spec limit = 0.5 / 0.25 = 2σ
+
+68-95-99.7 rule:
+  Within ±1σ: ~68%
+  Within ±2σ: ~95%  ← applies here
+  Within ±3σ: ~99.7%`,
+        choices: [
+          { id: "a", label: "~5% — spec limits are ±2σ, and 95% fall within ±2σ so ~5% fall outside", description: "Correct. The spec limits are exactly 2 standard deviations from the mean, so ~5% of parts will be out of spec." },
+          { id: "b", label: "~32% — spec limits are ±1σ so 32% fall outside ±1σ", description: "Incorrect — 0.5 / 0.25 = 2σ, not 1σ." },
+          { id: "c", label: "~0.3% — spec limits are ±3σ so only 0.3% fall outside", description: "Incorrect — 0.5 / 0.25 = 2, so the limits are ±2σ, not ±3σ." },
+        ],
+        branches: { a: "s4_terminal", b: "s4_terminal", c: "s4_terminal" },
+        rationale: "Answer A is correct. The spec limits (9.5 to 10.5) are each 0.5 units from the mean, which equals 0.5/0.25 = 2 standard deviations. By the 68-95-99.7 rule, approximately 95% of a normally distributed process falls within ±2σ, so ~5% of parts will be out of spec. This is the foundation of Six Sigma quality control, which aims to push spec limits to ±6σ, reducing defects to 3.4 per million.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "Two datasets have the same mean. Dataset A has σ=3; Dataset B has σ=15. Which of the following is true?",
+      options: [
+        "Dataset B is more spread out — individual values deviate more from the mean on average",
+        "Dataset A is more variable — smaller σ means the values are more extreme",
+        "They are equally variable because they share the same mean",
+      ],
+      correctIndex: 0,
+      explanation: "Dataset B is more spread out. Standard deviation measures the average distance of data points from the mean. A larger σ means points are farther from the mean on average. Two datasets can have the same mean and completely different spreads — this is exactly why you must report both.",
+    },
+    {
+      question: "Why does sample variance use n-1 in the denominator instead of n?",
+      options: [
+        "Because the sample mean underestimates the true spread of deviations from the population mean, and n-1 corrects this bias",
+        "Because n-1 makes the formula work for both odd and even sample sizes",
+        "Because the first data point is reserved as a baseline, leaving n-1 usable observations",
+      ],
+      correctIndex: 0,
+      explanation: "Bessel's correction: when we compute deviations from the sample mean (x̄) rather than the true population mean (μ), those deviations are systematically smaller because x̄ is estimated from the same data and minimizes them. This 'uses up' one degree of freedom. Dividing by n-1 instead of n compensates, producing an unbiased estimator of σ².",
+    },
+  ],
+},
+
+"st-f3": {
+  durationLabel: "12 min",
+  outcomes: [
+    "Calculate Q1, Q2, Q3, IQR, and Tukey fences from a sorted dataset",
+    "Apply the 1.5×IQR rule to flag outliers and explain why IQR is robust where standard deviation is not",
+    "Interpret percentile values in operational contexts like response time SLAs and growth charts",
+  ],
+  learnMarkdown: `## Percentiles, IQR & Outlier Detection
+
+Percentiles divide a sorted dataset into 100 equal parts. They're everywhere: the 90th-percentile response time (P90) is a standard SLA metric; growth charts express a child's height as a percentile; the IQR used for outlier detection is built from the 25th and 75th percentiles.
+
+## Quartiles: The Big Four Splits
+
+The most commonly used percentiles are the **quartiles**:
+
+- **Q1 (P25)** — 25% of values fall below this point
+- **Q2 (P50)** — the median; 50% fall below
+- **Q3 (P75)** — 75% of values fall below
+- **IQR = Q3 - Q1** — the middle 50% of the data
+
+\`\`\`
+sorted: [12, 18, 24, 28, 31, 35, 41, 47]
+         ↑Q1=21         ↑Q3=38
+         IQR = 38 - 21 = 17
+\`\`\`
+
+The IQR is a **resistant** measure of spread: it ignores the bottom 25% and top 25% entirely, so extreme values cannot inflate it.
+
+## Tukey Fences: Outlier Detection
+
+The standard rule for flagging outliers is the **1.5×IQR criterion** (Tukey fences):
+
+\`\`\`
+Lower fence = Q1 - 1.5 × IQR
+Upper fence = Q3 + 1.5 × IQR
+
+Any value outside [lower fence, upper fence] is a potential outlier.
+\`\`\`
+
+For extreme outliers, a stricter **3×IQR criterion** is sometimes used. Values beyond 3×IQR from the quartile are called "far outliers."
+
+## Why IQR Over Standard Deviation for Outlier Detection?
+
+Standard deviation is itself inflated by outliers — so using σ to detect outliers is circular: a very large outlier increases σ, making the threshold larger, potentially masking the outlier. IQR avoids this problem by ignoring the tails entirely.
+
+## Box Plots: Visualizing the Five-Number Summary
+
+A box plot encodes Q1, Q2, Q3, the fences (whiskers), and outlier points:
+
+\`\`\`
+    ○         [==|=====]          ○ ○
+    ↑          ↑ ↑    ↑           ↑↑
+  outlier     Q1 Q2   Q3       outliers
+              |<- IQR ->|
+    ←whisker→            ←whisker→
+\`\`\`
+
+## Operational Percentiles
+
+In engineering and product analytics, percentiles are used differently from statistics:
+
+- **P50 (median)** — typical case
+- **P90 / P95** — "tail latency" — 90% or 95% of requests complete within this time
+- **P99** — "long-tail" — 99% of requests; used for SLAs where 1 in 100 slow requests causes user-facing issues
+
+Optimizing for mean latency can mask the fact that 5% of users experience terrible performance. Percentile-based SLAs are more honest.
+
+## When Percentiles Beat Mean/SD
+
+For heavy-tailed distributions (latency, revenue, social engagement), percentiles tell the complete story without any distributional assumptions. Reporting P10, P50, P90 gives you a robust picture of typical and tail behavior that mean ± σ cannot provide for skewed data.
+
+## Interview hook (answer like a senior)
+
+> "When I'm doing exploratory analysis on a new metric, I immediately pull the percentile distribution — P10, P25, P50, P75, P90, P99. The gaps between adjacent percentiles tell me about skew, and P99 vs P95 tells me whether the tail is power-law or approximately normal. I use IQR for outlier flagging rather than ±2σ because σ itself gets inflated by outliers in skewed data — that's a circular trap."
+`,
+  video: null,
+  videoFallbackMarkdown: `## Video not yet available
+
+Work through the **Percentile & IQR Explorer** below. Toggle between the normal and outlier dataset and watch how the IQR barely changes even when an extreme outlier is added — that's the key intuition about IQR's robustness. Use the box plot view to see how whiskers and outlier points are plotted.`,
+  tryGuidance: "Switch to the dataset with the extreme outlier (value 97) and observe how the box plot changes. Notice that Q1, Q2, and Q3 all stay close to their original values, but the upper fence is now exceeded. Toggle to the 'Value Inspector' tab and hover over each data point to see its percentile rank. Then open 'Concepts' to review the operational use cases for P90 and P99 in engineering.",
+  interviewGraph: {
+    initialStageId: "s1_outlier_fence",
+    artifactDimensions: [
+      { label: "Tukey fence calculation", recoveryStageId: "r1_fence_calc" },
+      { label: "Percentile interpretation", recoveryStageId: "r2_percentile_meaning", passLabel: "Percentile applied correctly" },
+    ],
+    stages: {
+      s1_outlier_fence: {
+        id: "s1_outlier_fence",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Applying the Tukey fence",
+        prompt: "A dataset has Q1=20, Q3=40, so IQR=20. A value of 90 appears in the dataset. By the standard Tukey fence rule (1.5×IQR), is this value an outlier?",
+        code_snippet: `Q1 = 20
+Q3 = 40
+IQR = Q3 - Q1 = 20
+
+Upper fence = Q3 + 1.5 × IQR
+            = 40  + 1.5 × 20
+            = 40  + 30
+            = 70
+
+Value to check: 90`,
+        choices: [
+          { id: "a", label: "Yes — 90 exceeds the upper fence of 70, so it is flagged as an outlier", description: "Correct. 90 > 70, so this value lies outside the Tukey fence and is a potential outlier." },
+          { id: "b", label: "No — 90 is only 2.5×IQR above Q1, and the threshold is 3×IQR", description: "Wrong threshold — the standard rule is 1.5×IQR from Q3 (not Q1). The 3×IQR rule is for 'far outliers'." },
+          { id: "c", label: "Not enough information — we need the standard deviation to determine if it is an outlier", description: "The Tukey fence rule uses only Q1, Q3, and IQR. No standard deviation needed — and σ would be circular here." },
+          { id: "d", label: "No — outliers must be at least 3 standard deviations from the mean", description: "The ±3σ rule is a different (distributional) criterion. The IQR-based Tukey fence is distribution-free." },
+        ],
+        branches: { a: "s2_click_iqr_bug", b: "r1_fence_calc", c: "r1_fence_calc", d: "r1_fence_calc" },
+        rationale: "Yes, 90 is an outlier by the Tukey rule. Upper fence = Q3 + 1.5×IQR = 40 + 30 = 70. Since 90 > 70, it falls outside the fence. The 1.5×IQR rule is the standard (Tukey, 1977) and is distribution-free — you don't need to assume normality.",
+      },
+      s2_click_iqr_bug: {
+        id: "s2_click_iqr_bug",
+        type: "click_target",
+        badge: "Stage 2",
+        title: "Stage 2 · Spot the IQR formula bug",
+        prompt: "A data analyst wrote a script to compute IQR. Click the line that contains the formula error.",
+        code_snippet: `def compute_iqr(sorted_data):
+    n = len(sorted_data)
+    q1 = sorted_data[n // 4]
+    q2 = sorted_data[n // 2]
+    q3 = sorted_data[3 * n // 4]
+    iqr = q2 - q1   -- ds-target:wrong_iqr
+    return iqr`,
+        validationCopy: {
+          wrong_iqr: "Correct. IQR = Q3 - Q1, not Q2 - Q1. The line should read `iqr = q3 - q1`. Using Q2 (the median) instead of Q3 computes the distance from Q1 to the median, which is only half of the interquartile range.",
+        },
+        branches: { wrong_iqr: "s3_p90_meaning" },
+      },
+      s3_p90_meaning: {
+        id: "s3_p90_meaning",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Interpreting P90 operationally",
+        prompt: "Your service's P90 response time is 850ms. An engineer says 'our average is only 210ms so 850ms doesn't matter.' How do you respond?",
+        code_snippet: `Response time distribution (n=100,000 requests):
+  P50:  95ms   ← typical request
+  P75: 320ms
+  P90: 850ms   ← 10% of requests exceed this
+  P99: 3200ms  ← 1% of requests hit 3+ seconds
+
+  mean: 210ms  ← dominated by fast requests`,
+        choices: [
+          { id: "a", label: "P90=850ms means 10% of requests take 850ms or longer — that's 10,000 users per 100,000 experiencing slow responses, which is a real user experience problem", description: "Correct — absolute count of affected users makes the percentile concrete." },
+          { id: "b", label: "The engineer is right — if the mean is fast, most users are fine and P90 is an edge case we can ignore", description: "Wrong. 10% is not an edge case — and P90 is often the metric in SLAs precisely because it's user-perceptible." },
+          { id: "c", label: "P90 only matters for high-traffic services — at low traffic it is statistically unreliable", description: "P90 is meaningful at any scale proportional to the traffic. 10% of requests are slow regardless of volume." },
+          { id: "d", label: "We should optimize for the mean, which is a better overall metric of system health", description: "Mean latency is easily dominated by the large volume of fast requests. It masks slow-tail problems — that's why engineers specifically monitor P90/P99." },
+        ],
+        branches: { a: "s4_terminal", b: "r2_percentile_meaning", c: "r2_percentile_meaning", d: "r2_percentile_meaning" },
+        rationale: "Answer A is correct. P90=850ms means 10% of all requests take at least 850ms. At 100,000 requests, that's 10,000 users per reporting period experiencing slow responses — a real and significant UX problem regardless of the mean. SLAs are typically expressed in percentiles (not mean) precisely because the tail behavior directly impacts user experience.",
+      },
+      r1_fence_calc: {
+        id: "r1_fence_calc",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Tukey fence calculation",
+        prompt: "A dataset has Q1=15, Q3=35. Calculate the upper Tukey fence (1.5×IQR rule).",
+        code_snippet: `Q1 = 15
+Q3 = 35
+IQR = Q3 - Q1 = ?
+
+Upper fence = Q3 + 1.5 × IQR = ?`,
+        choices: [
+          { id: "a", label: "65  (IQR=20, fence = 35 + 1.5×20 = 35 + 30 = 65)", description: "Correct. IQR = 35-15 = 20; upper fence = 35 + 30 = 65." },
+          { id: "b", label: "50  (fence = Q3 + IQR = 35 + 20 = 55)", description: "Off — you need to multiply IQR by 1.5, not use IQR directly." },
+          { id: "c", label: "52.5  (fence = Q3 + 0.5×IQR)", description: "Wrong multiplier — the standard Tukey rule uses 1.5×IQR, not 0.5×IQR." },
+          { id: "d", label: "42.5  (fence = Q3 + 0.25×IQR)", description: "Wrong multiplier — the rule is 1.5×IQR." },
+        ],
+        branches: { a: "s2_click_iqr_bug", b: "r1_fence_calc", c: "r1_fence_calc", d: "r1_fence_calc" },
+        rationale: "IQR = Q3 - Q1 = 35 - 15 = 20. Upper fence = Q3 + 1.5 × IQR = 35 + 1.5 × 20 = 35 + 30 = 65. Any value above 65 is a potential outlier by the Tukey rule. The lower fence would be Q1 - 1.5×IQR = 15 - 30 = -15.",
+      },
+      r2_percentile_meaning: {
+        id: "r2_percentile_meaning",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · Percentile interpretation",
+        prompt: "A standardized test reports that a student scored at the 82nd percentile. Which interpretation is correct?",
+        code_snippet: `Test score: 78 / 100
+Percentile: 82nd
+
+# What does P82 mean?`,
+        choices: [
+          { id: "a", label: "82% of test-takers scored at or below this student's score", description: "Correct. Percentile rank = percentage of the reference group at or below your score." },
+          { id: "b", label: "The student answered 82% of questions correctly", description: "Incorrect — that's the raw score percentage, not the percentile rank. An 82nd percentile student might have a raw score of 78%." },
+          { id: "c", label: "The student scored 82 points out of 100", description: "Incorrect — the student scored 78/100. Percentile rank (82nd) is a different quantity from the raw score (78)." },
+          { id: "d", label: "The student is in the top 82% of test-takers", description: "Almost right but backwards — the student is in the top 18% (100 - 82 = 18), not the top 82%." },
+        ],
+        branches: { a: "s3_p90_meaning", b: "r2_percentile_meaning", c: "r2_percentile_meaning", d: "r2_percentile_meaning" },
+        rationale: "Answer A is correct. The Nth percentile is the value below which N% of the data falls. An 82nd percentile score means 82% of test-takers scored at or below that level — equivalently, this student outperformed 82% of the group. Confusing percentile rank with raw score or 'top X%' is a very common error.",
+      },
+      s4_terminal: {
+        id: "s4_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Revision complete · Percentile & IQR mastery",
+        terminal: true,
+        prompt: "Final check: a user engagement score distribution has many zeros (users who never engaged) and a long right tail (power users). Which set of summary statistics would you report to give a complete picture?",
+        code_snippet: `Engagement score distribution:
+  60% of users: score = 0 (never engaged)
+  Remaining 40%: scores from 1 to 500
+
+  mean = 8.4   (pulled up by power users)
+  σ    = 22.1  (inflated by variance in tail)
+  P0   = 0
+  P50  = 0     (more than 50% are zero)
+  P75  = 3
+  P90  = 28
+  P99  = 180`,
+        choices: [
+          { id: "a", label: "P50, P75, P90, P99 plus the percentage of zeros — this captures the spike at zero and the shape of the active-user tail", description: "Correct. Percentiles are distribution-free and capture both the zero spike and the long tail without distortion." },
+          { id: "b", label: "Mean ± standard deviation — these are the standard and most widely understood statistics", description: "Mean=8.4 is misleading when 60% of users have score=0. σ=22.1 is dominated by the tail and hard to interpret." },
+          { id: "c", label: "Median only — it's robust and gives the best single-number summary", description: "Median=0 just tells you that most users never engaged. You lose all information about the active users." },
+          { id: "d", label: "Mode and mean — mode shows the most common value and mean shows the average", description: "Mode=0 just confirms zero is most common. Mean=8.4 is misleading. Neither captures the active-user behavior." },
+        ],
+        branches: { a: "s4_terminal", b: "s4_terminal", c: "s4_terminal", d: "s4_terminal" },
+        rationale: "Answer A is correct. For a distribution with a mass point at zero (60% zeros) and a long right tail, percentiles plus the zero-fraction are the most honest and complete summary. P50=0 confirms the majority never engaged. P75=3, P90=28, P99=180 characterize the active users. Mean and σ are both distorted by the spike at zero and the outlier power users, and would mislead anyone trying to understand typical behavior.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "A dataset has Q1=25 and Q3=55. A value of 100 appears. Is it an outlier by the Tukey 1.5×IQR rule?",
+      options: [
+        "Yes — upper fence = 55 + 1.5×30 = 100, and since 100 ≥ 100, it is at or beyond the boundary",
+        "No — the value would need to exceed 100 to be an outlier",
+        "Cannot determine without knowing the mean and standard deviation",
+      ],
+      correctIndex: 0,
+      explanation: "IQR = 55 - 25 = 30. Upper fence = Q3 + 1.5×IQR = 55 + 45 = 100. The value 100 sits exactly on the fence boundary. By most implementations, values beyond (strictly greater than) the fence are outliers — so 100 sits right at the threshold. Regardless of which convention you use, this is the correct fence calculation and the IQR-based approach requires no distributional assumption.",
+    },
+    {
+      question: "A server's P99 response time jumps from 200ms to 800ms after a deployment. The mean response time stayed at 45ms. What's the most likely explanation?",
+      options: [
+        "A slow code path or resource contention was introduced that only affects ~1% of requests but dramatically slows them",
+        "The mean is more reliable than P99 — the measurement is probably noise",
+        "P99 is inherently unstable and this change is within normal statistical variation",
+      ],
+      correctIndex: 0,
+      explanation: "P99 rising 4× while the mean barely moves is a classic signature of a tail-latency regression — a bug or bottleneck that affects a small percentage of requests severely. Common causes include database lock contention, garbage collection pauses, or a code path triggered only under specific conditions. The mean is stable because 99% of requests are unaffected. This is exactly why monitoring P99 is critical — mean latency would completely hide this regression.",
+    },
+  ],
+},
+
+"st-f4": {
+  durationLabel: "15 min",
+  outcomes: [
+    "Distinguish correlation from causation and identify confounding variables in realistic scenarios",
+    "Explain the design of randomized controlled trials and why they establish causation where observational data cannot",
+    "Apply a systematic framework before drawing causal conclusions from observed correlations",
+  ],
+  learnMarkdown: `## Correlation vs Causation (Seriously)
+
+This is the single most frequently cited concept in data science interviews — and it's cited so often precisely because it's violated so often. Strong correlation is seductive. It looks like an answer. But it's only a question.
+
+## What Correlation Actually Measures
+
+The Pearson correlation coefficient r measures the **linear relationship** between two variables:
+
+- r = +1: perfect positive linear relationship
+- r = 0: no linear relationship (but could have nonlinear!)
+- r = -1: perfect negative linear relationship
+
+r tells you how tightly two variables move together. It says nothing about **why** they move together.
+
+## The Classic Trap: Confounding Variables
+
+When X and Y are correlated, there are three possible explanations:
+
+1. **X causes Y** (the one everyone jumps to)
+2. **Y causes X** (reverse causation)
+3. **Z causes both X and Y** (confounding variable / common cause)
+
+The ice cream and drowning example is perfect: ice cream sales and drowning deaths have r≈0.97. Does ice cream cause drowning? No — summer temperature (the confounder) increases both ice cream consumption and swimming frequency. Remove the seasonal trend and the correlation vanishes.
+
+## Why Observational Data Is Tricky
+
+In an observational study, you can't control who gets "treated." Users who adopt Feature X might already be more engaged. Revenue might be higher in markets where you also spent more on sales. Height correlates with wealth in some studies — because childhood nutrition, a confounder, affects both.
+
+**Selection bias** is the most common form: the people who use a feature aren't randomly selected. They self-selected because of pre-existing characteristics.
+
+## The Causal Ladder (Pearl)
+
+Judea Pearl's causal hierarchy:
+1. **Association** (seeing): X and Y are correlated — r is this level
+2. **Intervention** (doing): What happens if we force X? — A/B tests live here
+3. **Counterfactual** (imagining): What *would* have happened if X had been different?
+
+Most analytics lives at level 1. Most product decisions require level 2.
+
+## How to Establish Causation
+
+**Gold standard: RCT (randomized controlled trial)** — Randomly assign users to treatment and control. Randomization breaks the correlation between treatment and all confounders. Any remaining difference in outcomes is caused by the treatment.
+
+**When RCTs are infeasible:**
+- **Instrumental variables** — Find a variable Z that causes X but does not directly cause Y (instrument)
+- **Difference-in-differences** — Compare trends before/after in treated vs untreated groups
+- **Regression discontinuity** — Exploit sharp cutoffs (e.g., users just above vs just below a threshold)
+
+## The PM Scenario (Classic Interview)
+
+"Users who use Feature X have 3× higher 30-day retention." → What's your concern?
+
+The users who adopted Feature X are not comparable to those who didn't. They may have been more engaged to begin with (self-selection), they may have been power users (survivorship bias), or they may have discovered Feature X because they were already highly retained. You can't assign the 3× lift to Feature X without a randomized test.
+
+## Interview hook (answer like a senior)
+
+> "When I see a strong correlation in product data, I treat it as a hypothesis, not a finding. My first question is always: 'Could there be a confounding variable?' If I'm confident the product team will act on this, I push for an A/B test. Correlation is cheap to compute and easy to misinterpret — causation is expensive to establish and worth fighting for."
+`,
+  video: null,
+  videoFallbackMarkdown: `## Video not yet available
+
+Use the **Correlation Explorer** below to build intuition for r values. Click through the preset scatter plots to see what r=+0.95, r=+0.40, r=0, and r=-0.92 look like visually. Then switch to 'Spurious Correlations' to see real examples of high-r pairs that have no causal relationship. Finally, read through the 'Establishing Causation' framework — it's a checklist worth memorizing.`,
+  tryGuidance: "Start with the 'Scatter Plot' tab — toggle between all four presets and notice how the regression line steepens and tightens as |r| approaches 1. Then go to 'Spurious Correlations' and work through all three examples. For each one, try to guess the confounding variable before reading the explanation. Finally, in 'Establishing Causation', trace through each step of the causal checklist and think about a product feature you've used recently — could you establish causation for its claimed effect?",
+  interviewGraph: {
+    initialStageId: "s1_confound_guess",
+    artifactDimensions: [
+      { label: "Confounders and spurious correlation", recoveryStageId: "r1_confounders" },
+      { label: "Establishing causation from observational data", recoveryStageId: "r2_causal_methods", passLabel: "Causal reasoning applied" },
+    ],
+    stages: {
+      s1_confound_guess: {
+        id: "s1_confound_guess",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Identify the confounder",
+        prompt: "A dataset covering 20 years shows ice cream sales and drowning deaths are strongly correlated (r=0.95, p<0.001). A headline reads: 'Ice cream consumption linked to drowning risk.' What is the most likely explanation?",
+        code_snippet: `correlation_matrix:
+              ice_cream_sales  drowning_deaths
+ice_cream_sales      1.000           0.950
+drowning_deaths      0.950           1.000
+
+p-value: 0.0001   (highly 'significant')
+n: 240 monthly data points`,
+        choices: [
+          { id: "a", label: "Confounding variable — summer temperature increases both ice cream sales and swimming activity, creating a spurious correlation", description: "Correct. Temperature is the confounder that drives both variables upward in summer months." },
+          { id: "b", label: "Causation — ice cream contains ingredients that impair judgment or swimming ability", description: "No evidence for a physiological mechanism; this is the classic causal fallacy from correlation." },
+          { id: "c", label: "Reverse causation — news about drownings causes people to buy comfort food like ice cream", description: "Creative, but implausible as the primary driver of a year-round seasonal pattern." },
+          { id: "d", label: "The correlation is real and meaningful — p<0.001 proves statistical significance", description: "Statistical significance confirms the correlation exists, not that it is causal. Significance can arise from confounders." },
+        ],
+        branches: { a: "s2_click_causal_claim", b: "r1_confounders", c: "r1_confounders", d: "r1_confounders" },
+        rationale: "Answer A is correct. The confounder is summer temperature (or season). Hot weather increases outdoor activity, which increases both ice cream consumption and swimming. Remove the seasonal component (e.g., by analyzing within-month data) and the correlation essentially disappears. This example perfectly illustrates why correlation ≠ causation.",
+      },
+      s2_click_causal_claim: {
+        id: "s2_click_causal_claim",
+        type: "click_target",
+        badge: "Stage 2",
+        title: "Stage 2 · Find the invalid causal claim",
+        prompt: "A data analyst wrote a summary memo after observing the ice cream/drowning correlation. Click the line that makes an unjustified causal claim.",
+        code_snippet: `Analysis Summary: Ice Cream & Safety Data
+==========================================
+Finding: r=0.95 between monthly ice cream
+  sales and drowning incidents (n=240 months)
+Observation: Both metrics peak in July-August
+Hypothesis: Seasonal confounding (temperature)
+  likely explains the co-movement
+Recommendation: Restrict ice cream sales near  -- ds-target:causal_claim
+  waterways to reduce drowning deaths`,
+        validationCopy: {
+          causal_claim: "Correct. This line makes an unjustified causal leap — recommending a policy intervention (restricting ice cream sales) that assumes ice cream causes drownings. No intervention should be recommended on the basis of a confounded observational correlation. The analyst's own hypothesis on the previous line correctly identifies seasonal confounding as the likely explanation.",
+        },
+        branches: { causal_claim: "s3_how_to_cause" },
+      },
+      s3_how_to_cause: {
+        id: "s3_how_to_cause",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Establishing causation",
+        prompt: "A PM says 'users who enable dark mode have 40% higher 7-day retention. Let's force all new users into dark mode.' What methodological concern do you raise, and what would you propose instead?",
+        code_snippet: `Observational data:
+  Dark mode users:     7-day retention = 62%
+  Non-dark-mode users: 7-day retention = 44%
+  Lift: +40% relative
+
+  Caveat: dark mode adoption is self-selected
+  n_dark_mode = 12,400 / n_total = 89,000`,
+        choices: [
+          { id: "a", label: "Self-selection bias — users who seek out dark mode may already be more engaged; propose an A/B test randomly assigning dark mode to new users", description: "Correct. Self-selection is the key confound; randomization breaks it." },
+          { id: "b", label: "The sample size is too small — with only 12,400 dark mode users the result is not reliable", description: "12,400 is actually quite large. The problem is selection bias, not sample size." },
+          { id: "c", label: "The 40% lift is already strong enough evidence — we don't need an experiment for obvious findings", description: "Correlational strength does not substitute for causal evidence. A 40% lift is precisely the kind of finding that deserves rigor, not shortcuts." },
+          { id: "d", label: "Retention is a vanity metric — we should use revenue instead", description: "This avoids the actual question. The methodological concern is causal validity, not metric choice." },
+        ],
+        branches: { a: "s4_terminal", b: "r2_causal_methods", c: "r2_causal_methods", d: "r2_causal_methods" },
+        rationale: "Answer A is correct. Self-selection is the primary threat to validity: power users who customize settings (enabling dark mode) may already have higher baseline retention. Randomizing dark mode assignment (A/B test) breaks the correlation between dark mode and pre-existing engagement, isolating the causal effect of the feature itself.",
+      },
+      r1_confounders: {
+        id: "r1_confounders",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Confounders and spurious correlation",
+        prompt: "A study finds that countries with more TV sets per capita have higher life expectancy (r=0.89). Which explanation is most likely correct?",
+        code_snippet: `Country data (n=150 countries):
+  TV sets / 1000 people  vs  Life expectancy (years)
+  r = 0.89  (p < 0.001)
+
+  Low TV, low life exp:  developing nations
+  High TV, high life exp: developed nations`,
+        choices: [
+          { id: "a", label: "Confounding — wealth (GDP per capita) causes both higher TV ownership and better healthcare/nutrition leading to longer life", description: "Correct. GDP is the confounder. Wealthier countries can afford both more consumer electronics and better health infrastructure." },
+          { id: "b", label: "Causation — watching TV improves health literacy and leads to healthier behaviors", description: "While plausible as a minor mechanism, it cannot explain an r=0.89 correlation across all countries. The primary driver is economic development." },
+          { id: "c", label: "Reverse causation — people who live longer buy more TVs because they have more years to purchase consumer goods", description: "Plausible in a tongue-in-cheek way but not the primary explanation for a cross-country correlation driven by development levels." },
+          { id: "d", label: "The correlation proves that TVs directly improve health through some mechanism we haven't identified yet", description: "A correlation, however strong, does not prove any causal mechanism without experimental evidence." },
+        ],
+        branches: { a: "s2_click_causal_claim", b: "r1_confounders", c: "r1_confounders", d: "r1_confounders" },
+        rationale: "Wealth (GDP per capita) is the confounder. Wealthy countries invest in both consumer technology (TVs) and healthcare (doctors, nutrition, sanitation). Both TV ownership and life expectancy are downstream of economic development. If you could equalize GDP across countries, the TV-life expectancy correlation would shrink dramatically. This is a classic example of a third variable driving two unrelated outcomes.",
+      },
+      r2_causal_methods: {
+        id: "r2_causal_methods",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · Methods for establishing causation",
+        prompt: "You want to test whether receiving a promotional email causes higher purchase rates. An A/B test is not feasible because marketing already sent the emails. What is the best alternative approach?",
+        code_snippet: `Available data:
+  - 50,000 users received the email
+  - 200,000 users did not (were not on the list)
+  - Email list: users who opted into promotions
+  - Purchase data: 30 days before and after
+
+Key concern: email recipients opted IN,
+so they may already buy more frequently`,
+        choices: [
+          { id: "a", label: "Difference-in-differences — compare the change in purchase rate before vs after the campaign for email recipients vs non-recipients", description: "Correct. DiD controls for baseline differences by looking at the change (delta) rather than the level." },
+          { id: "b", label: "Compare average purchase rates between the two groups — the email group's higher rate proves the email worked", description: "This is a simple observational comparison that ignores the self-selection bias (opt-in users already buy more)." },
+          { id: "c", label: "Run a new A/B test retroactively — randomly reassign users to treatment and control", description: "You cannot retroactively randomize — the email has already been sent. Past data is fixed." },
+          { id: "d", label: "Use only the email group's data and compare their post-campaign rate to a historical baseline", description: "A pre-post comparison without a control group confounds the email effect with any other time-varying factors (seasonality, site changes)." },
+        ],
+        branches: { a: "s3_how_to_cause", b: "r2_causal_methods", c: "r2_causal_methods", d: "r2_causal_methods" },
+        rationale: "Difference-in-differences (DiD) is the best available approach. By comparing the change in purchase rate (before vs after) for email recipients against the same change for non-recipients, DiD controls for baseline purchase propensity differences. If email recipients already bought more, DiD accounts for that by looking at the incremental change attributable to the campaign. It is not perfect (assumes parallel trends), but it is far stronger than a simple post-campaign comparison.",
+      },
+      s4_terminal: {
+        id: "s4_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Revision complete · Causal reasoning mastery",
+        terminal: true,
+        prompt: "Final check: A PM says 'Users who use Feature X have 3× higher 30-day retention (62% vs 21%). I want to roll out Feature X to all users immediately.' What is your primary statistical concern and your recommended next step?",
+        code_snippet: `Feature X adoption data:
+  Feature X users:     n=8,400   retention=62%
+  Non-Feature-X users: n=91,600  retention=21%
+  Relative lift: +195%  (3× higher)
+
+  Feature X users tend to be:
+  - Power users (>5 sessions/week)
+  - Users who completed onboarding
+  - Users from organic acquisition`,
+        choices: [
+          { id: "a", label: "Self-selection bias — Feature X users are already more engaged and retained; causality requires an A/B test where Feature X exposure is randomly assigned", description: "Correct. The 3× lift reflects who uses Feature X, not what Feature X does." },
+          { id: "b", label: "The sample size is too small — we need at least 100,000 Feature X users before drawing conclusions", description: "Sample size is not the issue. 8,400 is statistically powered for a 3× effect. Selection bias is the threat." },
+          { id: "c", label: "The effect is too large — a 3× lift is implausible and likely a data error", description: "Large effects from self-selected high-engagement users are entirely plausible. The concern is attribution, not magnitude." },
+          { id: "d", label: "The retention metric is flawed — we should use revenue instead before making this decision", description: "Metric choice is secondary. The primary concern is that we cannot attribute retention to Feature X without a causal test." },
+        ],
+        branches: { a: "s4_terminal", b: "s4_terminal", c: "s4_terminal", d: "s4_terminal" },
+        rationale: "Answer A is correct. This is the canonical 'correlation vs causation in product analytics' scenario. Feature X users are a self-selected group of power users who would likely have high retention regardless of Feature X. The 3× lift measures the difference between these users and the rest of the base — but most of that difference existed before Feature X. An A/B test — randomly exposing a subset of new users to Feature X — is the only way to isolate the causal effect. Rolling out on observational data risks optimizing for user type rather than product quality.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "A dataset shows that countries with more lawyers per capita have higher GDP per capita (r=0.83). The most likely explanation is:",
+      options: [
+        "Confounding — economic development drives both legal system complexity and GDP; lawyers don't cause GDP growth",
+        "Causation — lawyers create economic value through contracts, IP protection, and dispute resolution",
+        "Reverse causation — higher GDP creates demand for more legal services",
+      ],
+      correctIndex: 0,
+      explanation: "Confounding is the most likely primary explanation. Economic development, institutions, and rule-of-law create demand for both legal professionals and economic output. While lawyers may contribute to economic activity (causation) and higher GDP creates legal demand (reverse causation), the dominant driver of the cross-country correlation is the underlying level of institutional development — a confounder that causes both. This is why you cannot conclude from this data that hiring more lawyers will increase GDP.",
+    },
+    {
+      question: "Which study design most reliably establishes that a new drug causes lower blood pressure (vs simply correlating with it)?",
+      options: [
+        "A randomized controlled trial where patients are randomly assigned to drug or placebo",
+        "An observational cohort study comparing patients who chose to take the drug vs those who didn't",
+        "A cross-sectional survey measuring drug use and blood pressure at the same point in time",
+      ],
+      correctIndex: 0,
+      explanation: "Randomized controlled trials (RCTs) are the gold standard for causal inference. By randomly assigning patients to drug or placebo, RCTs ensure that the two groups are comparable on all confounders (both measured and unmeasured) at baseline. Any difference in blood pressure outcomes can then be attributed to the drug. Observational studies suffer from confounding (sicker patients may preferentially take the drug) and cross-sectional studies cannot even establish temporal order.",
+    },
+  ],
+},
+
+  // ── injected from stat_probability_lessons.js ──
+  "st-p1": {
+  durationLabel: "20 min",
+  outcomes: [
+    "Apply Bayes' theorem to compute posterior probabilities from prior, likelihood, and evidence",
+    "Recognize and correct base rate neglect in probabilistic reasoning",
+    "Distinguish prior vs posterior probability and interpret likelihood ratios",
+    "Communicate Bayesian updates clearly to non-technical stakeholders",
+  ],
+  learnMarkdown: `## Bayes' Theorem: Updating Beliefs
+
+**Bayes' theorem** lets you update a prior belief (probability before seeing evidence) into a posterior belief (probability after seeing evidence).
+
+\`\`\`
+P(A | B) = P(B | A) × P(A) / P(B)
+
+where P(B) = P(B|A)·P(A) + P(B|¬A)·P(¬A)
+\`\`\`
+
+**Anatomy of the formula**
+
+| Term | Name | Meaning |
+|------|------|---------|
+| P(A) | Prior | Belief before evidence |
+| P(B\|A) | Likelihood | How probable is B if A is true |
+| P(B) | Marginal / Evidence | Total probability of observing B |
+| P(A\|B) | Posterior | Belief after seeing evidence |
+
+## The Base Rate Trap
+
+The most common interview mistake is ignoring the **prior P(A)**. A test with 90% sensitivity sounds impressive — but if the disease affects only 1% of people, most positives are still false positives.
+
+\`\`\`
+Disease prevalence   P(D)  = 0.01
+Test sensitivity     P(+|D) = 0.90
+Test specificity     P(-|¬D) = 0.91 → P(+|¬D) = 0.09
+
+P(+) = 0.90×0.01 + 0.09×0.99 = 0.009 + 0.0891 = 0.0981
+
+P(D|+) = (0.90 × 0.01) / 0.0981 ≈ 0.0917  ← only ~9%!
+\`\`\`
+
+Even with a strong test, 9 out of 10 positive results are false positives when prevalence is low.
+
+## Likelihood Ratio: A Faster Intuition
+
+The **likelihood ratio (LR)** = P(+|D) / P(+|¬D) scales the prior odds:
+
+\`\`\`
+Prior odds   = P(D) / P(¬D) = 0.01 / 0.99 ≈ 0.0101
+LR           = 0.90 / 0.09 = 10
+Posterior odds = 0.0101 × 10 = 0.101
+Posterior P  = 0.101 / 1.101 ≈ 0.0917  ✓ same result
+\`\`\`
+
+## Updating Beliefs Iteratively
+
+Bayesian reasoning is **sequential** — today's posterior is tomorrow's prior:
+
+\`\`\`
+After test 1: P(D|+) ≈ 0.092  (new prior)
+After test 2: apply Bayes again with this as the starting point
+\`\`\`
+
+## Interview hook (answer like a senior)
+
+> "Bayes' theorem is the formal machinery for belief updating, but the real skill is never forgetting the base rate. When I see a model with 95% precision I always ask: what's the prevalence of positives in production? If it's 0.1%, even 95% precision means most flagged items are wrong. I use the likelihood ratio as a quick mental sanity check before running the full formula — LR > 10 is compelling evidence, LR < 2 barely moves the needle regardless of sensitivity."
+`,
+  video: null,
+  videoFallbackMarkdown: `## Bayes' Theorem Visual
+
+Imagine 10,000 people. With disease prevalence 1%:
+- 100 have the disease → ~90 test positive (sensitivity 90%)
+- 9,900 don't → ~891 also test positive (false positive rate 9%)
+
+Total positives: 90 + 891 = 981
+True positives: 90
+
+P(Disease | Positive) = 90 / 981 ≈ 9.2%
+
+The test is good. The base rate is what limits us.
+`,
+  tryGuidance: "Use the sliders to set disease prevalence (P(A)), test sensitivity (P(B|A)), and false positive rate (P(B|¬A)). Watch how the posterior P(Disease | Positive) changes. Try setting prevalence to 50% — now most positives are real. This is why screening programs and medical tests behave so differently.",
+  interviewGraph: {
+    initialStageId: "s1_medical_test",
+    artifactDimensions: [
+      { label: "Base rate application", recoveryStageId: "r1_base_rate" },
+      { label: "Correct Bayes formula construction", recoveryStageId: "r2_formula", passLabel: "Formula correct" },
+      { label: "Posterior interpretation", recoveryStageId: "r3_posterior" },
+    ],
+    stages: {
+      s1_medical_test: {
+        id: "s1_medical_test",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · The Medical Test Problem",
+        prompt: "A disease affects 1% of the population. A test has 90% sensitivity (P(+|Disease)) and 91% specificity (P(−|No Disease)). A patient tests positive. What is the approximate probability they actually have the disease?",
+        code_snippet: `P(Disease)         = 0.01
+P(+ | Disease)     = 0.90   -- sensitivity
+P(+ | No Disease)  = 0.09   -- 1 - specificity
+P(Disease | +)     = ?`,
+        choices: [
+          { id: "a", label: "~9%", description: "Apply the full Bayes formula accounting for the low prevalence prior." },
+          { id: "b", label: "~90%", description: "The test sensitivity is 90%, so a positive result means 90% chance of disease." },
+          { id: "c", label: "~50%", description: "Positive or negative — it's roughly 50/50 after testing." },
+          { id: "d", label: "~82%", description: "Average of sensitivity and specificity as a combined accuracy estimate." },
+        ],
+        branches: { a: "s2_formula_click", b: "r1_base_rate", c: "r1_base_rate", d: "r1_base_rate" },
+        rationale: "P(+) = 0.90×0.01 + 0.09×0.99 = 0.0981. P(D|+) = 0.009 / 0.0981 ≈ 9.2%. The key insight is that most positives are false positives when prevalence is low — a classic base rate neglect trap that catches even experienced practitioners.",
+      },
+      s2_formula_click: {
+        id: "s2_formula_click",
+        type: "click_target",
+        badge: "Stage 2 · Formula",
+        title: "Stage 2 · Spot the Transposition Error",
+        prompt: "An analyst wrote this derivation. One line has the conditional probability backwards — P(A|B) and P(B|A) are swapped. Click the line with the error.",
+        code_snippet: `-- Bayes' theorem applied to spam detection
+P(Spam | Flagged) = P(Spam) × P(Flagged | Spam) / P(Flagged)  -- line 1
+P(Flagged) = P(Flagged|Spam)×P(Spam) + P(Flagged|Ham)×P(Ham)  -- line 2
+P(Spam | Flagged) = P(Flagged) × P(Spam) / P(Flagged | Spam)  -- ds-target:swapped_line`,
+        validationCopy: {
+          swapped_line: "Correct. Line 3 has P(Flagged) and P(Flagged|Spam) swapped in the numerator and denominator — that's P(B)×P(A)/P(B|A), not the correct P(B|A)×P(A)/P(B). This reversal is a subtle but fatal error that produces results far from the true posterior.",
+        },
+        branches: { swapped_line: "s3_spam_filter" },
+      },
+      s3_spam_filter: {
+        id: "s3_spam_filter",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Spam Filter Posterior",
+        prompt: "A spam filter flags 'free money' emails as spam 95% of the time. It also incorrectly flags 2% of legitimate emails. If 30% of all email is spam, what is P(Spam | Flagged)?",
+        code_snippet: `P(Spam)            = 0.30
+P(Flagged | Spam)  = 0.95
+P(Flagged | Ham)   = 0.02
+
+P(Flagged) = 0.95×0.30 + 0.02×0.70
+           = 0.285 + 0.014 = 0.299
+
+P(Spam | Flagged) = (0.95 × 0.30) / 0.299 = ?`,
+        choices: [
+          { id: "a", label: "≈ 95.3%", description: "0.285 / 0.299 — the numerator is the joint P(Spam ∩ Flagged)." },
+          { id: "b", label: "≈ 30%", description: "The prior stays the same; the filter doesn't change it." },
+          { id: "c", label: "≈ 65%", description: "Average of 95% and 30%." },
+          { id: "d", label: "≈ 4.7%", description: "The false positive rate dominates." },
+        ],
+        branches: { a: "s4_terminal", b: "r3_posterior", c: "r3_posterior", d: "r3_posterior" },
+        rationale: "0.95 × 0.30 = 0.285. P(Flagged) = 0.299. Posterior = 0.285 / 0.299 ≈ 95.3%. Here base rates are much higher (30% spam is common) so the posterior is very high — contrast with the 1%-prevalence medical case where the same test quality gives only 9% posterior.",
+      },
+      r1_base_rate: {
+        id: "r1_base_rate",
+        type: "scenario_choice",
+        badge: "Recovery · Base Rate",
+        title: "Recovery · Base Rate Neglect",
+        prompt: "In a population of 10,000, disease prevalence is 1% (100 people sick). The test catches 90% of sick people (90 true positives) and incorrectly flags 9% of healthy people. How many false positives are there, and what does that tell us about P(Disease | Positive)?",
+        code_snippet: `Population: 10,000
+Sick:       100  → 90 test positive (true positives)
+Healthy:  9,900  → 9,900 × 0.09 = 891 test positive (false positives)
+
+Total positives = 90 + 891 = 981
+P(Disease | Positive) = 90 / 981 ≈ 9.2%`,
+        choices: [
+          { id: "a", label: "891 false positives — only ~9% of positives are real cases", description: "The denominator swamps the numerator when prevalence is low." },
+          { id: "b", label: "9 false positives — the specificity is 91% so very few false alarms", description: "Specificity applies to the healthy population of 9,900, not 100." },
+          { id: "c", label: "10 false positives — equal to the true positives", description: "There's no reason the counts would be equal." },
+        ],
+        branches: { a: "s2_formula_click", b: "r1_base_rate", c: "r1_base_rate" },
+        rationale: "9,900 healthy people × 9% false positive rate = 891 false positives, far outnumbering 90 true positives. This arithmetic is why base rate neglect is so dangerous — always compute the denominator P(B) in full.",
+      },
+      r2_formula: {
+        id: "r2_formula",
+        type: "scenario_choice",
+        badge: "Recovery · Formula",
+        title: "Recovery · Which Form is Correct?",
+        prompt: "Which expression correctly states Bayes' theorem for P(A|B)?",
+        code_snippet: `Option 1: P(A|B) = P(B|A) × P(A) / P(B)
+Option 2: P(A|B) = P(A|B) × P(B) / P(A)
+Option 3: P(A|B) = P(B) × P(A) / P(B|A)
+Option 4: P(A|B) = P(A) / (P(B|A) × P(B))`,
+        choices: [
+          { id: "a", label: "Option 1", description: "Likelihood × Prior / Evidence — the standard form." },
+          { id: "b", label: "Option 2", description: "This is circular — P(A|B) defined in terms of itself." },
+          { id: "c", label: "Option 3", description: "P(B) in the numerator and P(B|A) in the denominator — swapped." },
+          { id: "d", label: "Option 4", description: "P(A) alone divided by product — structurally wrong." },
+        ],
+        branches: { a: "s3_spam_filter", b: "r2_formula", c: "r2_formula", d: "r2_formula" },
+        rationale: "Option 1 is the canonical form: posterior = likelihood × prior / marginal evidence. The numerator P(B|A)×P(A) is the joint probability P(A∩B), divided by the total probability P(B) of the observed evidence.",
+      },
+      r3_posterior: {
+        id: "r3_posterior",
+        type: "scenario_choice",
+        badge: "Recovery · Posterior",
+        title: "Recovery · Computing the Posterior",
+        prompt: "P(Spam)=0.30, P(Flagged|Spam)=0.95, P(Flagged|Ham)=0.02. Walk through the calculation step by step. What is P(Flagged)?",
+        code_snippet: `Step 1: P(Flagged) = P(Flagged|Spam)×P(Spam) + P(Flagged|Ham)×P(Ham)
+Step 2:           = 0.95×0.30 + 0.02×0.70
+Step 3:           = 0.285 + 0.014
+Step 4:           = ?`,
+        choices: [
+          { id: "a", label: "0.299", description: "0.285 + 0.014 = 0.299 — the total probability of being flagged." },
+          { id: "b", label: "0.97", description: "0.95 + 0.02 = 0.97 — but you can't just add likelihoods directly." },
+          { id: "c", label: "0.30", description: "P(Flagged) equals the spam rate — but flagging depends on both groups." },
+        ],
+        branches: { a: "s4_terminal", b: "r3_posterior", c: "r3_posterior" },
+        rationale: "P(Flagged) = 0.299. This is the law of total probability: sum over all mutually exclusive conditions (spam or ham) weighted by their probabilities. Then the posterior is 0.285 / 0.299 ≈ 95.3%.",
+      },
+      s4_terminal: {
+        id: "s4_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Revision complete · COVID Test Scenario",
+        terminal: true,
+        prompt: "A COVID test has 99% sensitivity and 99% specificity. Population prevalence is 0.1%. A person tests positive. What is the approximate probability they have COVID? (Think through it — then check all options.)",
+        code_snippet: `P(COVID)       = 0.001
+P(+ | COVID)   = 0.99
+P(+ | No COVID)= 0.01
+
+P(+) = 0.99×0.001 + 0.01×0.999
+     = 0.00099 + 0.00999 = 0.01098
+
+P(COVID | +) = 0.00099 / 0.01098 ≈ 9.0%`,
+        choices: [
+          { id: "a", label: "~9% — base rate dominates even a 99% accurate test", description: "Even with an excellent test, 0.1% prevalence means most positives are false." },
+          { id: "b", label: "~99% — the test is 99% accurate", description: "Accuracy doesn't equal posterior probability; the prior matters." },
+          { id: "c", label: "~50% — equal chance", description: "No — Bayes gives a precise answer here." },
+        ],
+        branches: { a: "s4_terminal", b: "s4_terminal", c: "s4_terminal" },
+        rationale: "~9%. Even a 99%/99% test gives only ~9% posterior when prevalence is 0.1%. False positives from the healthy majority (0.01 × 99.9% ≈ 1%) swamp true positives (0.99 × 0.1% ≈ 0.1%). This is why mass screening programs always confirm with a second test.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "Disease prevalence is 2%, sensitivity is 80%, specificity is 95%. Which value do you plug in as P(A) in Bayes' theorem?",
+      options: ["0.02 — the prior probability of disease", "0.80 — the sensitivity of the test", "0.95 — the specificity of the test"],
+      correctIndex: 0,
+      explanation: "P(A) = P(Disease) = 0.02 is the prior. Sensitivity and specificity are likelihoods P(+|Disease) and P(−|No Disease), not priors.",
+    },
+    {
+      question: "After computing P(Disease | Positive) = 0.12, a second independent test is run. What is the correct prior for the second Bayes update?",
+      options: ["0.12 — the posterior from the first test becomes the new prior", "0.02 — always use the population prevalence", "0.80 — use the test sensitivity"],
+      correctIndex: 0,
+      explanation: "Bayesian updating is sequential: the posterior of round N is the prior for round N+1. This is what makes Bayesian reasoning iterative and coherent.",
+    },
+  ],
+},
+
+"st-p2": {
+  durationLabel: "15 min",
+  outcomes: [
+    "Apply the 68-95-99.7 rule to answer probability questions about normal distributions",
+    "Compute and interpret z-scores correctly",
+    "Use the normal distribution to set tolerance bounds and detect anomalies",
+    "Recognize when normality assumptions are appropriate or may be violated",
+  ],
+  learnMarkdown: `## Normal Distribution & The 68-95-99.7 Rule
+
+The **normal (Gaussian) distribution** is symmetric, bell-shaped, and completely described by two parameters: **mean μ** (center) and **standard deviation σ** (spread).
+
+\`\`\`
+X ~ N(μ, σ²)
+
+f(x) = (1 / σ√2π) · exp(−(x−μ)² / 2σ²)
+\`\`\`
+
+## The Empirical Rule (68-95-99.7)
+
+| Range | % of data |
+|-------|-----------|
+| μ ± 1σ | ~68.27% |
+| μ ± 2σ | ~95.45% |
+| μ ± 3σ | ~99.73% |
+
+**Key corollary:** data beyond 2σ occurs only ~5% of the time, and beyond 3σ only ~0.3%. These thresholds power control charts, anomaly detection, and A/B test significance levels.
+
+## The Z-Score
+
+A **z-score** converts any normal variable to the standard normal N(0,1):
+
+\`\`\`
+z = (x − μ) / σ
+\`\`\`
+
+Common mistake: dividing by σ² (variance) instead of σ (standard deviation). The units of z must be dimensionless.
+
+**Example:** IQ ~ N(100, 15²). P(IQ > 130)?
+\`\`\`
+z = (130 − 100) / 15 = 2.0
+P(Z > 2) = 1 − 0.9772 = 2.28% ≈ 2.5% (1 tail of the 95% rule)
+\`\`\`
+
+## Quality Control Example
+
+Bolt diameter ~ N(10mm, 0.1mm²) — note: σ = 0.1mm, variance = 0.01mm².
+\`\`\`
+Spec limits: [9.8mm, 10.2mm]
+z_lower = (9.8 − 10) / 0.1 = −2.0
+z_upper = (10.2 − 10) / 0.1 =  2.0
+
+P(within spec) = P(−2 < Z < 2) ≈ 95.45%
+P(out of spec) ≈ 4.55% → ~45,500 defects per million
+\`\`\`
+
+## Checking Normality
+
+Before assuming normality:
+- **Q-Q plot** — points should fall along a diagonal line
+- **Shapiro-Wilk test** — p > 0.05 means can't reject normality (small samples)
+- **Histogram + KDE** — visual check for symmetric bell shape
+- **Skewness & kurtosis** — |skew| < 0.5, excess kurtosis near 0 for near-normal
+
+## Interview hook (answer like a senior)
+
+> "I use the 68-95-99.7 rule constantly as a mental calculator — if someone asks whether a data point three standard deviations from the mean is unusual, I know immediately it's a 1-in-370 event. For production anomaly detection I set thresholds at ±3σ, but I always check whether the underlying process is actually normal first with a Q-Q plot. Many financial and business metrics are log-normal or heavy-tailed, where the 3σ rule wildly underestimates extreme event frequency."
+`,
+  video: null,
+  videoFallbackMarkdown: `## Normal Distribution Visually
+
+Imagine the bell curve centered at μ=0:
+
+- The middle 68% falls between -1σ and +1σ
+- The middle 95% falls between -2σ and +2σ
+- Nearly all data (99.7%) falls between -3σ and +3σ
+
+Each additional σ from the center represents increasingly rare events. The symmetry means left and right tails are mirror images — so "beyond +2σ" and "beyond -2σ" each hold ~2.5% of the distribution.
+`,
+  tryGuidance: "Adjust μ and σ on the visualization to see how the bell curve shifts and stretches. Use the z-score calculator to find exact probabilities. Try IQ > 145 (3σ above mean) and see how rare it really is. Then switch to the 'shaded area' mode to visualize P(a < X < b) for a manufacturing tolerance problem.",
+  interviewGraph: {
+    initialStageId: "s1_iq",
+    artifactDimensions: [
+      { label: "Empirical rule application", recoveryStageId: "r1_empirical" },
+      { label: "Correct z-score formula", recoveryStageId: "r2_zscore", passLabel: "Formula identified" },
+      { label: "Two-tailed probability", recoveryStageId: "r3_twotail" },
+    ],
+    stages: {
+      s1_iq: {
+        id: "s1_iq",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · IQ and the Empirical Rule",
+        prompt: "IQ scores are normally distributed with μ=100 and σ=15. What percentage of people have an IQ above 130?",
+        code_snippet: `X ~ N(μ=100, σ=15)
+z = (130 − 100) / 15 = 2.0
+
+68-95-99.7 rule:
+  P(μ − 2σ < X < μ + 2σ) ≈ 95%
+  P(X > μ + 2σ)           ≈ ?`,
+        choices: [
+          { id: "a", label: "~2.5%", description: "130 is exactly 2σ above mean. The upper tail of the 95% range is ~2.5%." },
+          { id: "b", label: "~16%", description: "That's the area above 1σ, not 2σ." },
+          { id: "c", label: "~5%", description: "5% is the two-tailed area outside ±2σ, not one tail." },
+          { id: "d", label: "~32%", description: "That's the area outside ±1σ combined." },
+        ],
+        branches: { a: "s2_zscore_click", b: "r1_empirical", c: "r1_empirical", d: "r1_empirical" },
+        rationale: "130 = 100 + 2×15 is exactly 2σ above the mean. The 95% rule says 95% of data falls within ±2σ, leaving 5% in both tails combined. By symmetry, the upper tail alone (IQ > 130) is 5%/2 = 2.5%. Precisely: P(Z > 2) = 1 − Φ(2) ≈ 2.28%.",
+      },
+      s2_zscore_click: {
+        id: "s2_zscore_click",
+        type: "click_target",
+        badge: "Stage 2 · Formula",
+        title: "Stage 2 · Spot the Z-Score Error",
+        prompt: "An analyst wrote three z-score calculations. One has a formula error — it uses the wrong denominator. Click the line with the bug.",
+        code_snippet: `-- Standardizing data points
+z_height = (175 − 170) / 7          -- line A: z = (x−μ)/σ
+z_weight = (80 − 75) / 6.25         -- ds-target:wrong_denominator
+z_salary = (95000 − 82000) / 12000  -- line C: z = (x−μ)/σ`,
+        validationCopy: {
+          wrong_denominator: "Correct. Line B divides by 6.25 which is σ² (variance = 6.25, so σ = 2.5). The z-score formula requires dividing by σ, not σ². Using variance in the denominator produces a value with units of 1/kg rather than a dimensionless standard score, making comparisons meaningless.",
+        },
+        branches: { wrong_denominator: "s3_bolts" },
+      },
+      s3_bolts: {
+        id: "s3_bolts",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Manufacturing Tolerance",
+        prompt: "A process produces bolts where diameter ~ N(10mm, 0.01mm²). Note: σ² = 0.01, so σ = 0.1mm. What percentage of bolts fall outside the spec range [9.8mm, 10.2mm]?",
+        code_snippet: `μ = 10mm,  σ² = 0.01,  σ = 0.1mm
+
+z_low  = (9.8  − 10) / 0.1 = −2.0
+z_high = (10.2 − 10) / 0.1 = +2.0
+
+P(9.8 < X < 10.2) = P(−2 < Z < 2) ≈ 95%
+P(outside spec)   = ?`,
+        choices: [
+          { id: "a", label: "~5%", description: "100% − 95% = 5% falls outside ±2σ by the empirical rule." },
+          { id: "b", label: "~0.3%", description: "That's outside ±3σ, not ±2σ." },
+          { id: "c", label: "~32%", description: "That's outside ±1σ." },
+          { id: "d", label: "~2.5%", description: "That's one tail only; the spec is two-sided." },
+        ],
+        branches: { a: "s4_terminal", b: "r3_twotail", c: "r3_twotail", d: "r3_twotail" },
+        rationale: "The spec [9.8, 10.2] corresponds to [μ−2σ, μ+2σ]. The 95% rule tells us ~95% of bolts are within spec, so ~5% are defective. This is the basis of Six Sigma: pushing tolerances to ±6σ reduces defects to ~3.4 per million.",
+      },
+      r1_empirical: {
+        id: "r1_empirical",
+        type: "scenario_choice",
+        badge: "Recovery · Empirical Rule",
+        title: "Recovery · The 68-95-99.7 Rule",
+        prompt: "For a normal distribution, roughly what percentage of data falls within 1, 2, and 3 standard deviations of the mean?",
+        code_snippet: `Within ±1σ: ____%
+Within ±2σ: ____%
+Within ±3σ: ____%`,
+        choices: [
+          { id: "a", label: "68%, 95%, 99.7%", description: "The empirical rule — memorize these three numbers." },
+          { id: "b", label: "50%, 75%, 90%", description: "These are Chebyshev bounds (work for any distribution, not just normal)." },
+          { id: "c", label: "68%, 90%, 99%", description: "Close but not the standard values for the normal distribution." },
+        ],
+        branches: { a: "s2_zscore_click", b: "r1_empirical", c: "r1_empirical" },
+        rationale: "68-95-99.7 is the empirical rule for the normal distribution specifically. Chebyshev's inequality gives 0%, 75%, 89% as guaranteed lower bounds for any distribution, but the normal is much tighter.",
+      },
+      r2_zscore: {
+        id: "r2_zscore",
+        type: "scenario_choice",
+        badge: "Recovery · Z-Score",
+        title: "Recovery · Z-Score Formula",
+        prompt: "Which is the correct z-score formula, and why does the denominator matter?",
+        code_snippet: `Option A: z = (x − μ) / σ
+Option B: z = (x − μ) / σ²
+Option C: z = (x − μ) × σ
+Option D: z = x / σ − μ`,
+        choices: [
+          { id: "a", label: "Option A: divide by σ (standard deviation)", description: "This makes z dimensionless and maps to the standard normal." },
+          { id: "b", label: "Option B: divide by σ² (variance)", description: "Variance has squared units — this produces a non-standard scale." },
+          { id: "c", label: "Option C: multiply by σ", description: "Multiplying by σ amplifies the deviation rather than standardizing it." },
+          { id: "d", label: "Option D: x/σ then subtract μ", description: "This mixes the operation order incorrectly." },
+        ],
+        branches: { a: "s3_bolts", b: "r2_zscore", c: "r2_zscore", d: "r2_zscore" },
+        rationale: "z = (x − μ) / σ subtracts the mean first (centering) then divides by the standard deviation (scaling), producing a value with mean 0 and std 1. Using σ² in the denominator is the most common mistake — always check whether a problem gives you σ or σ².",
+      },
+      r3_twotail: {
+        id: "r3_twotail",
+        type: "scenario_choice",
+        badge: "Recovery · Two-Tailed Area",
+        title: "Recovery · Outside Both Tails",
+        prompt: "The spec [μ−2σ, μ+2σ] is a two-sided range. If 95% falls inside, what falls outside?",
+        code_snippet: `P(μ−2σ < X < μ+2σ) = 95%
+
+P(X < μ−2σ)  +  P(X > μ+2σ)
+= left tail   +  right tail
+= 2.5%        +  2.5%
+= ?`,
+        choices: [
+          { id: "a", label: "5% total outside (2.5% in each tail)", description: "100% − 95% = 5%, split evenly by symmetry." },
+          { id: "b", label: "2.5% total outside (one tail only)", description: "The spec is two-sided, so both tails count as out-of-spec." },
+          { id: "c", label: "10% total outside", description: "No — if 95% is inside, exactly 5% is outside." },
+        ],
+        branches: { a: "s4_terminal", b: "r3_twotail", c: "r3_twotail" },
+        rationale: "5% outside ±2σ, split 2.5%+2.5% by symmetry of the normal. For a two-sided tolerance, you must account for both tails. Forgetting this gives the answer of 2.5% — which would apply only if the spec were one-sided (e.g., bolt must be no longer than 10.2mm, any length shorter is fine).",
+      },
+      s4_terminal: {
+        id: "s4_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Revision complete · Normality in Practice",
+        terminal: true,
+        prompt: "What does it mean for a dataset to be 'approximately normal', and which tools would you use to verify this assumption?",
+        code_snippet: `# Checking normality in Python
+import scipy.stats as stats
+import matplotlib.pyplot as plt
+
+# Q-Q plot: points on diagonal line → normal
+stats.probplot(data, plot=plt)
+
+# Shapiro-Wilk (good for n < 2000)
+stat, p = stats.shapiro(data)
+# p > 0.05: cannot reject normality
+
+# Visual histogram
+plt.hist(data, bins='auto', density=True)`,
+        choices: [
+          { id: "a", label: "Q-Q plot, Shapiro-Wilk test, and checking skewness/kurtosis — use all three together", description: "No single test is definitive; triangulate with visual and statistical checks." },
+          { id: "b", label: "Just check that the histogram looks like a bell", description: "Histograms are too sensitive to bin choice to be the sole test." },
+          { id: "c", label: "Normal if n > 30 by the CLT", description: "CLT applies to sample means, not individual observations." },
+        ],
+        branches: { a: "s4_terminal", b: "s4_terminal", c: "s4_terminal" },
+        rationale: "Approximately normal means the distribution is close enough to normal that normal-based inference (confidence intervals, t-tests) gives reliable results. Use Q-Q plots for visual diagnosis, Shapiro-Wilk for a formal test (small samples), and check skewness/kurtosis numerically. For large samples, the CLT protects the sample mean but individual observations can remain non-normal.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "X ~ N(50, 100). Note σ² = 100, so σ = 10. What z-score corresponds to x = 70?",
+      options: ["z = 2.0  →  (70−50)/10", "z = 0.2  →  (70−50)/100", "z = 20   →  (70−50)×10"],
+      correctIndex: 0,
+      explanation: "σ = √100 = 10. z = (70−50)/10 = 2.0. A common mistake is dividing by the variance (100) rather than the standard deviation (10), giving 0.2 — an answer that would represent a very common event rather than a moderately rare one.",
+    },
+    {
+      question: "Using the 68-95-99.7 rule, approximately what percentage of data in N(0,1) lies between -3 and +3?",
+      options: ["99.7%", "95%", "68%"],
+      correctIndex: 0,
+      explanation: "±3σ captures 99.73% of a normal distribution. This is why ±3σ control limits in manufacturing or monitoring catch nearly all natural variation while flagging true anomalies.",
+    },
+  ],
+},
+
+"st-p3": {
+  durationLabel: "18 min",
+  outcomes: [
+    "Select the correct discrete distribution (Binomial vs Poisson) for a given data scenario",
+    "Compute probabilities using the Binomial and Poisson PMFs",
+    "Identify the conditions under which Poisson approximates Binomial",
+    "Calculate mean, variance, and standard deviation for both distributions",
+  ],
+  learnMarkdown: `## Binomial, Poisson & When to Use Each
+
+Both are **discrete** distributions, but they model fundamentally different processes.
+
+## Binomial Distribution
+
+Use when you have a **fixed number of independent trials**, each with the same probability of success.
+
+\`\`\`
+X ~ Binomial(n, p)
+
+P(X = k) = C(n,k) · pᵏ · (1−p)ⁿ⁻ᵏ
+
+Mean     = np
+Variance = np(1−p)
+Std Dev  = √(np(1−p))
+\`\`\`
+
+**Required conditions:**
+1. Fixed n trials
+2. Each trial is binary (success/failure)
+3. Trials are independent
+4. Constant probability p per trial
+
+**Example:** 100 website visitors, each converts with probability 0.03.
+\`\`\`
+X ~ Binomial(100, 0.03)
+Mean = 100 × 0.03 = 3 conversions
+Std  = √(100 × 0.03 × 0.97) ≈ 1.71
+\`\`\`
+
+## Poisson Distribution
+
+Use when modeling **counts of events over a fixed interval** (time, area, volume) with a known average rate.
+
+\`\`\`
+X ~ Poisson(λ)
+
+P(X = k) = e⁻λ · λᵏ / k!
+
+Mean     = λ
+Variance = λ     ← mean equals variance, a key diagnostic
+Std Dev  = √λ
+\`\`\`
+
+**Required conditions:**
+1. Events occur at a constant average rate λ
+2. Events are independent
+3. Two events cannot happen at the same instant (rare events)
+
+**Example:** A call center receives an average of 4 calls/minute.
+\`\`\`
+X ~ Poisson(4)
+P(X = 6) = e⁻⁴ · 4⁶ / 6! = 0.1042 ≈ 10.4%
+Mean = Variance = 4
+\`\`\`
+
+## Poisson as an Approximation for Binomial
+
+When **n is large, p is small, and λ = np is moderate** (say λ < 10), Poisson(λ) closely approximates Binomial(n, p). This is useful because Poisson has only one parameter and is computationally simpler.
+
+\`\`\`
+Rule of thumb: n ≥ 20, p ≤ 0.05
+Then Binomial(n, p) ≈ Poisson(λ = np)
+\`\`\`
+
+## Decision Framework
+
+| Question | Use |
+|----------|-----|
+| Fixed n trials, binary outcome? | Binomial |
+| Counting events over time/space? | Poisson |
+| n large, p small (rare events)? | Either (Poisson simpler) |
+| Mean ≠ variance in data? | Check Poisson assumption |
+
+## Interview hook (answer like a senior)
+
+> "The quickest way to distinguish them: Binomial asks 'how many successes in n attempts' while Poisson asks 'how many events in a fixed window'. In practice I also use overdispersion as a diagnostic — if I fit Poisson and the observed variance significantly exceeds the mean, the independence assumption is likely violated and I'd consider a Negative Binomial instead. For web analytics, click-through events are almost always Poisson in theory but show overdispersion in practice due to user clustering."
+`,
+  video: null,
+  videoFallbackMarkdown: `## Binomial vs Poisson: Key Visual
+
+Binomial(n=20, p=0.15):
+- Discrete bars from k=0 to k=20
+- Mean = np = 3, Var = np(1-p) = 2.55
+
+Poisson(λ=3):
+- Discrete bars from k=0 to k=∞ (practically k=0..15)
+- Mean = Var = 3
+
+At n=20, p=0.15, both distributions look nearly identical — this illustrates the Poisson approximation for small p.
+`,
+  tryGuidance: "Switch between the Binomial and Poisson tabs. On the Binomial tab, set n=100 and p=0.03, then compare to Poisson with λ=3 — they look nearly identical, demonstrating the approximation. Notice that the Binomial PMF bar chart shifts and widens as you increase n or p. On the Poisson tab, watch how the distribution becomes more symmetric as λ increases (approaching normal by CLT).",
+  interviewGraph: {
+    initialStageId: "s1_website",
+    artifactDimensions: [
+      { label: "Distribution selection", recoveryStageId: "r1_selection" },
+      { label: "Poisson conditions", recoveryStageId: "r2_poisson_cond" },
+      { label: "Approximation rule", recoveryStageId: "r3_approx" },
+    ],
+    stages: {
+      s1_website: {
+        id: "s1_website",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Website Conversion Modeling",
+        prompt: "A website converts at 3%. You show it to 100 visitors. Which distribution models the number of conversions, and why?",
+        code_snippet: `n = 100 visitors (fixed)
+p = 0.03 (constant conversion rate)
+Each visitor independently converts or not
+
+X = number of conversions
+X ~ ?`,
+        choices: [
+          { id: "a", label: "Binomial(n=100, p=0.03)", description: "Fixed n, binary outcome per trial, independent trials, constant p." },
+          { id: "b", label: "Poisson(λ=3)", description: "Conversions per unit time with unknown n." },
+          { id: "c", label: "Normal(μ=3, σ²=2.91)", description: "Normal is continuous and only approximates discrete counts for large n." },
+          { id: "d", label: "Uniform(0, 100)", description: "All counts are equally likely — clearly not the case." },
+        ],
+        branches: { a: "s2_callcenter", b: "r1_selection", c: "r1_selection", d: "r1_selection" },
+        rationale: "Binomial(100, 0.03) is exact: fixed n=100 visitors, each independently converts with p=0.03. Poisson(3) would be a good approximation (n large, p small, λ=np=3) but Binomial is the precise model when n is known and fixed.",
+      },
+      s2_callcenter: {
+        id: "s2_callcenter",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Call Center Arrivals",
+        prompt: "A call center receives an average of 4 calls per minute. Which distribution models the number of calls in a 1-minute window?",
+        code_snippet: `λ = 4 calls per minute (average rate)
+Window = 1 minute (fixed interval)
+Calls arrive independently
+
+X = number of calls in 1 minute
+X ~ ?`,
+        choices: [
+          { id: "a", label: "Poisson(λ=4)", description: "Counting independent events over a fixed interval with known rate." },
+          { id: "b", label: "Binomial(n=4, p=1)", description: "n=4 trials, each certain to succeed — degenerately not what's happening." },
+          { id: "c", label: "Normal(μ=4, σ=2)", description: "Normal is continuous and a poor fit for small-count discrete data." },
+          { id: "d", label: "Geometric(p=0.25)", description: "Geometric models waiting time to first success, not event counts." },
+        ],
+        branches: { a: "s3_wrong_dist_click", b: "r2_poisson_cond", c: "r2_poisson_cond", d: "r2_poisson_cond" },
+        rationale: "Poisson(4) is the standard model: events arrive independently at constant rate λ=4/min, n is not fixed (could be 0, 4, 10, …). The Poisson assumptions match: constant rate, independence, events can't overlap in time.",
+      },
+      s3_wrong_dist_click: {
+        id: "s3_wrong_dist_click",
+        type: "click_target",
+        badge: "Stage 3 · Click",
+        title: "Stage 3 · Spot the Wrong Distribution",
+        prompt: "An analyst is modeling call center data. One line applies Binomial where Poisson is appropriate. Click the line with the distribution error.",
+        code_snippet: `# Modeling daily customer contacts
+emails_per_day = Binomial(n=500, p=0.08)   -- line A: emails sent, each opens or not
+support_calls  = Binomial(n=4, p=1.0)      -- ds-target:wrong_dist_line
+chat_sessions  = Poisson(lam=12.5)         -- line C: avg 12.5 chats/hour`,
+        validationCopy: {
+          wrong_dist_line: "Correct. Line B uses Binomial(n=4, p=1.0) to model support calls — but we don't have a fixed number of 'trials', each of which either becomes a call or not. Calls arrive as a stream at some rate, making Poisson the appropriate distribution. Binomial(4, 1.0) would mean exactly 4 calls always, which is degenerate and wrong.",
+        },
+        branches: { wrong_dist_line: "s4_approx" },
+      },
+      s4_approx: {
+        id: "s4_approx",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Poisson Approximation",
+        prompt: "When is Poisson a good approximation for Binomial(n, p)?",
+        code_snippet: `Exact:        X ~ Binomial(n=1000, p=0.002)
+Approximate:  X ~ Poisson(λ = np = 2.0)
+
+How close are they?
+P(X=0): Binomial=0.1353, Poisson=0.1353
+P(X=3): Binomial=0.1804, Poisson=0.1804`,
+        choices: [
+          { id: "a", label: "When n is large, p is small, and λ=np is moderate", description: "Rule of thumb: n ≥ 20, p ≤ 0.05. The approximation improves as n→∞ and p→0 with np fixed." },
+          { id: "b", label: "When n and p are both large", description: "Large p means many successes — the distribution is not rare-event dominated." },
+          { id: "c", label: "When the variance equals the mean", description: "That's a property of Poisson, not a condition for using it to approximate Binomial." },
+          { id: "d", label: "Only when n > 1000", description: "n ≥ 20 with p ≤ 0.05 is sufficient for practical accuracy." },
+        ],
+        branches: { a: "s5_terminal", b: "r3_approx", c: "r3_approx", d: "r3_approx" },
+        rationale: "The Poisson limit theorem: as n→∞ and p→0 with np=λ fixed, Binomial(n,p) → Poisson(λ). Practically, n≥20 and p≤0.05 gives excellent agreement. This matters because Poisson requires only one parameter (λ) and is computationally simpler for large n.",
+      },
+      r1_selection: {
+        id: "r1_selection",
+        type: "scenario_choice",
+        badge: "Recovery · Selection",
+        title: "Recovery · Choosing the Right Distribution",
+        prompt: "Match each scenario to the correct distribution.",
+        code_snippet: `Scenario A: 20 students take a pass/fail exam, each passes with P=0.8
+Scenario B: Defective microchips found per hour in a factory (avg 2.3/hr)
+Scenario C: Number of sales calls until first success`,
+        choices: [
+          { id: "a", label: "A=Binomial, B=Poisson, C=Geometric", description: "Fixed trials → Binomial; rate over interval → Poisson; waiting time → Geometric." },
+          { id: "b", label: "A=Poisson, B=Binomial, C=Normal", description: "Scenario A has fixed n=20 trials, not a rate — that's Binomial, not Poisson." },
+          { id: "c", label: "All three are Binomial", description: "Poisson and Geometric are distinct — they model different processes." },
+        ],
+        branches: { a: "s2_callcenter", b: "r1_selection", c: "r1_selection" },
+        rationale: "Binomial: fixed n, binary outcome. Poisson: event count over fixed interval with rate λ. Geometric: number of trials until first success. These three together cover most discrete count scenarios in data science.",
+      },
+      r2_poisson_cond: {
+        id: "r2_poisson_cond",
+        type: "scenario_choice",
+        badge: "Recovery · Poisson Conditions",
+        title: "Recovery · When to Use Poisson",
+        prompt: "Which scenario violates a core Poisson assumption?",
+        code_snippet: `Scenario A: Earthquakes above magnitude 4 per decade in a region
+Scenario B: Goals scored per match in a football league
+Scenario C: Car accidents at a busy intersection on Fridays at 5pm
+            (rate spikes dramatically at rush hour)`,
+        choices: [
+          { id: "a", label: "Scenario C — the rate is not constant (rush hour spike)", description: "Poisson requires a stationary rate λ; time-varying rates violate this." },
+          { id: "b", label: "Scenario A — earthquakes are not independent", description: "Aftershocks can violate independence, but major earthquakes are often modeled as Poisson." },
+          { id: "c", label: "Scenario B — goals are not rare enough", description: "Poisson doesn't require events to be rare — only independent with constant rate." },
+        ],
+        branches: { a: "s3_wrong_dist_click", b: "r2_poisson_cond", c: "r2_poisson_cond" },
+        rationale: "Scenario C has a non-constant rate — accidents spike at rush hour, violating the stationary rate assumption. You'd need to model it with a time-varying intensity (inhomogeneous Poisson process) or separate the data by time window.",
+      },
+      r3_approx: {
+        id: "r3_approx",
+        type: "scenario_choice",
+        badge: "Recovery · Approximation",
+        title: "Recovery · Poisson Approximation Conditions",
+        prompt: "Binomial(n=500, p=0.004). Is Poisson a good approximation? What is λ?",
+        code_snippet: `n = 500,  p = 0.004
+n ≥ 20?   500 ≥ 20  ✓
+p ≤ 0.05? 0.004 ≤ 0.05  ✓
+λ = np = ?`,
+        choices: [
+          { id: "a", label: "Yes, Poisson(λ=2) is a good approximation", description: "λ = 500×0.004 = 2.0; both conditions satisfied." },
+          { id: "b", label: "No, p is too small for Poisson", description: "Small p is exactly when Poisson works best — rare events." },
+          { id: "c", label: "No, n must be greater than 1000", description: "n ≥ 20 with p ≤ 0.05 is sufficient — n=500 easily qualifies." },
+        ],
+        branches: { a: "s5_terminal", b: "r3_approx", c: "r3_approx" },
+        rationale: "n=500 ≥ 20 and p=0.004 ≤ 0.05, so Poisson(λ=np=2) is an excellent approximation. The smaller p is (for fixed λ=np), the better the Poisson approximation becomes.",
+      },
+      s5_terminal: {
+        id: "s5_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Revision complete · Email Open Rate",
+        terminal: true,
+        prompt: "You send 200 emails with a historical open rate of 15%. Modeling opens as Binomial(200, 0.15), what are the mean and standard deviation of the number of opens?",
+        code_snippet: `X ~ Binomial(n=200, p=0.15)
+
+Mean     = n × p      = 200 × 0.15        = ?
+Variance = n × p × (1−p) = 200 × 0.15 × 0.85 = ?
+Std Dev  = √Variance                      = ?`,
+        choices: [
+          { id: "a", label: "Mean=30, Std≈5.05", description: "Mean=30, Var=25.5, Std=√25.5≈5.05." },
+          { id: "b", label: "Mean=30, Std=30", description: "Std=30 would mean Var=900 — that's the Poisson assumption (Var=Mean), not Binomial." },
+          { id: "c", label: "Mean=15, Std=5", description: "Mean=n×p=200×0.15=30, not 15." },
+        ],
+        branches: { a: "s5_terminal", b: "s5_terminal", c: "s5_terminal" },
+        rationale: "Mean = np = 30. Var = np(1−p) = 200×0.15×0.85 = 25.5. Std = √25.5 ≈ 5.05. Note Var < Mean (25.5 < 30) — this is characteristic of Binomial and contrasts with Poisson where Var = Mean. If you observed Var ≈ Mean in email data, Poisson would also be a reasonable model.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "A factory produces widgets where each has a 0.5% defect probability. You inspect 400 widgets. What is the mean number of defects, and which distribution applies exactly?",
+      options: ["Mean=2, Binomial(400, 0.005) exactly; Poisson(2) is a close approximation", "Mean=2, Poisson(2) exactly; Binomial is an approximation", "Mean=0.5%, Normal(2, 2) approximately"],
+      correctIndex: 0,
+      explanation: "Binomial(n=400, p=0.005) is exact because n is fixed and each widget independently defects with probability p. Mean=np=2. Poisson(2) is an excellent approximation since n≥20 and p≤0.05, but Binomial is the exact model.",
+    },
+    {
+      question: "For X ~ Poisson(λ=9), what is the standard deviation?",
+      options: ["3  →  σ = √λ = √9 = 3", "9  →  σ = λ", "81 →  σ = λ²"],
+      correctIndex: 0,
+      explanation: "For Poisson: Mean = Variance = λ, so Std Dev = √λ = √9 = 3. This is a key property — the standard deviation grows as the square root of the rate, meaning higher-rate Poisson processes are relatively less variable (lower CV = σ/μ = 1/√λ).",
+    },
+  ],
+},
+
+"st-p4": {
+  durationLabel: "20 min",
+  outcomes: [
+    "State the Central Limit Theorem precisely and identify its conditions",
+    "Explain why sample means become approximately normal regardless of population shape",
+    "Apply the n≥30 rule of thumb appropriately, with caveats for heavy-tailed populations",
+    "Distinguish between CLT applying to sample means vs individual observations",
+  ],
+  learnMarkdown: `## Central Limit Theorem: Why Everything is Normal
+
+The **Central Limit Theorem (CLT)** is the theoretical backbone of most statistical inference. It states:
+
+> If X₁, X₂, …, Xₙ are i.i.d. random variables with mean μ and finite variance σ², then as n → ∞:
+>
+> X̄ = (X₁ + … + Xₙ) / n  →  N(μ, σ²/n)
+
+In plain language: **the distribution of sample means becomes normal as sample size grows**, regardless of the population's shape.
+
+\`\`\`
+X̄ ~ N(μ, σ²/n)
+
+Standard error of the mean: SE = σ / √n
+\`\`\`
+
+## Why This Matters
+
+The CLT is why so many statistical tests (t-tests, z-tests, confidence intervals, regression coefficients) assume normality of estimates even when individual data is not normal. We're almost always working with means or totals of many independent observations.
+
+## The n ≥ 30 Rule of Thumb
+
+"At n=30, the sample mean distribution is approximately normal" is a useful heuristic, but:
+
+| Population shape | n needed for approximate normality |
+|-----------------|-------------------------------------|
+| Symmetric (near-normal) | n ≥ 5 often sufficient |
+| Mildly skewed | n ≥ 15–20 |
+| Strongly skewed (e.g., income) | n ≥ 50–100+ |
+| Heavy-tailed (e.g., Pareto) | n may need to be very large |
+
+## Critical Distinction: Means vs Individuals
+
+**CLT applies to sample means (and sums), NOT to individual observations.**
+
+\`\`\`python
+# Individual income values: right-skewed, NOT normal
+individual_incomes = [22000, 35000, 48000, 200000, 1500000]
+
+# Sample means of n=50: approximately normal by CLT
+sample_means = [np.mean(sample(50)) for _ in range(1000)]
+# ↑ this IS approximately normal
+\`\`\`
+
+Common mistake: "n=50 so the data is normally distributed." Wrong — n=50 means the *sample mean* is approximately normal; individual observations remain non-normal.
+
+## Standard Error and Precision
+
+As n increases, the standard error SE = σ/√n decreases — sample means cluster tighter around μ:
+
+\`\`\`
+n=1:   SE = σ
+n=4:   SE = σ/2
+n=25:  SE = σ/5
+n=100: SE = σ/10
+\`\`\`
+
+Quadrupling n halves the standard error — this drives sample size calculations.
+
+## A/B Testing Connection
+
+When you run an A/B test and compute a conversion rate difference, you're comparing two sample means. The CLT justifies using a normal approximation for the sampling distribution of the difference, enabling z-tests and confidence intervals.
+
+## Interview hook (answer like a senior)
+
+> "The CLT is why regression coefficients have standard errors and why t-statistics follow a t-distribution. But I always emphasize the 'i.i.d.' requirement — the CLT breaks down for correlated observations like time series, or when variance is infinite like Pareto-tailed distributions. And I make sure to be precise: the CLT normalizes the *sample mean's distribution*, not the raw data. A dataset of 1000 salaries is still right-skewed — but the mean salary computed from random samples of 1000 would be normally distributed across repeated experiments."
+`,
+  video: null,
+  videoFallbackMarkdown: `## CLT Simulation Description
+
+Imagine a uniform distribution: any value from 0 to 1 is equally likely.
+
+- Draw 1 observation: the distribution of that single value is uniform (flat).
+- Draw 5, compute mean: the distribution of means is triangular (less flat).
+- Draw 30, compute mean: the distribution of means is clearly bell-shaped.
+- Draw 100, compute mean: the distribution is a tight, normal bell centered at 0.5.
+
+The population never changed — it's still uniform. But the *distribution of sample means* converges to normal. That's the CLT in action.
+`,
+  tryGuidance: "Try all three population shapes with n=1 to see the original distribution. Then increase n to 5, 10, 30, 100 and observe the histogram of sample means transforming into a bell curve. Pay attention to the exponential/skewed population — at n=5 it's still right-skewed, but by n=30 it's approximately normal. Watch the theoretical σ/√n shrink as n grows — this is the standard error narrowing.",
+  interviewGraph: {
+    initialStageId: "s1_skewed_income",
+    artifactDimensions: [
+      { label: "CLT convergence rate", recoveryStageId: "r1_convergence" },
+      { label: "Sample size rule", recoveryStageId: "r2_n30" },
+      { label: "Means vs individuals", recoveryStageId: "r3_means_vs_indiv" },
+    ],
+    stages: {
+      s1_skewed_income: {
+        id: "s1_skewed_income",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Small Sample from Skewed Population",
+        prompt: "You sample n=5 observations from a heavily right-skewed income distribution. The distribution of sample means (across many such samples of n=5) is:",
+        code_snippet: `Population: income (strongly right-skewed)
+μ = $65,000,  σ = $80,000  (skewness ≈ 3.5)
+Sample size: n = 5
+
+X̄ = (X₁ + X₂ + X₃ + X₄ + X₅) / 5`,
+        choices: [
+          { id: "a", label: "Still noticeably right-skewed — n=5 is too small for CLT to kick in here", description: "For heavily skewed populations, n=5 is far too small for the sample mean to be approximately normal." },
+          { id: "b", label: "Approximately normal — CLT applies for any n", description: "CLT is an asymptotic result; for small n and skewed populations, convergence is slow." },
+          { id: "c", label: "Exactly normal — individual incomes are large enough", description: "CLT doesn't depend on the magnitude of values, and normality of individuals is irrelevant." },
+          { id: "d", label: "Uniform — the mean averages out the skew completely", description: "Averaging reduces skew but doesn't produce a uniform distribution." },
+        ],
+        branches: { a: "s2_n30_rule", b: "r1_convergence", c: "r1_convergence", d: "r1_convergence" },
+        rationale: "For a strongly skewed population (skewness ≈ 3.5), n=5 sample means will still show noticeable right skew. The CLT guarantees normality only in the limit — in practice, strongly skewed populations may need n=50+ for the sample mean distribution to look approximately normal.",
+      },
+      s2_n30_rule: {
+        id: "s2_n30_rule",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · The n ≥ 30 Rule",
+        prompt: "At what sample size does the CLT typically justify treating the sample mean as approximately normally distributed, and what is the important caveat?",
+        code_snippet: `Symmetric population  → CLT kicks in at n ≈ 5–10
+Moderate skew         → CLT kicks in at n ≈ 20–30
+Heavy skew / tails    → CLT may need n > 100
+
+Common interview rule: n ≥ 30`,
+        choices: [
+          { id: "a", label: "n ≥ 30 as a rule of thumb, but it depends on population skewness — heavier tails need larger n", description: "Correct: 30 is a starting point, not a universal guarantee." },
+          { id: "b", label: "n ≥ 30 always guarantees approximate normality for any population", description: "Not for very heavy-tailed distributions like Pareto or Cauchy." },
+          { id: "c", label: "n ≥ 100 is always required", description: "n=30 is sufficient for most practical distributions." },
+          { id: "d", label: "n ≥ 5 is always enough because averaging smooths everything", description: "Averaging reduces but doesn't eliminate non-normality for small n." },
+        ],
+        branches: { a: "s3_wrong_claim_click", b: "r2_n30", c: "r2_n30", d: "r2_n30" },
+        rationale: "n ≥ 30 is the standard rule of thumb for approximately symmetric distributions. For skewed distributions, more is better — income distributions often need n > 100. For infinite-variance distributions (Cauchy, heavy Pareto), the CLT doesn't apply at all.",
+      },
+      s3_wrong_claim_click: {
+        id: "s3_wrong_claim_click",
+        type: "click_target",
+        badge: "Stage 3 · Click",
+        title: "Stage 3 · Spot the Misapplication of CLT",
+        prompt: "An analyst wrote comments in their analysis notebook. One comment misapplies the CLT. Click the line with the incorrect claim.",
+        code_snippet: `# A/B test analysis — n=500 users per variant
+# The sampling distribution of conversion rate difference is normal by CLT  -- line A
+# With n=500, our sample mean estimate is reliable  -- line B
+individual_revenues = fetch_user_revenues()  # right-skewed raw data
+# Since n=500, individual revenue values are normally distributed  -- ds-target:wrong_clt_claim`,
+        validationCopy: {
+          wrong_clt_claim: "Correct. Line D claims individual revenue values are normally distributed because n=500. This misapplies the CLT — the theorem says the *distribution of the sample mean* (across repeated experiments) is approximately normal, not that individual observations become normal. The raw revenue data remains right-skewed regardless of sample size.",
+        },
+        branches: { wrong_clt_claim: "s4_terminal" },
+      },
+      r1_convergence: {
+        id: "r1_convergence",
+        type: "scenario_choice",
+        badge: "Recovery · Convergence Rate",
+        title: "Recovery · How Fast Does CLT Converge?",
+        prompt: "You draw samples of size n=1, 5, 30, 100 from a right-skewed population. At which sample size does the distribution of sample means first appear approximately normal?",
+        code_snippet: `n=1:   Distribution of X̄ = X₁ = original right-skewed shape
+n=5:   Distribution of X̄ is ... still slightly skewed
+n=30:  Distribution of X̄ is ... approximately bell-shaped
+n=100: Distribution of X̄ is ... tightly normal`,
+        choices: [
+          { id: "a", label: "Around n=30 for moderate skew (may need more for heavy skew)", description: "n=30 is the rule of thumb, though strongly skewed populations need more." },
+          { id: "b", label: "n=5 — any averaging is enough to produce normality", description: "n=5 still retains substantial skew for a skewed population." },
+          { id: "c", label: "n=1 — the CLT applies even to single observations", description: "A single observation just has the population's distribution — CLT hasn't acted." },
+        ],
+        branches: { a: "s2_n30_rule", b: "r1_convergence", c: "r1_convergence" },
+        rationale: "CLT convergence speed depends on skewness. For a moderately right-skewed distribution, n=30 is typically sufficient. For the income distribution with skewness > 3, you might need n=50–100. The rule n≥30 assumes 'moderate' departure from normality.",
+      },
+      r2_n30: {
+        id: "r2_n30",
+        type: "scenario_choice",
+        badge: "Recovery · n ≥ 30",
+        title: "Recovery · What the n ≥ 30 Rule Actually Means",
+        prompt: "Which statement correctly explains the n ≥ 30 heuristic?",
+        code_snippet: `True or false for each:
+A) n ≥ 30 means each individual observation is normal
+B) n ≥ 30 means the sample mean X̄ is approximately normal
+C) n ≥ 30 works for any distribution including Cauchy
+D) n ≥ 30 means the standard error is small enough to ignore`,
+        choices: [
+          { id: "a", label: "Only B is true — CLT applies to the distribution of X̄, not individuals", description: "The theorem is about the sampling distribution of the mean." },
+          { id: "b", label: "A and B are true — large n normalizes both individuals and means", description: "Individual observations retain their population distribution regardless of n." },
+          { id: "c", label: "B and C are true — n=30 works universally", description: "Cauchy distribution has undefined variance — CLT doesn't apply to it at all." },
+        ],
+        branches: { a: "s3_wrong_claim_click", b: "r2_n30", c: "r2_n30" },
+        rationale: "Only B: the CLT states that the sampling distribution of X̄ is approximately normal for large n (with the caveats about distribution type). Individual observations keep their original distribution. The Cauchy distribution has undefined mean and variance — it violates the finite-variance requirement for the CLT.",
+      },
+      r3_means_vs_indiv: {
+        id: "r3_means_vs_indiv",
+        type: "scenario_choice",
+        badge: "Recovery · Means vs Individuals",
+        title: "Recovery · The Key CLT Distinction",
+        prompt: "A dataset of 200 customer purchase amounts is heavily right-skewed (many small purchases, a few very large ones). Which statement is correct?",
+        code_snippet: `purchase_amounts = load_data()  # n=200, right-skewed
+
+mean_estimate = np.mean(purchase_amounts)
+# The sampling distribution of mean_estimate is approximately normal
+# (if we were to repeat the sampling many times)
+
+# But the individual purchase_amounts themselves are... ?`,
+        choices: [
+          { id: "a", label: "Individuals remain right-skewed; the sample mean's sampling distribution is approximately normal", description: "CLT applies to the mean, not the raw data." },
+          { id: "b", label: "Both individuals and the sample mean are right-skewed since n=200 isn't enough", description: "n=200 is enough for the mean to be approximately normal for most distributions." },
+          { id: "c", label: "Both are approximately normal because n=200 is large", description: "n=200 doesn't change the shape of individual observations." },
+        ],
+        branches: { a: "s4_terminal", b: "r3_means_vs_indiv", c: "r3_means_vs_indiv" },
+        rationale: "This is the most important CLT distinction. The 200 individual purchase amounts remain right-skewed — you'd need to transform them (e.g., log transform) for them to look normal. But if you repeatedly sampled 200 customers and computed the mean purchase each time, those means would form an approximately normal distribution centered at the true mean.",
+      },
+      s4_terminal: {
+        id: "s4_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Revision complete · False Positives in A/B Tests",
+        terminal: true,
+        prompt: "An analyst runs 1000 A/B tests with α=0.05, all on truly null effects (no real difference exists). By the CLT and properties of hypothesis testing, how many false positives should they expect?",
+        code_snippet: `α = 0.05 (significance threshold)
+Number of tests = 1000
+True effect size = 0 for all tests
+
+Under H₀, P(false positive) = α = 0.05
+
+Expected false positives = 1000 × 0.05 = ?`,
+        choices: [
+          { id: "a", label: "~50 false positives — 5% of tests will cross the threshold by chance", description: "With α=0.05, the false positive rate is exactly 5% under the null." },
+          { id: "b", label: "~0 — if there's no effect, no test should be significant", description: "Random variation in test statistics will produce false positives at rate α even with no effect." },
+          { id: "c", label: "~500 — half the tests will be significant by coincidence", description: "500 would require α=0.5, not 0.05." },
+          { id: "d", label: "Depends on sample size — more data means fewer false positives", description: "Under H₀, P(false positive)=α regardless of sample size; larger n just reduces P(false negative)." },
+        ],
+        branches: { a: "s4_terminal", b: "s4_terminal", c: "s4_terminal", d: "s4_terminal" },
+        rationale: "Expected false positives = 1000 × 0.05 = 50. α is literally the false positive rate under H₀, so running 1000 null tests produces ~50 spurious 'significant' results. This is the multiple testing problem — it motivates Bonferroni correction (α/k) or False Discovery Rate (FDR) control in production A/B testing platforms. The CLT underpins all of this by justifying the normal approximation used to compute p-values.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "You collect samples of size n=50 from a population with μ=100 and σ=30. What is the standard error of the sample mean?",
+      options: ["SE = 30/√50 ≈ 4.24", "SE = 30/50 = 0.60", "SE = 30² / 50 = 18"],
+      correctIndex: 0,
+      explanation: "SE = σ/√n = 30/√50 ≈ 4.24. This tells you the typical spread of sample means around the true μ=100. Quadrupling the sample size to n=200 would halve the SE to ≈2.12.",
+    },
+    {
+      question: "A researcher claims: 'Our dataset has n=500 rows, so by the CLT the data is normally distributed.' What is wrong with this statement?",
+      options: [
+        "CLT applies to the sampling distribution of the mean, not to individual observations — the raw data can remain non-normal",
+        "Nothing is wrong — n=500 guarantees normality by CLT",
+        "The threshold should be n=30, not n=500",
+      ],
+      correctIndex: 0,
+      explanation: "The CLT guarantees that the distribution of sample means is approximately normal for large n — it says nothing about whether individual observations are normal. Raw data (individual rows) retains whatever shape the underlying population has. This is one of the most common misstatements of the CLT in practice.",
+    },
+  ],
+},
+
+  // ── injected from stat_inference1_lessons.js ──
+  "st-i1": {
+  durationLabel: "22 min",
+  outcomes: [
+    "State null and alternative hypotheses in testable, pre-specified form.",
+    "Explain why HARKing (Hypothesizing After Results Known) invalidates p-value interpretation.",
+    "Distinguish one-tailed from two-tailed tests and defend the choice under interview pressure.",
+  ],
+  learnMarkdown: `## The framework behind every hypothesis test
+
+A hypothesis test is a structured decision procedure, not a truth machine. Before you see data, you commit to:
+
+1. **H₀ (null hypothesis)** — the baseline claim of no effect or no difference. Always includes equality.
+2. **H₁ (alternative hypothesis)** — what you believe if H₀ is false.
+3. **α (significance level)** — the tolerated Type I error rate (commonly 0.05).
+4. **Test statistic** — a summary of the data that has a known distribution under H₀.
+5. **Decision rule** — reject H₀ if p-value < α, or equivalently if |z| > z*.
+
+## Pre-registration is the backbone
+
+The framework only works if you commit to hypotheses *before* seeing data. If you peek at results and then frame the hypothesis to match, you commit **HARKing** — the p-value no longer has valid frequentist meaning because you've effectively searched for a pattern.
+
+## Two-sided vs one-sided tests
+
+- **Two-sided (≠)**: H₁ says the effect can go in either direction. More conservative; preferred unless the direction is theoretically fixed and pre-specified.
+- **One-sided (> or <)**: H₁ specifies the direction. More power in that direction, but you forfeit the ability to detect an effect in the other direction.
+
+Choosing one-sided *after* seeing data to squeeze significance is p-hacking.
+
+## Common traps
+
+- **Peeking at data early** and stopping when p < 0.05 inflates Type I error (sequential testing problem; use group sequential methods instead).
+- **H₀ should never be a directional claim** — the null hypothesis is the equality/no-difference baseline; the alternative carries the directional claim.
+- **Failing to reject H₀ ≠ proving H₀** — low power, small samples, or high variance can all hide a real effect.
+
+\`\`\`
+Hypothesis test procedure (pseudocode):
+  1. Define H₀: μ_A = μ_B  (no difference)
+  2. Define H₁: μ_A ≠ μ_B  (two-sided)
+  3. Set α = 0.05 before data collection
+  4. Collect data; compute test statistic
+  5. If p-value < α → reject H₀
+             else  → fail to reject H₀
+\`\`\`
+
+## Interview hook (answer like a senior)
+
+"Walk me through how you set up a hypothesis test."
+
+Strong answer: "I start by framing a testable null hypothesis that represents no effect — always an equality claim. I choose the alternative based on the scientific question, decide between one-sided and two-sided (and justify it), then set α before touching the data. If it's a product experiment, I also run a power calculation to ensure I'll have enough observations to detect the minimum effect size that matters to the business. After running the test, the p-value is one input — I also look at effect size, confidence intervals, and whether the test assumptions are met."`,
+  video: null,
+  videoFallbackMarkdown: `## Hypothesis testing drill (5 minutes)
+
+Without looking at notes, write out the five-step procedure for a two-sided two-sample t-test, specifying each of: H₀, H₁, α, test statistic, and decision rule.
+
+Then answer aloud: "Why does peeking at results before forming the hypothesis invalidate the p-value?"
+
+If you cannot answer fluently, return to the Learn section before attempting the simulation.`,
+  tryGuidance: "Run the interview simulation. In Stage 1 choose the statistically correct action when p=0.04. In Stage 2 click the line that represents HARKing. In Stage 3 identify the correctly stated null hypothesis.",
+  interviewGraph: {
+    initialStageId: "ht_action_choice",
+    artifactDimensions: [
+      { label: "Decision Rule Fluency", recoveryStageId: "ht_recovery_decision" },
+      { label: "HARKing Recognition", recoveryStageId: "ht_recovery_harking" },
+      { label: "Null Hypothesis Form", recoveryStageId: "ht_recovery_null", passLabel: "Hypothesis Framework Clear" },
+    ],
+    stages: {
+      ht_action_choice: {
+        id: "ht_action_choice",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Interpreting p = 0.04",
+        prompt: "An A/B test has been running for 3 days. The observed p-value is 0.04 with a pre-specified α = 0.05. The sample size was not pre-calculated. What is the most defensible action?",
+        code_snippet: `A/B Test Summary (Day 3 of planned 14-day run)
+----------------------------------------------
+Control:   n = 412,  conversion = 9.2%
+Treatment: n = 408,  conversion = 11.7%
+p-value (two-sided): 0.04
+Pre-specified α: 0.05`,
+        choices: [
+          { id: "a", label: "Reject H₀ but note the caveats", description: "Reject H₀ since p < α, but flag that the test ran only 3 of 14 planned days — early stopping inflates Type I error unless a sequential testing correction is applied." },
+          { id: "b", label: "Immediately ship the treatment", description: "p < 0.05, so the effect is proven and there's no reason to wait." },
+          { id: "c", label: "Declare the result not significant", description: "The experiment ran too few days, so ignore the p-value entirely." },
+          { id: "d", label: "Lower α to 0.01 and re-evaluate", description: "Change the threshold post-hoc to make the result safer." },
+        ],
+        branches: { a: "ht_harking_click", b: "ht_recovery_decision", c: "ht_recovery_decision", d: "ht_recovery_decision" },
+        rationale: "The correct answer acknowledges the formal decision (reject H₀ per the pre-specified rule) while flagging the practical issue: stopping early inflates error rates. Immediately shipping ignores statistical discipline; ignoring the result entirely throws away valid data; retroactively tightening α is p-hacking in reverse.",
+      },
+      ht_recovery_decision: {
+        id: "ht_recovery_decision",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · When p < α with caveats",
+        prompt: "The interviewer stops you: 'You need to make a decision today. p = 0.04 and α = 0.05. What do you do and what do you report?' Choose the strongest answer.",
+        code_snippet: `Pre-specified decision rule: reject H₀ if p < α = 0.05
+Observed: p = 0.04
+Issue: test stopped at Day 3 of planned Day 14`,
+        choices: [
+          { id: "a", label: "Formally reject H₀, transparently flag early stopping", description: "The rule says reject. Separately document that early stopping was not pre-specified and the error rate is likely inflated." },
+          { id: "b", label: "Report the experiment as failed", description: "p < α means the experiment succeeded by its own pre-specified criterion." },
+          { id: "c", label: "Run a new experiment from scratch", description: "The existing data still provides valid (if imperfect) information." },
+          { id: "d", label: "Change α to 0.03 to account for early stopping", description: "Retroactively adjusting α is p-hacking; the correct tool is a sequential testing procedure." },
+        ],
+        branches: { a: "ht_harking_click", b: "ht_recovery_decision", c: "ht_recovery_decision", d: "ht_recovery_decision" },
+        rationale: "Formally rejecting and transparently reporting the limitation is the senior answer: it respects the pre-specified rule while giving stakeholders the information they need to weigh the decision.",
+      },
+      ht_harking_click: {
+        id: "ht_harking_click",
+        type: "click_target",
+        badge: "Stage 2 target",
+        title: "Stage 2 · Spot the HARKing",
+        prompt: "An analyst looked at the data first, then wrote up a hypothesis test. Click the line that represents HARKing — Hypothesizing After Results Known.",
+        code_snippet: `STEP 1: Collected experiment data for 14 days
+STEP 2: Observed that treatment had higher revenue for male users
+STEP 3: Defined H₁: treatment improves revenue for male users  -- ds-target:harking_line
+STEP 4: Ran t-test on male-user subgroup; p = 0.03
+STEP 5: Reported: "We pre-specified this hypothesis and it is significant"`,
+        validationCopy: {
+          harking_line: "Correct. H₁ was formed after seeing that males had higher revenue — the test is now circular. The p-value no longer reflects a pre-specified decision rule; it is a post-hoc rationalization.",
+        },
+        branches: { harking_line: "ht_null_form_choice" },
+      },
+      ht_recovery_harking: {
+        id: "ht_recovery_harking",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · Why HARKing breaks the p-value",
+        prompt: "Why does forming H₁ after seeing which subgroup had the largest effect invalidate the p-value?",
+        code_snippet: `# The frequentist guarantee:
+# P(reject H₀ | H₀ true) = α  —  only if H₁ is pre-specified
+# If you search over subgroups and pick the best one,
+# you are effectively running many tests simultaneously.`,
+        choices: [
+          { id: "a", label: "It turns one test into implicit multiple testing", description: "Searching many subgroups and reporting the best result inflates the effective family-wise error rate far above α." },
+          { id: "b", label: "t-tests are invalid on subgroups", description: "t-tests are valid on any subset; the problem is with the hypothesis, not the test statistic." },
+          { id: "c", label: "The sample is too small", description: "Sample size is a separate concern; HARKing is a problem even in large samples." },
+          { id: "d", label: "Male users have different variance", description: "Variance differences affect the test statistic, not the conceptual validity of the p-value framework." },
+        ],
+        branches: { a: "ht_null_form_choice", b: "ht_recovery_harking", c: "ht_recovery_harking", d: "ht_recovery_harking" },
+        rationale: "HARKing is implicit multiple testing: by scanning data for patterns and then framing them as hypotheses, you've searched without adjusting for the search, making the p-value meaningless as a decision threshold.",
+      },
+      ht_null_form_choice: {
+        id: "ht_null_form_choice",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Correctly stated null hypothesis",
+        prompt: "Which of the following correctly states a null hypothesis for an A/B test comparing email open rates?",
+        code_snippet: `Experiment: Two email subject lines (A vs B)
+Metric: Open rate (proportion of recipients who opened)
+Business goal: Subject B improves open rate`,
+        choices: [
+          { id: "a", label: "H₀: p_A = p_B", description: "No difference in open rates between the two subject lines. Includes equality — correct null form." },
+          { id: "b", label: "H₀: p_B > p_A", description: "This is a directional claim — it belongs in H₁, not H₀. The null is always the equality or no-effect baseline." },
+          { id: "c", label: "H₀: subject B is better", description: "Business expectation is not a null hypothesis. H₀ is what you assume in the absence of evidence." },
+          { id: "d", label: "H₀: p-value < 0.05", description: "The p-value is a test output, not a hypothesis. H₀ is a claim about population parameters." },
+        ],
+        branches: { a: "ht_terminal", b: "ht_recovery_null", c: "ht_recovery_null", d: "ht_recovery_null" },
+        rationale: "The null hypothesis is always the equality baseline: p_A = p_B. The alternative carries the directional or non-equality claim. This structure ensures the Type I error rate equals α when H₀ is true.",
+      },
+      ht_recovery_null: {
+        id: "ht_recovery_null",
+        type: "scenario_choice",
+        badge: "Recovery 3",
+        title: "Recovery · Null hypothesis must assert equality",
+        prompt: "The interviewer asks: 'What must every null hypothesis include, and why?' Choose the strongest answer.",
+        code_snippet: `H₀: [parameter] = [baseline value]
+H₁: [parameter] ≠ / > / < [baseline value]`,
+        choices: [
+          { id: "a", label: "An equality or no-effect claim", description: "H₀ always includes = so that the distribution of the test statistic under H₀ is fully specified and the rejection threshold can be computed." },
+          { id: "b", label: "A directional prediction", description: "Directional claims belong in H₁; putting them in H₀ inverts the test logic." },
+          { id: "c", label: "The researcher's expectation", description: "H₀ is the skeptic's position — no effect. The researcher's expectation is in H₁." },
+          { id: "d", label: "A p-value threshold", description: "α is the decision threshold, separate from the hypothesis statement." },
+        ],
+        branches: { a: "ht_terminal", b: "ht_recovery_null", c: "ht_recovery_null", d: "ht_recovery_null" },
+        rationale: "The equality form of H₀ is essential: it pins down the null distribution so the p-value and critical values can be computed. Without equality, you cannot compute P(data | H₀).",
+      },
+      ht_terminal: {
+        id: "ht_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Revision complete · Early stopping consequences",
+        terminal: true,
+        prompt: "An experiment runs for 1 week. On day 5, p = 0.03. The analyst stops and declares significance. What statistical problem does this create, and what is the correct approach?",
+        code_snippet: `Planned duration: 7 days
+Peeked at: Day 5
+p = 0.03 at Day 5
+α = 0.05 (fixed, not sequential)`,
+        choices: [
+          { id: "a", label: "Inflated Type I error; use group sequential / alpha-spending methods", description: "Peeking and stopping early without adjustment raises the effective error rate above α. Sequential testing procedures like O'Brien-Fleming or Pocock maintain the promised error rate." },
+          { id: "b", label: "No problem; p < 0.05 is p < 0.05", description: "The 0.05 guarantee only holds for a single pre-planned look, not for repeated peeks." },
+          { id: "c", label: "Run the full 7 days and ignore day-5 data", description: "The day-5 observation is not invalidated; the stopping rule is the problem." },
+        ],
+        branches: { a: "ht_terminal", b: "ht_terminal", c: "ht_terminal" },
+        rationale: "Early stopping without a sequential testing correction inflates Type I error because the probability of ever observing p < 0.05 during a run is much higher than 5%, even when H₀ is true. Group sequential methods pre-specify interim looks and apportion α across them.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "Which statement correctly describes a null hypothesis?",
+      options: [
+        "It asserts no effect or no difference — always includes equality",
+        "It asserts the direction of the expected effect",
+        "It is chosen after seeing the data to match the observed pattern",
+      ],
+      correctIndex: 0,
+      explanation: "H₀ is the baseline claim of equality (μ_A = μ_B, or p = 0.5). The alternative carries the directional or non-equality claim. This structure lets us compute P(data | H₀) precisely.",
+    },
+    {
+      question: "A researcher examines 20 subgroups, finds one with p = 0.04, then reports it as a pre-specified finding. What is this error called?",
+      options: [
+        "HARKing — Hypothesizing After Results Known",
+        "Type II error — failing to reject a false null",
+        "Heteroskedasticity — unequal variance across groups",
+      ],
+      correctIndex: 0,
+      explanation: "HARKing (Hypothesizing After Results Known) converts exploratory data analysis into false confirmatory claims. Scanning 20 subgroups at α = 0.05 gives about a 64% chance of at least one false positive by chance alone.",
+    },
+  ],
+},
+
+"st-i2": {
+  durationLabel: "18 min",
+  outcomes: [
+    "Define a p-value as a conditional probability under H₀, not a posterior probability.",
+    "Identify the four most common p-value misconceptions and give the correct interpretation.",
+    "Explain why statistical significance does not imply practical significance.",
+  ],
+  learnMarkdown: `## What a p-value actually is
+
+A **p-value** is the probability of observing data at least as extreme as your sample, *given that H₀ is true*:
+
+\`\`\`
+p-value = P(|T| ≥ |t_observed| | H₀ is true)
+\`\`\`
+
+It is a **conditional probability** with H₀ in the condition. It is NOT:
+- P(H₀ is true | data) — that is a posterior, requiring Bayes
+- The probability of replication
+- A measure of effect size or importance
+
+## The four misconceptions (memorise these for interviews)
+
+| Myth | Reality |
+|------|---------|
+| p = 0.03 → 97% chance effect is real | p-value conditions on H₀ true; probability inversion needs a prior |
+| Smaller p = bigger effect | p conflates effect size with sample size; always report effect sizes |
+| p > 0.05 proves no effect | Absence of evidence ≠ evidence of absence; study may be underpowered |
+| p = 0.049 vs p = 0.051 is meaningful | The 0.05 threshold is a convention; treat p as continuous evidence |
+
+## Statistical vs practical significance
+
+A finding can be:
+- **Statistically significant, practically trivial**: A drug reduces blood pressure by 0.3 mmHg (p < 0.0001 with n = 100,000). Statistically real, clinically useless.
+- **Statistically non-significant, practically important**: A new cancer treatment adds 2 months median survival (p = 0.07, n = 40). Underpowered; shouldn't be dismissed.
+
+Always report **effect size** (Cohen's d, odds ratio, η², lift) alongside the p-value.
+
+## Why the Bayesian inversion error is so common
+
+Humans naturally think in posteriors ("given what I saw, what do I believe?"). The frequentist p-value answers a different question: "If H₀ were true, how surprising is my data?" To convert that to "how likely is H₀?", you need Bayes' theorem and a prior — and that prior is rarely stated.
+
+## Interview hook (answer like a senior)
+
+"What's a p-value?"
+
+Strong answer: "It's the probability of observing data as extreme as mine, or more extreme, assuming the null hypothesis is true. It's a conditional probability — P(data | H₀). It is not the probability that H₀ is false, and it doesn't tell you the effect size or whether the result will replicate. To go from p-value to 'probability H₀ is false,' you'd need Bayes' theorem and a prior. In practice, I always report the p-value alongside a confidence interval and an effect size measure."`,
+  video: null,
+  videoFallbackMarkdown: `## P-value interpretation drill
+
+Write in your own words — without looking — the one-sentence definition of a p-value using the phrase "given that H₀ is true."
+
+Then list the four common misconceptions from memory and write one sentence correcting each.
+
+If any feels vague, use the AI tutor: "Quiz me on p-value misconceptions with feedback."`,
+  tryGuidance: "Use the P-Value Interpreter to slide the z-score and watch the shaded tail change. Notice how a large sample size can produce the same p-value as a small effect — this is the core intuition for why p ≠ effect size.",
+  interviewGraph: {
+    initialStageId: "pv_definition_choice",
+    artifactDimensions: [
+      { label: "P-Value Definition Precision", recoveryStageId: "pv_recovery_definition" },
+      { label: "Inversion Error Recognition", recoveryStageId: "pv_recovery_inversion" },
+      { label: "Effect Size vs Significance", recoveryStageId: "pv_recovery_effectsize", passLabel: "P-Value Mastery" },
+    ],
+    stages: {
+      pv_definition_choice: {
+        id: "pv_definition_choice",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Which interpretation is correct?",
+        prompt: "A study returns p = 0.03 (two-sided, α = 0.05). Which of the following is the correct interpretation of this p-value?",
+        code_snippet: `Study results:
+  n = 200 (100 per group)
+  Treatment mean: 48.2
+  Control mean:   44.7
+  Two-sided p-value: 0.03`,
+        choices: [
+          { id: "a", label: "P(data this extreme or more | H₀ true) = 0.03", description: "The probability of observing a difference this large or larger, if H₀ (no difference) were true, is 3%." },
+          { id: "b", label: "There is a 97% chance the effect is real", description: "This inverts the conditional — it would require knowing P(H₀) via Bayes." },
+          { id: "c", label: "The null hypothesis has a 3% chance of being true", description: "P(H₀ | data) ≠ p-value; again, this requires a prior probability on H₀." },
+          { id: "d", label: "This result will replicate 97% of the time", description: "Replication probability depends on power and the true effect size, not directly on the p-value." },
+        ],
+        branches: { a: "pv_inversion_click", b: "pv_recovery_definition", c: "pv_recovery_definition", d: "pv_recovery_definition" },
+        rationale: "The p-value is P(data | H₀), not P(H₀ | data). Options B, C, and D all commit the Bayesian inversion error — they describe posterior probabilities that require a prior.",
+      },
+      pv_recovery_definition: {
+        id: "pv_recovery_definition",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · The conditional in the p-value",
+        prompt: "Complete this sentence with the most precise definition: 'The p-value is the probability of...'",
+        code_snippet: `p-value = P(  ??? | H₀ is true  )`,
+        choices: [
+          { id: "a", label: "...observing data as extreme as the sample, or more extreme", description: "Conditional on H₀ being true — the core frequentist definition." },
+          { id: "b", label: "...H₀ being true given the observed data", description: "This is P(H₀ | data) — a posterior that needs a prior." },
+          { id: "c", label: "...the alternative hypothesis being true", description: "That would require P(H₁) and likelihood ratio; not what p-value computes." },
+          { id: "d", label: "...making a Type II error", description: "Type II error (false negative) rate is β, related to power, not the p-value." },
+        ],
+        branches: { a: "pv_inversion_click", b: "pv_recovery_definition", c: "pv_recovery_definition", d: "pv_recovery_definition" },
+        rationale: "P(data | H₀) — observed or more extreme data, given H₀ is true. Every other option inverts or confuses the conditioning.",
+      },
+      pv_inversion_click: {
+        id: "pv_inversion_click",
+        type: "click_target",
+        badge: "Stage 2 target",
+        title: "Stage 2 · Find the inversion error in the report",
+        prompt: "A data analyst wrote up these results. Click the exact line that commits the Bayesian inversion error.",
+        code_snippet: `RESULTS SUMMARY
+===============
+Test: two-sample t-test (n = 80 per group)
+Observed difference in means: +4.1 points
+Test statistic: t(158) = 2.31
+p-value: 0.022
+
+INTERPRETATION
+p = 0.022, so there is a 97.8% chance the effect is real.  -- ds-target:inversion_error
+We therefore recommend shipping the new feature immediately.`,
+        validationCopy: {
+          inversion_error: "Correct. 'p = 0.022 → 97.8% chance effect is real' inverts the conditional. The p-value is P(data | H₀); converting to P(effect is real | data) requires Bayes with a prior on H₀.",
+        },
+        branches: { inversion_error: "pv_effectsize_choice" },
+      },
+      pv_recovery_inversion: {
+        id: "pv_recovery_inversion",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · The inversion error",
+        prompt: "Why is '97% chance the effect is real' wrong when p = 0.03?",
+        code_snippet: `Bayes' theorem:
+P(H₀ | data) = P(data | H₀) × P(H₀) / P(data)
+
+The p-value only gives us P(data | H₀).
+Without P(H₀) — the prior — we cannot compute P(H₀ | data).`,
+        choices: [
+          { id: "a", label: "It inverts the conditional without a prior", description: "P(data | H₀) ≠ P(H₀ | data). You need P(H₀) via Bayes to compute the latter." },
+          { id: "b", label: "The complement of 0.03 is 0.97, which is correct", description: "1 - p is not the posterior probability of the effect being real." },
+          { id: "c", label: "Effect size was not reported, making p meaningless", description: "Effect size is a separate issue; the conditional error is conceptually distinct." },
+          { id: "d", label: "Only two-sided tests can be inverted this way", description: "The inversion error applies regardless of sidedness." },
+        ],
+        branches: { a: "pv_effectsize_choice", b: "pv_recovery_inversion", c: "pv_recovery_inversion", d: "pv_recovery_inversion" },
+        rationale: "The inversion error (also called the prosecutor's fallacy) confuses P(data | H₀) with P(H₀ | data). Bayes' theorem shows these are different unless the prior is known.",
+      },
+      pv_effectsize_choice: {
+        id: "pv_effectsize_choice",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Statistical vs practical significance",
+        prompt: "Study A: n=50, effect size d=0.8, p=0.001. Study B: n=10,000, effect size d=0.05, p=0.04. Which finding is more practically significant?",
+        code_snippet: `Study A: small n, large effect, very low p
+  n = 50, Cohen's d = 0.80, p = 0.001
+
+Study B: large n, tiny effect, borderline p
+  n = 10,000, Cohen's d = 0.05, p = 0.04`,
+        choices: [
+          { id: "a", label: "Study A — effect size drives practical importance, not p-value", description: "A Cohen's d of 0.80 is a large, meaningful effect. Study B's d=0.05 is negligible even though it's statistically significant." },
+          { id: "b", label: "Study B — p = 0.001 is smaller than p = 0.04", description: "Smaller p-values do not imply larger effects. Study B's p is larger and its effect is tiny." },
+          { id: "c", label: "They're equally significant since both p < 0.05", description: "Statistical significance at α = 0.05 says nothing about effect magnitude." },
+          { id: "d", label: "Study B — larger samples are always more reliable", description: "Larger samples have more power, which is why they can detect trivially small effects as 'significant'." },
+        ],
+        branches: { a: "pv_terminal", b: "pv_recovery_effectsize", c: "pv_recovery_effectsize", d: "pv_recovery_effectsize" },
+        rationale: "Study A has a large effect (d=0.80) — practically meaningful. Study B's d=0.05 is statistically detectable only because n=10,000 gives enormous power. The p-value alone cannot distinguish these cases; always report and interpret effect size.",
+      },
+      pv_recovery_effectsize: {
+        id: "pv_recovery_effectsize",
+        type: "scenario_choice",
+        badge: "Recovery 3",
+        title: "Recovery · Effect size vs significance",
+        prompt: "A drug trial with n=100,000 finds blood pressure reduction of 0.4 mmHg (p < 0.0001). What is the most important additional metric to report?",
+        code_snippet: `n = 100,000
+Blood pressure reduction: 0.4 mmHg
+p-value: < 0.0001
+Clinical meaningful difference: ≥ 5 mmHg`,
+        choices: [
+          { id: "a", label: "Effect size and clinical threshold comparison", description: "0.4 mmHg is statistically real (huge n) but clinically trivial. Report effect size vs the minimum clinically important difference." },
+          { id: "b", label: "A smaller α to confirm significance", description: "α is already exceeded dramatically; tightening it doesn't change the effect magnitude." },
+          { id: "c", label: "More subgroup p-values", description: "More p-values without effect sizes compounds the problem." },
+          { id: "d", label: "The confidence interval width only", description: "CI width relates to precision; the key gap is practical vs statistical significance." },
+        ],
+        branches: { a: "pv_terminal", b: "pv_recovery_effectsize", c: "pv_recovery_effectsize", d: "pv_recovery_effectsize" },
+        rationale: "With very large n, almost any non-zero effect is statistically significant. The essential question is whether 0.4 mmHg crosses the minimum clinically important difference threshold — which it does not.",
+      },
+      pv_terminal: {
+        id: "pv_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Revision complete · The skeptic's challenge",
+        terminal: true,
+        prompt: "A drug trial finds p = 0.049. A skeptic says: 'The p-value doesn't tell us the probability the drug works.' Is the skeptic right? What would tell us that probability?",
+        code_snippet: `Trial result: p = 0.049 (α = 0.05)
+Skeptic: "We still don't know if the drug works."
+
+To compute P(drug works | data), we need:
+  P(data | drug works) × P(drug works)
+  ─────────────────────────────────────
+              P(data)`,
+        choices: [
+          { id: "a", label: "Yes — correct. Posterior requires a prior via Bayes", description: "The skeptic is right. P(drug works | data) = P(data | drug works) × P(drug works) / P(data). The p-value only provides P(data | H₀)." },
+          { id: "b", label: "No — p = 0.049 < 0.05 proves the drug works", description: "p < α is a decision rule under frequentist assumptions, not proof of efficacy." },
+          { id: "c", label: "Partially — we need to replicate for full certainty", description: "Replication improves confidence but doesn't resolve the inversion error." },
+        ],
+        branches: { a: "pv_terminal", b: "pv_terminal", c: "pv_terminal" },
+        rationale: "The skeptic is completely correct. 'Probability the drug works' is a Bayesian posterior that requires a prior. Frequentist p-values answer a different, narrower question: how surprising is this data if the drug has no effect? Both frameworks have value; confusing them is the most common statistical error in science.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "A study finds p = 0.02. Which statement is correct?",
+      options: [
+        "There is a 2% chance of observing data this extreme or more extreme if H₀ is true",
+        "There is a 98% probability that the alternative hypothesis is correct",
+        "The effect size is large because p is small",
+      ],
+      correctIndex: 0,
+      explanation: "The p-value is P(data | H₀) — a conditional probability given H₀ is true. It says nothing about P(H₀ | data) (requires Bayes) or effect size (requires a separate measure like Cohen's d).",
+    },
+    {
+      question: "Study A (n=100) has d=0.70 and p=0.003. Study B (n=5,000) has d=0.08 and p=0.04. Which has greater practical significance?",
+      options: [
+        "Study A — effect size d=0.70 is large; Study B's d=0.08 is negligible despite being significant",
+        "Study B — p=0.04 < 0.05 and it has a much larger sample",
+        "They are equivalent because both p-values are below 0.05",
+      ],
+      correctIndex: 0,
+      explanation: "Large samples have the power to detect trivially small effects as statistically significant. Effect size (Cohen's d) measures practical importance; d=0.70 is large and meaningful, d=0.08 is negligible in most applied contexts.",
+    },
+  ],
+},
+
+"st-i3": {
+  durationLabel: "25 min",
+  outcomes: [
+    "Select the appropriate test (t-test, chi-squared, ANOVA) given data type and study design.",
+    "Explain why multiple t-tests inflate Type I error and what ANOVA controls instead.",
+    "Interpret post-hoc test results following a significant ANOVA.",
+  ],
+  learnMarkdown: `## Three tests, one decision framework
+
+When comparing groups, the test you choose depends on two questions: **what type of outcome variable?** and **how many groups?**
+
+\`\`\`
+Outcome continuous (means)?
+  2 groups → t-test
+  3+ groups → ANOVA (+ post-hoc if significant)
+
+Outcome categorical (counts/frequencies)?
+  1 categorical variable vs expectation → chi-squared goodness of fit
+  2 categorical variables → chi-squared test of independence
+\`\`\`
+
+## t-Tests: comparing means
+
+Three flavors — all estimate whether a difference in means is larger than expected by chance:
+
+| Type | When to use |
+|------|-------------|
+| One-sample | Is μ equal to a known reference value? |
+| Two-sample (independent) | Do two separate groups have the same mean? |
+| Paired | Do before/after measurements on the same subjects differ? |
+
+**Formula (two-sample):** t = (x̄₁ − x̄₂) / SE_pooled
+
+**Assumptions:** independence, approximate normality (or n ≥ 30), equal variances (or use Welch's t).
+
+## Chi-squared (χ²): comparing frequencies
+
+\`\`\`
+χ² = Σ (O − E)² / E
+\`\`\`
+
+- **Goodness of fit**: does the observed distribution match an expected one (e.g., 25/25/25/25% across four segments)?
+- **Test of independence**: in a contingency table, are two categorical variables independent?
+
+**Key assumption:** expected count in each cell ≥ 5. Below this, use Fisher's exact test.
+
+## ANOVA: comparing 3+ group means
+
+Analysis of Variance decomposes total variance into *between-group* and *within-group* components:
+
+\`\`\`
+F = MS_between / MS_within
+    = (variance explained by groups) / (unexplained within-group noise)
+\`\`\`
+
+H₀: all group means are equal. H₁: at least one group mean differs.
+
+**Why not three t-tests for three groups?** With 3 groups you need 3 pairwise t-tests. At α = 0.05 each, the family-wise error rate (probability of at least one false positive) is:
+
+\`\`\`
+P(≥1 false positive) = 1 − (1 − 0.05)³ = 0.143 ≈ 14%
+\`\`\`
+
+ANOVA controls this by testing all groups simultaneously under one H₀.
+
+## Post-hoc tests
+
+A significant ANOVA tells you *at least one* mean differs — it doesn't tell you *which* pairs. Post-hoc tests correct for multiple comparisons:
+
+- **Tukey HSD**: controls family-wise error for all pairwise comparisons; balanced designs.
+- **Bonferroni**: divides α by the number of comparisons; conservative but widely understood.
+
+## Interview hook (answer like a senior)
+
+"You have three product variants and want to compare average session time. What's your approach?"
+
+Strong answer: "I'd use a one-way ANOVA rather than three paired t-tests to control the family-wise error rate. Before running it, I'd check the assumptions: independence of observations, approximate normality within each group (histograms, Shapiro-Wilk), and equal variances (Levene's test). If ANOVA is significant, I'd run Tukey HSD to identify which specific pairs differ. I'd also report effect size — η² (eta-squared) — alongside the p-value."`,
+  video: null,
+  videoFallbackMarkdown: `## Test selection drill (5 minutes)
+
+For each scenario below, write the test you'd use and one assumption you'd verify:
+
+1. Comparing average order value between two independent customer segments.
+2. Testing whether a 4-option survey question follows a 25/25/25/25% distribution.
+3. Comparing NPS scores across 5 geographic regions.
+4. Testing whether marketing channel (email / social / search) and purchase outcome (yes/no) are independent.
+5. Comparing a user's response time before and after a UI change (same users, measured twice).`,
+  tryGuidance: "Use the Statistical Test Selector. Navigate the decision tree for your scenario, then explore each test's formula and worked example. Pay special attention to the 'Multiple t-tests' explainer at the bottom.",
+  interviewGraph: {
+    initialStageId: "st_multiple_ttest_choice",
+    artifactDimensions: [
+      { label: "Multiple Comparison Inflation", recoveryStageId: "st_recovery_inflation" },
+      { label: "Test Selection Logic", recoveryStageId: "st_recovery_testselect" },
+      { label: "Post-Hoc Test Purpose", recoveryStageId: "st_recovery_posthoc", passLabel: "Statistical Tests Mastery" },
+    ],
+    stages: {
+      st_multiple_ttest_choice: {
+        id: "st_multiple_ttest_choice",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Why not multiple t-tests for 3 groups?",
+        prompt: "You have 3 product page variants (A, B, C) and want to compare conversion rates. A colleague suggests running t-tests for every pair: A vs B, A vs C, B vs C. Why is this incorrect?",
+        code_snippet: `Groups: Variant A, Variant B, Variant C
+Metric: Conversion rate (binary outcome per user)
+α = 0.05 per test
+
+Proposed approach:
+  Test 1: A vs B → p-value
+  Test 2: A vs C → p-value
+  Test 3: B vs C → p-value`,
+        choices: [
+          { id: "a", label: "Each test has 5% false-positive risk; 3 tests ≈ 14% family error rate", description: "Running 3 independent tests at α=0.05 inflates the probability of at least one false positive to 1-(0.95)³ ≈ 14.3%." },
+          { id: "b", label: "t-tests cannot compare proportions", description: "Two-proportion z-tests are preferred for conversion rates, but the core problem here is multiple comparisons, not test choice." },
+          { id: "c", label: "You need at least 5 groups for multiple testing to matter", description: "Multiple testing inflation begins with the second test; it is not a threshold phenomenon." },
+          { id: "d", label: "t-tests require more than 3 groups", description: "t-tests work for 2 groups; the problem is running multiple tests without correction, not the test itself." },
+        ],
+        branches: { a: "st_contingency_choice", b: "st_recovery_inflation", c: "st_recovery_inflation", d: "st_recovery_inflation" },
+        rationale: "Each t-test independently has a 5% chance of false positive under H₀. Running 3 tests means the family-wise Type I error rate is approximately 14%, not 5%. ANOVA tests all groups simultaneously, controlling this under one H₀.",
+      },
+      st_recovery_inflation: {
+        id: "st_recovery_inflation",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Computing the family error rate",
+        prompt: "With 4 groups requiring 6 pairwise comparisons, each at α = 0.05, what is the approximate family-wise error rate?",
+        code_snippet: `Family-wise error rate = 1 - (1 - α)^m
+  where m = number of comparisons
+
+m = 6, α = 0.05
+P(≥ 1 false positive) = 1 - (0.95)^6 = ?`,
+        choices: [
+          { id: "a", label: "≈ 26%", description: "1 - (0.95)^6 ≈ 0.265. Over one-in-four chance of a false positive even when all nulls are true." },
+          { id: "b", label: "5% — same as a single test", description: "Each test contributes its own error probability; they compound across tests." },
+          { id: "c", label: "30% — it scales linearly with comparisons", description: "The formula is 1-(1-α)^m, not α×m (though α×m is a reasonable approximation for small m)." },
+          { id: "d", label: "< 1% — fewer comparisons mean lower error", description: "More comparisons mean higher, not lower, family-wise error." },
+        ],
+        branches: { a: "st_contingency_choice", b: "st_recovery_inflation", c: "st_recovery_inflation", d: "st_recovery_inflation" },
+        rationale: "1 - (0.95)^6 ≈ 26.5%. This is why ANOVA (or other omnibus tests) is used to test multiple groups simultaneously before any pairwise comparison.",
+      },
+      st_contingency_choice: {
+        id: "st_contingency_choice",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Choosing chi-squared",
+        prompt: "You have a 2×2 contingency table showing whether users saw a new onboarding flow (yes/no) and whether they completed setup (yes/no). Which test is appropriate?",
+        code_snippet: `Contingency table:
+                Completed  Not completed
+Saw new flow:     142           58
+Saw old flow:      97          103
+
+Question: Are onboarding flow and completion independent?`,
+        choices: [
+          { id: "a", label: "Chi-squared test of independence", description: "Two categorical variables (flow version × completion) — use chi-squared to test independence in the contingency table." },
+          { id: "b", label: "Two-sample t-test", description: "t-tests compare means of continuous variables; completion is binary (categorical)." },
+          { id: "c", label: "One-way ANOVA", description: "ANOVA compares means across 3+ groups; this is a 2×2 categorical comparison." },
+          { id: "d", label: "Pearson correlation", description: "Correlation measures linear association between continuous variables, not categorical independence." },
+        ],
+        branches: { a: "st_paired_click", b: "st_recovery_testselect", c: "st_recovery_testselect", d: "st_recovery_testselect" },
+        rationale: "Chi-squared test of independence is the correct choice for testing whether two categorical variables are related. The null hypothesis is that flow version and completion are independent.",
+      },
+      st_recovery_testselect: {
+        id: "st_recovery_testselect",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · Matching test to data type",
+        prompt: "The interviewer asks: 'For each scenario, which test?' Choose the correct set of matches.",
+        code_snippet: `Scenario 1: Compare mean load times across 4 server regions
+Scenario 2: Test if click-through (yes/no) and ad type (3 types) are independent
+Scenario 3: Compare a user's satisfaction score before and after a redesign`,
+        choices: [
+          { id: "a", label: "One-way ANOVA / Chi-squared independence / Paired t-test", description: "Continuous 4-group comparison → ANOVA; categorical 2-variable independence → chi-squared; same users before/after → paired t-test." },
+          { id: "b", label: "Three t-tests / ANOVA / Two-sample t-test", description: "Multiple t-tests for 4 groups inflates error; the before/after design requires a paired test, not independent-samples." },
+          { id: "c", label: "Chi-squared / t-test / ANOVA", description: "Chi-squared applies to categorical outcomes; load time is continuous (ANOVA); satisfaction before/after is paired." },
+          { id: "d", label: "ANOVA / Pearson correlation / One-sample t-test", description: "Correlation requires continuous variables; one-sample t-test compares to a known reference, not before/after." },
+        ],
+        branches: { a: "st_paired_click", b: "st_recovery_testselect", c: "st_recovery_testselect", d: "st_recovery_testselect" },
+        rationale: "ANOVA for continuous 4-group comparison; chi-squared for categorical independence (click-through type vs ad type); paired t-test for same-subject repeated measurements.",
+      },
+      st_paired_click: {
+        id: "st_paired_click",
+        type: "click_target",
+        badge: "Stage 3 target",
+        title: "Stage 3 · Wrong test for paired data",
+        prompt: "An analyst measures page load time for the same 200 users before and after a backend optimization, then applies this code. Click the line with the wrong test choice.",
+        code_snippet: `before = [...]  # 200 load times, same users
+after  = [...]  # 200 load times, same users
+
+# Analyst's code:
+t_stat, p_value = independent_samples_t_test(before, after)  -- ds-target:wrong_test
+print(f"p = {p_value:.3f}")`,
+        validationCopy: {
+          wrong_test: "Correct. Same users measured twice is a paired design — the within-subject correlation is meaningful information. An independent-samples t-test ignores this correlation, losing statistical power and violating the independence assumption.",
+        },
+        branches: { wrong_test: "st_posthoc_choice" },
+      },
+      st_posthoc_choice: {
+        id: "st_posthoc_choice",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · After a significant ANOVA",
+        prompt: "One-way ANOVA comparing session duration across 5 product tiers returns F(4, 495) = 8.3, p < 0.0001. What is the correct next step?",
+        code_snippet: `ANOVA result:
+  F(4, 495) = 8.3,  p < 0.0001
+  Groups: Free, Starter, Pro, Business, Enterprise
+
+H₀ rejected: at least one group mean differs.
+Question: which pairs differ?`,
+        choices: [
+          { id: "a", label: "Run Tukey HSD or Bonferroni post-hoc tests", description: "Post-hoc tests identify which specific pairs of groups differ while controlling the family-wise error rate across all comparisons." },
+          { id: "b", label: "Report that all groups differ from each other", description: "A significant ANOVA only says at least one pair differs — it does not tell you which or how many." },
+          { id: "c", label: "Run pairwise t-tests between all 5 groups without correction", description: "10 pairwise comparisons at α=0.05 gives ≈ 40% family error rate." },
+          { id: "d", label: "Lower α to 0.01 and re-run the ANOVA", description: "Changing α post-hoc is p-hacking; post-hoc corrections are the appropriate tool." },
+        ],
+        branches: { a: "st_terminal", b: "st_recovery_posthoc", c: "st_recovery_posthoc", d: "st_recovery_posthoc" },
+        rationale: "A significant ANOVA is an omnibus test: it tells you the global H₀ (all means equal) is rejected, but not which pairs differ. Post-hoc tests (Tukey HSD for balanced designs, Bonferroni for any) answer that question while controlling Type I error.",
+      },
+      st_recovery_posthoc: {
+        id: "st_recovery_posthoc",
+        type: "scenario_choice",
+        badge: "Recovery 4",
+        title: "Recovery · Why post-hoc tests are needed",
+        prompt: "ANOVA rejects H₀. Why can't you just say 'all group means differ from each other'?",
+        code_snippet: `H₀: μ₁ = μ₂ = μ₃ = μ₄ = μ₅
+H₁: at least one μᵢ ≠ μⱼ
+
+Rejecting H₀ tells you: ∃ at least one differing pair
+It does NOT tell you: which pairs, or how many`,
+        choices: [
+          { id: "a", label: "ANOVA's H₁ only asserts ≥ 1 pair differs — post-hoc tests find which", description: "The alternative hypothesis is existential (at least one), not universal (all). Post-hoc tests with multiple comparison correction identify the specific pairs." },
+          { id: "b", label: "You need to re-run ANOVA with a lower α", description: "Re-running with lower α doesn't identify which pairs differ." },
+          { id: "c", label: "All pairs always differ when ANOVA is significant", description: "A single outlier group can drive significance while other pairs are nearly identical." },
+          { id: "d", label: "ANOVA p-value tells you the number of differing pairs", description: "The F-statistic and p-value summarize overall variance ratio, not a pairwise breakdown." },
+        ],
+        branches: { a: "st_terminal", b: "st_recovery_posthoc", c: "st_recovery_posthoc", d: "st_recovery_posthoc" },
+        rationale: "ANOVA's H₁ is 'at least one group differs.' You cannot conclude all pairs differ — a single unusual group could drive the result. Post-hoc tests find which specific comparisons are significant.",
+      },
+      st_terminal: {
+        id: "st_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Revision complete · Paired vs independent design",
+        terminal: true,
+        prompt: "You're comparing page load times before and after a backend optimization for the same 200 users. Which test and why?",
+        code_snippet: `Study design:
+  Same 200 users measured at Time 1 (before) and Time 2 (after)
+  Outcome: page load time (milliseconds, continuous)
+
+Options:
+  A. Independent-samples t-test
+  B. Paired t-test
+  C. One-way ANOVA
+  D. Chi-squared test`,
+        choices: [
+          { id: "a", label: "Paired t-test — same subjects, repeated measures", description: "The paired t-test uses each user as their own control by analyzing differences (after − before). This eliminates between-subject variability and substantially increases power versus an independent-samples test on the same data." },
+          { id: "b", label: "Independent-samples t-test — two conditions", description: "This would ignore the within-subject correlation and treat the two observations per user as if they came from different people, losing power." },
+          { id: "c", label: "ANOVA — comparing means", description: "ANOVA is used for 3+ groups; with 2 time points on the same subjects, paired t-test is the direct tool." },
+          { id: "d", label: "Chi-squared — comparing before and after", description: "Chi-squared applies to categorical frequency data; load time is continuous." },
+        ],
+        branches: { a: "st_terminal", b: "st_terminal", c: "st_terminal", d: "st_terminal" },
+        rationale: "The paired t-test is correct because measurements come from the same users. The key insight: paired design eliminates individual differences in baseline load time. Each person's (after − before) difference becomes the unit of analysis — dramatically increasing sensitivity to the treatment effect.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "You compare average revenue across 4 customer segments. What is the main statistical reason to use ANOVA rather than 6 separate t-tests?",
+      options: [
+        "Multiple t-tests inflate the family-wise Type I error rate; ANOVA controls it under one omnibus null hypothesis",
+        "ANOVA is faster to compute than multiple t-tests",
+        "t-tests cannot handle continuous revenue data",
+      ],
+      correctIndex: 0,
+      explanation: "With 6 pairwise t-tests at α=0.05, the family-wise error rate is 1-(0.95)^6 ≈ 26.5%. ANOVA tests all groups simultaneously under H₀: all means equal, keeping Type I error at α.",
+    },
+    {
+      question: "An ANOVA across 5 groups returns p = 0.002. What does this tell you, and what is the next step?",
+      options: [
+        "At least one group mean differs; run post-hoc tests (Tukey HSD / Bonferroni) to find which pairs",
+        "All five group means are significantly different from each other",
+        "The largest and smallest groups differ; no further testing needed",
+      ],
+      correctIndex: 0,
+      explanation: "ANOVA's H₁ is existential: at least one pair differs. Post-hoc tests identify which specific pairs are different while controlling the family-wise error rate across all pairwise comparisons.",
+    },
+  ],
+},
+
+  // ── injected from stat_inference2_lessons.js ──
+  "st-i4": {
+  durationLabel: "15 min",
+  outcomes: [
+    "State the correct frequentist interpretation of a confidence interval without slipping into the probability-of-the-parameter trap.",
+    "Predict how changing n, σ, or confidence level affects CI width using the 1/√n relationship.",
+    "Use a CI to answer a significance question: if 0 is not inside the CI for a difference, the effect is significant.",
+  ],
+  learnMarkdown: `## What a confidence interval actually means
+
+A **95% confidence interval** is built from a procedure, not from Bayesian probability. If you repeated the sampling process many times and built a CI each time, approximately 95% of those intervals would contain the true population parameter.
+
+This specific interval you computed either contains μ or it doesn't. There is no "95% chance" — the probability is 0 or 1, you just don't know which.
+
+## The formula
+
+\`\`\`
+CI = x̄ ± z* × (σ / √n)
+\`\`\`
+
+- **x̄**: sample mean
+- **z***: critical value (1.645 for 90%, 1.96 for 95%, 2.576 for 99%)
+- **σ / √n**: standard error (SE)
+
+**Width ∝ 1/√n** — doubling n does not halve the width; you must quadruple n to halve it. This surprises most candidates.
+
+## What affects CI width
+
+| Factor | Increase → width | Decrease → width |
+|--------|-----------------|-----------------|
+| Sample size n | smaller | larger |
+| Std deviation σ | larger | smaller |
+| Confidence level | larger (99% > 95%) | smaller (90% < 95%) |
+
+## Three misconceptions to kill
+
+**Wrong:** "There is a 95% probability the true mean is in [42, 58]."
+- Once computed, the CI is fixed. The parameter is fixed (unknown). Probability language does not apply.
+
+**Right:** "If we ran this study 100 times, about 95 of the resulting CIs would contain μ."
+
+**Wrong:** "The CI contains 95% of the data."
+- That's a **prediction interval**. A CI is about the parameter, not individual values.
+
+## Using CIs for significance
+
+If the CI for a **difference** (treatment − control) does not contain 0, the effect is statistically significant at the corresponding α level. This is equivalent to the p-value test and often more informative.
+
+A CI of [0.3%, 1.7%] for a conversion lift means: the effect is significant AND the effect is probably small (less than 2 percentage points).
+
+## Interview hook (answer like a senior)
+
+"A confidence interval is a range estimate that captures the precision of an estimate, not the probability that a specific claim is true. The 95% refers to the hit rate of the construction *procedure* across many samples — not to this one interval. In practice, I always report CIs alongside p-values because they communicate effect size and precision, not just binary significance. And I pay attention to whether the CI is narrow enough to be decision-relevant: a significant but wide CI often means we need more data before acting."`,
+  video: null,
+  videoFallbackMarkdown: `## Confidence interval deep dive
+
+Work through this sequence before touching the interactive:
+
+1. **State the formula** from memory: CI = x̄ ± z* × σ/√n. Identify each term.
+2. **Predict the direction**: if n goes from 100 to 400, does width double, halve, or stay the same? Work it out: √400/√100 = 2, so SE halves → width halves.
+3. **Correct the misconception**: write in your own words why "95% probability μ is in this interval" is wrong for a frequentist CI.
+4. **Apply it**: a 95% CI for a conversion rate difference is [0.5%, 2.1%]. Is this significant? Does zero fall inside? What should you tell the PM?
+
+The interactive tool then lets you verify each prediction with sliders and a repeated-sampling simulation.`,
+  tryGuidance: "Use the CI Builder tab to see how n, σ, and confidence level shift the bracket width. Then switch to Simulation to watch ~95% of bars capture μ and some miss. Finally review Misconceptions and make sure you can explain each one out loud.",
+  interviewGraph: {
+    initialStageId: "ci_interp_click",
+    artifactDimensions: [
+      { label: "CI Interpretation Precision", recoveryStageId: "ci_recovery_interp" },
+      { label: "Width Determinants (1/√n)", recoveryStageId: "ci_recovery_width" },
+      { label: "CI for Significance Decisions", recoveryStageId: "ci_recovery_significance", passLabel: "CI Mastery Clear" },
+    ],
+    stages: {
+      ci_interp_click: {
+        id: "ci_interp_click",
+        type: "click_target",
+        badge: "Stage 1 target",
+        title: "Stage 1 · Click the misinterpretation",
+        prompt: "A data analyst wrote this report summary. One line contains a classic CI misinterpretation. Click the line that is wrong.",
+        code_snippet: `ANALYSIS SUMMARY
+────────────────────────────────────────────
+Finding 1: 95% CI for mean session time = [42s, 58s]
+Finding 2: "There is a 95% probability the true
+            mean is inside [42s, 58s]."  -- ds-target:wrong_interp
+Finding 3: correct interpretation is about repeated
+           sampling — ~95% of CIs from repeated
+           experiments would contain the true mean`,
+        validationCopy: {
+          wrong_interp: "Correct. Once the data are observed the interval is fixed — it either contains μ or it doesn't. The 95% describes the long-run hit rate of the procedure across many samples, not the probability for this specific interval.",
+        },
+        branches: {
+          wrong_interp: "ci_width_choice",
+        },
+      },
+      ci_recovery_interp: {
+        id: "ci_recovery_interp",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Restore the correct mental model",
+        prompt: "An interviewer asks: 'What does a 95% confidence level actually mean?' Which answer is correct?",
+        code_snippet: `-- Population mean μ is fixed but unknown.
+-- We draw one sample and build one CI.`,
+        choices: [
+          { id: "a", label: "95% of CIs built from repeated samples would contain μ", description: "The confidence level is a property of the procedure, not of this specific interval." },
+          { id: "b", label: "There is a 95% chance μ falls inside this interval", description: "Once computed the interval is either right or wrong — no room for probability." },
+          { id: "c", label: "95% of the population data values are inside the CI", description: "That describes a prediction interval, not a confidence interval." },
+          { id: "d", label: "The CI contains the sample mean with 95% confidence", description: "The sample mean is always at the center of the CI by construction." },
+        ],
+        branches: { a: "ci_width_choice", b: "ci_recovery_interp", c: "ci_recovery_interp", d: "ci_recovery_interp" },
+        rationale: "The frequentist CI is a statement about the procedure: repeat sampling many times and the hit rate approaches the confidence level. This specific interval has no further probability statement attached to it.",
+      },
+      ci_width_choice: {
+        id: "ci_width_choice",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Width and sample size",
+        prompt: "Your team doubles the sample size from n=100 to n=400. How does the 95% CI width change?",
+        code_snippet: `-- Width = 2 × z* × σ/√n
+-- z* = 1.96, σ = 20, n₁ = 100, n₂ = 400`,
+        choices: [
+          { id: "a", label: "Width halves", description: "√400/√100 = 2, so SE halves, and width = 2 × z* × SE halves." },
+          { id: "b", label: "Width doubles", description: "Larger n reduces, not increases, the standard error." },
+          { id: "c", label: "Width stays the same", description: "Width depends on SE which depends on n." },
+          { id: "d", label: "Width quarters", description: "Halving SE requires 4× n — which is what we did — but that halves, not quarters, the width." },
+        ],
+        branches: { a: "ci_significance_choice", b: "ci_recovery_width", c: "ci_recovery_width", d: "ci_recovery_width" },
+        rationale: "Width ∝ 1/√n. Quadrupling n doubles √n, halves SE, and halves the CI width. This is a common numerical check in interviews.",
+      },
+      ci_recovery_width: {
+        id: "ci_recovery_width",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · Width determinants",
+        prompt: "Which combination of changes would make a 95% CI narrower?",
+        code_snippet: `-- CI = x̄ ± z* × σ/√n`,
+        choices: [
+          { id: "a", label: "Increase n and decrease σ (or use a more homogeneous sample)", description: "Both reduce the standard error and hence the margin of error." },
+          { id: "b", label: "Increase the confidence level from 95% to 99%", description: "Higher confidence level requires a larger z* and produces a wider CI." },
+          { id: "c", label: "Decrease n to reduce noise", description: "Smaller n increases SE and widens the CI." },
+          { id: "d", label: "Use a one-sided interval instead", description: "One-sided CIs are narrower on one side but change interpretation, not the total precision concept." },
+        ],
+        branches: { a: "ci_significance_choice", b: "ci_recovery_width", c: "ci_recovery_width", d: "ci_recovery_width" },
+        rationale: "Larger n and smaller population variance are the two primary levers for narrowing a CI without sacrificing confidence level.",
+      },
+      ci_significance_choice: {
+        id: "ci_significance_choice",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · CI for significance",
+        prompt: "You run an A/B test. The 95% CI for the conversion rate difference (treatment − control) is [1.2%, 4.8%]. A PM asks if it's statistically significant at α=0.05. What do you say?",
+        code_snippet: `-- Control CR: 5.0%
+-- Treatment CR: 6.8%
+-- 95% CI for difference: [1.2%, 4.8%]`,
+        choices: [
+          { id: "a", label: "Yes — 0 is not inside the CI, so the effect is significant", description: "If 0 were inside the CI the effect could be zero, which would be non-significant." },
+          { id: "b", label: "No — you need a p-value to determine significance", description: "The CI and p-value are mathematically equivalent for this test. If 0 is outside the CI, p < 0.05." },
+          { id: "c", label: "Cannot tell — need the sample sizes", description: "The CI already incorporates sample size; if it doesn't contain 0, it's significant." },
+          { id: "d", label: "Probably — but only if the CI is symmetric", description: "CIs for proportions can be asymmetric; symmetry is not required for the significance rule." },
+        ],
+        branches: { a: "ci_terminal", b: "ci_recovery_significance", c: "ci_recovery_significance", d: "ci_recovery_significance" },
+        rationale: "A two-sided 95% CI that excludes 0 is exactly equivalent to p < 0.05 for the two-sided test of whether the difference equals zero. This duality lets you answer significance questions directly from CIs.",
+      },
+      ci_recovery_significance: {
+        id: "ci_recovery_significance",
+        type: "scenario_choice",
+        badge: "Recovery 3",
+        title: "Recovery · CI-to-significance rule",
+        prompt: "Which statement correctly describes the relationship between a 95% CI and a significance test at α=0.05?",
+        code_snippet: `-- H₀: difference = 0
+-- Two-sided test, α = 0.05`,
+        choices: [
+          { id: "a", label: "If the CI excludes 0, reject H₀ (p < 0.05)", description: "The CI and p-value encode the same information; exclusion of 0 equals significance." },
+          { id: "b", label: "CIs and p-values are independent calculations", description: "They are mathematically dual: same assumptions, same answer, different format." },
+          { id: "c", label: "You need p < 0.025 to match a 95% CI", description: "A 95% CI corresponds to a two-sided p < 0.05, not 0.025 (which would be a 97.5% CI)." },
+          { id: "d", label: "A CI that includes 0 always means no practical effect", description: "Statistical non-significance is not the same as practical unimportance; the CI width matters." },
+        ],
+        branches: { a: "ci_terminal", b: "ci_recovery_significance", c: "ci_recovery_significance", d: "ci_recovery_significance" },
+        rationale: "The duality of CIs and hypothesis tests: a 95% CI excluding 0 is exactly α=0.05 two-sided significance. This is more informative than a p-value alone because it shows effect size and precision.",
+      },
+      ci_terminal: {
+        id: "ci_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Revision complete · Confidence intervals locked",
+        terminal: true,
+        prompt: "A/B test: control CR=5%, treatment CR=6%. The 95% CI for the difference is [0.3%, 1.7%]. Interpret this for a non-technical PM.",
+        code_snippet: `-- CI for (treatment - control): [0.3%, 1.7%]
+-- 0 is not in the interval
+-- Width: 1.4 percentage points`,
+        choices: [
+          { id: "a", label: "The effect is real and small: the lift is likely between 0.3 and 1.7 pp", description: "Significant (0 excluded) and the effect is meaningful but modest." },
+          { id: "b", label: "We're 95% sure the lift is exactly 1.0%", description: "The CI is a range, not a point. The center is the estimate; the range shows uncertainty." },
+          { id: "c", label: "The test is inconclusive because the CI is wide", description: "1.4 pp width may or may not be wide depending on the business context, but significance is clear." },
+        ],
+        branches: { a: "ci_terminal", b: "ci_terminal", c: "ci_terminal" },
+        rationale: "The correct PM-ready answer: 'We're confident the treatment lifts conversion by somewhere between 0.3 and 1.7 percentage points. The effect is statistically real. The question is whether that range of lift is worth shipping.' This anchors the decision in the CI range, not just a yes/no.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "A 95% CI for a mean is [42, 58]. Which interpretation is correct?",
+      options: [
+        "If we repeated this sampling procedure many times, about 95% of the resulting CIs would contain the true mean",
+        "There is a 95% probability that the true mean is between 42 and 58",
+        "95% of individual data values fall between 42 and 58",
+      ],
+      correctIndex: 0,
+      explanation: "The 95% describes the long-run hit rate of the procedure across repeated samples, not a probability statement about this specific fixed interval.",
+    },
+    {
+      question: "Sample size increases from n=25 to n=100 with σ and confidence level fixed. What happens to CI width?",
+      options: [
+        "Width halves (because √100/√25 = 2, so SE halves)",
+        "Width doubles",
+        "Width stays the same",
+      ],
+      correctIndex: 0,
+      explanation: "Width = 2 × z* × σ/√n. Quadrupling n doubles √n, halves σ/√n (SE), and halves the width.",
+    },
+    {
+      question: "A 95% CI for a treatment-control difference is [0.5%, 3.2%]. What can you conclude at α=0.05?",
+      options: [
+        "The effect is statistically significant because 0 is not inside the CI",
+        "The effect is not significant because the CI is wider than 1 percentage point",
+        "Cannot determine significance without the raw p-value",
+      ],
+      correctIndex: 0,
+      explanation: "A two-sided 95% CI excluding 0 is mathematically equivalent to p < 0.05. The interval directly answers the significance question.",
+    },
+  ],
+},
+
+"st-i5": {
+  durationLabel: "15 min",
+  outcomes: [
+    "Distinguish Type I (false positive, probability α) from Type II (false negative, probability β) errors without confusing them under pressure.",
+    "Explain the tradeoff: lowering α to reduce false positives inflates β for fixed sample size.",
+    "Choose the right error to prioritize based on asymmetric real-world costs in medical, security, and business contexts.",
+  ],
+  learnMarkdown: `## The decision matrix
+
+Every hypothesis test produces one of four outcomes:
+
+| | Fail to Reject H₀ | Reject H₀ |
+|--|--|--|
+| **H₀ True** | Correct (prob = 1−α) | **Type I Error** (prob = α) |
+| **H₁ True** | **Type II Error** (prob = β) | Power (prob = 1−β) |
+
+**Type I error (α)**: False positive. You cry wolf when there is no wolf.
+**Type II error (β)**: False negative. You miss the wolf that was actually there.
+**Power (1−β)**: Correctly detecting a real effect.
+
+## The tradeoff
+
+α and β are inversely related **for a fixed sample size and effect size**. If you make the rejection threshold stricter (lower α), you require stronger evidence before rejecting H₀, which means you'll miss more real effects (higher β).
+
+\`\`\`
+Strict α (0.001) → few false alarms, but many real effects missed
+Lenient α (0.10) → catches more real effects, but more false alarms
+\`\`\`
+
+The only way to reduce both simultaneously: **increase sample size n**.
+
+## Asymmetric error costs
+
+The optimal α depends on the relative costs of each error type:
+
+- **Medical screening** — missing a disease (Type II) is catastrophic. Use higher α to be sensitive. Follow up positives with more specific tests.
+- **Fraud detection** — missing fraud (Type II) causes severe damage; false alarms are merely annoying. Minimize β, accept higher α.
+- **Marketing A/B test** — costs of both errors are roughly symmetric. Standard α=0.05 is reasonable.
+
+## Base rate matters (Bayes)
+
+In a rare-disease population, even a highly specific test (low α) will produce many false positives relative to true positives, because true cases are rare. This is why a 99%-specific test on a 0.5%-prevalence disease still has a large proportion of false positives among all positives.
+
+## Interview hook (answer like a senior)
+
+"I think of Type I vs Type II through the lens of cost asymmetry. Statistically, they're complementary — α controls false positives, β controls false negatives, and tightening one loosens the other at fixed n. In practice I ask: 'What is the consequence of a false alarm versus a miss?' In healthcare screening I'd raise α to be sensitive and triage false positives. In a low-volume fraud system where every false alarm burns analyst time, I'd be more conservative. The symmetry assumption baked into the standard α=0.05 is a convention, not a law."`,
+  video: null,
+  videoFallbackMarkdown: `## Type I and Type II errors drill
+
+Work through this before the interactive:
+
+1. **Draw the 2×2 matrix** from memory: rows = (H₀ True, H₁ True), columns = (Fail to Reject, Reject). Label each cell.
+2. **Trace the probabilities**: label (H₀ True, Reject) with α; label (H₁ True, Fail to Reject) with β; label (H₁ True, Reject) with 1−β.
+3. **Apply to a scenario**: COVID testing in a low-prevalence population. Which error type is more common even with a strict α? Why?
+4. **State the tradeoff in one sentence**: why can't you simply set α=0.001 and call it a rigorous study?
+
+Then use the interactive Decision Matrix to click each cell and verify your mental model.`,
+  tryGuidance: "Click each cell in the Decision Matrix to see the name, probability, and consequence. Adjust α with the slider and watch Type I vs Type II rates move. Switch to The Tradeoff tab to see the inverse relationship visually. Use Context Matters to apply error cost reasoning to real scenarios.",
+  interviewGraph: {
+    initialStageId: "errors_base_rate_choice",
+    artifactDimensions: [
+      { label: "Type I / Type II Definitions", recoveryStageId: "errors_recovery_defs" },
+      { label: "Tradeoff Mechanics", recoveryStageId: "errors_recovery_tradeoff" },
+      { label: "Cost-Asymmetric α Choice", recoveryStageId: "errors_recovery_cost", passLabel: "Error Tradeoff Clear" },
+    ],
+    stages: {
+      errors_base_rate_choice: {
+        id: "errors_base_rate_choice",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Base rate and false positives",
+        prompt: "A COVID test has α=0.01 (Type I error rate). In a population where 0.5% actually have COVID, you test 10,000 people. Roughly how many false positives do you expect?",
+        code_snippet: `-- Population: 10,000 people
+-- True prevalence: 0.5% → 50 truly positive
+-- True negatives: 9,950
+-- Test α (false positive rate): 0.01`,
+        choices: [
+          { id: "a", label: "~100 false positives", description: "9,950 true negatives × 0.01 ≈ 99.5, rounded to ~100." },
+          { id: "b", label: "~50 false positives", description: "50 would be the number of true positives, not false positives from the negative pool." },
+          { id: "c", label: "~10 false positives", description: "10,000 × 0.01 counts everyone, not just the true negatives." },
+          { id: "d", label: "~1 false positive", description: "Much too low — the large true-negative pool at 1% false-positive rate generates ~100 errors." },
+        ],
+        branches: { a: "errors_click_analyst", b: "errors_recovery_defs", c: "errors_recovery_defs", d: "errors_recovery_defs" },
+        rationale: "9,950 true negatives × α (0.01) ≈ 99.5 false positives. This illustrates why false positives vastly outnumber true positives in low-prevalence settings — even with a 'strict' α.",
+      },
+      errors_recovery_defs: {
+        id: "errors_recovery_defs",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Type I vs Type II",
+        prompt: "Match the term to the correct definition.",
+        code_snippet: `-- H₀: no effect / null is true
+-- H₁: real effect exists`,
+        choices: [
+          { id: "a", label: "Type I = false positive (reject true H₀); Type II = false negative (fail to reject false H₀)", description: "α = P(Type I), β = P(Type II)." },
+          { id: "b", label: "Type I = false negative; Type II = false positive", description: "These labels are swapped — Type I is the false positive (α)." },
+          { id: "c", label: "Type I = missing a real effect; Type II = detecting a non-existent effect", description: "Again swapped. Type I is the alarm with no fire; Type II is the fire with no alarm." },
+          { id: "d", label: "Both are the same — they both refer to incorrect decisions", description: "They are different directions of error with different probabilities and costs." },
+        ],
+        branches: { a: "errors_click_analyst", b: "errors_recovery_defs", c: "errors_recovery_defs", d: "errors_recovery_defs" },
+        rationale: "Type I (α) = reject H₀ when it's true = false positive = false alarm. Type II (β) = fail to reject H₀ when it's false = false negative = missed effect.",
+      },
+      errors_click_analyst: {
+        id: "errors_click_analyst",
+        type: "click_target",
+        badge: "Stage 2 target",
+        title: "Stage 2 · Click the incomplete reasoning",
+        prompt: "An analyst is tightening the significance threshold to improve rigor. Click the line that ignores the Type II error cost of this decision.",
+        code_snippet: `ANALYSIS DECISION LOG
+────────────────────────────────────────────
+Step 1: Set α = 0.001 to minimize false positives
+Step 2: "This guarantees a rigorous study."  -- ds-target:ignores_beta
+Step 3: (note: β and power were not calculated
+         for the chosen effect size and n)`,
+        validationCopy: {
+          ignores_beta: "Correct. Declaring rigor from low α alone ignores that stricter α inflates β. If sample size and effect size are unchanged, the study may now be severely underpowered — missing most real effects while avoiding false alarms.",
+        },
+        branches: {
+          ignores_beta: "errors_fraud_choice",
+        },
+      },
+      errors_fraud_choice: {
+        id: "errors_fraud_choice",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Asymmetric costs",
+        prompt: "You're building a fraud detection model. Missing fraud is catastrophic; false alarms are merely annoying and require a brief analyst review. What should you optimize?",
+        code_snippet: `-- Missing fraud (Type II): large financial loss, legal risk
+-- False alarm (Type I): 5 minutes of analyst review time`,
+        choices: [
+          { id: "a", label: "Minimize Type II error (β) — accept higher Type I rate (α)", description: "The cost of a miss vastly exceeds the cost of a false alarm. Raise the alarm more often." },
+          { id: "b", label: "Minimize Type I error (α) — to avoid wasting analyst time", description: "Analyst time is cheap compared to missed fraud. This optimizes the wrong objective." },
+          { id: "c", label: "Keep both equal at α = β = 0.05", description: "Equal error rates are not appropriate when costs are asymmetric — and 0.05 for β implies 95% power which is a separate calculation." },
+          { id: "d", label: "Ignore error rates and maximize AUC instead", description: "AUC is a useful summary but optimizing a threshold still requires weighing the cost of each error type." },
+        ],
+        branches: { a: "errors_terminal", b: "errors_recovery_cost", c: "errors_recovery_cost", d: "errors_recovery_cost" },
+        rationale: "Cost-asymmetric decisions require setting α based on the ratio of error costs, not convention. When missing a true event is catastrophic, raise α (be more willing to raise false alarms) to drive β down.",
+      },
+      errors_recovery_tradeoff: {
+        id: "errors_recovery_tradeoff",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · The α-β tradeoff",
+        prompt: "You lower α from 0.05 to 0.01 without changing sample size. What happens to β (Type II error rate) for a fixed true effect size?",
+        code_snippet: `-- Fixed n, fixed true effect size (d)
+-- α: 0.05 → 0.01`,
+        choices: [
+          { id: "a", label: "β increases (more real effects are missed)", description: "Stricter rejection threshold means weaker evidence is needed to detect — so more real effects slip past." },
+          { id: "b", label: "β decreases (fewer effects missed)", description: "This is the tradeoff direction people wish for — but it goes the other way at fixed n." },
+          { id: "c", label: "β stays the same — it only depends on sample size", description: "β depends on α, n, and effect size. Changing α changes β." },
+          { id: "d", label: "β becomes undefined when α changes", description: "β is always defined; it's the probability of failing to reject a false H₀ at the new α threshold." },
+        ],
+        branches: { a: "errors_fraud_choice", b: "errors_recovery_tradeoff", c: "errors_recovery_tradeoff", d: "errors_recovery_tradeoff" },
+        rationale: "The tradeoff is the core of Neyman-Pearson: stricter α → harder to reject → more real effects missed (higher β). The fix is a larger sample size, not just adjusting α.",
+      },
+      errors_recovery_cost: {
+        id: "errors_recovery_cost",
+        type: "scenario_choice",
+        badge: "Recovery 3",
+        title: "Recovery · Choosing α by error cost",
+        prompt: "A patient screening test. Missing a disease costs $500,000 in downstream health outcomes. A false positive triggers a $200 follow-up test. What α direction is appropriate?",
+        code_snippet: `-- Cost of Type I error (false positive): $200
+-- Cost of Type II error (false negative): $500,000`,
+        choices: [
+          { id: "a", label: "Use higher α (e.g., 0.10) to maximize sensitivity", description: "With a 2,500:1 cost ratio for missing vs false alarm, being more liberal with alarms is rational." },
+          { id: "b", label: "Use lower α (e.g., 0.001) to minimize false positives", description: "This saves $200 per false alarm but risks $500,000 per miss — the wrong direction." },
+          { id: "c", label: "Always use α = 0.05 regardless of costs", description: "α = 0.05 is a convention, not a principle. Domain costs should drive threshold choice." },
+          { id: "d", label: "α is irrelevant — just maximize the F1-score", description: "F1 balances precision and recall equally; asymmetric costs require cost-weighted evaluation." },
+        ],
+        branches: { a: "errors_terminal", b: "errors_recovery_cost", c: "errors_recovery_cost", d: "errors_recovery_cost" },
+        rationale: "When the cost of a miss vastly exceeds the cost of a false alarm, use a higher α to catch more true positives at the expense of more follow-up tests. This is rational risk management.",
+      },
+      errors_terminal: {
+        id: "errors_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Revision complete · Type I & II errors locked",
+        terminal: true,
+        prompt: "A hiring algorithm flags candidates as 'unqualified.' Hiring a bad candidate costs $50k. Rejecting a good candidate costs $200k in lost talent. What error type should you minimize, and what does that imply for α?",
+        code_snippet: `-- Type I error: flag a qualified candidate as unqualified
+--   (false positive alarm → wrongly rejected)
+-- Type II error: pass an unqualified candidate as qualified
+--   (false negative → wrongly hired)
+-- Cost(Type I) = $200k  |  Cost(Type II) = $50k`,
+        choices: [
+          { id: "a", label: "Minimize Type I — use lower α to avoid rejecting good candidates", description: "Rejecting a good candidate costs 4× more than hiring a bad one. Be more conservative with the 'unqualified' label." },
+          { id: "b", label: "Minimize Type II — use higher α to catch all bad candidates", description: "This optimizes the cheaper error. You would incur many $200k errors to avoid $50k errors." },
+          { id: "c", label: "Both errors cost the same so use α=0.05", description: "$200k ≠ $50k. Use cost-weighted thresholds, not convention." },
+        ],
+        branches: { a: "errors_terminal", b: "errors_terminal", c: "errors_terminal" },
+        rationale: "In this framing, Type I = false positive (wrongly rejected good candidate, cost $200k). Type II = false negative (wrongly passed bad candidate, cost $50k). Minimize Type I → lower α on the 'unqualified' classifier → be stricter about applying that label. The 4:1 cost ratio makes this clear.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "In a hypothesis test, Type I error (α) is best defined as:",
+      options: [
+        "Rejecting H₀ when H₀ is true — a false positive",
+        "Failing to reject H₀ when H₁ is true — a false negative",
+        "The probability of detecting a real effect — statistical power",
+      ],
+      correctIndex: 0,
+      explanation: "Type I error = false positive = rejecting a true null hypothesis. Its probability is controlled by the significance level α.",
+    },
+    {
+      question: "You lower α from 0.05 to 0.01 without changing sample size or effect size. What happens to β?",
+      options: [
+        "β increases — stricter α means more real effects are missed",
+        "β decreases — you're being more careful, so fewer errors overall",
+        "β is unchanged — it only depends on sample size",
+      ],
+      correctIndex: 0,
+      explanation: "α and β trade off at fixed n and effect size. Stricter α moves the rejection threshold, reducing power (1−β) and increasing β.",
+    },
+    {
+      question: "A disease has 0.1% prevalence. A test has α=0.05 (5% false positive rate). In 10,000 healthy people, how many false positives do you expect?",
+      options: [
+        "~500 (9,990 × 0.05 ≈ 500)",
+        "~5 (10,000 × 0.0005)",
+        "~10 (0.1% of 10,000)",
+      ],
+      correctIndex: 0,
+      explanation: "9,990 truly negative people × 5% false positive rate ≈ 500 false alarms. This dwarfs the ~10 true positives, illustrating the base rate problem in rare conditions.",
+    },
+  ],
+},
+
+"st-i6": {
+  durationLabel: "18 min",
+  outcomes: [
+    "Explain why a non-significant result does not prove 'no effect' — it may simply reflect an underpowered study.",
+    "Calculate approximate required n per group given Cohen's d, α, and target power using the standard formula.",
+    "State what 80% power means and its practical implication for study planning and result interpretation.",
+  ],
+  learnMarkdown: `## What is statistical power?
+
+**Power = 1 − β** = the probability of correctly detecting a real effect when one truly exists.
+
+At 80% power: if the true effect is present, your study will detect it (p < α) about 80% of the time. The other 20% are false negatives — experiments that miss a real effect.
+
+Power is determined by four factors. Change any one and the others must adjust:
+
+\`\`\`
+Power ↑ when:
+  n increases (more data)
+  effect size d increases (larger true difference)
+  α increases (more lenient threshold)
+  σ decreases (less noise)
+\`\`\`
+
+## Sample size formula (two-sided t-test)
+
+\`\`\`
+n per group ≈ 2 × ((z_α/2 + z_β) / d)²
+
+where:
+  z_α/2 = 1.96 for α = 0.05
+  z_β   = 1.282 for 80% power (β = 0.20)
+  d     = Cohen's d = (μ₁ - μ₂) / σ
+\`\`\`
+
+## Cohen's d benchmarks
+
+| Effect size | d | Required n (80% power, α=0.05) |
+|---|---|---|
+| Small | 0.2 | ~394 per group |
+| Medium | 0.5 | ~64 per group |
+| Large | 0.8 | ~26 per group |
+
+Small effects require enormous samples. This is why underpowered studies in psychology and medicine have high false-negative rates and unreliable replication.
+
+## Absence of evidence ≠ evidence of absence
+
+p = 0.12 does not mean "no effect." It means "we did not detect an effect at this threshold." If power was 30%, a non-significant result is nearly uninformative — you'd expect to miss 70% of real effects.
+
+Always report power alongside non-significant results.
+
+## The replication crisis connection
+
+Many landmark studies in social science were run at n = 20–50 per group. For small-to-medium effects (d ≈ 0.3–0.5), power was often 20–40%. This explains why many findings didn't replicate: the original studies were publishing noise.
+
+## Study design checklist
+
+1. Pre-register α before data collection
+2. Determine effect size d from prior work or minimum detectable effect (MDE)
+3. Calculate required n (use formula or power calculator)
+4. Commit to a stopping rule — no peeking until n is reached
+5. Collect full sample before analysis
+6. Interpret non-significant results as "inconclusive," not "null"
+
+## Interview hook (answer like a senior)
+
+"Power is the sensitivity of your study — the probability of detecting an effect that's actually there. I always compute required n before starting an experiment. For A/B tests at our company the minimum detectable effect drives the calculation: if we need to detect a 1% lift in conversion and our baseline variance is high, we might need months of data. I also flag underpowered studies explicitly when reviewing others' work — a p = 0.20 from n = 30 is not 'evidence of no effect,' it's a study that was never able to answer the question it was asked."`,
+  video: null,
+  videoFallbackMarkdown: `## Power analysis deep dive
+
+Work through this sequence before using the interactive:
+
+1. **State the formula** from memory: n ≈ 2 × ((z_α/2 + z_β) / d)². Identify each parameter.
+2. **Predict effect size impact**: which requires more subjects — detecting d=0.2 or d=0.5 at the same power and α? Calculate the ratio: (0.5/0.2)² = 6.25×. The small effect needs ~6× more participants.
+3. **Interpret a result**: a study finds p=0.15 with n=30 per group. What is the approximate power for d=0.5? (~44%) What does this non-significant result actually tell you?
+4. **Run the checklist**: list the 6 study design steps from memory.
+
+Then use the interactive calculator to verify your sample size calculations and explore the power curve.`,
+  tryGuidance: "Use the Calculator tab: set effect size d, α, and target power to see required n update in real time. Watch the power curve change as d increases. Switch to Real-World to see the canonical small/medium/large benchmarks. Use the Checklist tab and tick off each study design step to internalize the workflow.",
+  interviewGraph: {
+    initialStageId: "power_null_choice",
+    artifactDimensions: [
+      { label: "Absence of Evidence vs Evidence of Absence", recoveryStageId: "power_recovery_null" },
+      { label: "Sample Size Calculation", recoveryStageId: "power_recovery_n" },
+      { label: "Power Implications for Study Design", recoveryStageId: "power_recovery_design", passLabel: "Power Analysis Clear" },
+    ],
+    stages: {
+      power_null_choice: {
+        id: "power_null_choice",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Non-significant ≠ no effect",
+        prompt: "A study finds p = 0.12 (non-significant). The researcher concludes 'the treatment has no effect.' What is wrong with this conclusion?",
+        code_snippet: `-- Study: n = 30 per group
+-- True effect size: unknown
+-- Result: p = 0.12, α = 0.05
+-- Power at d=0.5: approximately 44%`,
+        choices: [
+          { id: "a", label: "The study may be underpowered — absence of evidence is not evidence of absence", description: "At n=30 for a medium effect, power ≈ 44%. The study misses real effects 56% of the time." },
+          { id: "b", label: "p = 0.12 is close to 0.05, so the effect almost exists", description: "p-values do not measure how 'close' an effect is to existing. p = 0.12 means non-significant, not almost significant." },
+          { id: "c", label: "The analysis should be repeated until p < 0.05", description: "Repeated peeking inflates Type I error. This is p-hacking." },
+          { id: "d", label: "The p-value threshold should be raised to 0.20 to include this result", description: "Post-hoc threshold changes invalidate pre-registration and inflate false positives." },
+        ],
+        branches: { a: "power_n_choice", b: "power_recovery_null", c: "power_recovery_null", d: "power_recovery_null" },
+        rationale: "A non-significant p-value with low power is nearly uninformative. At 44% power, you'd expect to miss a medium effect 56% of the time. The correct conclusion is 'inconclusive' not 'no effect.'",
+      },
+      power_recovery_null: {
+        id: "power_recovery_null",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · What does power tell you?",
+        prompt: "A study has 80% power for a given effect size. Which statement is correct?",
+        code_snippet: `-- Power = 1 - β = 0.80
+-- β = 0.20`,
+        choices: [
+          { id: "a", label: "If the true effect exists, the study will detect it 80% of the time", description: "Power is the hit rate for real effects — 20% will still be false negatives." },
+          { id: "b", label: "80% of the time, the p-value will be below 0.05 regardless of truth", description: "Power is conditional on the effect being real; it doesn't apply when H₀ is true." },
+          { id: "c", label: "The study is wrong 20% of the time", description: "20% (β) is the Type II error rate when H₁ is true, not a general error rate." },
+          { id: "d", label: "80% confidence the effect is real", description: "Confidence and power are unrelated quantities." },
+        ],
+        branches: { a: "power_n_choice", b: "power_recovery_null", c: "power_recovery_null", d: "power_recovery_null" },
+        rationale: "Power is P(reject H₀ | H₁ is true). At 80% power, 20% of experiments with a real effect will still return p ≥ α. This 20% is β, the Type II error rate.",
+      },
+      power_n_choice: {
+        id: "power_n_choice",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Sample size for a small effect",
+        prompt: "To detect a small effect (Cohen's d = 0.2) with 80% power at α = 0.05 (two-sided), approximately how many participants per group do you need?",
+        code_snippet: `-- Formula: n ≈ 2 × ((z_α/2 + z_β) / d)²
+-- z_0.025 = 1.96, z_0.20 = 1.282, d = 0.2`,
+        choices: [
+          { id: "a", label: "~394 per group", description: "n ≈ 2 × ((1.96 + 1.282) / 0.2)² ≈ 2 × (16.21)² ≈ 394." },
+          { id: "b", label: "~64 per group", description: "64 is for a medium effect (d = 0.5), not small." },
+          { id: "c", label: "~26 per group", description: "26 is for a large effect (d = 0.8)." },
+          { id: "d", label: "~100 per group", description: "100 is a common default but gives only about 17% power for d=0.2." },
+        ],
+        branches: { a: "power_click_premature", b: "power_recovery_n", c: "power_recovery_n", d: "power_recovery_n" },
+        rationale: "n ≈ 2 × ((1.96 + 1.282) / 0.2)² = 2 × 16.21² ≈ 2 × 262.8 ≈ 394 per group. Small effects require large samples — this is why replication of small-effect studies is so difficult.",
+      },
+      power_recovery_n: {
+        id: "power_recovery_n",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · Effect size and required n",
+        prompt: "How does required sample size change as effect size d doubles (all else equal)?",
+        code_snippet: `-- n ∝ (1/d)²
+-- d doubles: d → 2d`,
+        choices: [
+          { id: "a", label: "Required n quarters (divides by 4)", description: "n ∝ 1/d². If d doubles, d² quadruples, so n = 1/(d²) divides by 4." },
+          { id: "b", label: "Required n halves", description: "n ∝ 1/d, not 1/d. The relationship is quadratic." },
+          { id: "c", label: "Required n stays the same — d doesn't affect n directly", description: "d is the primary driver of required n. Larger effects need far fewer subjects." },
+          { id: "d", label: "Required n doubles", description: "Larger d means easier detection, so n goes down, not up." },
+        ],
+        branches: { a: "power_click_premature", b: "power_recovery_n", c: "power_recovery_n", d: "power_recovery_n" },
+        rationale: "Because n ∝ (1/d)², doubling d quadruples d², so required n is one-quarter as large. This is why detecting large effects is so much cheaper than detecting small ones.",
+      },
+      power_click_premature: {
+        id: "power_click_premature",
+        type: "click_target",
+        badge: "Stage 3 target",
+        title: "Stage 3 · Click the premature conclusion",
+        prompt: "A researcher needed n=200 per group but collected only n=50 and stopped early. Click the line where the conclusion is premature given this underpowered study.",
+        code_snippet: `STUDY REPORT EXCERPT
+────────────────────────────────────────────
+Pre-registered: n = 200 per group, α = 0.05
+Actual collected: n = 50 per group (stopped early)
+Result: p = 0.18 (non-significant)
+"We conclude the intervention has no effect."  -- ds-target:premature_null
+Note: power at n=50 for target d=0.4 is ~26%`,
+        validationCopy: {
+          premature_null: "Correct. With only 26% power, the study misses 74% of real effects of the targeted size. A non-significant result from a severely underpowered study is nearly uninformative — 'inconclusive' is the only valid conclusion.",
+        },
+        branches: {
+          premature_null: "power_terminal",
+        },
+      },
+      power_recovery_design: {
+        id: "power_recovery_design",
+        type: "scenario_choice",
+        badge: "Recovery 3",
+        title: "Recovery · Study design implications",
+        prompt: "A PM asks: 'Can we run the A/B test for 3 weeks instead of 4 to save time?' The original plan was powered for 4 weeks at 80% power. What is the statistical implication?",
+        code_snippet: `-- Original plan: 4 weeks, n = 1,000 per group → 80% power
+-- Proposed change: 3 weeks, n ≈ 750 per group`,
+        choices: [
+          { id: "a", label: "Power drops below 80% — the study may miss a real effect", description: "Less time means fewer observations, smaller n, lower power. The study becomes underpowered." },
+          { id: "b", label: "Power is unaffected — you can always analyze early and get the same answer", description: "Collecting less data than planned reduces power. Analyzing early inflates Type I error additionally." },
+          { id: "c", label: "The α threshold adjusts automatically to compensate", description: "α is pre-registered and fixed; it doesn't auto-adjust for sample size changes." },
+          { id: "d", label: "Only a 1-week reduction — the impact is negligible", description: "A 25% reduction in n reduces power non-trivially (from ~80% to potentially ~70% depending on effect size)." },
+        ],
+        branches: { a: "power_terminal", b: "power_recovery_design", c: "power_recovery_design", d: "power_recovery_design" },
+        rationale: "Power scales with n. Collecting 75% of the planned n will reduce power below target. The PM needs to understand that early stopping trades off reliability of the conclusion.",
+      },
+      power_terminal: {
+        id: "power_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Revision complete · Power analysis locked",
+        terminal: true,
+        prompt: "An A/B test was run at 80% power. The result is p = 0.07 (non-significant at α = 0.05). A PM asks: 'Does this mean the treatment doesn't work?' What is the most accurate response?",
+        code_snippet: `-- Pre-registered: 80% power for d = 0.3
+-- Result: p = 0.07 (not significant)
+-- 20% chance of missing a real d=0.3 effect`,
+        choices: [
+          { id: "a", label: "It's inconclusive — we can't rule out a real effect of d=0.3 even with 80% power", description: "At 80% power, 20% of experiments with a true d=0.3 would return p ≥ 0.05. This is one of those 20%." },
+          { id: "b", label: "The treatment definitely doesn't work — p = 0.07 is not significant", description: "Non-significance at 80% power does not confirm the null. It means the evidence is insufficient at this threshold." },
+          { id: "c", label: "We should lower α to 0.10 to capture this borderline result", description: "Post-hoc threshold changes are p-hacking and inflate false positive rates." },
+        ],
+        branches: { a: "power_terminal", b: "power_terminal", c: "power_terminal" },
+        rationale: "80% power means 20% of experiments with a real effect still return p ≥ α. p = 0.07 is within that 20% possibility. The correct answer to the PM: 'Inconclusive — we had an 80% chance of detecting an effect this size. We may have hit the unlucky 20%. We should consider running a follow-up study with larger n or accepting a wider confidence interval.'",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "A study finds p = 0.15 (non-significant). What is the correct interpretation?",
+      options: [
+        "The result is inconclusive — the study may be underpowered for the true effect size",
+        "The treatment definitively has no effect",
+        "The p-value is close to 0.05, so the effect almost exists",
+      ],
+      correctIndex: 0,
+      explanation: "A non-significant p-value is not evidence of no effect. If the study is underpowered, most real effects would also return p > 0.05. Absence of evidence ≠ evidence of absence.",
+    },
+    {
+      question: "To detect a medium effect (Cohen's d = 0.5) with 80% power at α = 0.05, approximately how many participants per group do you need?",
+      options: [
+        "~64 per group",
+        "~394 per group",
+        "~26 per group",
+      ],
+      correctIndex: 0,
+      explanation: "n ≈ 2 × ((1.96 + 1.282) / 0.5)² ≈ 64 per group. For small effects (d=0.2) you'd need ~394, and for large (d=0.8) only ~26.",
+    },
+    {
+      question: "An A/B test was planned for 80% power. The PM cuts the run time, reducing n by 30%. What happens to power?",
+      options: [
+        "Power drops below 80% — the study becomes underpowered",
+        "Power is unchanged — α adjusts automatically",
+        "Power increases because less noise is introduced",
+      ],
+      correctIndex: 0,
+      explanation: "Power depends on n. Reducing n by 30% reduces power below the planned 80%, increasing the probability of a false negative (missing a real effect).",
+    },
+  ],
+},
+
+  // ── injected from stat_applied_lessons.js ──
+  "st-a1": {
+  durationLabel: "25 min",
+  outcomes: [
+    "Design a statistically sound A/B test: hypothesis, metric, sample size, and stopping rule.",
+    "Identify peeking, SRM, novelty effects, and post-hoc subgroup analysis as validity threats.",
+    "Distinguish statistical significance from practical significance in business contexts.",
+  ],
+  learnMarkdown: `## Outcomes
+
+- Translate a product hypothesis into a testable H₀ and primary metric.
+- Calculate required sample size from expected effect size, α, and power.
+- Spot the four most common A/B test validity failures interviewers probe.
+
+## The anatomy of a sound A/B test
+
+An experiment has three checkpoints before the p-value matters:
+
+1. **Pre-registration**: hypothesis, primary metric, sample size, and stopping rule all decided *before* data collection.
+2. **Randomization check**: after assignment, verify treatment and control are balanced on key covariates (SRM — sample ratio mismatch — is a red flag).
+3. **Duration discipline**: run until the pre-specified n or time window, not until p < 0.05.
+
+## The peeking problem
+
+Checking results daily and stopping when you see p < 0.05 is **optional stopping** — a form of multiple testing that inflates your false-positive rate far above the nominal α. At α = 0.05 with daily peeking over a week, the true error rate can exceed 25%.
+
+Remedies: pre-registered fixed horizons, sequential tests (SPRT, mSPRT), or always-valid p-values.
+
+## Sample ratio mismatch (SRM)
+
+If you planned a 50/50 split and see 70/30, something is broken — a logging bug, a holdback policy, or a redirect race condition. Never interpret results from an experiment with SRM; fix the cause first.
+
+## Post-hoc subgroup analysis
+
+After a neutral overall result, you search subgroups: gender, device, region. Finding one at p < 0.05 across 20 subgroups is expected even if all null effects are true — classic multiple comparisons. Ship only what you pre-specified or replicate in a dedicated experiment.
+
+## Novelty effect
+
+Users engage more with *any* new experience initially, then revert. A 3-day test of a redesigned homepage will overestimate long-run retention lift. Run experiments long enough for novelty to decay (typically 2–4 weeks for engagement metrics).
+
+## Practical vs statistical significance
+
+A conversion rate lift from 10.000% to 10.002% may reach p < 0.05 with n = 5M. That is not worth shipping. Always pair a p-value with an **effect size** (absolute lift, relative lift, MDE) and ask whether the lift justifies the engineering cost, risk, and opportunity cost.
+
+## Sample size formula
+
+\`\`\`
+n = 2 * (z_alpha/2 + z_beta)^2 * p*(1-p) / delta^2
+\`\`\`
+
+Where δ is the minimum detectable effect. Increasing power from 80% to 95% roughly doubles n. Under-powered tests produce noise disguised as science.
+
+## Interview hook (answer like a senior)
+
+"An A/B test I ran showed a statistically significant 8% lift in 3 days. Before shipping, I checked three things: whether the sample ratio matched the intended 50/50 split (it did), whether the duration was long enough to clear novelty effects (it wasn't — I extended to 2 weeks and the lift shrank to 3%), and whether that 3% lift cleared the business MDE threshold (it did). We shipped with guardrail metrics in place for 72 hours post-launch."`,
+  video: null,
+  videoFallbackMarkdown: `## Deep dive: build the test yourself
+
+Without a curated clip, do this 15-minute active exercise:
+
+1. Pick a product change (e.g., button color on a signup flow).
+2. Write the formal H₀ and H₁ in one sentence each.
+3. Choose a primary metric and two guardrail metrics.
+4. Use an online sample size calculator (e.g., Evan Miller's) to find n given α=0.05, power=0.8, and a 2% absolute MDE.
+5. Identify one peeking temptation you'd face and how you'd resist it.`,
+  tryGuidance: "Use the A/B Test Simulator to explore how sampling noise affects a single experiment. Vary the true rates and sample size: notice how often an experiment 'misses' a real effect (Type II error) and how often it 'finds' an effect that isn't there (Type I error). Run the same parameters 10 times and observe the variance in p-values — this is why pre-registration matters.",
+  interviewGraph: {
+    initialStageId: "stage_1_peeking_click",
+    artifactDimensions: [
+      { label: "Experimental validity", recoveryStageId: "recovery_srm" },
+      { label: "Multiple comparisons discipline", recoveryStageId: "recovery_subgroup" },
+      { label: "Duration and novelty reasoning", recoveryStageId: "recovery_novelty", passLabel: "Ready to design end-to-end" },
+    ],
+    stages: {
+      stage_1_peeking_click: {
+        id: "stage_1_peeking_click",
+        type: "click_target",
+        badge: "Stage 1 target",
+        title: "Stage 1 · Spot the peeking anti-pattern",
+        prompt: "Your team's A/B test workflow is shown below. Click the line that introduces invalid optional stopping.",
+        code_snippet: `# Experiment: new checkout CTA button
+Step 1: Define H0, metric, MDE, alpha=0.05
+Step 2: Assign users 50/50 to control/treatment
+Step 3: Check p-value at end of each day     -- ds-target:peeking
+Step 4: Stop experiment when p < 0.05        -- ds-target:stop_on_sig
+Step 5: Ship treatment if significant`,
+        validationCopy: {
+          peeking: "Correct. Checking results repeatedly at each day is optional stopping — it inflates the true false-positive rate well above the nominal 5%.",
+          stop_on_sig: "This is the consequence of peeking, but the root cause is Step 3. Without daily checking, stopping on significance isn't triggered prematurely.",
+        },
+        branches: {
+          peeking: "stage_2_srm_choice",
+          stop_on_sig: "recovery_srm",
+          default: "recovery_srm",
+        },
+      },
+      stage_2_srm_choice: {
+        id: "stage_2_srm_choice",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Diagnose the traffic split anomaly",
+        prompt: "Your A/B test was designed as a 50/50 split. After 48 hours you observe a 70/30 split (treatment/control). What should you do?",
+        code_snippet: `Planned:   Control 50% | Treatment 50%
+Observed:  Control 30% | Treatment 70%
+Current p-value: 0.032 (below 0.05)`,
+        choices: [
+          { id: "a", label: "Stop and investigate the SRM cause", description: "Pause the experiment, find the logging or assignment bug causing the imbalance, fix it, then restart with a clean split." },
+          { id: "b", label: "Ship because the p-value is already significant", description: "The result is statistically significant so the split imbalance doesn't matter." },
+          { id: "c", label: "Use statistical adjustment to correct for the imbalance", description: "Apply post-hoc weighting to normalize the 70/30 back to 50/50 and proceed." },
+          { id: "d", label: "Continue running until planned sample size, then analyze", description: "The imbalance will self-correct as more users are assigned." },
+        ],
+        branches: {
+          a: "stage_3_subgroup_choice",
+          b: "recovery_srm",
+          c: "recovery_srm",
+          d: "recovery_srm",
+        },
+        rationale: "Sample ratio mismatch signals a broken randomization or logging mechanism. Results from a biased assignment are not interpretable regardless of the p-value. Post-hoc statistical adjustment doesn't recover causal validity — you need clean randomization.",
+      },
+      stage_3_subgroup_choice: {
+        id: "stage_3_subgroup_choice",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Evaluate post-hoc subgroup claims",
+        prompt: "Your A/B test shows no overall effect (p = 0.43). A stakeholder finds that among female users, the treatment shows a 15% lift at p = 0.04. They want to ship a women-only version. What is the key statistical risk?",
+        code_snippet: `Overall result:   p = 0.43 (not significant)
+Subgroup female:  p = 0.04 (significant!)
+Subgroups tested: gender, age, device, region,
+                  plan_type, country (6 total)`,
+        choices: [
+          { id: "a", label: "Multiple comparisons inflate false-positive risk", description: "Testing 6 subgroups at α=0.05 each gives a ~26% chance of a false positive even if all null effects are true." },
+          { id: "b", label: "The female subgroup result is definitely real", description: "p < 0.05 in a subgroup means the effect is statistically valid in that group." },
+          { id: "c", label: "The sample is too small for subgroup analysis", description: "Sample size is the only consideration — the p-value within the subgroup is still unbiased." },
+          { id: "d", label: "Ship it and monitor with guardrails", description: "A positive result, even if exploratory, is worth shipping quickly." },
+        ],
+        branches: {
+          a: "stage_4_novelty_choice",
+          b: "recovery_subgroup",
+          c: "recovery_subgroup",
+          d: "recovery_subgroup",
+        },
+        rationale: "With 6 subgroups at α=0.05, FWER = 1 - 0.95^6 ≈ 26%. The subgroup finding is a hypothesis for a new, pre-registered experiment — not a shippable result.",
+      },
+      stage_4_novelty_choice: {
+        id: "stage_4_novelty_choice",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Account for novelty effects",
+        prompt: "Your new feature shows a 12% engagement lift after 3 days. How does the novelty effect influence your decision about experiment duration?",
+        code_snippet: `Metric:    Daily active engagement
+Day 1 lift: +18%
+Day 2 lift: +14%
+Day 3 lift: +12%
+Trend: decreasing`,
+        choices: [
+          { id: "a", label: "Run longer — users engage more with anything new, then revert", description: "Novelty wears off over 2-4 weeks; short tests overestimate long-run lift for engagement metrics." },
+          { id: "b", label: "Ship immediately — the lift is already at significance", description: "Reaching significance quickly means the effect is strong and durable." },
+          { id: "c", label: "Use only Day 1 data — it has the highest signal", description: "The first day shows the true preference before habituation sets in." },
+          { id: "d", label: "Novelty doesn't apply to engagement metrics, only to conversion", description: "Conversion is habitual; engagement is more susceptible to novelty than conversion metrics." },
+        ],
+        branches: {
+          a: "terminal_ab_design",
+          b: "recovery_novelty",
+          c: "recovery_novelty",
+          d: "recovery_novelty",
+        },
+        rationale: "Novelty effect is especially pronounced for engagement and UI changes. The decreasing trend in lift over 3 days is a classic novelty signature. Pre-specify a minimum duration (typically 2–4 weeks) in your test plan.",
+      },
+      recovery_srm: {
+        id: "recovery_srm",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Why does SRM invalidate results?",
+        prompt: "The interviewer asks: 'You have a 70/30 split instead of 50/50. Why can't you just analyze what you have?'",
+        code_snippet: `Planned: 50% Control | 50% Treatment
+Actual:  30% Control | 70% Treatment
+Q: Is the p-value still valid?`,
+        choices: [
+          { id: "a", label: "Biased assignment means users self-selected, confounding the effect estimate", description: "SRM suggests the randomization mechanism broke, meaning treatment and control may differ on unmeasured covariates." },
+          { id: "b", label: "Unequal splits reduce power so you need more data", description: "The split imbalance is just a power issue — collect more data to compensate." },
+          { id: "c", label: "The p-value formula accounts for unequal groups automatically", description: "Two-proportion z-tests handle unequal n, so the result is still valid." },
+          { id: "d", label: "You can stratify post-hoc to rebalance the analysis", description: "Weight treatment users by 5/7 and control by 5/3 to restore effective balance." },
+        ],
+        branches: {
+          a: "stage_3_subgroup_choice",
+          b: "recovery_srm",
+          c: "recovery_srm",
+          d: "recovery_srm",
+        },
+        rationale: "SRM is a validity problem, not just a power problem. If assignment was biased, the unequal split is a symptom of a broken mechanism that likely introduces confounders. Statistical corrections don't restore causal identification.",
+      },
+      recovery_subgroup: {
+        id: "recovery_subgroup",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · What to do with subgroup findings",
+        prompt: "You found a promising subgroup result (female users, p=0.04). What is the correct next step?",
+        code_snippet: `Post-hoc subgroup: p = 0.04
+Subgroups tested: 6 total
+FWER at alpha=0.05, k=6: ~26%`,
+        choices: [
+          { id: "a", label: "Use the subgroup result as a hypothesis for a dedicated pre-registered experiment", description: "Pre-specify the female user subgroup as the primary analysis in a new test with its own sample size calculation." },
+          { id: "b", label: "Ship the women-only version since p < 0.05", description: "Statistical significance is the standard — other factors are secondary." },
+          { id: "c", label: "Apply Bonferroni correction and re-check significance", description: "Corrected alpha = 0.05/6 = 0.008; if p=0.04 doesn't survive, the finding is noise." },
+          { id: "d", label: "Widen the subgroup to include more users to raise power", description: "Add adjacent segments to the female group to get a larger n and more stable estimate." },
+        ],
+        branches: {
+          a: "stage_4_novelty_choice",
+          b: "recovery_subgroup",
+          c: "recovery_subgroup",
+          d: "recovery_subgroup",
+        },
+        rationale: "Both a new pre-registered experiment AND Bonferroni correction are valid responses. The key is that an exploratory subgroup finding, however promising, cannot be treated as a confirmed result. It's a hypothesis that demands its own test.",
+      },
+      recovery_novelty: {
+        id: "recovery_novelty",
+        type: "scenario_choice",
+        badge: "Recovery 3",
+        title: "Recovery · Why does novelty effect matter for test duration?",
+        prompt: "The PM insists: 'We see a significant lift at day 3 — we should ship now.' What's your response?",
+        code_snippet: `Day 1: +18%  Day 2: +14%  Day 3: +12%
+The lift is still positive and significant.
+Is 3 days sufficient?`,
+        choices: [
+          { id: "a", label: "The downward trend suggests novelty, not a durable effect — need 2-4 weeks minimum", description: "Engagement lifts typically decay after novelty wears off; a 3-day window overestimates long-run value." },
+          { id: "b", label: "Significant is significant — three days is standard in the industry", description: "Industry convention is 48-72 hours for fast-moving products." },
+          { id: "c", label: "Run another 3 days and ship if still significant", description: "A 6-day test gives a more stable estimate than 3." },
+          { id: "d", label: "Novelty effect only matters if the day-1 lift is extremely high", description: "A moderate lift like 12% is stable and not novelty-driven." },
+        ],
+        branches: {
+          a: "terminal_ab_design",
+          b: "recovery_novelty",
+          c: "recovery_novelty",
+          d: "recovery_novelty",
+        },
+        rationale: "The hallmark of novelty is a decreasing daily lift trend. The business value of the feature is the long-run lift, not the novelty peak. 2-4 week horizons for engagement metrics are standard at companies that care about durable impact.",
+      },
+      terminal_ab_design: {
+        id: "terminal_ab_design",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Simulation complete · Design an end-to-end test",
+        terminal: true,
+        prompt: "You've navigated peeking, SRM, subgroup inflation, and novelty. Now summarize the components of a rigorous A/B test design for a checkout flow change.",
+        code_snippet: `# Complete A/B test design checklist:
+# 1. Hypothesis (H0, H1, primary metric)
+# 2. Guardrail metrics (latency, error rate, revenue)
+# 3. Minimum detectable effect (business threshold)
+# 4. Sample size (alpha=0.05, power=0.8)
+# 5. Fixed duration (novelty-aware minimum)
+# 6. Stopping rule (no peeking)
+# 7. Randomization check (SRM detection)
+# 8. Pre-specified subgroups only`,
+        choices: [],
+        branches: {},
+        rationale: "A rigorous A/B test is mostly decided before data collection: pre-specify the hypothesis, primary metric, sample size, duration, stopping rule, and the handful of subgroups you care about. Everything discovered post-hoc becomes a hypothesis for the next experiment.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "You run an A/B test and check results daily, stopping on day 4 when p = 0.03. What is the primary statistical problem?",
+      options: [
+        "Optional stopping inflates the true false-positive rate above the nominal alpha",
+        "Day 4 is too short to detect any effect",
+        "The p-value threshold should have been 0.01 for daily checks",
+      ],
+      correctIndex: 0,
+      explanation: "Repeated testing without adjusting the stopping rule is optional stopping. Each peek adds a new chance to cross the threshold by chance, so the true Type I error rate grows far above 5%.",
+    },
+    {
+      question: "An A/B test planned for 50/50 splits shows 68/32 after 2 days. What should you do first?",
+      options: [
+        "Pause the experiment and investigate the randomization or logging mechanism",
+        "Proceed — unequal splits are handled by the two-proportion z-test",
+        "Apply inverse probability weighting to rebalance post-hoc",
+      ],
+      correctIndex: 0,
+      explanation: "Sample ratio mismatch (SRM) indicates a broken assignment or logging mechanism, not just a power issue. Until the cause is identified and fixed, results are not causally interpretable.",
+    },
+    {
+      question: "After finding no overall effect, a post-hoc subgroup shows p=0.03 for mobile users. What is the best next step?",
+      options: [
+        "Treat it as a hypothesis and run a new pre-registered experiment targeting mobile users",
+        "Ship the mobile-only version since p < 0.05",
+        "Apply Bonferroni and if it fails, the result is confirmed noise and can be ignored forever",
+      ],
+      correctIndex: 0,
+      explanation: "Post-hoc subgroup findings are exploratory hypotheses, not confirmatory results. A pre-registered follow-up experiment with mobile users as the primary analysis is the correct response.",
+    },
+  ],
+},
+
+"st-a2": {
+  durationLabel: "12 min",
+  outcomes: [
+    "Calculate FWER for k simultaneous tests and explain why it grows rapidly.",
+    "Apply Bonferroni correction and state its power trade-off.",
+    "Choose between FWER control (Bonferroni) and FDR control (Benjamini-Hochberg) given study context.",
+  ],
+  learnMarkdown: `## Outcomes
+
+- Derive the family-wise error rate formula and feel how quickly it inflates.
+- Explain Bonferroni correction and when it is too conservative to use.
+- Distinguish FWER and FDR and know which method to apply in practice.
+
+## The multiple testing problem
+
+Every hypothesis test has a false-positive rate α. Run k independent tests and the probability of at least one false positive — the **family-wise error rate** — grows:
+
+\`\`\`
+FWER = 1 - (1 - α)^k
+\`\`\`
+
+At k=1, FWER = 5%. At k=20, FWER ≈ 64%. At k=100, FWER > 99%. The more tests you run, the more guaranteed false discoveries you accumulate.
+
+## Bonferroni correction
+
+The simplest FWER control: divide α by the number of tests k. Call this new threshold α*.
+
+\`\`\`
+α* = α / k
+\`\`\`
+
+At k=20 and α=0.05, the corrected per-test threshold is α* = 0.0025. A result must reach p < 0.0025 to be declared significant.
+
+**Trade-off:** Bonferroni is conservative — it reduces power substantially when k is large. Many real effects will be missed.
+
+**When to use Bonferroni:** Confirmatory studies, few tests (k < 20), settings where a single false positive is costly (e.g., clinical trials, regulatory decisions).
+
+## False Discovery Rate (FDR) — Benjamini-Hochberg
+
+FDR control takes a different target: the expected *proportion* of declared discoveries that are false positives. At FDR = 0.05, you accept that 5% of your flagged results may be false.
+
+The Benjamini-Hochberg (BH) procedure:
+1. Sort all p-values: p(1) ≤ p(2) ≤ ... ≤ p(k)
+2. Find the largest j where p(j) ≤ (j/k) × α
+3. Reject all H₀ for i ≤ j
+
+\`\`\`
+Reject H(i) if p(i) ≤ (i/k) * FDR_level
+\`\`\`
+
+BH controls FDR under independence and positive dependence. It is far more powerful than Bonferroni for large test families.
+
+**When to use BH:** Genomics, feature screening, exploratory data analysis — any setting where missing real effects is costly and a few false positives are acceptable.
+
+## Genomics example
+
+A GWAS tests 20,000 SNPs at α = 0.05:
+- Without correction: **1,000 expected false positives**
+- Bonferroni threshold: 0.05 / 20,000 = **2.5 × 10⁻⁶**
+- BH at FDR = 0.05: threshold adapts to the p-value distribution — often 10–100× less stringent than Bonferroni, recovering many true associations
+
+## Interview hook (answer like a senior)
+
+"When our team runs A/B test fleets of 20 simultaneous tests, we use Benjamini-Hochberg at FDR = 0.10 — we'd rather follow up on a few false positives than miss real improvements. For confirmatory tests that directly gate a regulatory submission, we use Bonferroni because a single false positive there has major downstream consequences. The choice of correction method is a business decision about the cost of false positives vs false negatives in your specific context."`,
+  video: null,
+  videoFallbackMarkdown: `## Active exercise: feel the FWER growth
+
+1. Use the Multiple Testing Visualizer to drag k from 1 to 50 and watch the FWER bar fill up.
+2. At k=20, how many false positives would you expect in a study where all 20 null hypotheses are truly null? (Hint: 20 × 0.05)
+3. What Bonferroni threshold would keep the overall FWER at 5%?
+4. Now switch to the Genomics tab. Without correction, how many false positives would a 20,000-SNP GWAS produce?`,
+  tryGuidance: "Explore all three tabs in the Multiple Testing Visualizer. In the FWER Calculator, move the slider slowly from k=1 to k=50 and watch the inflection — note where FWER crosses 50%. In the False Discovery Grid, count how many of the 20 'truly null' hypotheses get flagged — this is your expected noise floor. In the Genomics tab, feel the scale of the problem that Bonferroni and FDR methods were designed to solve.",
+  interviewGraph: {
+    initialStageId: "stage_1_fp_count",
+    artifactDimensions: [
+      { label: "FWER intuition", recoveryStageId: "recovery_fwer_formula" },
+      { label: "Bonferroni mechanics", recoveryStageId: "recovery_bonferroni" },
+      { label: "FWER vs FDR decision", recoveryStageId: "recovery_bonferroni", passLabel: "Ready to apply corrections in practice" },
+    ],
+    stages: {
+      stage_1_fp_count: {
+        id: "stage_1_fp_count",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Calculate expected false positives",
+        prompt: "You run 20 simultaneous A/B tests. All 20 are truly null (no real effect). Using α = 0.05 per test, how many false positives do you expect?",
+        code_snippet: `Tests: k = 20
+All truly null: H0 is true for every test
+Alpha per test: 0.05
+
+Expected false positives = ?`,
+        choices: [
+          { id: "a", label: "~1 (0.05 × 20 = 1.0)", description: "The expected count of false positives is simply k × α when all nulls are true." },
+          { id: "b", label: "0 — if all nulls are true, no test should be significant", description: "A p-value below 0.05 on a truly null test is impossible." },
+          { id: "c", label: "~13 (FWER × 20)", description: "The family-wise error rate is the expected number of false positives." },
+          { id: "d", label: "20 — all tests will be false positives eventually", description: "All tests will eventually produce false positives with enough samples." },
+        ],
+        branches: {
+          a: "stage_2_uncorrected_click",
+          b: "recovery_fwer_formula",
+          c: "recovery_fwer_formula",
+          d: "recovery_fwer_formula",
+        },
+        rationale: "Expected false positives = k × α = 20 × 0.05 = 1.0. FWER (1 - 0.95^20 ≈ 64%) is the probability of at least one false positive — distinct from the expected count. Both are important to understand.",
+      },
+      stage_2_uncorrected_click: {
+        id: "stage_2_uncorrected_click",
+        type: "click_target",
+        badge: "Stage 2 target",
+        title: "Stage 2 · Flag the uncorrected multiple comparison",
+        prompt: "This analysis tests 20 features simultaneously and reports significant results. Click the line that represents the multiple testing error.",
+        code_snippet: `for feature in features:  # 20 features
+    p_val = run_t_test(control, feature_group)
+    if p_val < 0.05:  # ds-target:uncorrected_alpha
+        report_significant(feature)
+# Result: 3 features flagged as significant
+# No correction applied for k=20 tests   -- ds-target:no_correction_note`,
+        validationCopy: {
+          uncorrected_alpha: "Correct. Using raw α=0.05 for each of 20 tests without any correction inflates FWER to ~64%. The threshold should be adjusted (Bonferroni: 0.0025, or BH procedure applied).",
+          no_correction_note: "This comment correctly identifies the problem, but the actual error is in the threshold comparison. Clicking the threshold line more precisely targets the mechanical failure.",
+        },
+        branches: {
+          uncorrected_alpha: "stage_3_bonferroni_choice",
+          no_correction_note: "stage_3_bonferroni_choice",
+          default: "recovery_bonferroni",
+        },
+      },
+      stage_3_bonferroni_choice: {
+        id: "stage_3_bonferroni_choice",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Apply Bonferroni correction",
+        prompt: "You are running 10 pre-specified hypothesis tests at α = 0.05. What is the Bonferroni-corrected per-test threshold, and when would you choose a different method?",
+        code_snippet: `k = 10 tests
+alpha = 0.05 (desired FWER level)
+
+Bonferroni threshold = ?`,
+        choices: [
+          { id: "a", label: "0.005 (= 0.05 / 10); switch to BH for large exploratory test families", description: "Bonferroni threshold is α/k = 0.005. For genomics or feature selection with k in the thousands, BH FDR control is far more powerful." },
+          { id: "b", label: "0.05 — no correction needed for fewer than 20 tests", description: "Small k doesn't justify skipping correction; even 10 tests at 0.05 inflates FWER to ~40%." },
+          { id: "c", label: "0.001 (α / k^2)", description: "Bonferroni is too conservative, so we apply extra conservatism by squaring k." },
+          { id: "d", label: "0.01 (α / (k/2))", description: "The correction only applies to half the tests because the other half are confirmatory." },
+        ],
+        branches: {
+          a: "terminal_multiple_testing",
+          b: "recovery_bonferroni",
+          c: "recovery_bonferroni",
+          d: "recovery_bonferroni",
+        },
+        rationale: "Bonferroni: α* = α/k = 0.05/10 = 0.005. It controls FWER conservatively — acceptable for confirmatory studies with few tests. For large k (genomics, ML feature selection), the power loss from Bonferroni is prohibitive; Benjamini-Hochberg FDR control is the standard alternative.",
+      },
+      recovery_fwer_formula: {
+        id: "recovery_fwer_formula",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · The FWER formula explained",
+        prompt: "The interviewer asks: 'Walk me through why running 20 tests at α=0.05 is dangerous even if each individual test is clean.'",
+        code_snippet: `P(at least 1 false positive) = ?
+Single test: P(FP) = 0.05
+k = 20 tests, all truly null`,
+        choices: [
+          { id: "a", label: "FWER = 1 - (1-α)^k = 1 - 0.95^20 ≈ 64%", description: "The probability of no false positives across all 20 tests is 0.95^20 ≈ 36%, so FWER ≈ 64%." },
+          { id: "b", label: "FWER = k × α = 20 × 0.05 = 100%", description: "Multiplying gives the expected count of false positives, not the probability of at least one." },
+          { id: "c", label: "FWER stays at 5% because each test is independent", description: "Independence means each test doesn't affect the others, but FWER still inflates." },
+          { id: "d", label: "FWER = α^k = 0.05^20 ≈ 0", description: "This would be the probability of ALL 20 tests being false positives simultaneously." },
+        ],
+        branches: {
+          a: "stage_2_uncorrected_click",
+          b: "recovery_fwer_formula",
+          c: "recovery_fwer_formula",
+          d: "recovery_fwer_formula",
+        },
+        rationale: "FWER = 1 - (1-α)^k because the probability of NO false positives (all k tests correctly non-significant) is (1-α)^k under independence. Subtract from 1 to get the complement.",
+      },
+      recovery_bonferroni: {
+        id: "recovery_bonferroni",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · Bonferroni mechanics and limits",
+        prompt: "You need to control FWER at 0.05 across 10 tests. The interviewer asks why Bonferroni may be a bad choice for a genomics team testing 20,000 SNPs.",
+        code_snippet: `k = 20,000 SNP tests
+desired_FWER = 0.05
+Bonferroni threshold = 0.05 / 20,000 = 2.5e-6
+
+Q: Why might this be problematic?`,
+        choices: [
+          { id: "a", label: "Power collapse — most true effects have p >> 2.5e-6 and are missed entirely", description: "Bonferroni is so conservative at k=20,000 that only the strongest genetic associations survive, missing subtler but real effects." },
+          { id: "b", label: "The threshold is miscalculated — it should be α^k not α/k", description: "The formula α/k is wrong; the correct formula involves exponentiation." },
+          { id: "c", label: "Genomics always uses p < 0.001 by convention regardless of k", description: "Industry convention overrides statistical theory here." },
+          { id: "d", label: "With 20,000 tests, the central limit theorem guarantees no false positives", description: "Large k brings the CLT into play and eliminates false positives." },
+        ],
+        branches: {
+          a: "stage_3_bonferroni_choice",
+          b: "recovery_bonferroni",
+          c: "recovery_bonferroni",
+          d: "recovery_bonferroni",
+        },
+        rationale: "Bonferroni's α/k threshold becomes 2.5×10⁻⁶ for k=20,000 — far below what most true genetic effects produce. This destroys statistical power. Benjamini-Hochberg FDR control maintains meaningful power while limiting the proportion of false discoveries.",
+      },
+      terminal_multiple_testing: {
+        id: "terminal_multiple_testing",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Simulation complete · Genomics correction design",
+        terminal: true,
+        prompt: "A genomics team tests 10,000 SNPs at α=0.05. Summarize: how many false positives without correction, the Bonferroni threshold, and when you'd recommend BH instead.",
+        code_snippet: `# Genomics multiple testing summary:
+# k = 10,000 SNPs tested
+# alpha = 0.05 (uncorrected)
+#
+# Without correction:
+#   Expected FP = 10,000 * 0.05 = 500
+#
+# Bonferroni threshold:
+#   0.05 / 10,000 = 5e-6
+#
+# BH (FDR=0.05) → better power for
+# discovery, acceptable FP rate`,
+        choices: [],
+        branches: {},
+        rationale: "500 expected false positives without correction is unacceptable for genomics. Bonferroni threshold of 5×10⁻⁶ is rigorous but very conservative. For exploratory discovery phases, BH at FDR=0.05 is standard practice — it identifies more true associations while controlling the proportion of false discoveries.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "You run 50 independent tests at α=0.05. Approximately what is the family-wise error rate?",
+      options: [
+        "~92% (FWER = 1 - 0.95^50)",
+        "~5% (each test is still at α=0.05)",
+        "~50% (half the tests will produce false positives)",
+      ],
+      correctIndex: 0,
+      explanation: "FWER = 1 - (1-0.05)^50 = 1 - 0.95^50 ≈ 92.3%. Running 50 tests at 0.05 almost guarantees at least one false positive.",
+    },
+    {
+      question: "A team runs 100 feature importance tests. Bonferroni threshold would be 0.0005. They're worried about missing real signals. What's the better approach?",
+      options: [
+        "Benjamini-Hochberg FDR control at FDR=0.05 — controls the false discovery rate with much more power",
+        "Keep α=0.05 on each test — individual test validity is all that matters",
+        "Run each test on a separate dataset to avoid the multiple testing problem",
+      ],
+      correctIndex: 0,
+      explanation: "For large exploratory test families, Bonferroni is too conservative. Benjamini-Hochberg controls the expected proportion of false discoveries (FDR), maintaining meaningful power while limiting noise.",
+    },
+    {
+      question: "When is Bonferroni correction most appropriate?",
+      options: [
+        "Confirmatory studies with few pre-specified tests where any false positive is costly",
+        "Exploratory genomics studies testing tens of thousands of markers",
+        "Any A/B test fleet where speed matters more than false positive control",
+      ],
+      correctIndex: 0,
+      explanation: "Bonferroni controls FWER (probability of any false positive) — most valuable in confirmatory settings with few tests. For large exploratory test families, FDR control (BH) is far more practical.",
+    },
+  ],
+},
+
+"st-a3": {
+  durationLabel: "15 min",
+  outcomes: [
+    "Explain why bootstrap resampling is done with replacement and what it simulates.",
+    "Construct a bootstrap confidence interval for any statistic (mean, median, correlation).",
+    "Identify when bootstrap outperforms parametric CI methods.",
+  ],
+  learnMarkdown: `## Outcomes
+
+- Build an intuitive model of the bootstrap as an empirical sampling distribution.
+- Derive a 95% CI from bootstrap percentiles without distributional assumptions.
+- Know the settings where bootstrap is necessary and where it merely duplicates parametric methods.
+
+## Core idea: the plug-in principle
+
+We want the sampling distribution of a statistic θ̂ (mean, median, correlation...) but we only have one sample. Bootstrap's insight: treat your sample as a stand-in for the population, and simulate the sampling process by resampling **with replacement**.
+
+Each bootstrap sample:
+1. Draw n observations from your sample, **with replacement** (so some appear twice, some zero times)
+2. Compute θ̂* on this new sample
+3. Repeat B times (typically 1000–10,000)
+4. The distribution of {θ̂*₁, ..., θ̂*_B} approximates the sampling distribution of θ̂
+
+## Why with replacement?
+
+Without replacement, you'd get a permutation of your original data — always the same values, always the same statistic. Replacement is what introduces variability and simulates the uncertainty of drawing a new sample from the population.
+
+## Bootstrap confidence interval (percentile method)
+
+\`\`\`
+CI_95 = [θ̂*_{2.5th percentile}, θ̂*_{97.5th percentile}]
+\`\`\`
+
+This is the simplest bootstrap CI. More accurate variants (BCa — bias-corrected and accelerated) exist for skewed distributions.
+
+## When bootstrap beats parametric methods
+
+| Setting | Parametric CI | Bootstrap |
+|---|---|---|
+| Mean, large n, normal data | Works great | Works (redundant) |
+| Median, any distribution | Doesn't apply cleanly | Works |
+| Correlation, small n | Assumes bivariate normality | Distribution-free |
+| 90th percentile | Requires order statistic theory | Straightforward |
+| Complex estimator (AUC, ratio) | Often intractable | Straightforward |
+| n < 30, non-normal | Unreliable | Better (if n ≥ 20-ish) |
+
+## Limitations
+
+- Bootstrap cannot create information that isn't in your data — it fails with extremely small n (< 15-20)
+- Does not fix biased estimators
+- Computationally intensive for very large datasets (though parallelizable)
+- Percentile CI can be inaccurate for highly skewed statistics (use BCa or bias-corrected variants)
+
+## Interview hook (answer like a senior)
+
+"Bootstrap is my go-to for confidence intervals when I can't easily verify normality or when I'm computing statistics beyond the mean — medians, quantiles, AUC, or model-level metrics. At a previous role, I needed a CI for the 90th percentile of transaction latency. Parametric order-statistic intervals require large samples and assumptions I couldn't verify; bootstrap gave me a direct, distribution-free answer in 20 lines of code. The key thing I always communicate to stakeholders: bootstrap tells you about uncertainty given what's in your sample — it doesn't compensate for a small or unrepresentative sample."`,
+  video: null,
+  videoFallbackMarkdown: `## Active exercise: build bootstrap by hand
+
+With a small dataset of 8 values (e.g., [3, 5, 7, 4, 6, 8, 5, 6]):
+
+1. Draw 3 bootstrap samples with replacement (use a random number generator or dice).
+2. Compute the mean and median of each bootstrap sample.
+3. Notice which values appear multiple times and which are missing.
+4. Conceptually: if you did this 1000 times, the distribution of bootstrap means would estimate the sampling distribution of the mean.
+5. The 2.5th and 97.5th percentiles of those 1000 means form the 95% bootstrap CI.`,
+  tryGuidance: "Use the Bootstrap Simulator to see resampling in action. Click 'Draw bootstrap sample' 3-5 times and notice: some values from the original dataset appear twice (highlighted ×2), some don't appear at all. This is the with-replacement sampling that drives the method. Then click 'Show distribution (200 samples)' to see the bootstrap distribution of means and the 95% CI derived from its percentiles. Compare the bootstrap CI to the theoretical SE-based CI.",
+  interviewGraph: {
+    initialStageId: "stage_1_replacement",
+    artifactDimensions: [
+      { label: "Bootstrap mechanics", recoveryStageId: "recovery_replacement" },
+      { label: "Method selection", recoveryStageId: "recovery_median_ci" },
+      { label: "Identifying the sampling error", recoveryStageId: "recovery_without_replacement", passLabel: "Ready to apply bootstrap in production" },
+    ],
+    stages: {
+      stage_1_replacement: {
+        id: "stage_1_replacement",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · The essential mechanic",
+        prompt: "Bootstrap resampling is done WITH or WITHOUT replacement, and why does the answer matter?",
+        code_snippet: `Original data: [3, 7, 5, 9, 4, 6, 8, 5, 7, 4]
+n = 10
+
+Bootstrap sample = ???
+  (a) sample 10 values with replacement
+  (b) sample 10 values without replacement`,
+        choices: [
+          { id: "a", label: "WITH replacement — creates variability between bootstrap samples", description: "Without replacement, every bootstrap sample is just a permutation of the original, giving the same statistic each time. Replacement introduces the necessary randomness." },
+          { id: "b", label: "WITHOUT replacement — preserves the original data distribution", description: "Sampling without replacement avoids duplicates and keeps the sample representative." },
+          { id: "c", label: "Either — the choice doesn't affect the confidence interval", description: "The replacement mechanism is arbitrary and doesn't change the resulting CI." },
+          { id: "d", label: "WITH replacement — because it increases the effective sample size", description: "Resampling with replacement is correct, but the reason is variability, not sample size inflation." },
+        ],
+        branches: {
+          a: "stage_2_median_choice",
+          b: "recovery_replacement",
+          c: "recovery_replacement",
+          d: "recovery_replacement",
+        },
+        rationale: "With replacement is essential: it means some observations are drawn multiple times, others not at all. This variability across bootstrap samples is what empirically builds the sampling distribution. Without replacement, every resample is a permutation — same values, zero variance in the statistic.",
+      },
+      stage_2_median_choice: {
+        id: "stage_2_median_choice",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Choosing bootstrap vs parametric CI",
+        prompt: "You have n=30 customer satisfaction ratings and need a 95% confidence interval for the MEDIAN (not the mean). Which method is most appropriate?",
+        code_snippet: `n = 30 customer ratings
+Target statistic: MEDIAN
+Options:
+  (a) Bootstrap CI (percentile method)
+  (b) t-interval on the sample mean
+  (c) Normal approximation CI
+  (d) Exact binomial order-statistic CI`,
+        choices: [
+          { id: "a", label: "Bootstrap CI — distribution-free, directly applicable to the median", description: "Bootstrap makes no distributional assumptions and works naturally for any statistic including the median." },
+          { id: "b", label: "t-interval on the sample mean", description: "The t-interval is for the mean, not the median. It doesn't apply to other statistics." },
+          { id: "c", label: "Normal approximation — CLT applies at n=30", description: "CLT gives a normal approximation for the sample mean, not the median. The sampling distribution of the median converges much more slowly." },
+          { id: "d", label: "Exact binomial order-statistic CI", description: "This exists but requires large samples and specific assumptions; bootstrap is simpler and more generally applicable." },
+        ],
+        branches: {
+          a: "stage_3_wrong_code_click",
+          b: "recovery_median_ci",
+          c: "recovery_median_ci",
+          d: "recovery_median_ci",
+        },
+        rationale: "The CLT applies to sample means, not medians. The sampling distribution of the median converges to normality much more slowly and depends on the density at the median. Bootstrap is the natural choice for medians and other non-mean statistics.",
+      },
+      stage_3_wrong_code_click: {
+        id: "stage_3_wrong_code_click",
+        type: "click_target",
+        badge: "Stage 3 target",
+        title: "Stage 3 · Spot the bootstrap implementation error",
+        prompt: "A colleague wrote bootstrap code to estimate uncertainty for the median. Click the line that breaks the core bootstrap mechanic.",
+        code_snippet: `import numpy as np
+
+def bootstrap_ci(data, n_boot=1000):
+    means = []
+    for _ in range(n_boot):
+        sample = np.random.choice(
+            data,
+            size=len(data),
+            replace=False    # ds-target:wrong_replace
+        )
+        means.append(np.median(sample))
+    return np.percentile(means, [2.5, 97.5])`,
+        validationCopy: {
+          wrong_replace: "Correct. replace=False produces permutations of the original data — every bootstrap 'sample' has identical values, just in different order. The median is invariant to order, so all bootstrap medians will be identical and the CI will collapse to a point.",
+        },
+        branches: {
+          wrong_replace: "terminal_bootstrap_design",
+          default: "recovery_without_replacement",
+        },
+      },
+      recovery_replacement: {
+        id: "recovery_replacement",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Why replacement is mandatory",
+        prompt: "The interviewer asks: 'If I sample 10 values WITHOUT replacement from a dataset of 10, what will every bootstrap sample look like?'",
+        code_snippet: `Original: [3, 7, 5, 9, 4, 6, 8, 5, 7, 4]
+n = 10
+
+Without replacement, each sample = ?`,
+        choices: [
+          { id: "a", label: "A permutation of the original data — always the same 10 values, just shuffled", description: "Every resample without replacement is a rearrangement, so every statistic (mean, median, etc.) is identical. The bootstrap distribution is a point mass with zero width." },
+          { id: "b", label: "A subset — only 7-8 values since some are excluded", description: "Without replacement from 10 into 10 means all are selected exactly once (permutation)." },
+          { id: "c", label: "A random draw from the underlying population", description: "Bootstrap operates on the sample only — it has no access to the underlying population." },
+          { id: "d", label: "A sample with slightly different values due to rounding", description: "Values come from the original dataset; no rounding is introduced." },
+        ],
+        branches: {
+          a: "stage_2_median_choice",
+          b: "recovery_replacement",
+          c: "recovery_replacement",
+          d: "recovery_replacement",
+        },
+        rationale: "Sampling n items without replacement from n items gives a permutation — all original values present exactly once. Since statistics like the mean and median are permutation-invariant, all 'bootstrap' samples give the same statistic. No variability = no CI. This is why replacement is not optional.",
+      },
+      recovery_median_ci: {
+        id: "recovery_median_ci",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · Bootstrap vs parametric for non-mean statistics",
+        prompt: "The interviewer says: 'The CLT gives a normal approximation. Why doesn't it apply to the median's sampling distribution at n=30?'",
+        code_snippet: `CLT: sample mean → Normal as n → ∞
+Q: Does sample median → Normal at n=30?`,
+        choices: [
+          { id: "a", label: "The median's convergence to normality is slower and depends on the density at the median", description: "The CLT for the median requires the density to be positive at the median and converges at rate 1/√n, but with a different variance term — and at n=30, the approximation may be poor." },
+          { id: "b", label: "CLT applies to all statistics, including the median, at n=30", description: "The CLT applies to sums/means; other statistics converge differently." },
+          { id: "c", label: "n=30 is the universal threshold after which all statistics are normal", description: "The n=30 rule is a heuristic for means from symmetric distributions — it doesn't generalize." },
+          { id: "d", label: "The median has no sampling distribution because it's always in the data", description: "All statistics have sampling distributions; the median is computed from a sample and varies across samples." },
+        ],
+        branches: {
+          a: "stage_3_wrong_code_click",
+          b: "recovery_median_ci",
+          c: "recovery_median_ci",
+          d: "recovery_median_ci",
+        },
+        rationale: "The CLT is specifically about sums/means converging to normal. For medians and quantiles, convergence exists but depends on the local density at the quantile value and is harder to guarantee at small n. Bootstrap sidesteps this by making no distributional assumption.",
+      },
+      recovery_without_replacement: {
+        id: "recovery_without_replacement",
+        type: "scenario_choice",
+        badge: "Recovery 3",
+        title: "Recovery · What does replace=False produce?",
+        prompt: "A bootstrap code uses replace=False. If the original data has 20 values and you draw 20 without replacement, what does the bootstrap distribution look like?",
+        code_snippet: `data = [... 20 values ...]
+# With replace=False:
+for _ in range(1000):
+    s = np.random.choice(data, size=20, replace=False)
+    bootstrap_stats.append(statistic(s))`,
+        choices: [
+          { id: "a", label: "A point mass — all bootstrap statistics are identical because every sample is a permutation", description: "Order-invariant statistics (mean, median, std) give the exact same value for every permutation of the data." },
+          { id: "b", label: "A wide distribution because there are many permutations", description: "The number of permutations is large, but the statistic's value doesn't change between permutations." },
+          { id: "c", label: "A valid bootstrap distribution with some variance due to randomness", description: "Randomizing the order of fixed values doesn't change order-invariant statistics." },
+          { id: "d", label: "A distribution centered on the population mean, not the sample mean", description: "Bootstrap operates on the sample; it doesn't access the population." },
+        ],
+        branches: {
+          a: "terminal_bootstrap_design",
+          b: "recovery_without_replacement",
+          c: "recovery_without_replacement",
+          d: "recovery_without_replacement",
+        },
+        rationale: "Every permutation of 20 values has the same mean, median, variance, etc. replace=False produces a degenerate 'distribution' with zero variance — a useless CI. This is the single most common bootstrap implementation error.",
+      },
+      terminal_bootstrap_design: {
+        id: "terminal_bootstrap_design",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Simulation complete · Design a bootstrap CI for a percentile",
+        terminal: true,
+        prompt: "You have 50 transaction amounts and need a 95% CI for the 90th percentile. Describe the bootstrap procedure step by step.",
+        code_snippet: `# Bootstrap CI for the 90th percentile:
+# n = 50 transactions
+#
+# Step 1: Compute p90 = np.percentile(data, 90)
+# Step 2: For b in range(B=2000):
+#     sample = np.random.choice(data, size=50,
+#                               replace=True)  # <- key
+#     boot_p90[b] = np.percentile(sample, 90)
+# Step 3: CI = np.percentile(boot_p90, [2.5, 97.5])`,
+        choices: [],
+        branches: {},
+        rationale: "Bootstrap applies uniformly: replace 'mean' with any statistic. Resample with replacement, compute the target statistic, collect B replicates, take the 2.5th and 97.5th percentiles. For skewed statistics like high quantiles on small samples, consider BCa (bias-corrected accelerated) intervals for better coverage.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "You draw a bootstrap sample from n=15 data points. Why must you sample WITH replacement?",
+      options: [
+        "Without replacement, every resample is a permutation — order-invariant statistics are identical across all resamples, collapsing the bootstrap distribution to a point",
+        "Without replacement you get fewer than 15 values and lose statistical power",
+        "Replacement doubles the effective sample size, improving CI accuracy",
+      ],
+      correctIndex: 0,
+      explanation: "Sampling without replacement from n values into n values gives a permutation. Statistics like mean and median are identical for all permutations, producing a degenerate 'distribution' with zero width. Replacement is what creates variability across bootstrap samples.",
+    },
+    {
+      question: "Why is bootstrap preferred over a t-interval for a confidence interval on the MEDIAN?",
+      options: [
+        "Bootstrap makes no distributional assumptions; the CLT doesn't directly apply to the median's sampling distribution",
+        "Bootstrap uses more data by resampling 1000 times, giving a more stable estimate",
+        "The t-distribution applies to medians when n > 30 per the central limit theorem",
+      ],
+      correctIndex: 0,
+      explanation: "The CLT applies to sums/means. The sampling distribution of the median depends on the density at the median and converges to normality much more slowly. Bootstrap sidesteps these assumptions entirely.",
+    },
+    {
+      question: "A bootstrap CI for the 90th percentile of salary data is [58k, 72k]. How do you construct this?",
+      options: [
+        "Resample with replacement 1000+ times, compute the 90th percentile each time, then take the 2.5th and 97.5th percentile of those bootstrap statistics",
+        "Compute the mean of the salary data and add/subtract 1.96 standard errors",
+        "Use the exact binomial order-statistic formula for quantile CIs",
+      ],
+      correctIndex: 0,
+      explanation: "Bootstrap CI for any statistic: resample with replacement, compute the statistic B times, take the [α/2, 1-α/2] percentiles of the bootstrap distribution. No normality assumptions needed.",
+    },
+  ],
+},
+
+"st-a4": {
+  durationLabel: "18 min",
+  outcomes: [
+    "Articulate the philosophical difference between Frequentist and Bayesian probability.",
+    "Correctly interpret confidence intervals vs credible intervals — and avoid the most common misinterpretation.",
+    "Choose between frameworks given problem structure: sequential testing, small n, domain knowledge, or direct probability statements.",
+  ],
+  learnMarkdown: `## Outcomes
+
+- State what each framework means by 'probability' and why the definitions lead to different tools.
+- Translate a Bayesian credible interval into plain language (and explain why you can't do the same for a frequentist CI).
+- Know when Bayesian methods solve problems that frequentist methods structurally cannot.
+
+## The core philosophical divide
+
+**Frequentist:** Probability is long-run frequency. The parameter θ (e.g., drug efficacy) is a fixed, unknown constant — it doesn't have a distribution. Only data are random.
+
+**Bayesian:** Probability is degree of belief. The parameter θ is uncertain and can be represented as a probability distribution — the posterior P(θ | data), updated from a prior P(θ).
+
+This isn't just philosophy — it changes what questions you can answer.
+
+## Frequentist framework
+
+- Hypothesis testing: Fix H₀, compute P(data this extreme | H₀ is true) — the p-value
+- Confidence interval: A procedure with 95% long-run coverage, **not** a probability statement about this specific interval
+- Correct: "If we repeated this experiment many times, 95% of intervals built this way would contain the true θ"
+- Wrong: "There is a 95% probability θ is in [2.1%, 4.7%]" ← this is the Bayesian statement
+
+## Bayesian framework
+
+For the drug scenario (15/20 patients improved):
+- **Prior:** P(p) — your belief before data, e.g., Beta(2,2) = "mildly skeptical"
+- **Likelihood:** P(data | p) = Binomial(20, p)
+- **Posterior:** P(p | data) ∝ Likelihood × Prior = Beta(17, 7)
+
+\`\`\`
+Posterior = Beta(a₀ + successes, b₀ + failures)
+          = Beta(2 + 15, 2 + 5) = Beta(17, 7)
+Posterior mean = 17 / (17+7) = 70.8%
+\`\`\`
+
+A 95% **credible interval** from the posterior IS a probability statement: "Given the prior and data, there is a 95% probability the true efficacy is in this range."
+
+## The peeking problem solved by Bayes
+
+Frequentist p-values are invalid when you peek at data and stop when p < 0.05 (optional stopping). Bayesian posterior probabilities update coherently with every new observation — you can check at any time and the interpretation remains valid.
+
+## Prior sensitivity
+
+The prior matters most when n is small and decreases in influence as n grows. With 15/20 observations:
+- Skeptical prior Beta(2,8): posterior mean ≈ 60%
+- Neutral prior Beta(2,2): posterior mean ≈ 71%
+- Optimistic prior Beta(8,2): posterior mean ≈ 79%
+
+With n=2000 observations at 75%, all priors converge near 75%. This convergence (Bernstein-von Mises theorem) reassures frequentists that Bayesian results aren't purely driven by prior choice.
+
+## When to choose Bayesian
+
+| Situation | Frequentist | Bayesian |
+|---|---|---|
+| "Is the difference significant?" | Yes | Yes |
+| "P(treatment is better)?" | Cannot answer | Direct answer |
+| Sequential stopping | Invalid peeking | Coherent |
+| Domain knowledge available | Ignored | Incorporated as prior |
+| Small n, rare events | Unstable | Prior stabilizes |
+
+## Interview hook (answer like a senior)
+
+"A PM asked me: 'Is our new onboarding 60% likely to improve retention?' Under frequentism, I can't answer that directly — I can only say whether our result would be unlikely under H₀. I'd give a p-value and 95% CI. Under a Bayesian framework, I'd build a Beta-Binomial model with a weakly informative prior, update on the observed data, and directly compute P(p > 0.6 | data) from the posterior. If it's 87%, I can literally tell the PM 'there's an 87% chance the treatment works.' The choice of framework depends on whether the team needs a direct probability of success or just a hypothesis test result."`,
+  video: null,
+  videoFallbackMarkdown: `## Active exercise: the interpretation challenge
+
+Write the following sentence and identify which framework it belongs to:
+
+1. "95% of confidence intervals built by this procedure will contain the true mean." → [Frequentist]
+2. "There is a 95% probability the true conversion rate is between 2.1% and 4.7%." → [Bayesian]
+3. "The probability this drug works is 87%." → [Bayesian]
+4. "If H₀ were true, we'd see this result only 3% of the time." → [Frequentist]
+
+Now: how would you explain the difference between statements 1 and 2 to a product manager who has never taken a statistics course?`,
+  tryGuidance: "Use the Bayesian vs Frequentist Explorer to compare both frameworks on the same drug scenario (15/20 patients improved). In 'Side-by-side' view, notice how the frequentist result gives a p-value and CI while the Bayesian result gives a posterior mean and credible interval. Switch priors from Skeptical to Neutral to Optimistic and watch the posterior shift in the 'Posterior chart' tab. In 'Key differences', study the credible vs confidence interval distinction — this is one of the most commonly tested concepts in DS interviews.",
+  interviewGraph: {
+    initialStageId: "stage_1_credible_meaning",
+    artifactDimensions: [
+      { label: "Credible vs confidence interval", recoveryStageId: "recovery_ci_interpretation" },
+      { label: "Framework probability claims", recoveryStageId: "recovery_freq_probability" },
+      { label: "Sequential testing validity", recoveryStageId: "recovery_sequential", passLabel: "Ready to choose frameworks in practice" },
+    ],
+    stages: {
+      stage_1_credible_meaning: {
+        id: "stage_1_credible_meaning",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Interpret the credible interval",
+        prompt: "A Bayesian analysis produces a 95% credible interval [2.1%, 4.7%] for a conversion rate lift. What does this mean?",
+        code_snippet: `Bayesian model:
+  Prior: Beta(2, 2) -- weakly informative
+  Data: 420/10000 conversions in treatment
+        vs 380/10000 in control
+  Posterior 95% credible interval: [2.1%, 4.7%]`,
+        choices: [
+          { id: "a", label: "There is a 95% probability the true lift is between 2.1% and 4.7%, given the prior and data", description: "Bayesian credible intervals are direct probability statements about the parameter — unlike frequentist confidence intervals." },
+          { id: "b", label: "If we ran this experiment 100 times, 95 of the CIs would contain the true lift", description: "That is the frequentist confidence interval interpretation, not the Bayesian credible interval." },
+          { id: "c", label: "The true lift is definitely between 2.1% and 4.7%", description: "The credible interval reflects probabilistic uncertainty, not certainty." },
+          { id: "d", label: "The experiment had 95% statistical power at these lift values", description: "Power is a frequentist pre-experiment calculation, not a Bayesian posterior summary." },
+        ],
+        branches: {
+          a: "stage_2_freq_misuse_click",
+          b: "recovery_ci_interpretation",
+          c: "recovery_ci_interpretation",
+          d: "recovery_ci_interpretation",
+        },
+        rationale: "A Bayesian credible interval IS a probability statement: P(θ ∈ [2.1%, 4.7%] | data, prior) = 0.95. This is the statement frequentist CIs cannot make — frequentist CIs describe a procedure's long-run behavior, not the probability of a specific interval.",
+      },
+      stage_2_freq_misuse_click: {
+        id: "stage_2_freq_misuse_click",
+        type: "click_target",
+        badge: "Stage 2 target",
+        title: "Stage 2 · Flag the misinterpretation",
+        prompt: "A report uses a frequentist confidence interval but interprets it incorrectly in a Bayesian way. Click the line with the invalid interpretation.",
+        code_snippet: `# Frequentist analysis of drug trial:
+p_hat = 0.72  # observed success rate
+ci_95 = (0.61, 0.83)  # 95% confidence interval
+
+# Report conclusions:
+print("We observed 72% success rate.")
+print("95% CI: (61%, 83%)")
+print(f"There is a 95% probability the true")
+print(f"success rate is between 61% and 83%.") # ds-target:bayes_misuse
+print("This result is statistically significant.")`,
+        validationCopy: {
+          bayes_misuse: "Correct. Frequentist CIs do NOT support 'there is a 95% probability the true parameter is in this interval.' That is the Bayesian credible interval interpretation. The correct frequentist statement: 'this procedure produces intervals that contain the true value in 95% of repeated experiments.'",
+        },
+        branches: {
+          bayes_misuse: "stage_3_probability_choice",
+          default: "recovery_freq_probability",
+        },
+      },
+      stage_3_probability_choice: {
+        id: "stage_3_probability_choice",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Which framework can make this claim?",
+        prompt: "An analyst says: 'The probability that the drug is effective is 87%.' Which statistical framework supports this statement?",
+        code_snippet: `Statement: "P(drug is effective) = 87%"
+
+Framework A (Frequentist):
+  - theta is fixed, not random
+  - P-values describe data under H0
+
+Framework B (Bayesian):
+  - theta has a probability distribution
+  - posterior gives P(theta | data)`,
+        choices: [
+          { id: "a", label: "Bayesian — only Bayesian posteriors allow direct probability statements about parameters", description: "Frequentists treat θ as a fixed constant, so P(drug effective) is not a meaningful frequentist statement. Bayesians model θ as a random variable and can compute this directly from the posterior." },
+          { id: "b", label: "Frequentist — the p-value of 0.13 implies 87% confidence", description: "1 - p-value does not equal the probability of the hypothesis being true. This is a common but fundamental error." },
+          { id: "c", label: "Both — any probability statement about results is valid in either framework", description: "The frameworks assign probability to different objects: data (frequentist) vs parameters (Bayesian)." },
+          { id: "d", label: "Neither — it is impossible to assign probabilities to scientific hypotheses", description: "Bayesian statistics is explicitly designed to assign probabilities to hypotheses and parameters." },
+        ],
+        branches: {
+          a: "stage_4_sequential_choice",
+          b: "recovery_freq_probability",
+          c: "recovery_freq_probability",
+          d: "recovery_freq_probability",
+        },
+        rationale: "Frequentists treat θ as a fixed unknown constant — P(drug effective) is not a valid frequentist quantity. Only Bayesian posteriors assign probabilities to parameter values and hypotheses. This is the deepest conceptual difference between the frameworks.",
+      },
+      stage_4_sequential_choice: {
+        id: "stage_4_sequential_choice",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Sequential testing and the peeking problem",
+        prompt: "An analyst runs a sequential A/B test and checks results weekly, stopping when the Bayesian posterior probability that treatment beats control exceeds 95%. Is this statistically valid?",
+        code_snippet: `# Sequential Bayesian A/B test
+week = 1
+while True:
+    observe_new_data()
+    update_posterior()
+    p_treatment_better = compute_posterior_prob()
+    if p_treatment_better > 0.95:
+        stop_and_ship()
+        break
+    week += 1`,
+        choices: [
+          { id: "a", label: "Yes — Bayesian posteriors update coherently; checking at any point is valid under the Bayesian framework", description: "Unlike frequentist p-values which are invalid under optional stopping, Bayesian posterior probabilities remain coherent regardless of when you check. There is no multiple comparisons inflation." },
+          { id: "b", label: "No — checking weekly is peeking, which inflates false-positive rates regardless of framework", description: "The peeking problem is a frequentist issue caused by optional stopping. Bayesian posteriors don't suffer from this." },
+          { id: "c", label: "Only valid if you pre-register the stopping threshold before the experiment", description: "Pre-registration is a frequentist requirement to prevent p-hacking. In the Bayesian framework, the posterior is valid at any stopping point." },
+          { id: "d", label: "It depends on whether the data are independent week over week", description: "Bayesian updating handles sequential data naturally; independence between observations is an assumption about the likelihood, not about when you check the posterior." },
+        ],
+        branches: {
+          a: "terminal_bayes_freq_comparison",
+          b: "recovery_sequential",
+          c: "recovery_sequential",
+          d: "recovery_sequential",
+        },
+        rationale: "Bayesian sequential testing is one of the framework's genuine advantages. The posterior probability is a coherent summary of your current belief given all data seen so far. Stopping when P(treatment > control | data) > 95% is a valid and natural Bayesian decision rule — unlike frequentist optional stopping, which inflates Type I error.",
+      },
+      recovery_ci_interpretation: {
+        id: "recovery_ci_interpretation",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Confidence interval vs credible interval",
+        prompt: "The interviewer asks: 'After an experiment, you report CI = [2%, 8%]. What can you NOT say about this if it is a frequentist confidence interval?'",
+        code_snippet: `Result: 95% frequentist CI = [2%, 8%]
+
+Which statement is invalid?
+(a) "95% of such intervals contain the true value"
+(b) "There is a 95% probability true lift is in [2%,8%]"
+(c) "This procedure has 95% long-run coverage"
+(d) "The interval was computed at alpha=0.05"`,
+        choices: [
+          { id: "a", label: "Statement (b) — cannot claim 95% probability that THIS specific interval contains the true value", description: "The frequentist CI describes the procedure's long-run behavior, not the probability for the realized interval. Once computed, the true value is either in it or not — no probability applies to a specific interval." },
+          { id: "b", label: "Statement (a) — frequentist CIs don't describe long-run coverage", description: "Long-run coverage is exactly what a frequentist CI describes." },
+          { id: "c", label: "Statement (c) — frequentist CIs say nothing about the procedure", description: "The procedure's long-run coverage is the frequentist CI's primary claim." },
+          { id: "d", label: "Statement (d) — alpha is a Bayesian concept", description: "Alpha is used in frequentist hypothesis testing and interval construction." },
+        ],
+        branches: {
+          a: "stage_2_freq_misuse_click",
+          b: "recovery_ci_interpretation",
+          c: "recovery_ci_interpretation",
+          d: "recovery_ci_interpretation",
+        },
+        rationale: "The frequentist CI is a procedure: 'If we ran this experiment infinitely many times and computed CIs each time, 95% would contain the true θ.' For the single realized interval [2%, 8%], the true value is either in it or not. We cannot say there is 95% probability it's inside — that's the Bayesian credible interval.",
+      },
+      recovery_freq_probability: {
+        id: "recovery_freq_probability",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · What does a frequentist p-value actually measure?",
+        prompt: "A frequentist test produces p = 0.04. The PM asks 'does this mean there's a 96% chance the drug works?' What do you say?",
+        code_snippet: `Frequentist test:
+  H0: drug has no effect (p_success = 0.5)
+  Observed: 15/20 improvements
+  p-value = 0.04
+
+PM: "So 96% chance the drug works?"`,
+        choices: [
+          { id: "a", label: "No — p=0.04 means: if H₀ were true, data this extreme would occur only 4% of the time. It says nothing about P(drug works).", description: "The p-value measures the probability of the observed data (or more extreme) given H₀ is true — P(data | H₀). It does not measure P(H₀ false | data)." },
+          { id: "b", label: "Yes — 1 - p-value is the probability the alternative hypothesis is correct", description: "1-p is not P(H₁). This conflation (the 'prosecutor's fallacy') is one of the most common statistical errors." },
+          { id: "c", label: "P(drug works) = 0.96 only if we assume a uniform prior", description: "P(drug works | data) requires a Bayesian posterior — it depends on the prior, not on 1-p." },
+          { id: "d", label: "Frequentist p-values are equivalent to Bayesian posterior probabilities for large samples", description: "They converge numerically in specific conditions (Jeffreys-Lindley paradox aside), but they answer fundamentally different questions." },
+        ],
+        branches: {
+          a: "stage_4_sequential_choice",
+          b: "recovery_freq_probability",
+          c: "recovery_freq_probability",
+          d: "recovery_freq_probability",
+        },
+        rationale: "P(data | H₀) ≠ P(H₀ | data). The p-value is not the probability the null is false. It's the probability of observing data at least this extreme assuming H₀ is true. To get P(H₀ false | data), you need Bayes' theorem and a prior.",
+      },
+      recovery_sequential: {
+        id: "recovery_sequential",
+        type: "scenario_choice",
+        badge: "Recovery 3",
+        title: "Recovery · Why Bayesian posteriors handle sequential checking",
+        prompt: "The interviewer asks: 'Why does peeking at frequentist p-values daily inflate false positives, but checking Bayesian posteriors daily does not?'",
+        code_snippet: `# Frequentist daily check:
+for day in experiment:
+    if p_value < 0.05:  # invalid: inflates FPR
+        ship()
+
+# Bayesian daily check:
+for day in experiment:
+    update_posterior(new_data)
+    if P(treatment > control | data) > 0.95:  # valid
+        ship()`,
+        choices: [
+          { id: "a", label: "Frequentist p-values depend on the stopping rule; Bayesian posteriors are valid summaries of current evidence regardless of when you stop", description: "P-values are calibrated assuming a pre-specified stopping rule. Bayesian posteriors carry no such calibration requirement — they describe current belief given all data seen, at any point." },
+          { id: "b", label: "Bayesian methods are also invalid under sequential checking — the same peeking problem applies", description: "Peeking is a frequentist problem caused by violation of optional stopping assumptions. It does not apply to Bayesian posteriors." },
+          { id: "c", label: "Bayesian methods use larger sample sizes, giving them more stable estimates", description: "Both frameworks use the same data; the difference is how evidence is accumulated and interpreted." },
+          { id: "d", label: "P-values and posteriors are numerically equivalent for large samples, so peeking is equally valid in both", description: "Numerical near-equivalence in some cases doesn't imply the same validity under sequential stopping." },
+        ],
+        branches: {
+          a: "terminal_bayes_freq_comparison",
+          b: "recovery_sequential",
+          c: "recovery_sequential",
+          d: "recovery_sequential",
+        },
+        rationale: "Frequentist p-values are p-hacked by optional stopping because their calibration assumes a fixed stopping rule. Bayesian posteriors update via Bayes' theorem — each update is coherent regardless of when you check. The posterior P(θ | data so far) is always a valid summary of current belief.",
+      },
+      terminal_bayes_freq_comparison: {
+        id: "terminal_bayes_freq_comparison",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Simulation complete · Answer the PM's question both ways",
+        terminal: true,
+        prompt: "A PM asks: 'Is our new onboarding 60% likely to improve retention?' How do you answer under frequentism and under Bayesianism?",
+        code_snippet: `# PM's question: P(improvement > 0%) = ?
+#
+# Frequentist response:
+#   Cannot directly answer.
+#   Report: p-value, 95% CI, reject/fail to reject H0
+#   "We cannot quantify P(hypothesis is true)"
+#
+# Bayesian response:
+#   Compute posterior P(delta > 0 | data)
+#   Can directly say: "87% probability treatment improves retention"
+#   Report: posterior mean, credible interval`,
+        choices: [],
+        branches: {},
+        rationale: "This is the practical punch line: frequentist tools answer 'is the data consistent with H₀?' while Bayesian tools answer 'what do we believe about the parameter?' PMs almost always want the latter. Recognizing when the question demands a Bayesian framework — and being able to set one up — is a senior DS skill.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "A frequentist 95% CI is [12%, 18%]. Which interpretation is CORRECT?",
+      options: [
+        "If we built CIs this way across many experiments, 95% of them would contain the true value",
+        "There is a 95% probability the true value is between 12% and 18%",
+        "The true value is definitely between 12% and 18% with 95% certainty",
+      ],
+      correctIndex: 0,
+      explanation: "Frequentist CIs describe a procedure's long-run behavior. Once computed, the specific interval [12%, 18%] either contains the true value or it doesn't — we can't assign a probability to this specific interval. The 95% refers to the procedure across repeated experiments.",
+    },
+    {
+      question: "Which framework allows the statement 'there is a 73% probability the treatment is better than control'?",
+      options: [
+        "Bayesian — posteriors assign probability directly to parameter values and hypotheses",
+        "Frequentist — 1 - p-value gives the probability the alternative is correct",
+        "Both frameworks support this statement for large samples",
+      ],
+      correctIndex: 0,
+      explanation: "Frequentists treat θ as fixed; P(treatment better) is not a frequentist quantity. 1-p-value is not P(H₁). Only Bayesian posteriors allow direct probability statements about hypotheses and parameters.",
+    },
+    {
+      question: "Why can a Bayesian analyst validly check posterior probabilities weekly during a sequential A/B test, while a frequentist analyst cannot check p-values weekly?",
+      options: [
+        "Frequentist p-values are calibrated assuming a pre-specified stopping rule; Bayesian posteriors update coherently regardless of when you check",
+        "Bayesian methods automatically adjust for multiple comparisons; frequentist methods do not",
+        "Bayesian sequential testing uses larger sample sizes, avoiding the peeking bias",
+      ],
+      correctIndex: 0,
+      explanation: "Optional stopping inflates frequentist p-values because their Type I error calibration assumes the stopping rule was fixed before data collection. Bayesian posteriors describe current belief given all data seen — there is no inflation from checking at different times.",
+    },
+  ],
+},
+
 };
 
 
