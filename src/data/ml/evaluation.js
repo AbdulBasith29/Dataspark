@@ -120,6 +120,342 @@ Draw the 2×2 matrix from memory and label every cell (TN, FP, FN, TP). Now run 
 2. Model B catches 8 of 10 positives but raises 40 false alarms. Matrix: TP=8, FN=2, FP=40, TN=950. Now precision = 8/48 ≈ 0.17, recall = 0.8, accuracy = 0.958 — *lower* accuracy, vastly more useful model.
 3. Write one sentence: "I would pick the threshold to hit recall ≥ ___ because a miss costs ___." Filling that blank with a business unit is the muscle interviewers probe.`,
     tryGuidance: `Use the **Confusion Matrix** visualization. Drag the threshold from low to high and narrate out loud: as the threshold rises, which cells shrink, and which of precision/recall climbs while the other falls? Find the threshold where F1 peaks — then ask yourself whether the *business* would actually want that point, or would prefer to trade some precision for more recall.`,
+    interviewGraph: {
+            initialStageId: "e1_click_accuracy",
+            artifactDimensions: [
+              {
+                label: "Metric Selection",
+                recoveryStageId: "e1_recovery_metrics",
+              },
+              {
+                label: "Precision-Recall Tradeoff",
+                recoveryStageId: "e1_recovery_threshold",
+              },
+              {
+                label: "F-Scores",
+                recoveryStageId: "e1_recovery_fbeta",
+                passLabel: "Classification Metrics Mastery",
+              },
+            ],
+            stages: {
+              e1_click_accuracy: {
+                id: "e1_click_accuracy",
+                type: "click_target",
+                badge: "Stage 1",
+                title: "Stage 1 · Spotting misleading accuracy",
+                prompt: "The code below evaluates a fraud detection model and reports accuracy as the headline metric to stakeholders. Click the line that obscures the model's actual fraud-detection ability.",
+                code_snippet: `from sklearn.metrics import accuracy_score, classification_report
+
+# Dataset: 100,000 transactions — 99% legitimate, 1% fraud
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+
+acc = accuracy_score(y_test, y_pred)
+print(f"Model accuracy: {acc:.1%}")   # ds-target:misleading_accuracy
+# Output: Model accuracy: 99.2%
+
+# A model that predicts 'legitimate' for EVERY transaction
+# would also score 99.0% accuracy`,
+                validationCopy: {
+                  misleading_accuracy: "Correct. On a 99% negative-class dataset, even a trivial classifier that always predicts 'legitimate' achieves 99% accuracy. Reporting 99.2% accuracy to stakeholders gives the impression of excellent performance while completely hiding the fact that the model may be missing most actual fraud cases. Precision, recall, and F1 on the positive (fraud) class are the relevant metrics here.",
+                },
+                branches: {
+                  misleading_accuracy: "e1_choice_conservative",
+                },
+              },
+              e1_choice_conservative: {
+                id: "e1_choice_conservative",
+                type: "scenario_choice",
+                badge: "Stage 2",
+                title: "Stage 2 · Interpreting precision and recall operationally",
+                prompt: "A fraud detection model has Precision=0.90 and Recall=0.30 on the fraud class. What does this mean operationally?",
+                code_snippet: `from sklearn.metrics import precision_score, recall_score
+
+prec = precision_score(y_test, y_pred)   # 0.90
+rec  = recall_score(y_test, y_pred)      # 0.30
+
+# Out of 1,000 actual fraud cases in the test set,
+# how many did the model flag? How many flags were correct?`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Model is very conservative — few false alarms, but missing 70% of actual fraud",
+                    description: "Correct. Precision=0.90 means 90% of fraud alerts are real fraud (few false positives). Recall=0.30 means only 30% of actual fraud cases were caught — 700 out of 1,000 real fraud transactions go undetected. This is a high-precision, low-recall system.",
+                  },
+                  {
+                    id: "b",
+                    label: "Model is aggressive — catching most fraud but raising many false alarms",
+                    description: "An aggressive model has high recall (catches most fraud) and low precision (many false alarms). This model is the opposite: high precision, low recall.",
+                  },
+                  {
+                    id: "c",
+                    label: "Precision=0.90 means the model is 90% accurate overall",
+                    description: "Precision is a class-specific metric: of all predicted positives, how many are true positives. It is not the same as overall accuracy.",
+                  },
+                  {
+                    id: "d",
+                    label: "Recall=0.30 means 30% of the model's predictions are wrong",
+                    description: "Recall (sensitivity) is true positives / (true positives + false negatives) — the fraction of actual fraud cases that were caught. It says nothing about the error rate of the model's positive predictions.",
+                  },
+                ],
+                branches: {
+                  a: "e1_choice_threshold",
+                  b: "e1_recovery_metrics",
+                  c: "e1_recovery_metrics",
+                  d: "e1_recovery_metrics",
+                },
+                rationale: "High precision + low recall = conservative model: when it says 'fraud', it's usually right, but it lets most fraud slip through. High recall + low precision = aggressive model: catches most fraud but generates many false alarms. In fraud detection, missing real fraud (low recall) is usually costlier than false alarms — this model's recall=0.30 is a serious problem.",
+              },
+              e1_recovery_metrics: {
+                id: "e1_recovery_metrics",
+                type: "scenario_choice",
+                badge: "Recovery 1",
+                title: "Recovery · Choosing the right metric for imbalanced classes",
+                prompt: "Your fraud dataset has 99% negative class. Which metric set should you use as your primary evaluation framework?",
+                code_snippet: `# Dataset: 990 legitimate, 10 fraud (per 1,000 records)
+# Candidate metrics:
+# A: Accuracy only
+# B: Precision, Recall, F1 on the fraud (positive) class
+# C: ROC-AUC
+# D: B + C together`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Accuracy only",
+                    description: "Accuracy is dominated by the majority class in imbalanced settings. A model that always predicts 'legitimate' achieves 99% accuracy while detecting zero fraud.",
+                  },
+                  {
+                    id: "b",
+                    label: "Precision, Recall, F1 on the positive class + ROC-AUC",
+                    description: "Correct. Precision and recall on the minority (fraud) class directly measure what matters. ROC-AUC evaluates the model's ranking ability across thresholds. Together they give a complete picture of both threshold-specific and threshold-independent performance.",
+                  },
+                  {
+                    id: "c",
+                    label: "ROC-AUC alone",
+                    description: "ROC-AUC is relatively robust to imbalance and measures discrimination ability, but doesn't tell you precision/recall at your operating threshold. Pair it with threshold-specific metrics.",
+                  },
+                  {
+                    id: "d",
+                    label: "F1 score only",
+                    description: "F1 is better than accuracy for imbalanced classes, but alone doesn't show whether errors lean toward false positives or false negatives — which is operationally crucial for fraud detection.",
+                  },
+                ],
+                branches: {
+                  a: "e1_choice_threshold",
+                  b: "e1_choice_threshold",
+                  c: "e1_choice_threshold",
+                  d: "e1_choice_threshold",
+                },
+                rationale: "For imbalanced datasets: (1) never rely on accuracy alone; (2) use precision/recall/F1 on the minority class; (3) augment with ROC-AUC for threshold-independent evaluation; (4) consider AUPRC (area under precision-recall curve) for extremely imbalanced data.",
+              },
+              e1_choice_threshold: {
+                id: "e1_choice_threshold",
+                type: "scenario_choice",
+                badge: "Stage 3",
+                title: "Stage 3 · Classification threshold effects",
+                prompt: "You lower the fraud model's classification threshold from 0.5 to 0.2. What happens to precision and recall?",
+                code_snippet: `# Original threshold: 0.5
+y_pred_05 = (model.predict_proba(X_test)[:, 1] >= 0.5).astype(int)
+# prec=0.90, rec=0.30
+
+# Lower threshold: 0.2
+y_pred_02 = (model.predict_proba(X_test)[:, 1] >= 0.2).astype(int)
+# prec=?, rec=?`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Recall increases, precision decreases — more positives flagged, including more false positives",
+                    description: "Correct. A lower threshold flags more transactions as fraud. This catches more actual fraud (recall up) but also flags more legitimate transactions as fraud (precision down). There is an inherent precision-recall tradeoff controlled by the threshold.",
+                  },
+                  {
+                    id: "b",
+                    label: "Both precision and recall increase — a more sensitive model is better on both metrics",
+                    description: "Increasing recall by lowering the threshold necessarily admits more false positives, which decreases precision. You cannot simultaneously increase both by threshold adjustment alone.",
+                  },
+                  {
+                    id: "c",
+                    label: "Precision increases, recall decreases — more conservative at lower threshold",
+                    description: "This is backwards. A lower threshold means more liberal positive predictions — more flags, higher recall, lower precision.",
+                  },
+                  {
+                    id: "d",
+                    label: "Neither changes — threshold only affects the output labels, not the underlying probabilities",
+                    description: "The threshold directly determines which predicted probabilities become positive labels, which changes TP, FP, FN counts and therefore precision and recall.",
+                  },
+                ],
+                branches: {
+                  a: "e1_choice_fbeta",
+                  b: "e1_recovery_threshold",
+                  c: "e1_recovery_threshold",
+                  d: "e1_recovery_threshold",
+                },
+                rationale: "The classification threshold is a business decision, not a model parameter. Lower threshold → more positive predictions → higher recall, lower precision. Higher threshold → fewer positive predictions → higher precision, lower recall. The optimal threshold depends on the relative cost of false positives vs false negatives in your domain.",
+              },
+              e1_recovery_threshold: {
+                id: "e1_recovery_threshold",
+                type: "scenario_choice",
+                badge: "Recovery 2",
+                title: "Recovery · Threshold and precision-recall tradeoff",
+                prompt: "A medical screening model. Missing a cancer case (false negative) is far more costly than a false alarm (false positive). How should you set the threshold?",
+                code_snippet: `# Cost matrix:
+# False Negative (missed cancer): very high cost
+# False Positive (unnecessary follow-up): low cost
+
+y_proba = model.predict_proba(X_test)[:, 1]
+# threshold = ?`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Lower the threshold — prioritise recall to minimise missed cancers, accepting more false alarms",
+                    description: "Correct. When false negatives are very costly, you prioritise recall. A lower threshold flags more positives, catching more true cancers at the cost of more false alarms (unnecessary but low-cost follow-ups).",
+                  },
+                  {
+                    id: "b",
+                    label: "Raise the threshold — maximise precision so every flagged case is definitely cancer",
+                    description: "Raising the threshold increases precision but decreases recall — you'd miss more real cancers. In this cost structure that is the more dangerous error.",
+                  },
+                  {
+                    id: "c",
+                    label: "Use the default threshold of 0.5 — it balances both errors equally",
+                    description: "The default threshold of 0.5 is arbitrary and appropriate only when false positives and false negatives have equal cost. When costs are asymmetric, the threshold must reflect that asymmetry.",
+                  },
+                  {
+                    id: "d",
+                    label: "Use F1 score to find the optimal threshold automatically",
+                    description: "F1 gives equal weight to precision and recall, which doesn't match the asymmetric cost structure here. Use F-beta with beta > 1, or directly optimise recall above a minimum precision constraint.",
+                  },
+                ],
+                branches: {
+                  a: "e1_choice_fbeta",
+                  b: "e1_choice_fbeta",
+                  c: "e1_choice_fbeta",
+                  d: "e1_choice_fbeta",
+                },
+                rationale: "Threshold selection is a business decision driven by the cost ratio of false negatives to false positives. High FN cost → low threshold (prioritise recall). High FP cost → high threshold (prioritise precision). Use cost-sensitive thresholding or F-beta with beta tuned to the cost ratio.",
+              },
+              e1_choice_fbeta: {
+                id: "e1_choice_fbeta",
+                type: "scenario_choice",
+                badge: "Stage 4",
+                title: "Stage 4 · F1 vs F-beta",
+                prompt: "When would you use F2 score instead of F1 score to evaluate a model?",
+                code_snippet: `from sklearn.metrics import fbeta_score
+
+f1 = fbeta_score(y_test, y_pred, beta=1)  # equal weight
+f2 = fbeta_score(y_test, y_pred, beta=2)  # recall weighted 2x
+
+# F-beta formula:
+# F_beta = (1 + beta²) * (precision * recall)
+#          / (beta² * precision + recall)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "When recall is twice as important as precision — e.g., medical screening where missing a case is costlier than a false alarm",
+                    description: "Correct. F-beta weights recall beta² times more than precision. F2 (beta=2) weights recall 4x more than precision — appropriate when false negatives are significantly more costly than false positives, such as disease screening or safety-critical defect detection.",
+                  },
+                  {
+                    id: "b",
+                    label: "When you want a higher numeric score to impress stakeholders",
+                    description: "Choosing a metric because it produces a higher number, rather than because it reflects business priorities, is metric gaming and produces misleading evaluations.",
+                  },
+                  {
+                    id: "c",
+                    label: "When precision is more important than recall",
+                    description: "When precision matters more, use F-beta with beta < 1 (e.g., F0.5). F2 with beta=2 weights recall more heavily than precision.",
+                  },
+                  {
+                    id: "d",
+                    label: "F2 and F1 are identical — the beta parameter has no effect",
+                    description: "Beta controls the relative weight of recall vs precision. F1 (beta=1) weights them equally; F2 (beta=2) weights recall 4x more than precision in the harmonic mean formula.",
+                  },
+                ],
+                branches: {
+                  a: "e1_terminal",
+                  b: "e1_recovery_fbeta",
+                  c: "e1_recovery_fbeta",
+                  d: "e1_recovery_fbeta",
+                },
+                rationale: "F-beta = (1+β²) × (P×R) / (β²×P + R). β=1: equal weight (F1). β=2: recall weighted 4x more than precision (F2). β=0.5: precision weighted 4x more (F0.5). Choose beta based on the cost ratio of false negatives to false positives in your domain.",
+              },
+              e1_recovery_fbeta: {
+                id: "e1_recovery_fbeta",
+                type: "scenario_choice",
+                badge: "Recovery 3",
+                title: "Recovery · F-score variants",
+                prompt: "A spam filter. Sending a legitimate email to spam (false positive) is annoying but tolerable. Missing spam (false negative) is mildly bad. Which F-score is most appropriate?",
+                code_snippet: `# spam = positive class
+# FP: legitimate email → spam folder (annoying)
+# FN: spam email → inbox (mildly bad, similar cost to FP)
+
+# beta = ? in fbeta_score(y_test, y_pred, beta=?)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "F1 (beta=1) — costs are roughly symmetric; equal weight to precision and recall",
+                    description: "Correct. When false positives (legit email marked spam) and false negatives (spam in inbox) have roughly similar business cost, F1 with equal weighting is appropriate.",
+                  },
+                  {
+                    id: "b",
+                    label: "F2 (beta=2) — recall is more important so F2 is always better for spam",
+                    description: "F2 would deprioritise precision, accepting more legitimate emails in spam. That's only appropriate if false negatives are significantly costlier than false positives, which isn't the case described here.",
+                  },
+                  {
+                    id: "c",
+                    label: "F0.5 (beta=0.5) — precision is critical for spam filters",
+                    description: "F0.5 would prioritise precision (fewer false alarms) at the cost of recall. This is appropriate when FP cost far exceeds FN cost — but the scenario describes roughly equal costs.",
+                  },
+                  {
+                    id: "d",
+                    label: "Accuracy — spam datasets are balanced so accuracy works fine",
+                    description: "Spam datasets are typically imbalanced (most email is legitimate), so accuracy alone is misleading.",
+                  },
+                ],
+                branches: {
+                  a: "e1_terminal",
+                  b: "e1_terminal",
+                  c: "e1_terminal",
+                  d: "e1_terminal",
+                },
+                rationale: "F-score selection maps directly to the cost asymmetry: symmetric costs → F1; recall more important → F2 or higher beta; precision more important → F0.5 or lower beta. Always justify your metric choice with the business cost of each error type.",
+              },
+              e1_terminal: {
+                id: "e1_terminal",
+                type: "scenario_choice",
+                badge: "Final",
+                title: "Revision complete · Classification Metrics Mastery",
+                terminal: true,
+                prompt: "Design an evaluation framework for a spam filter. What metrics, what threshold, and how do you A/B test it?",
+                code_snippet: `# Spam filter: email client, 100M emails/day
+# Business constraints:
+# - < 0.1% legitimate emails going to spam (FP rate)
+# - Catch > 95% of spam (recall)
+# - A/B test window: 2 weeks`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Use precision-recall curve to find threshold meeting both constraints; primary metric = recall at precision ≥ 99.9%; A/B test by routing 5% traffic to new model and comparing metrics on labelled sample",
+                    description: "Correct. The business constraints (< 0.1% FP on legitimate email = precision ≥ 99.9%; recall > 95%) define threshold selection from the precision-recall curve. A/B testing routes a small traffic fraction to the challenger model, collects labels via user reports + manual review, and uses statistical significance tests on precision and recall differences.",
+                  },
+                  {
+                    id: "b",
+                    label: "Optimise for overall accuracy; A/B test by giving 50% of users the new model for one day",
+                    description: "Accuracy ignores the class imbalance and the asymmetric cost structure. One day is insufficient for statistical significance on rare-event metrics like false positives in a 99.9% precision regime.",
+                  },
+                  {
+                    id: "c",
+                    label: "Report F1 score; no A/B test needed if offline evaluation looks good",
+                    description: "F1 equally weights precision and recall, which doesn't match the asymmetric constraint (precision ≥ 99.9% is a hard floor). Offline evaluation alone is insufficient — distribution shift between historical data and live traffic makes A/B testing essential.",
+                  },
+                ],
+                branches: {
+                  a: "e1_terminal",
+                  b: "e1_terminal",
+                  c: "e1_terminal",
+                },
+                rationale: "Evaluation framework for a high-precision requirement: (1) primary metric = recall subject to precision ≥ constraint; (2) plot precision-recall curve to select operating threshold; (3) A/B test on live traffic with a small hold-out fraction; (4) collect labels via user feedback + sampled manual review; (5) use two-proportion z-test or bootstrapped confidence intervals to determine if differences are significant. Run for at least 1-2 weeks to capture daily/weekly traffic patterns.",
+              },
+            },
+          },
     knowledgeCheck: [
       {
         question: "A model on a 1%-fraud dataset reports 99% accuracy. What is the most likely explanation a senior engineer suspects first?",
@@ -299,6 +635,335 @@ ROC/AUC and PR/AP are **threshold-free** summaries: they describe the model acro
 
 Take a tiny scored test set and build the ROC by hand. Sort 5 examples by score descending with labels [P, P, N, P, N]. Start at (0,0); walk down the sorted list, stepping **up** by 1/P for each positive and **right** by 1/N for each negative (here P=3, N=2). You will trace the staircase (0,0)→(0,⅓)→(0,⅔)→(½,⅔)→(½,1)→(1,1). The area under that staircase *is* the AUC; verify it equals the fraction of (positive, negative) pairs the model ranks correctly. Now imagine duplicating the two negatives 1000× each: the ROC is **unchanged** (prevalence-invariant), but precision at any threshold collapses — which is exactly why you would switch to a PR curve for that imbalanced version.`,
     tryGuidance: `Open the **ROC Curve** visualization and drag the threshold along the curve. Watch the green operating point slide from (1,1) at a low threshold toward (0,0) at a high one, and confirm the AUC number stays fixed — it summarizes the whole curve, not your current threshold. Then mentally picture the same data with 100× more negatives: the ROC would barely move, but precision would crater. That gap is the case for PR curves.`,
+    interviewGraph: {
+            initialStageId: "e2_click_auc_only",
+            artifactDimensions: [
+              {
+                label: "AUC Interpretation",
+                recoveryStageId: "e2_recovery_auc",
+              },
+              {
+                label: "Operating Point Selection",
+                recoveryStageId: "e2_recovery_operating",
+              },
+              {
+                label: "ROC vs PR Curve",
+                recoveryStageId: "e2_recovery_pr",
+                passLabel: "ROC & AUC Mastery",
+              },
+            ],
+            stages: {
+              e2_click_auc_only: {
+                id: "e2_click_auc_only",
+                type: "click_target",
+                badge: "Stage 1",
+                title: "Stage 1 · AUC as sole decision criterion",
+                prompt: "The code below selects the production model based solely on AUC, ignoring the business constraint that only operates at very low false positive rate. Click the line that draws the wrong conclusion.",
+                code_snippet: `from sklearn.metrics import roc_auc_score, roc_curve
+
+auc_a = roc_auc_score(y_test, model_a.predict_proba(X_test)[:, 1])
+auc_b = roc_auc_score(y_test, model_b.predict_proba(X_test)[:, 1])
+
+# auc_a = 0.91, auc_b = 0.87
+# At FPR=0.02 (business operating point):
+#   model_a TPR = 0.58,  model_b TPR = 0.74
+
+deploy_model = "A" if auc_a > auc_b else "B"  # ds-target:auc_only_decision
+print(f"Deploying model {deploy_model} — higher AUC wins")`,
+                validationCopy: {
+                  auc_only_decision: "Correct. AUC is a global metric that integrates performance over all thresholds. At the specific business operating point (FPR=0.02), Model B has a TPR of 0.74 vs Model A's 0.58 — meaning Model B catches 27% more true positives where it actually matters. Selecting purely on AUC ignores the operationally relevant region of the ROC curve.",
+                },
+                branches: {
+                  auc_only_decision: "e2_choice_auc_meaning",
+                },
+              },
+              e2_choice_auc_meaning: {
+                id: "e2_choice_auc_meaning",
+                type: "scenario_choice",
+                badge: "Stage 2",
+                title: "Stage 2 · Interpreting AUC = 0.5",
+                prompt: "Your binary classifier's ROC-AUC is 0.5. What does this mean?",
+                code_snippet: `from sklearn.metrics import roc_auc_score
+import numpy as np
+
+auc = roc_auc_score(y_test, y_pred_proba)
+print(f"AUC: {auc:.3f}")  # 0.500`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Model performs no better than random — its ROC curve lies along the diagonal",
+                    description: "Correct. AUC=0.5 means the model has zero discriminative ability — equivalent to randomly assigning probability scores. The ROC curve traces the diagonal from (0,0) to (1,1). A useful model should have AUC > 0.5.",
+                  },
+                  {
+                    id: "b",
+                    label: "Model is correct 50% of the time",
+                    description: "AUC is not accuracy. AUC=0.5 means the model's predicted probabilities have no ordering relationship with the true labels — not that it predicts the right class 50% of the time.",
+                  },
+                  {
+                    id: "c",
+                    label: "Model needs more training data to improve beyond 0.5",
+                    description: "AUC=0.5 can occur regardless of data size — it means the features or model architecture provide no discriminative information. More data won't help if the features are uninformative.",
+                  },
+                  {
+                    id: "d",
+                    label: "AUC=0.5 is an excellent result — perfect precision-recall balance",
+                    description: "AUC=0.5 represents the worst useful outcome — equivalent to random chance. A perfect model has AUC=1.0.",
+                  },
+                ],
+                branches: {
+                  a: "e2_choice_operating_point",
+                  b: "e2_recovery_auc",
+                  c: "e2_recovery_auc",
+                  d: "e2_recovery_auc",
+                },
+                rationale: "AUC is the probability that a randomly chosen positive example is ranked higher than a randomly chosen negative example. AUC=0.5 → random ranking. AUC=1.0 → perfect ranking. AUC < 0.5 → worse than random (predictions are systematically inverted — flip them!). Typical useful models: AUC 0.7–0.9 depending on domain difficulty.",
+              },
+              e2_recovery_auc: {
+                id: "e2_recovery_auc",
+                type: "scenario_choice",
+                badge: "Recovery 1",
+                title: "Recovery · AUC geometric meaning",
+                prompt: "Which statement correctly describes the geometric meaning of AUC?",
+                code_snippet: `# ROC curve: TPR on y-axis, FPR on x-axis
+# Each point = (FPR, TPR) at a different threshold
+# AUC = area under this curve
+#
+# Random model:    AUC = 0.5  (diagonal line, area = 0.5)
+# Perfect model:   AUC = 1.0  (step to top-left corner)
+# Inverted model:  AUC < 0.5  (below diagonal)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "AUC is the probability that the model ranks a random positive example higher than a random negative example",
+                    description: "Correct. This is the exact probabilistic interpretation of AUC: P(score(positive) > score(negative)) when randomly sampling one positive and one negative. It is threshold-independent.",
+                  },
+                  {
+                    id: "b",
+                    label: "AUC is the average accuracy across all classification thresholds",
+                    description: "AUC integrates TPR over FPR, not accuracy. Accuracy requires a threshold; AUC is threshold-free.",
+                  },
+                  {
+                    id: "c",
+                    label: "AUC is the percentage of positive examples correctly classified",
+                    description: "That description is recall (sensitivity) at a specific threshold. AUC is a global, threshold-independent ranking metric.",
+                  },
+                  {
+                    id: "d",
+                    label: "AUC is the F1 score averaged over all thresholds",
+                    description: "F1 is a threshold-specific metric. AUC is not related to F1 — it is computed from TPR and FPR, not precision.",
+                  },
+                ],
+                branches: {
+                  a: "e2_choice_operating_point",
+                  b: "e2_choice_operating_point",
+                  c: "e2_choice_operating_point",
+                  d: "e2_choice_operating_point",
+                },
+                rationale: "The Wilcoxon-Mann-Whitney interpretation of AUC: for randomly drawn pairs (positive, negative), AUC = P(model scores the positive higher). This makes AUC interpretable, threshold-independent, and robust to class imbalance.",
+              },
+              e2_choice_operating_point: {
+                id: "e2_choice_operating_point",
+                type: "scenario_choice",
+                badge: "Stage 3",
+                title: "Stage 3 · Model selection at the operating point",
+                prompt: "Model A has AUC=0.82. Model B has AUC=0.79. At your business operating threshold (FPR=0.05), Model B has TPR=0.81 while Model A has TPR=0.69. Which do you deploy?",
+                code_snippet: `fpr_a, tpr_a, _ = roc_curve(y_test, proba_a)
+fpr_b, tpr_b, _ = roc_curve(y_test, proba_b)
+
+# At FPR ≈ 0.05:
+#   Model A TPR = 0.69   (AUC = 0.82 globally)
+#   Model B TPR = 0.81   (AUC = 0.79 globally)
+
+# Which model goes to production?`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Model B — AUC is global; what matters is the TPR at your specific operating FPR",
+                    description: "Correct. AUC summarises performance across ALL thresholds equally. Your business only operates at FPR=0.05. At that point, Model B catches 12% more true positives. The global AUC comparison is irrelevant to the actual deployment scenario.",
+                  },
+                  {
+                    id: "b",
+                    label: "Model A — always choose the higher AUC model",
+                    description: "Higher AUC means better average performance globally, but if you only ever operate at one specific threshold, the local TPR/FPR at that point is what determines real-world performance.",
+                  },
+                  {
+                    id: "c",
+                    label: "Neither — a difference of 0.03 AUC is not statistically significant",
+                    description: "Statistical significance of AUC difference is a separate question from operating-point performance. At FPR=0.05, Model B's advantage is 12 percentage points in TPR — operationally substantial regardless of global AUC significance.",
+                  },
+                  {
+                    id: "d",
+                    label: "Average the two models' probabilities to get the best of both",
+                    description: "Ensembling might be valid in some cases, but it doesn't address the question of which single model to deploy when one clearly outperforms at the specific operating point.",
+                  },
+                ],
+                branches: {
+                  a: "e2_choice_imbalance",
+                  b: "e2_recovery_operating",
+                  c: "e2_recovery_operating",
+                  d: "e2_recovery_operating",
+                },
+                rationale: "AUC is an aggregate statistic. If your system always operates at a specific precision or FPR constraint, evaluate models at that exact operating point on the ROC or precision-recall curve. Don't let a global metric override the local metric that determines actual business performance.",
+              },
+              e2_recovery_operating: {
+                id: "e2_recovery_operating",
+                type: "scenario_choice",
+                badge: "Recovery 2",
+                title: "Recovery · Finding the operating threshold from ROC",
+                prompt: "You need to operate at exactly TPR=0.90 (catch 90% of positives). How do you find the corresponding threshold from an ROC curve?",
+                code_snippet: `fpr, tpr, thresholds = roc_curve(y_test, y_pred_proba)
+
+# How do you find the threshold for TPR = 0.90?`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Find the index where TPR first meets or exceeds 0.90 in the tpr array, then use thresholds[that index]",
+                    description: "Correct. sklearn's roc_curve returns sorted (fpr, tpr, thresholds) arrays. Find the first index where tpr >= 0.90, then read off the corresponding threshold value. This is the minimum threshold that achieves the target recall.",
+                  },
+                  {
+                    id: "b",
+                    label: "Use threshold = 1 - 0.90 = 0.10 directly",
+                    description: "The threshold value is not simply 1 - TPR. The mapping from threshold to TPR depends on the model's score distribution — there's no arithmetic shortcut.",
+                  },
+                  {
+                    id: "c",
+                    label: "Set threshold = 0.90 since TPR and threshold are on the same scale",
+                    description: "Threshold values are model output scores (usually between 0 and 1) and have no direct arithmetic relationship to TPR values. The relationship is data-dependent.",
+                  },
+                  {
+                    id: "d",
+                    label: "ROC curves don't contain threshold information — you must use trial and error",
+                    description: "sklearn's roc_curve returns the thresholds array alongside fpr and tpr, making it straightforward to find the threshold for any target TPR or FPR.",
+                  },
+                ],
+                branches: {
+                  a: "e2_choice_imbalance",
+                  b: "e2_choice_imbalance",
+                  c: "e2_choice_imbalance",
+                  d: "e2_choice_imbalance",
+                },
+                rationale: "The roc_curve function returns three arrays of the same length: fpr, tpr, and thresholds. To find the threshold for a target recall: idx = np.searchsorted(tpr, target_tpr); threshold = thresholds[idx]. To find the threshold for a target FPR, sort by FPR and find the corresponding threshold.",
+              },
+              e2_choice_imbalance: {
+                id: "e2_choice_imbalance",
+                type: "scenario_choice",
+                badge: "Stage 4",
+                title: "Stage 4 · ROC-AUC vs PR-AUC for imbalanced data",
+                prompt: "Your dataset has 99% negative class. AUC = 0.95. A colleague says to use PR-AUC instead. Are they right?",
+                code_snippet: `from sklearn.metrics import roc_auc_score, average_precision_score
+
+roc_auc = roc_auc_score(y_test, y_proba)          # 0.95
+pr_auc  = average_precision_score(y_test, y_proba) # 0.31
+
+# Which metric should be the primary evaluation criterion?`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Both are valuable — but PR-AUC is often more informative for highly imbalanced datasets because it focuses on the minority class",
+                    description: "Correct. ROC-AUC counts true negatives (which are abundant in imbalanced data), making it relatively easy to achieve high AUC even with mediocre minority-class recall. PR-AUC focuses only on precision and recall for the positive class — a model with PR-AUC=0.31 on a 1% positive-class dataset is not very useful despite AUC=0.95.",
+                  },
+                  {
+                    id: "b",
+                    label: "ROC-AUC=0.95 proves the model is excellent — PR-AUC is unnecessary",
+                    description: "ROC-AUC can be inflated by a model that correctly classifies the majority of negatives while doing poorly on the rare positives. For 1% prevalence, PR-AUC tells a more honest story.",
+                  },
+                  {
+                    id: "c",
+                    label: "PR-AUC is always better than ROC-AUC regardless of class balance",
+                    description: "For balanced datasets, ROC-AUC is perfectly informative. PR-AUC becomes distinctly preferable in highly imbalanced settings where the minority class is what matters.",
+                  },
+                  {
+                    id: "d",
+                    label: "Neither is valid — use accuracy for all binary classification problems",
+                    description: "Accuracy is the least appropriate metric for imbalanced data. Both AUC variants are far more informative.",
+                  },
+                ],
+                branches: {
+                  a: "e2_terminal",
+                  b: "e2_recovery_pr",
+                  c: "e2_recovery_pr",
+                  d: "e2_recovery_pr",
+                },
+                rationale: "ROC-AUC: measures how well the model separates ALL examples; relatively robust to imbalance but can be overly optimistic when TN >> TP. PR-AUC (average precision): focuses purely on how well the model identifies positive examples — more pessimistic and more informative when positive class is rare. A model can have AUC=0.95 and PR-AUC=0.20, meaning it looks good globally but rarely finds the rare class precisely.",
+              },
+              e2_recovery_pr: {
+                id: "e2_recovery_pr",
+                type: "scenario_choice",
+                badge: "Recovery 3",
+                title: "Recovery · PR curve construction",
+                prompt: "Which axis pair defines a precision-recall curve?",
+                code_snippet: `from sklearn.metrics import precision_recall_curve
+
+precision, recall, thresholds = precision_recall_curve(
+    y_test, y_pred_proba
+)
+# Plot: x-axis = ?, y-axis = ?`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "x-axis = Recall (TPR), y-axis = Precision; threshold decreases left to right",
+                    description: "Correct. The PR curve plots precision (y) against recall (x) as the threshold varies. Moving left to right on the x-axis corresponds to lowering the threshold (more positive predictions → higher recall, lower precision). The ideal point is (1.0, 1.0) — top right.",
+                  },
+                  {
+                    id: "b",
+                    label: "x-axis = FPR, y-axis = TPR; this is the same as the ROC curve",
+                    description: "That is the ROC curve, not the PR curve. The PR curve replaces FPR with Precision on the y-axis.",
+                  },
+                  {
+                    id: "c",
+                    label: "x-axis = Threshold, y-axis = F1 score",
+                    description: "This is a threshold-vs-F1 plot, which is useful but not the PR curve.",
+                  },
+                  {
+                    id: "d",
+                    label: "x-axis = Precision, y-axis = Recall; the curve goes from (0,1) to (1,0)",
+                    description: "The axes are swapped. Recall is conventionally on the x-axis, precision on the y-axis. The curve runs from high-threshold (high precision, low recall) to low-threshold (low precision, high recall).",
+                  },
+                ],
+                branches: {
+                  a: "e2_terminal",
+                  b: "e2_terminal",
+                  c: "e2_terminal",
+                  d: "e2_terminal",
+                },
+                rationale: "PR curve: x-axis = recall, y-axis = precision. Baseline = positive class prevalence (a random classifier has PR-AUC ≈ prevalence). ROC curve: x-axis = FPR, y-axis = TPR. Baseline = diagonal (AUC=0.5). Both sweep over all possible thresholds.",
+              },
+              e2_terminal: {
+                id: "e2_terminal",
+                type: "scenario_choice",
+                badge: "Final",
+                title: "Revision complete · ROC & AUC Mastery",
+                terminal: true,
+                prompt: "Walk through constructing an ROC curve from scratch and explain when PR-AUC is a better choice than ROC-AUC.",
+                code_snippet: `# Binary classifier, test set: 1,000 samples (950 neg, 50 pos)
+# Model outputs: predicted probabilities in [0, 1]
+# Steps to construct ROC curve from scratch?`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Sort by predicted probability descending; sweep threshold from 1→0, computing (FPR, TPR) at each unique probability value; plot these pairs; AUC = area under curve. Prefer PR-AUC when positive class is rare (<5%) because ROC-AUC is inflated by easy TN classification",
+                    description: "Correct. ROC construction: (1) sort examples by score descending; (2) for each unique score as threshold, compute TPR = TP/(TP+FN), FPR = FP/(FP+TN); (3) plot (FPR, TPR); (4) integrate. For 5% positive prevalence (like this 50/1000 dataset), ROC-AUC may look artificially high because the model easily classifies the 95% negatives. PR-AUC focuses on how well the model identifies the rare positives.",
+                  },
+                  {
+                    id: "b",
+                    label: "ROC and PR curves are constructed the same way — just with different axis labels",
+                    description: "They both sweep thresholds, but the metrics plotted are different: ROC uses FPR and TPR; PR curve uses Recall and Precision. Precision depends on the predicted positive count (TP+FP), not on TN — this is the key difference in imbalanced settings.",
+                  },
+                  {
+                    id: "c",
+                    label: "ROC-AUC is always the right choice — PR-AUC is only for research papers",
+                    description: "PR-AUC is widely used in industry for imbalanced problems (fraud, medical diagnosis, anomaly detection). The choice between them is a practical decision based on class imbalance and business goals.",
+                  },
+                ],
+                branches: {
+                  a: "e2_terminal",
+                  b: "e2_terminal",
+                  c: "e2_terminal",
+                },
+                rationale: "ROC curve construction: sort predicted probabilities descending → sweep threshold → at each value compute TPR and FPR → plot → compute AUC via trapezoidal rule. When to use PR-AUC: imbalanced datasets (positive prevalence < ~10%) where TN volume inflates ROC-AUC. The baseline for PR-AUC is the positive prevalence (e.g., 0.05 for 5% prevalence), making it harder to look good — and more honest.",
+              },
+            },
+          },
     knowledgeCheck: [
       {
         question: "What does an AUC of 0.85 mean, precisely?",
@@ -463,6 +1128,367 @@ A subtle credibility issue: random search, Bayesian search, and CV folds all dep
 
 Sketch a 2-D hyperparameter space where the objective depends almost entirely on the x-axis (say learning rate) and barely on the y-axis. Plot a 5×5 **grid**: you get only **5 distinct x-values** despite 25 fits — the y-sweep is wasted. Now plot **25 random** points: you get ~25 distinct x-values, so you sample the dimension that matters 5× more finely for the same cost. That single picture is the entire grid-vs-random argument. Then layer the honesty point: write "inner CV picks the config; outer CV (never seen during picking) tells me how the *process* generalizes." If you only have one loop, the score you report is the score you optimized — biased upward.`,
     tryGuidance: `If a search-visualization is available, sweep the number of trials for grid vs random on a landscape with one dominant parameter and watch random reach a good score with fewer evaluations. Otherwise, reason it on paper: for a fixed budget of N fits across D hyperparameters where only one matters, count how many distinct values of the important parameter grid vs random gives you. Then add a CV loop and articulate why the score you *select on* cannot be the score you *report*.`,
+    interviewGraph: {
+            initialStageId: "e3_click_leakage",
+            artifactDimensions: [
+              {
+                label: "Hyperparameter Leakage",
+                recoveryStageId: "e3_recovery_leakage",
+              },
+              {
+                label: "Search Strategy",
+                recoveryStageId: "e3_recovery_search",
+              },
+              {
+                label: "Nested CV & Overfitting",
+                recoveryStageId: "e3_recovery_nested",
+                passLabel: "Hyperparameter Tuning Mastery",
+              },
+            ],
+            stages: {
+              e3_click_leakage: {
+                id: "e3_click_leakage",
+                type: "click_target",
+                badge: "Stage 1",
+                title: "Stage 1 · Hyperparameter selection leakage",
+                prompt: "The code below uses GridSearchCV on the full dataset and then reports best_score_ as the model's expected test performance. Click the line that leaks test data into hyperparameter selection.",
+                code_snippet: `from sklearn.model_selection import GridSearchCV
+from sklearn.ensemble import GradientBoostingClassifier
+
+param_grid = {
+    "n_estimators": [100, 200, 500],
+    "max_depth":    [3, 5, 7],
+    "learning_rate": [0.01, 0.1, 0.3],
+}
+
+gs = GridSearchCV(GradientBoostingClassifier(),
+                  param_grid, cv=5, scoring="roc_auc")
+gs.fit(X, y)   # ds-target:full_data_fit
+
+print(f"Expected AUC: {gs.best_score_:.3f}")
+model = gs.best_estimator_`,
+                validationCopy: {
+                  full_data_fit: "Correct. GridSearchCV is fitted on the entire dataset X (including what should be the held-out test set). The best_score_ reflects cross-validation performance on all available data — but there is no truly independent test set to estimate generalisation. The reported AUC will be optimistically biased because hyperparameter selection was driven by all available data.",
+                },
+                branches: {
+                  full_data_fit: "e3_choice_random_vs_grid",
+                },
+              },
+              e3_choice_random_vs_grid: {
+                id: "e3_choice_random_vs_grid",
+                type: "scenario_choice",
+                badge: "Stage 2",
+                title: "Stage 2 · Random search vs grid search",
+                prompt: "Random search and grid search explore the same hyperparameter space with the same number of trials. Why is random search often more efficient?",
+                code_snippet: `# Grid search: 3 × 3 × 3 = 27 fixed combinations
+grid_search = GridSearchCV(model, {
+    "n_estimators": [100, 200, 300],
+    "max_depth":    [3, 5, 7],
+    "learning_rate": [0.01, 0.1, 1.0],
+}, cv=5)
+
+# Random search: 27 random samples from distributions
+random_search = RandomizedSearchCV(model, {
+    "n_estimators": randint(50, 500),
+    "max_depth":    randint(2, 10),
+    "learning_rate": loguniform(0.001, 1.0),
+}, n_iter=27, cv=5)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Random search samples hyperparameter distributions broadly — not all dimensions matter equally, so random samples find good regions faster",
+                    description: "Correct. Research (Bergstra & Bengio 2012) shows that in high-dimensional hyperparameter spaces, only a few dimensions significantly affect performance. Grid search wastes trials on unimportant dimensions with fixed values. Random search samples each dimension independently, giving more unique values per important dimension across the same trial budget.",
+                  },
+                  {
+                    id: "b",
+                    label: "Random search trains each model faster because it uses fewer data points",
+                    description: "Random search and grid search evaluate each model on the same data. Speed comes from sampling fewer hyperparameter combinations, not from using less data.",
+                  },
+                  {
+                    id: "c",
+                    label: "Grid search is always more thorough — random search might miss the optimal combination",
+                    description: "Grid search is only more thorough on its chosen discrete grid. With continuous distributions, random search can discover values between grid points that grid search never tests.",
+                  },
+                  {
+                    id: "d",
+                    label: "They are equivalent — random is just a shuffled grid",
+                    description: "Random search samples from continuous distributions, covering the full hyperparameter space more densely for important dimensions. Grid search is restricted to the predefined discrete values.",
+                  },
+                ],
+                branches: {
+                  a: "e3_choice_test_contamination",
+                  b: "e3_recovery_search",
+                  c: "e3_recovery_search",
+                  d: "e3_recovery_search",
+                },
+                rationale: "The key insight: grid search marginalises over the full grid for every hyperparameter. If n_estimators has three values but doesn't matter much, all three are equally explored while learning_rate (which matters a lot) only gets 3 distinct values. Random search assigns unique values to important dimensions across all trials, giving more coverage where it counts.",
+              },
+              e3_recovery_search: {
+                id: "e3_recovery_search",
+                type: "scenario_choice",
+                badge: "Recovery 1",
+                title: "Recovery · Choosing a search strategy",
+                prompt: "Each training run takes 4 hours. You have a budget of 20 runs. Which hyperparameter search strategy is most appropriate?",
+                code_snippet: `# Budget: 20 trials × 4 hours = 80 GPU-hours
+# Hyperparameters: learning_rate, batch_size,
+#                  dropout, weight_decay, architecture depth
+# Constraint: cannot afford to waste any trial`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Bayesian optimization — models the objective surface and directs trials toward promising regions",
+                    description: "Correct. When each trial is very expensive and the budget is small, Bayesian optimization (e.g., Optuna, Hyperopt) uses the history of evaluated trials to model the objective function and select the next hyperparameter configuration most likely to improve performance. It outperforms random search when trial cost is high.",
+                  },
+                  {
+                    id: "b",
+                    label: "Grid search over all 5 hyperparameters at 2 values each",
+                    description: "2⁵ = 32 combinations exceeds the 20-trial budget. Even within budget, grid search wastes trials on unimportant dimensions.",
+                  },
+                  {
+                    id: "c",
+                    label: "Random search — it's the standard approach for all budgets",
+                    description: "Random search is efficient but not adaptive. With only 20 trials and expensive evaluations, Bayesian optimization's ability to learn from previous trials and focus on promising regions gives it a significant advantage.",
+                  },
+                  {
+                    id: "d",
+                    label: "Manual search based on intuition — hyperparameter tuning tools are too complex",
+                    description: "Manual search is the least reproducible and typically worse than even random search with similar trial count. Modern tools like Optuna are straightforward to use.",
+                  },
+                ],
+                branches: {
+                  a: "e3_choice_test_contamination",
+                  b: "e3_choice_test_contamination",
+                  c: "e3_choice_test_contamination",
+                  d: "e3_choice_test_contamination",
+                },
+                rationale: "Search strategy selection by trial cost: cheap trials (seconds) → grid or random search. Moderate cost (minutes) → random search. Expensive trials (hours) → Bayesian optimization. Very expensive (days) → Bayesian + early stopping (e.g., Hyperband/ASHA). Bayesian optimization's benefit grows with trial cost.",
+              },
+              e3_choice_test_contamination: {
+                id: "e3_choice_test_contamination",
+                type: "scenario_choice",
+                badge: "Stage 3",
+                title: "Stage 3 · Test set contamination during tuning",
+                prompt: "You run 100-trial random search, select the best hyperparameters, then evaluate on the held-out test set. Is the test score reliable?",
+                code_snippet: `# Workflow:
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42)
+
+rs = RandomizedSearchCV(model, param_dist,
+                        n_iter=100, cv=5,
+                        scoring="roc_auc")
+rs.fit(X_train, y_train)  # tuned entirely on X_train
+
+final_model = rs.best_estimator_
+test_auc = roc_auc_score(y_test,
+               final_model.predict_proba(X_test)[:, 1])
+print(f"Test AUC: {test_auc:.3f}")`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Yes — the test set was never touched during tuning; it gives an unbiased generalisation estimate",
+                    description: "Correct. The entire hyperparameter search (including all 100 trials and their cross-validation) was conducted on X_train only. The test set was held out until the very final evaluation. This is the correct procedure — the test score is an unbiased estimate of generalisation performance.",
+                  },
+                  {
+                    id: "b",
+                    label: "No — running 100 trials inflates the test score through multiple comparisons",
+                    description: "The 100 trials only compared models on cross-validation folds of X_train. The test set was never involved in any trial. Multiplicity affects the cross-validation score (optimistic bias in best_score_), not the independent test score.",
+                  },
+                  {
+                    id: "c",
+                    label: "No — GridSearchCV and RandomizedSearchCV always use the test set internally",
+                    description: "GridSearchCV/RandomizedSearchCV perform k-fold cross-validation on the data passed to .fit() — which is X_train. They have no access to X_test unless you pass it.",
+                  },
+                  {
+                    id: "d",
+                    label: "The workflow is invalid because you should never use train_test_split with cross-validation",
+                    description: "Train-test split + cross-validation is the standard evaluation pattern. The outer split creates a held-out test; inner CV is used for hyperparameter selection. This is correct and widely used.",
+                  },
+                ],
+                branches: {
+                  a: "e3_choice_bayesian",
+                  b: "e3_recovery_leakage",
+                  c: "e3_recovery_leakage",
+                  d: "e3_recovery_leakage",
+                },
+                rationale: "The golden rule: touch the test set exactly once. As long as all model development (feature engineering, hyperparameter tuning, architecture search) is done on training data only, the test score is unbiased. The optimistic bias from hyperparameter selection affects the CV best_score_ (not the final test score), which is why nested cross-validation is needed for unbiased CV estimates.",
+              },
+              e3_recovery_leakage: {
+                id: "e3_recovery_leakage",
+                type: "scenario_choice",
+                badge: "Recovery 2",
+                title: "Recovery · Correct hyperparameter tuning pipeline",
+                prompt: "Which workflow prevents both hyperparameter selection bias and test set contamination?",
+                code_snippet: `# Workflow A:
+gs.fit(X, y)  # all data
+report(gs.best_score_)
+
+# Workflow B:
+X_tr, X_te = split(X)
+gs.fit(X_tr, y_tr)  # tune on train
+report(eval(gs.best_estimator_, X_te))
+
+# Workflow C:
+X_tr, X_te = split(X)
+gs.fit(X_tr, y_tr)
+report(gs.best_score_)  # CV score as test estimate`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Workflow B — tune on train with CV, evaluate best model on independent held-out test",
+                    description: "Correct. Workflow B is the standard pattern: split → tune with CV on train → final evaluation on held-out test. The test score is unbiased. Note: gs.best_score_ (Workflow C) is slightly optimistic because the best is selected from multiple CV runs — use the independent test score instead.",
+                  },
+                  {
+                    id: "b",
+                    label: "Workflow A — using all data for CV gives the most reliable estimate",
+                    description: "Workflow A has no independent test set — best_score_ is optimistically biased by hyperparameter selection. No unbiased generalisation estimate is possible.",
+                  },
+                  {
+                    id: "c",
+                    label: "Workflow C — CV score equals the true test error",
+                    description: "The CV best_score_ is from the same data used to select hyperparameters — it is optimistically biased. For an unbiased test estimate, evaluate the best model on a separate held-out test set.",
+                  },
+                  {
+                    id: "d",
+                    label: "None — you must use nested cross-validation for any unbiased estimate",
+                    description: "Nested CV is the theoretically cleanest approach, but Workflow B (train/val/test split) is a valid and widely used practical alternative that gives an unbiased test score.",
+                  },
+                ],
+                branches: {
+                  a: "e3_choice_bayesian",
+                  b: "e3_choice_bayesian",
+                  c: "e3_choice_bayesian",
+                  d: "e3_choice_bayesian",
+                },
+                rationale: "Workflow B is the standard industry pattern. The bias in best_score_ comes from optimising over multiple hyperparameter configurations — you've 'peeked' at the CV results to pick the best. Using an independent test set that was never involved in any decision removes this bias.",
+              },
+              e3_choice_bayesian: {
+                id: "e3_choice_bayesian",
+                type: "scenario_choice",
+                badge: "Stage 4",
+                title: "Stage 4 · Bayesian optimization over random search",
+                prompt: "Bayesian optimization vs random search for hyperparameter tuning. When does Bayesian optimization win most decisively?",
+                code_snippet: `# Scenario A: model trains in 2 seconds, budget = 1000 trials
+# Scenario B: model trains in 3 hours, budget = 20 trials
+# Scenario C: 2 hyperparameters, wide ranges, budget = 50 trials
+# Scenario D: 20 hyperparameters, complex dependencies, budget = 100 trials`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Scenario B and D — expensive trials or complex dependency structure where learning from previous trials is most valuable",
+                    description: "Correct. Bayesian optimization fits a surrogate model (Gaussian process or TPE) on previous (hyperparameters → score) observations. This pays off when: (1) trials are expensive (B) — each trial's information is precious; (2) the search space is complex with dependencies (D) — random search spreads too thinly. For cheap trials (A), random search's simplicity wins. For few hyperparameters (C), random search is nearly optimal.",
+                  },
+                  {
+                    id: "b",
+                    label: "Scenario A — more trials mean Bayesian optimization converges faster",
+                    description: "With cheap trials and a large budget, random search can densely sample the space efficiently. Bayesian optimization's sequential acquisition overhead becomes a bottleneck and doesn't outperform parallelised random search.",
+                  },
+                  {
+                    id: "c",
+                    label: "Bayesian optimization is never worth the complexity — use random search everywhere",
+                    description: "For expensive models (hours/days per trial), Bayesian optimization's sample efficiency provides substantial practical benefits that outweigh its setup complexity.",
+                  },
+                  {
+                    id: "d",
+                    label: "Scenario C — Bayesian optimization is specifically designed for 2-hyperparameter problems",
+                    description: "Bayesian optimization works across all dimensionalities. For low-dimensional, simple search spaces, random search is competitive and simpler. Bayesian optimization's advantage grows with dimensionality and trial cost.",
+                  },
+                ],
+                branches: {
+                  a: "e3_terminal",
+                  b: "e3_recovery_nested",
+                  c: "e3_recovery_nested",
+                  d: "e3_recovery_nested",
+                },
+                rationale: "Bayesian optimization uses an acquisition function (e.g., expected improvement) guided by a surrogate model to select the next hyperparameter configuration. Its key advantage is sample efficiency — it finds good regions faster than random search when each evaluation is expensive. For cheap evaluations with large budgets, random search often performs comparably with less overhead.",
+              },
+              e3_recovery_nested: {
+                id: "e3_recovery_nested",
+                type: "scenario_choice",
+                badge: "Recovery 3",
+                title: "Recovery · Why nested cross-validation is necessary",
+                prompt: "You use 5-fold CV to select the best hyperparameters and report the best CV score as the model's performance estimate. Why is this estimate optimistically biased?",
+                code_snippet: `param_grid = {"C": [0.01, 0.1, 1, 10, 100]}
+gs = GridSearchCV(LogisticRegression(), param_grid, cv=5)
+gs.fit(X_train, y_train)
+
+# Is gs.best_score_ an unbiased performance estimate?
+print(f"Best CV score: {gs.best_score_:.3f}")`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Yes — because you selected the best C from 5 candidates using the same CV folds that produced the score",
+                    description: "Correct. The selection process (pick C with highest CV score) uses the same fold scores. This is a form of multiple comparisons — with 5 C values and 5 folds, you select the maximum of 5 noisy estimates. The maximum is positively biased relative to a new independent test set.",
+                  },
+                  {
+                    id: "b",
+                    label: "No — cross-validation is always unbiased regardless of how the result is used",
+                    description: "Cross-validation gives an unbiased estimate of a fixed model's performance. When you SELECT a model based on CV scores, the selected score is optimistically biased — the selection process introduces bias.",
+                  },
+                  {
+                    id: "c",
+                    label: "The bias is negligible — 5-fold CV with 5 candidates is fine",
+                    description: "The magnitude of bias depends on the variance in CV scores and the number of candidates. With more candidates or noisier data, the bias can be substantial. Nested CV quantifies it empirically.",
+                  },
+                  {
+                    id: "d",
+                    label: "Only biased if the dataset is small",
+                    description: "Selection bias (choosing the best from multiple options) affects estimates regardless of dataset size. Sample size affects the variance of CV scores, not whether selection introduces bias.",
+                  },
+                ],
+                branches: {
+                  a: "e3_terminal",
+                  b: "e3_terminal",
+                  c: "e3_terminal",
+                  d: "e3_terminal",
+                },
+                rationale: "When you select the best model from cross-validation, the reported score is E[max(CV scores)] — the expected maximum of multiple noisy evaluations. This is always >= the true performance. Nested cross-validation wraps an outer CV loop around the inner CV+selection loop, providing an unbiased performance estimate of the model selection procedure itself.",
+              },
+              e3_terminal: {
+                id: "e3_terminal",
+                type: "scenario_choice",
+                badge: "Final",
+                title: "Revision complete · Hyperparameter Tuning Mastery",
+                terminal: true,
+                prompt: "Explain nested cross-validation and when it is necessary. Why does regular cross-validation with model selection give optimistic performance estimates?",
+                code_snippet: `# Standard (biased) approach:
+gs = GridSearchCV(model, param_grid, cv=5)
+gs.fit(X_train, y_train)
+report(gs.best_score_)  # biased — how biased?
+
+# Nested CV approach:
+outer_cv = KFold(n_splits=5)
+inner_cv  = KFold(n_splits=3)
+nested_scores = cross_val_score(
+    GridSearchCV(model, param_grid, cv=inner_cv),
+    X_train, y_train, cv=outer_cv
+)
+report(nested_scores.mean())  # unbiased`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Standard CV best_score_ is biased upward because model selection uses the same folds that produced the score; nested CV wraps an outer loop to score the selection procedure on held-out folds — necessary when reporting generalisation performance in research or high-stakes production decisions",
+                    description: "Correct. In nested CV: inner loop = hyperparameter search; outer loop = evaluates the best model from each inner fold on left-out outer fold data. The outer fold was never seen during hyperparameter selection, so the outer-fold scores are unbiased estimates of the full pipeline's generalisation. Necessary when: (1) publishing results; (2) comparing multiple model architectures; (3) small datasets where bias from selection is large.",
+                  },
+                  {
+                    id: "b",
+                    label: "Standard CV is unbiased — nested CV is only needed for time-series data",
+                    description: "Time-series requires special CV (e.g., TimeSeriesSplit), but nested CV addresses selection bias, which is independent of data type. Standard CV with selection is optimistically biased for all data types.",
+                  },
+                  {
+                    id: "c",
+                    label: "Nested CV is the same as standard CV — just with more folds",
+                    description: "Nested CV has two nested loops: an outer loop that scores the full model selection procedure on held-out folds, and an inner loop that performs hyperparameter search on the remaining data. It is structurally different from simply increasing the fold count.",
+                  },
+                ],
+                branches: {
+                  a: "e3_terminal",
+                  b: "e3_terminal",
+                  c: "e3_terminal",
+                },
+                rationale: "Nested CV gives an unbiased estimate of the generalisation performance of a model class (including its hyperparameter selection procedure). When to use: comparing architectures on small datasets, reporting results in papers, auditing a full ML pipeline. When standard train/val/test split suffices: large datasets with a truly held-out test set that is touched only once. The difference in scores between nested and non-nested CV quantifies the selection bias.",
+              },
+            },
+          },
     knowledgeCheck: [
       {
         question: "For tuning 5 hyperparameters on a moderately expensive model, why is random search often preferred over grid search?",
@@ -634,6 +1660,366 @@ A point worth stating twice because it bites people: both resampling and class w
 
 Take 1,000 rows, 1% positive (10 positives). Mentally run "predict all negative": accuracy 0.99, recall 0.0 — useless, glowing dashboard. Now compare two real fixes. **(a) Class weights:** the loss now treats one missed positive like ~99 missed negatives, bending the boundary toward catching positives, *no synthetic data*. **(b) SMOTE:** you synthesize ~980 fake positives between real ones — but if you did that *before* splitting, a fake positive interpolated from a row now sitting in your validation fold means train and val share information, and your score is a mirage. Write the one rule that prevents it: "split first, resample the training fold only, leave validation and test at the real 1% rate." Finally note: a well-ranked model often needs *no* resampling — just move the threshold off 0.5 using the PR curve and a cost matrix.`,
     tryGuidance: `Open the **Imbalanced Classes** visualization. Crank the imbalance ratio toward extreme skew and watch accuracy stay near the top while recall on the minority class collapses — the accuracy paradox, live. Now drag the decision threshold down and see recall recover at the cost of precision; toggle "rebalance" to feel how class weighting shifts the operating point. The takeaway to narrate: accuracy is the liar, the threshold is the cheap lever, and the confusion matrix never lets you hide.`,
+    interviewGraph: {
+            initialStageId: "e4_click_smote_leakage",
+            artifactDimensions: [
+              {
+                label: "Resampling Pipeline Correctness",
+                recoveryStageId: "e4_recovery_pipeline",
+              },
+              {
+                label: "Oversampling Techniques",
+                recoveryStageId: "e4_recovery_techniques",
+              },
+              {
+                label: "Metrics for Imbalanced Data",
+                recoveryStageId: "e4_recovery_metrics",
+                passLabel: "Imbalanced Classes Mastery",
+              },
+            ],
+            stages: {
+              e4_click_smote_leakage: {
+                id: "e4_click_smote_leakage",
+                type: "click_target",
+                badge: "Stage 1",
+                title: "Stage 1 · SMOTE leaking into test set",
+                prompt: "The code below applies SMOTE before the train/test split. Click the line that causes synthetic minority samples to leak into the test set.",
+                code_snippet: `from imblearn.over_sampling import SMOTE
+from sklearn.model_selection import train_test_split
+
+X, y = load_fraud_data()
+# Class distribution: 99% legitimate (0), 1% fraud (1)
+
+sm = SMOTE(random_state=42)
+X_res, y_res = sm.fit_resample(X, y)   # ds-target:smote_before_split
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X_res, y_res, test_size=0.2, random_state=42
+)
+
+model.fit(X_train, y_train)
+print(model.score(X_test, y_test))`,
+                validationCopy: {
+                  smote_before_split: "Correct. SMOTE is applied to the entire dataset before splitting. The synthetic minority samples are interpolated from the original data — including from points that will end up in the test set. This means the test set contains synthetic samples generated using test-fold neighbours, creating data leakage. SMOTE must be applied only inside the training fold, never before splitting.",
+                },
+                branches: {
+                  smote_before_split: "e4_choice_class_weight",
+                },
+              },
+              e4_choice_class_weight: {
+                id: "e4_choice_class_weight",
+                type: "scenario_choice",
+                badge: "Stage 2",
+                title: "Stage 2 · class_weight=balanced mechanics",
+                prompt: "You train a classifier with class_weight='balanced' on a dataset with 1% positive class. What does this parameter do?",
+                code_snippet: `from sklearn.linear_model import LogisticRegression
+
+model = LogisticRegression(class_weight="balanced")
+model.fit(X_train, y_train)
+
+# class distribution: 990 negatives, 10 positives
+# balanced weights: negative = ?, positive = ?`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Upweights minority class in the loss function — misclassifying a positive costs ~99× more than misclassifying a negative",
+                    description: "Correct. class_weight='balanced' sets weights inversely proportional to class frequencies: weight_i = n_samples / (n_classes × count_i). For 1% positive class: positive weight ≈ 99× negative weight. This penalises minority-class errors more heavily, pushing the model to focus on correctly classifying the rare class.",
+                  },
+                  {
+                    id: "b",
+                    label: "Duplicates minority class samples to create a balanced dataset",
+                    description: "class_weight modifies the loss function weighting, not the data. Duplication is random oversampling — a different (and often inferior) technique.",
+                  },
+                  {
+                    id: "c",
+                    label: "Automatically applies SMOTE to generate synthetic samples",
+                    description: "class_weight and SMOTE are separate mechanisms. class_weight adjusts loss weights; SMOTE generates new synthetic data points.",
+                  },
+                  {
+                    id: "d",
+                    label: "Normalises feature values so all classes have equal influence",
+                    description: "class_weight is about the contribution of each training example to the loss function based on class membership — not about feature normalisation.",
+                  },
+                ],
+                branches: {
+                  a: "e4_choice_smote_placement",
+                  b: "e4_recovery_pipeline",
+                  c: "e4_recovery_pipeline",
+                  d: "e4_recovery_pipeline",
+                },
+                rationale: "class_weight='balanced' computes: weight_i = n_samples / (n_classes × n_i). For 1000 samples, 10 positives, 990 negatives: weight_positive = 1000/(2×10) = 50; weight_negative = 1000/(2×990) ≈ 0.5. The ratio 50:0.5 = 100:1 means each positive example counts 100× more in the gradient update. No new data is created — only the loss landscape is modified.",
+              },
+              e4_recovery_pipeline: {
+                id: "e4_recovery_pipeline",
+                type: "scenario_choice",
+                badge: "Recovery 1",
+                title: "Recovery · Correct resampling pipeline",
+                prompt: "Which pipeline correctly applies SMOTE during cross-validation without leakage?",
+                code_snippet: `# Option A: apply SMOTE before CV
+X_res, y_res = SMOTE().fit_resample(X_train, y_train)
+cross_val_score(model, X_res, y_res, cv=5)
+
+# Option B: imbalanced-learn Pipeline
+from imblearn.pipeline import Pipeline
+pipe = Pipeline([("smote", SMOTE()), ("clf", model)])
+cross_val_score(pipe, X_train, y_train, cv=5)
+
+# Option C: apply SMOTE only once on full training set
+X_res, y_res = SMOTE().fit_resample(X_train, y_train)
+model.fit(X_res, y_res)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Option A — SMOTE before CV with the original training set is clean",
+                    description: "Option A still leaks: SMOTE is applied to all of X_train before CV folds are created. Synthetic points are generated using neighbours from validation folds, inflating CV scores.",
+                  },
+                  {
+                    id: "b",
+                    label: "Option B — imbalanced-learn Pipeline applies SMOTE inside each CV fold, only on the training portion",
+                    description: "Correct. When using imblearn's Pipeline with cross_val_score, the pipeline's .fit() (including SMOTE) is called only on the training folds. The validation fold is passed through without resampling, ensuring no leakage.",
+                  },
+                  {
+                    id: "c",
+                    label: "Option C — SMOTE on full training set before final model fit is valid for production",
+                    description: "Option C is valid for fitting the production model (no test set leakage if X_train was already separated from X_test). However, it cannot be used for cross-validation without leakage — which is Option B's purpose.",
+                  },
+                  {
+                    id: "d",
+                    label: "All options are equivalent — SMOTE doesn't cause leakage",
+                    description: "Options A and C with CV do cause leakage. Only Option B (Pipeline inside CV) guarantees SMOTE is applied only to training folds.",
+                  },
+                ],
+                branches: {
+                  a: "e4_choice_smote_placement",
+                  b: "e4_choice_smote_placement",
+                  c: "e4_choice_smote_placement",
+                  d: "e4_choice_smote_placement",
+                },
+                rationale: "The correct pattern: use imblearn.pipeline.Pipeline (not sklearn's) to combine SMOTE with a classifier. When passed to cross_val_score or GridSearchCV, the pipeline ensures SMOTE is re-fitted on each training fold only. This is the only leak-free way to cross-validate with resampling.",
+              },
+              e4_choice_smote_placement: {
+                id: "e4_choice_smote_placement",
+                type: "scenario_choice",
+                badge: "Stage 3",
+                title: "Stage 3 · Where SMOTE must be applied",
+                prompt: "SMOTE generates synthetic minority samples. At which stage of a pipeline must it be applied to avoid data leakage?",
+                code_snippet: `# Full ML workflow:
+# 1. Load data
+# 2. Train/test split
+# 3. Feature engineering / scaling
+# 4. ???  ← where does SMOTE go?
+# 5. Model training
+# 6. Evaluation on test set
+
+# With cross-validation inside step 5:
+# a. SMOTE before outer CV loop
+# b. SMOTE before inner CV loop only
+# c. SMOTE inside each inner fold (training portion only)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Inside each training fold only — never on validation or test data",
+                    description: "Correct. SMOTE interpolates between existing minority samples. If it sees validation or test points, the synthetic samples are influenced by held-out data — leakage. Apply SMOTE only to the training portion of each fold, after the split is made.",
+                  },
+                  {
+                    id: "b",
+                    label: "Before the train/test split — using all data for SMOTE improves synthetic sample quality",
+                    description: "This is the pattern shown in Stage 1 — it causes test data to influence synthetic sample generation, leaking information from the test set.",
+                  },
+                  {
+                    id: "c",
+                    label: "After the test split but before cross-validation — the test set is already safe",
+                    description: "Applying SMOTE to X_train before CV folds are created means validation folds from X_train influence the synthetic sample interpolation — still a form of leakage for CV purposes.",
+                  },
+                  {
+                    id: "d",
+                    label: "On the test set only — the test set needs synthetic samples to match training distribution",
+                    description: "The test set must never be modified. It represents the real-world distribution the model will encounter — adding synthetic samples would make evaluation invalid.",
+                  },
+                ],
+                branches: {
+                  a: "e4_choice_oversample_vs_smote",
+                  b: "e4_recovery_techniques",
+                  c: "e4_recovery_techniques",
+                  d: "e4_recovery_techniques",
+                },
+                rationale: "Resampling rule: any data augmentation technique (SMOTE, random oversampling, undersampling) must be applied exclusively to training data, after the validation/test split. This ensures the evaluation data reflects the real, unmodified class distribution. Use imblearn.pipeline.Pipeline to enforce this automatically.",
+              },
+              e4_recovery_techniques: {
+                id: "e4_recovery_techniques",
+                type: "scenario_choice",
+                badge: "Recovery 2",
+                title: "Recovery · Oversampling vs undersampling tradeoffs",
+                prompt: "When should you prefer undersampling the majority class over oversampling the minority class?",
+                code_snippet: `# Dataset: 1,000,000 records — 990,000 neg, 10,000 pos
+# Undersampling: reduce negatives to ~10,000
+# Oversampling (SMOTE): increase positives to ~990,000
+
+# Option A: oversample to balance (2× minority)
+# Option B: undersample to balance (reduce majority)
+# Option C: both (combination) — e.g. SMOTEENN`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "When the dataset is very large and training time is prohibitive — undersampling dramatically reduces compute while retaining enough majority-class signal",
+                    description: "Correct. With 1M rows, oversampling to 50/50 could create ~2M rows. Training time doubles or worse. Undersampling to e.g. 10,000 negatives gives a manageable dataset and often sufficient majority-class coverage when the original majority class is large enough. The key risk: you discard potentially informative majority examples.",
+                  },
+                  {
+                    id: "b",
+                    label: "Undersampling is always better than SMOTE because it uses real data",
+                    description: "Undersampling discards real data, which can lose informative examples and hurt model performance. SMOTE's synthetic data, while artificial, preserves all real minority samples. Neither is universally superior.",
+                  },
+                  {
+                    id: "c",
+                    label: "Never undersample — always oversample because you're removing information",
+                    description: "Undersampling is a valid strategy, especially for very large datasets where training time is a constraint and the majority class is over-represented relative to the true signal density.",
+                  },
+                  {
+                    id: "d",
+                    label: "Undersample whenever the positive class rate is below 5%",
+                    description: "Class imbalance level alone doesn't determine the choice. Training data size, compute budget, and the nature of the majority class all factor into the decision.",
+                  },
+                ],
+                branches: {
+                  a: "e4_choice_oversample_vs_smote",
+                  b: "e4_choice_oversample_vs_smote",
+                  c: "e4_choice_oversample_vs_smote",
+                  d: "e4_choice_oversample_vs_smote",
+                },
+                rationale: "Undersampling: fast training (smaller dataset), may lose informative majority examples. Oversampling: preserves all data, risks overfitting to duplicated/synthetic points, increases training time. Combination methods (SMOTEENN, SMOTETomek) apply both and often outperform either alone. Choose based on dataset size, compute budget, and empirical cross-validation performance.",
+              },
+              e4_choice_oversample_vs_smote: {
+                id: "e4_choice_oversample_vs_smote",
+                type: "scenario_choice",
+                badge: "Stage 4",
+                title: "Stage 4 · Random oversampling vs SMOTE",
+                prompt: "Random oversampling duplicates existing minority samples. SMOTE generates new synthetic points. What is the key practical difference?",
+                code_snippet: `from imblearn.over_sampling import RandomOverSampler, SMOTE
+
+# Random oversampling: duplicate existing minority samples
+ros = RandomOverSampler(random_state=42)
+X_ros, y_ros = ros.fit_resample(X_train, y_train)
+
+# SMOTE: interpolate new points between neighbours
+sm = SMOTE(k_neighbors=5, random_state=42)
+X_sm, y_sm = sm.fit_resample(X_train, y_train)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Random oversampling can cause overfitting to specific minority examples; SMOTE interpolates between nearest neighbours creating diverse synthetic points that generalise better",
+                    description: "Correct. Random oversampling simply repeats existing samples — the model sees identical points many times, which can cause it to memorise those specific samples. SMOTE creates new points along line segments connecting minority class neighbours, introducing variation and reducing the risk of exact overfitting to specific training examples.",
+                  },
+                  {
+                    id: "b",
+                    label: "They are equivalent — both produce the same training distribution",
+                    description: "Random oversampling preserves exactly the original minority support (same points, more copies). SMOTE creates a convex hull of synthetic points between existing samples — a fundamentally different distribution with more coverage.",
+                  },
+                  {
+                    id: "c",
+                    label: "Random oversampling is always better because it uses real data",
+                    description: "Using exact duplicates of real data can lead to overfitting those specific points. SMOTE's synthetic interpolation often generalises better, especially when the minority class is small.",
+                  },
+                  {
+                    id: "d",
+                    label: "SMOTE can only be used for binary classification",
+                    description: "SMOTE works for multi-class problems as well — it generates synthetic samples for each minority class independently.",
+                  },
+                ],
+                branches: {
+                  a: "e4_terminal",
+                  b: "e4_recovery_metrics",
+                  c: "e4_recovery_metrics",
+                  d: "e4_recovery_metrics",
+                },
+                rationale: "Random oversampling: duplicate minority samples → model may overfit to those exact feature vectors. SMOTE: for each minority sample, pick k nearest minority neighbours, select a random one, interpolate a new synthetic point along the connecting vector. This creates a denser, more varied synthetic minority region. Key weakness of SMOTE: it can generate synthetic points in overlap regions with the majority class if k-neighbours cross class boundaries.",
+              },
+              e4_recovery_metrics: {
+                id: "e4_recovery_metrics",
+                type: "scenario_choice",
+                badge: "Recovery 3",
+                title: "Recovery · Right metrics for imbalanced evaluation",
+                prompt: "You have a 0.5% positive class dataset. Your model achieves 99.6% accuracy. Which metrics would actually tell you if the model is useful?",
+                code_snippet: `from sklearn.metrics import (
+    accuracy_score,
+    precision_score, recall_score, f1_score,
+    average_precision_score, roc_auc_score
+)
+
+acc = accuracy_score(y_test, y_pred)        # 0.996
+prec = precision_score(y_test, y_pred)      # ?
+rec  = recall_score(y_test, y_pred)         # ?
+f1   = f1_score(y_test, y_pred)             # ?
+auprc = average_precision_score(y_test, proba)  # ?`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Precision, Recall, F1 on positive class + AUPRC — these directly measure minority-class performance without being dominated by the majority class",
+                    description: "Correct. With 0.5% positive class, a model that predicts 'negative' for everything gets 99.5% accuracy. Precision/recall/F1 on the positive class and AUPRC are unaffected by the abundance of true negatives and directly measure what matters: how well the model identifies the rare positive cases.",
+                  },
+                  {
+                    id: "b",
+                    label: "ROC-AUC only — it is the gold standard for all classification problems",
+                    description: "ROC-AUC is robust to imbalance but still inflated by easy TN classification in extreme cases. For 0.5% positive prevalence, AUPRC is more informative because its baseline is the prevalence (0.005) rather than 0.5.",
+                  },
+                  {
+                    id: "c",
+                    label: "Balanced accuracy — it averages sensitivity and specificity",
+                    description: "Balanced accuracy is better than raw accuracy, but still doesn't show you precision (how reliable positive predictions are) — which is critical for the business decision to act on a positive prediction.",
+                  },
+                  {
+                    id: "d",
+                    label: "Accuracy is sufficient — 99.6% proves the model works",
+                    description: "A model that always predicts 'negative' achieves 99.5% accuracy on a 0.5% positive-class dataset. 99.6% accuracy is barely better than the trivial baseline and tells you nothing about whether any positives were detected.",
+                  },
+                ],
+                branches: {
+                  a: "e4_terminal",
+                  b: "e4_terminal",
+                  c: "e4_terminal",
+                  d: "e4_terminal",
+                },
+                rationale: "For highly imbalanced datasets (< 5% positive class): (1) never report accuracy alone; (2) precision/recall/F1 on positive class directly measure minority performance; (3) AUPRC provides a threshold-independent view with a meaningful baseline (= prevalence); (4) consider cost-sensitive metrics if FP and FN costs are quantified.",
+              },
+              e4_terminal: {
+                id: "e4_terminal",
+                type: "scenario_choice",
+                badge: "Final",
+                title: "Revision complete · Imbalanced Classes Mastery",
+                terminal: true,
+                prompt: "Your positive class is 0.1%. A colleague suggests oversampling to 50/50. What are the trade-offs and what metrics would you use to evaluate the final model?",
+                code_snippet: `# Original: 1,000,000 rows — 999,000 neg, 1,000 pos (0.1%)
+# Option A: oversample minority to 50/50
+#   → 999,000 pos (synthetic) + 999,000 neg = 1,998,000 rows
+# Option B: undersample to 50/50
+#   → 1,000 pos + 1,000 neg = 2,000 rows
+# Option C: class_weight='balanced', no resampling
+# Option D: mild oversampling, e.g. to 10% minority`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "50/50 via oversampling: massive SMOTE computation + risk of overfitting/mode collapse; prefer class_weight or mild oversampling (5-10%); evaluate with AUPRC, Recall@precision_floor, and confusion matrix at business threshold",
+                    description: "Correct. Oversampling 0.1% to 50/50 means generating 998× more synthetic samples than real ones — dominated by synthetic data, losing real-data diversity and risking mode collapse. class_weight='balanced' achieves similar loss-function rebalancing with no data inflation. Mild oversampling (to 5-10%) is a reasonable middle ground. Metrics: AUPRC (baseline=0.001, so hard to game), recall at a minimum precision floor, confusion matrix at the operating threshold.",
+                  },
+                  {
+                    id: "b",
+                    label: "Always oversample to 50/50 — perfectly balanced classes always produce the best models",
+                    description: "There is no empirical support for 50/50 being universally optimal. The optimal ratio depends on the cost asymmetry between FP and FN. Extreme oversampling of a 0.1% class creates massive synthetic datasets that don't represent the real distribution.",
+                  },
+                  {
+                    id: "c",
+                    label: "Undersample to 50/50 (2,000 rows) — smaller dataset is faster to train",
+                    description: "Undersampling to 2,000 rows discards 999,997 real observations — nearly all your data. While fast, this throws away enormous amounts of real signal from the majority class and will likely produce a poorly calibrated model.",
+                  },
+                ],
+                branches: {
+                  a: "e4_terminal",
+                  b: "e4_terminal",
+                  c: "e4_terminal",
+                },
+                rationale: "Handling 0.1% positive class in practice: (1) start with class_weight='balanced' — no data manipulation, just loss reweighting; (2) if that's insufficient, try mild oversampling (SMOTE to 1-5%) inside a Pipeline; (3) avoid extreme 50/50 oversampling — it inflates training data with synthetic noise; (4) for evaluation use AUPRC (baseline = 0.001 makes high scores meaningful), precision/recall at business threshold, and calibration plots; (5) always apply resampling inside CV folds using imblearn.pipeline.Pipeline.",
+              },
+            },
+          },
     knowledgeCheck: [
       {
         question: "On a 1%-positive dataset, what is the FIRST thing a senior engineer fixes before reaching for SMOTE?",

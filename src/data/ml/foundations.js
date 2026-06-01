@@ -114,6 +114,299 @@ Grab three recent product features you use (a spam filter, a "customers also bou
 
 Then flip one of them: redesign the *same product* under a different paradigm. (E.g. turn the spam filter from supervised classification into unsupervised anomaly detection — what label do you now lose, and what novel spam do you now catch?) The act of *re-framing the feedback signal* is exactly the muscle interviewers test.`,
     tryGuidance: `Toggle between the three paradigms in the lab and watch how the *feedback signal* changes — labeled colored points, an unlabeled cloud you must cluster yourself, or an agent chasing reward. Before you switch, **predict** what disappears from the screen when labels go away.`,
+    interviewGraph: {
+            initialStageId: "f1_paradigm_click",
+            artifactDimensions: [
+              {
+                label: "Supervision Signal",
+                recoveryStageId: "f1_recovery_supervision",
+              },
+              {
+                label: "Paradigm Classification",
+                recoveryStageId: "f1_recovery_paradigm",
+              },
+              {
+                label: "Hybrid & Edge Cases",
+                recoveryStageId: "f1_recovery_hybrid",
+                passLabel: "Paradigm Mastery",
+              },
+            ],
+            stages: {
+              f1_paradigm_click: {
+                id: "f1_paradigm_click",
+                type: "click_target",
+                badge: "Stage 1",
+                title: "Stage 1 · Unsupervised evaluation mistake",
+                prompt: "Your colleague ran a clustering pipeline and then measured its quality. Click the line that contradicts the fundamental principle that unsupervised learning has no ground-truth labels.",
+                code_snippet: `from sklearn.cluster import KMeans
+from sklearn.metrics import accuracy_score
+
+X = load_customer_data()
+labels_true = load_ground_truth_labels()   # ds-target:load_labels
+
+kmeans = KMeans(n_clusters=4)
+kmeans.fit(X)
+preds = kmeans.labels_
+
+acc = accuracy_score(labels_true, preds)   # ds-target:accuracy_eval
+print("Cluster accuracy:", acc)`,
+                validationCopy: {
+                  load_labels: "Partially right — loading labels isn't the core error, but it sets up the problem. The contradiction is actually evaluating an unsupervised model with supervised accuracy. Try the accuracy_score line.",
+                  accuracy_eval: "Correct. Unsupervised learning by definition has no ground-truth labels. Using accuracy_score with true labels contradicts the paradigm — you're treating clustering like a classification task. Use intrinsic metrics (silhouette score, inertia) or only compare to labels in a post-hoc analysis.",
+                },
+                branches: {
+                  load_labels: "f1_recovery_supervision",
+                  accuracy_eval: "f1_recommendation_choice",
+                },
+              },
+              f1_recommendation_choice: {
+                id: "f1_recommendation_choice",
+                type: "scenario_choice",
+                badge: "Stage 2",
+                title: "Stage 2 · Recommendation system paradigm",
+                prompt: "A recommendation system learns from implicit signals: clicks, dwell-time, and skips. Users never provide explicit star ratings. The model updates its weights after every session. Which learning paradigm best describes this system?",
+                code_snippet: `# System receives:
+# - user_id
+# - item_id
+# - event_type: "click" | "skip" | "dwell_30s"
+# - session_context
+
+# Model updates after each session.
+# No explicit label y is ever collected.`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Self-supervised / unsupervised signal learning",
+                    description: "Implicit signals (clicks, skips) are treated as proxy labels derived from user behaviour — no human annotation required. This is the dominant paradigm for collaborative filtering and contrastive recommendation models.",
+                  },
+                  {
+                    id: "b",
+                    label: "Supervised learning",
+                    description: "Supervised learning requires explicit labels (e.g., a user rating). Implicit signals are not ground-truth labels — they are noisy proxies that must be interpreted carefully.",
+                  },
+                  {
+                    id: "c",
+                    label: "Reinforcement learning",
+                    description: "RL applies when the model takes actions that affect future state and receives a reward signal. A recommendation system that simply learns from historical interactions without an explicit reward/action loop is not RL by default.",
+                  },
+                  {
+                    id: "d",
+                    label: "Semi-supervised learning",
+                    description: "Semi-supervised learning combines a small labelled set with a large unlabelled set. This system has no labelled set at all — it uses only implicit feedback.",
+                  },
+                ],
+                branches: {
+                  a: "f1_fraud_choice",
+                  b: "f1_recovery_supervision",
+                  c: "f1_recovery_supervision",
+                  d: "f1_recovery_paradigm",
+                },
+                rationale: "Implicit feedback recommendation systems occupy the unsupervised / self-supervised space. Clicks and dwell-time are behavioural proxies, not ground-truth labels. RL would apply only if the model explicitly takes actions (e.g., selects content) and receives a delayed reward that affects future recommendations in a policy-gradient loop.",
+              },
+              f1_fraud_choice: {
+                id: "f1_fraud_choice",
+                type: "scenario_choice",
+                badge: "Stage 3",
+                title: "Stage 3 · Novel fraud patterns",
+                prompt: "Your team has 90 days of labeled fraud transactions (0 = legitimate, 1 = fraud). Last week a new fraud ring emerged with entirely different patterns — no labels exist for these new events yet. Which approach best covers these novel patterns?",
+                code_snippet: `# Available data:
+# - 90 days of transactions with fraud labels (historical)
+# - 7 days of recent transactions (no labels yet)
+
+# Goal: detect BOTH known fraud types AND novel emerging patterns.`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Unsupervised anomaly detection on the recent unlabelled data",
+                    description: "Anomaly detection (isolation forest, autoencoder reconstruction error) flags statistical outliers without needing labels. This is exactly the right tool for novel patterns that have never been seen before.",
+                  },
+                  {
+                    id: "b",
+                    label: "Retrain the supervised classifier on the 90-day labelled set",
+                    description: "The supervised classifier can only recognise patterns it was trained on. Novel fraud patterns from last week are out-of-distribution — the classifier will likely miss them or assign low fraud probability.",
+                  },
+                  {
+                    id: "c",
+                    label: "Use reinforcement learning to penalise fraudulent transactions",
+                    description: "RL is unsuitable here — you don't have a clear reward signal for novel patterns, and the environment is not defined as a sequential decision process with known state transitions.",
+                  },
+                  {
+                    id: "d",
+                    label: "Collect more labels and retrain before deploying anything",
+                    description: "Waiting weeks for labels leaves you exposed to the active fraud ring. Anomaly detection can flag suspicious clusters now, which analysts can then label to bootstrap a future supervised model.",
+                  },
+                ],
+                branches: {
+                  a: "f1_terminal",
+                  b: "f1_recovery_paradigm",
+                  c: "f1_recovery_paradigm",
+                  d: "f1_recovery_hybrid",
+                },
+                rationale: "Novel patterns have no labels by definition, so supervised learning is blind to them. Unsupervised anomaly detection identifies transactions that deviate from the learned 'normal' distribution — it catches what it has never seen before. A production system often layers both: the supervised model handles known fraud types with high precision, while an anomaly detector surfaces emerging threats for analyst review.",
+              },
+              f1_recovery_supervision: {
+                id: "f1_recovery_supervision",
+                type: "scenario_choice",
+                badge: "Recovery A",
+                title: "Recovery · Supervision signal definition",
+                prompt: "What is the defining characteristic that separates supervised learning from unsupervised learning?",
+                code_snippet: `# Supervised:
+# X_train, y_train = load_labelled_data()
+# model.fit(X_train, y_train)
+
+# Unsupervised:
+# X_train = load_raw_data()
+# model.fit(X_train)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "The presence of ground-truth labels (y) provided during training",
+                    description: "Correct. Supervised learning optimises a model against explicit targets. Unsupervised learning finds structure in X alone — no y is available or used during training.",
+                  },
+                  {
+                    id: "b",
+                    label: "The size of the training dataset",
+                    description: "Dataset size is irrelevant to the paradigm. A tiny labelled dataset is still supervised; a massive unlabelled corpus is still unsupervised.",
+                  },
+                  {
+                    id: "c",
+                    label: "Whether the model uses gradient descent",
+                    description: "Both supervised and unsupervised models can use gradient descent. The optimisation algorithm does not determine the paradigm.",
+                  },
+                  {
+                    id: "d",
+                    label: "Whether the model makes predictions on new data",
+                    description: "All trained models can make predictions on new data. The paradigm is determined by how the model is trained, not how it is used at inference.",
+                  },
+                ],
+                branches: {
+                  a: "f1_recommendation_choice",
+                  b: "f1_recovery_supervision",
+                  c: "f1_recovery_supervision",
+                  d: "f1_recovery_supervision",
+                },
+                rationale: "The supervision signal is the label y. In supervised learning, the model learns a mapping f(X) → y by minimising a loss against known targets. In unsupervised learning, no y exists — the model discovers structure, clusters, or representations purely from X.",
+              },
+              f1_recovery_paradigm: {
+                id: "f1_recovery_paradigm",
+                type: "scenario_choice",
+                badge: "Recovery B",
+                title: "Recovery · Paradigm classification",
+                prompt: "A game-playing AI receives +1 for winning, -1 for losing, and 0 for all other moves. It plays millions of games and improves its move selection over time. Which paradigm is this?",
+                code_snippet: `# After each game:
+# reward = +1  # win
+# reward = -1  # loss
+# reward =  0  # draw or intermediate move
+
+# The agent updates its policy based on rewards.`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Reinforcement learning",
+                    description: "Correct. The agent takes actions (moves), those actions affect future game state, and a delayed reward signal is used to update a policy. This is the canonical RL setting.",
+                  },
+                  {
+                    id: "b",
+                    label: "Supervised learning",
+                    description: "There are no pre-labelled 'correct move' examples for every game state. The agent is learning from outcomes, not from labelled decisions.",
+                  },
+                  {
+                    id: "c",
+                    label: "Unsupervised learning",
+                    description: "There is an explicit reward signal. Unsupervised learning has no such signal — it finds structure with no external feedback.",
+                  },
+                  {
+                    id: "d",
+                    label: "Self-supervised learning",
+                    description: "Self-supervised learning generates pseudo-labels from the data itself (e.g., predict masked tokens). A game reward signal from the environment is RL, not self-supervised.",
+                  },
+                ],
+                branches: {
+                  a: "f1_fraud_choice",
+                  b: "f1_recovery_paradigm",
+                  c: "f1_recovery_paradigm",
+                  d: "f1_recovery_paradigm",
+                },
+                rationale: "Reinforcement learning is defined by the agent–environment loop: the agent selects actions, the environment transitions to a new state, and a reward signal is received. The key distinguisher from supervised learning is that there are no pre-labelled correct actions — only delayed outcome signals.",
+              },
+              f1_recovery_hybrid: {
+                id: "f1_recovery_hybrid",
+                type: "scenario_choice",
+                badge: "Recovery C",
+                title: "Recovery · Hybrid paradigms",
+                prompt: "Semi-supervised learning is useful when labelling is expensive. Which scenario is the best fit for semi-supervised learning?",
+                code_snippet: `# Scenario A: 1 million images, 500 labelled by radiologists
+# Scenario B: 10,000 fully labelled customer records
+# Scenario C: 2 million transactions, no labels exist
+# Scenario D: 100 samples with labels, 100 samples without`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Scenario A: 1M images, 500 labelled by radiologists",
+                    description: "Correct. Semi-supervised learning shines when a large unlabelled pool is cheap to collect but labelling is expensive (radiologist time). The model learns representations from the 1M unlabelled images and fine-tunes on the 500 labelled ones.",
+                  },
+                  {
+                    id: "b",
+                    label: "Scenario B: 10,000 fully labelled customer records",
+                    description: "When all data is labelled, fully supervised learning is the right choice. Semi-supervised adds complexity without benefit when labels are complete.",
+                  },
+                  {
+                    id: "c",
+                    label: "Scenario C: 2M transactions, no labels at all",
+                    description: "With zero labels, you cannot use semi-supervised learning — it requires at least some labelled examples. This is a pure unsupervised setting.",
+                  },
+                  {
+                    id: "d",
+                    label: "Scenario D: 100 labelled + 100 unlabelled",
+                    description: "While technically semi-supervised, 100 unlabelled samples is usually too few to gain meaningful representation learning. Semi-supervised is most powerful when unlabelled data vastly outnumbers labelled data.",
+                  },
+                ],
+                branches: {
+                  a: "f1_terminal",
+                  b: "f1_recovery_hybrid",
+                  c: "f1_recovery_hybrid",
+                  d: "f1_recovery_hybrid",
+                },
+                rationale: "Semi-supervised learning is the paradigm for high-label-cost domains: medical imaging, legal document classification, scientific annotation. The key ratio is a small labelled set surrounded by a large unlabelled pool. The model uses the unlabelled data for self-supervised pre-training or consistency regularisation, then fine-tunes on the labelled subset.",
+              },
+              f1_terminal: {
+                id: "f1_terminal",
+                type: "scenario_choice",
+                badge: "Complete",
+                title: "Revision complete · ML Paradigms mastered",
+                terminal: true,
+                prompt: "A content moderation system flags posts, human reviewers approve or reject the flags, and the model updates its weights based on reviewer decisions. Which paradigm does this most closely resemble, and what is the key risk in this setup?",
+                code_snippet: `# Pipeline:
+# 1. model.predict(post) → flag_score
+# 2. if flag_score > threshold: send to human_review_queue
+# 3. reviewer labels: approved_flag | rejected_flag
+# 4. model.update(post, reviewer_label)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Supervised / active learning — risk: reviewer bias becomes encoded in the model",
+                    description: "Correct. Reviewer decisions are ground-truth labels used to update the model — this is supervised learning with a human-in-the-loop. The key risk is systematic reviewer bias: if reviewers consistently under-flag certain content types, the model learns that bias and perpetuates it at scale.",
+                  },
+                  {
+                    id: "b",
+                    label: "Reinforcement learning — risk: reward hacking",
+                    description: "RL would require a formal action-reward loop with delayed outcomes. Here the reviewer label is an immediate supervised signal, not a delayed environmental reward.",
+                  },
+                  {
+                    id: "c",
+                    label: "Unsupervised — risk: no interpretability",
+                    description: "The system has explicit labels from reviewers. It is not unsupervised.",
+                  },
+                ],
+                branches: {
+                  a: "f1_terminal",
+                  b: "f1_terminal",
+                  c: "f1_terminal",
+                },
+                rationale: "Human-in-the-loop systems are a form of active supervised learning. The human label IS the ground truth. This creates a feedback loop where model errors influence what gets reviewed (only flagged posts reach reviewers), and reviewer biases get encoded into training data. Auditing reviewer agreement rates and maintaining a random sample of unflagged posts for review are essential safeguards.",
+              },
+            },
+          },
     knowledgeCheck: [
       {
         question:
@@ -325,6 +618,351 @@ Sketch **two** plots side by side from memory and label every region:
 
 Then write one sentence for each lever — regularization, more data, more features — naming **which term it moves and which it costs**. If you can produce both plots and the lever sentences without notes, you can defend any "underfit or overfit?" question.`,
     tryGuidance: `Drag the **complexity** dial in the lab and watch bias², variance, and total error move in real time. **Before** you touch it: predict which curve dominates the error when the model is *too simple*, and which dominates when it's *too complex* — then find the U-curve minimum yourself.`,
+    interviewGraph: {
+            initialStageId: "f2_variance_click",
+            artifactDimensions: [
+              {
+                label: "Overfitting Diagnosis",
+                recoveryStageId: "f2_recovery_overfit",
+              },
+              {
+                label: "Bias-Variance Balance",
+                recoveryStageId: "f2_recovery_biasvar",
+              },
+              {
+                label: "Regularization Strategy",
+                recoveryStageId: "f2_recovery_regularize",
+                passLabel: "Bias-Variance Mastery",
+              },
+            ],
+            stages: {
+              f2_variance_click: {
+                id: "f2_variance_click",
+                type: "click_target",
+                badge: "Stage 1",
+                title: "Stage 1 · High-variance deployment",
+                prompt: "A data scientist trained a decision tree with 1000 leaf nodes and immediately deployed it. Click the line that most directly creates the high-variance problem.",
+                code_snippet: `from sklearn.tree import DecisionTreeClassifier
+
+X_train, y_train = load_training_data()
+
+dt = DecisionTreeClassifier(max_depth=None, min_samples_leaf=1)  # ds-target:no_regularize
+dt.fit(X_train, y_train)
+
+# No validation set evaluation performed
+score = dt.score(X_train, y_train)   # ds-target:train_score_only
+print("Ready to deploy, score:", score)
+deploy(dt)                            # ds-target:deploy_no_val`,
+                validationCopy: {
+                  no_regularize: "Correct. Setting max_depth=None and min_samples_leaf=1 allows the tree to grow until every leaf is pure — memorising every training example including noise. This is the root cause of high variance.",
+                  train_score_only: "Good instinct — evaluating only on training data misses the overfitting. But the real cause is the unconstrained tree configuration. The train-only evaluation is a symptom of the workflow problem, not the model problem. Try the DecisionTreeClassifier line.",
+                  deploy_no_val: "Deploying without validation is reckless, but the high-variance problem is created earlier — when the model is configured with no depth limit. Try the DecisionTreeClassifier line.",
+                },
+                branches: {
+                  no_regularize: "f2_mse_choice",
+                  train_score_only: "f2_recovery_overfit",
+                  deploy_no_val: "f2_recovery_overfit",
+                },
+              },
+              f2_mse_choice: {
+                id: "f2_mse_choice",
+                type: "scenario_choice",
+                badge: "Stage 2",
+                title: "Stage 2 · Diagnosing train/val gap",
+                prompt: "After training a regression model you observe: Train MSE = 0.02, Validation MSE = 2.1. What does this gap indicate, and what is the correct diagnosis?",
+                code_snippet: `# Results after training:
+train_mse = 0.02   # nearly perfect on training data
+val_mse   = 2.10   # 100x worse on unseen data
+
+# The model has 847 parameters.
+# Training set size: 1,200 samples.`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "High variance — the model is overfitting the training set",
+                    description: "Correct. A 100x gap between train and validation loss is a textbook sign of high variance. The model has memorised training-set noise rather than learning the underlying signal. Solutions: reduce model complexity, add regularization, collect more training data.",
+                  },
+                  {
+                    id: "b",
+                    label: "High bias — the model is too simple to fit the data",
+                    description: "High bias causes both train AND validation error to be high. Here train MSE is excellent (0.02) — the model fits training data perfectly. The problem is it fails to generalise.",
+                  },
+                  {
+                    id: "c",
+                    label: "Optimal fit — 0.02 training error is the target",
+                    description: "A near-zero training error paired with a 100x higher validation error is not optimal. It signals the model has memorised the training set.",
+                  },
+                  {
+                    id: "d",
+                    label: "Data quality issue — validation set must be corrupted",
+                    description: "While data quality should always be checked, a 100x error ratio is a classical overfitting signature. Blaming data quality without investigating the model complexity is premature.",
+                  },
+                ],
+                branches: {
+                  a: "f2_complexity_choice",
+                  b: "f2_recovery_biasvar",
+                  c: "f2_recovery_overfit",
+                  d: "f2_recovery_overfit",
+                },
+                rationale: "The bias-variance tradeoff manifests in the train/val gap. Low train error + high val error = high variance (overfitting). High train error + high val error = high bias (underfitting). The gap size is your diagnostic signal: a 100x ratio demands complexity reduction or regularization.",
+              },
+              f2_complexity_choice: {
+                id: "f2_complexity_choice",
+                type: "scenario_choice",
+                badge: "Stage 3",
+                title: "Stage 3 · Complexity vs. validation error",
+                prompt: "You increase your decision tree's max_depth from 3 to 20 in steps. Training error drops steadily. Validation error drops until depth=7, then rises consistently. What should you do?",
+                code_snippet: `# Learning curve observations:
+# depth=3:  train_err=0.18, val_err=0.20  (underfitting)
+# depth=7:  train_err=0.09, val_err=0.11  (sweet spot)
+# depth=12: train_err=0.05, val_err=0.16  (overfitting begins)
+# depth=20: train_err=0.01, val_err=0.29  (severe overfitting)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Set max_depth=7 and apply early stopping or pruning",
+                    description: "Correct. Depth=7 is the sweet spot where the bias-variance tradeoff is best balanced. Beyond that, increasing complexity only increases variance. Apply cost-complexity pruning or simply cap depth at 7.",
+                  },
+                  {
+                    id: "b",
+                    label: "Continue increasing depth to further reduce training error",
+                    description: "Training error will continue to fall, but validation error will keep rising. You are moving further into high-variance territory. The training error is not the metric you should be optimising.",
+                  },
+                  {
+                    id: "c",
+                    label: "Add more features to reduce the gap",
+                    description: "Adding features increases model complexity, which will worsen the overfitting at higher depths. The problem is complexity, not insufficient features.",
+                  },
+                  {
+                    id: "d",
+                    label: "Collect a larger test set to get a more accurate measure",
+                    description: "The validation set is for model selection, not diagnosis. The learning curve already clearly shows where the optimum lies — more validation data confirms it but doesn't change the action.",
+                  },
+                ],
+                branches: {
+                  a: "f2_bias_choice",
+                  b: "f2_recovery_overfit",
+                  c: "f2_recovery_regularize",
+                  d: "f2_recovery_biasvar",
+                },
+                rationale: "The validation learning curve is your guide for model selection. The sweet spot is where validation error is minimised — adding complexity beyond that point is pure variance increase with no bias benefit. In practice you'd use cross-validation to find this point robustly, and apply pruning or regularization to stabilise the model there.",
+              },
+              f2_bias_choice: {
+                id: "f2_bias_choice",
+                type: "scenario_choice",
+                badge: "Stage 4",
+                title: "Stage 4 · High bias diagnosis",
+                prompt: "A linear regression model has Train R²=0.31 and Val R²=0.29 — essentially no gap, but both are poor. Adding 50 additional noisy features does not improve performance. What does the model need?",
+                code_snippet: `# Current state:
+# Linear model, 12 features
+# train_r2 = 0.31
+# val_r2   = 0.29  # tiny gap → not overfitting
+
+# After adding 50 noisy features:
+# train_r2 = 0.33
+# val_r2   = 0.28  # still poor, gap widens slightly`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "A more expressive model or non-linear feature engineering",
+                    description: "Correct. When both train and val errors are high and roughly equal, you have high bias — the model cannot represent the true relationship. A linear model may be fundamentally wrong for this data. Try polynomial features, interaction terms, or a non-linear model (gradient boosted trees, neural net).",
+                  },
+                  {
+                    id: "b",
+                    label: "More regularization to reduce the slight val gap",
+                    description: "There is virtually no train/val gap — this is not an overfitting problem. Adding regularization would increase bias further, making performance worse.",
+                  },
+                  {
+                    id: "c",
+                    label: "More training data to reduce variance",
+                    description: "More data helps with high variance, not high bias. The tiny train/val gap confirms this is a bias problem. More data will not help a model that is fundamentally too simple.",
+                  },
+                  {
+                    id: "d",
+                    label: "Feature scaling — the features may have different magnitudes",
+                    description: "Feature scaling can help linear models converge faster but does not change the model's expressive power. If the true relationship is non-linear, scaling will not close the bias gap.",
+                  },
+                ],
+                branches: {
+                  a: "f2_terminal",
+                  b: "f2_recovery_regularize",
+                  c: "f2_recovery_biasvar",
+                  d: "f2_recovery_regularize",
+                },
+                rationale: "High bias (underfitting) is diagnosed by high train error AND a small train/val gap. The model is equally bad everywhere — it lacks the capacity to fit the data. The fix is always more model capacity or better features. Adding noisy features does not help because they carry no signal; you need features that capture the true non-linear structure.",
+              },
+              f2_recovery_overfit: {
+                id: "f2_recovery_overfit",
+                type: "scenario_choice",
+                badge: "Recovery A",
+                title: "Recovery · Overfitting diagnosis",
+                prompt: "Which learning curve pattern is the clearest sign of high variance (overfitting)?",
+                code_snippet: `# Pattern A: as training size grows,
+#   train_error stays low (~0.02), val_error stays high (~0.18)
+#   → gap does NOT close
+
+# Pattern B: as training size grows,
+#   train_error rises from 0.01 to 0.12
+#   val_error drops from 0.25 to 0.13
+#   → gap closes, both converge
+
+# Pattern C: as training size grows,
+#   both train_error and val_error stay high (~0.22)
+#   → gap is always small`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Pattern A — persistent large gap between train and val error",
+                    description: "Correct. A gap that stays wide as training size grows is the hallmark of high variance. The model has too much capacity relative to the signal — more data helps but slowly. You need regularization or a simpler model.",
+                  },
+                  {
+                    id: "b",
+                    label: "Pattern B — gap closes as training size grows",
+                    description: "Pattern B shows a model that was initially overfitting on small data but generalises better with more samples. This is expected behaviour, not chronic overfitting.",
+                  },
+                  {
+                    id: "c",
+                    label: "Pattern C — both errors high and close together",
+                    description: "Both errors high with a small gap is high bias (underfitting). The model is too simple for the task.",
+                  },
+                  {
+                    id: "d",
+                    label: "All patterns indicate overfitting",
+                    description: "Patterns B and C do not indicate overfitting. Pattern B shows convergence; Pattern C shows underfitting.",
+                  },
+                ],
+                branches: {
+                  a: "f2_mse_choice",
+                  b: "f2_recovery_overfit",
+                  c: "f2_recovery_overfit",
+                  d: "f2_recovery_overfit",
+                },
+                rationale: "Learning curves plot error vs. training set size. High variance shows as a persistent wide gap — the model memorises whatever data it gets but fails on new data. High bias shows as high error on both sets with a small gap. This visual distinction is one of the most important diagnostic tools in ML.",
+              },
+              f2_recovery_biasvar: {
+                id: "f2_recovery_biasvar",
+                type: "scenario_choice",
+                badge: "Recovery B",
+                title: "Recovery · Bias-variance balance",
+                prompt: "Total prediction error can be decomposed into three components. Which decomposition is correct?",
+                code_snippet: `# For a model's expected MSE on unseen data:
+# Option A: MSE = Bias² + Variance + Irreducible Noise
+# Option B: MSE = Bias  + Variance + Model Complexity
+# Option C: MSE = Bias² + Variance²+ Irreducible Noise
+# Option D: MSE = Bias² + Variance + Training Error`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Option A: MSE = Bias² + Variance + Irreducible Noise",
+                    description: "Correct. The bias-variance decomposition says: expected test MSE = (bias of the estimator)² + variance of the estimator + irreducible noise. The bias is squared because it represents the systematic offset from the true value.",
+                  },
+                  {
+                    id: "b",
+                    label: "Option B: MSE = Bias + Variance + Model Complexity",
+                    description: "Model complexity is not a direct component of the error decomposition. It influences bias and variance but is not itself part of the MSE formula.",
+                  },
+                  {
+                    id: "c",
+                    label: "Option C: MSE = Bias² + Variance² + Irreducible Noise",
+                    description: "Variance is not squared in the decomposition. Bias is squared (it represents a systematic deviation), but variance enters linearly.",
+                  },
+                  {
+                    id: "d",
+                    label: "Option D: MSE = Bias² + Variance + Training Error",
+                    description: "Training error is not a component of the generalisation error decomposition. The decomposition applies to the expected error on unseen data.",
+                  },
+                ],
+                branches: {
+                  a: "f2_complexity_choice",
+                  b: "f2_recovery_biasvar",
+                  c: "f2_recovery_biasvar",
+                  d: "f2_recovery_biasvar",
+                },
+                rationale: "MSE = Bias² + Variance + Irreducible Noise. This decomposition explains the fundamental tradeoff: reducing bias (using a more complex model) typically increases variance, and vice versa. The irreducible noise floor is the best any model can do given the inherent randomness in the data.",
+              },
+              f2_recovery_regularize: {
+                id: "f2_recovery_regularize",
+                type: "scenario_choice",
+                badge: "Recovery C",
+                title: "Recovery · Regularization strategy",
+                prompt: "L2 regularization (Ridge) adds λ·Σw² to the loss function. What is the primary effect on the bias-variance tradeoff?",
+                code_snippet: `# Ridge loss:
+# L = MSE(y, ŷ) + λ * sum(w_i ** 2)
+
+# As λ increases from 0 to ∞:
+# A) bias increases, variance decreases
+# B) bias decreases, variance increases
+# C) both bias and variance decrease
+# D) neither changes; only convergence speed changes`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Bias increases, variance decreases",
+                    description: "Correct. L2 regularization penalises large weights, shrinking them toward zero. Smaller weights mean a smoother, less flexible model — higher bias but lower variance. As λ→∞, all weights approach zero (the model predicts the mean), which is maximum bias / minimum variance.",
+                  },
+                  {
+                    id: "b",
+                    label: "Bias decreases, variance increases",
+                    description: "This is the opposite direction. Regularization restricts the model — it can't fit the training data as well (more bias) but fits new data more consistently (less variance).",
+                  },
+                  {
+                    id: "c",
+                    label: "Both bias and variance decrease",
+                    description: "The bias-variance tradeoff generally prevents both from decreasing simultaneously. Regularization is a deliberate trade: accept more bias in exchange for less variance.",
+                  },
+                  {
+                    id: "d",
+                    label: "Neither changes; only convergence speed changes",
+                    description: "Regularization fundamentally changes the model's functional form. It is not just a solver parameter — it changes the solution found by optimisation.",
+                  },
+                ],
+                branches: {
+                  a: "f2_bias_choice",
+                  b: "f2_recovery_regularize",
+                  c: "f2_recovery_regularize",
+                  d: "f2_recovery_regularize",
+                },
+                rationale: "Regularization is a deliberate bias-variance trade. L2 (Ridge) shrinks weights toward zero, reducing model flexibility (higher bias) but making the model more stable across different training samples (lower variance). The hyperparameter λ controls where you sit on the tradeoff curve. Cross-validation is used to find the λ that minimises validation error.",
+              },
+              f2_terminal: {
+                id: "f2_terminal",
+                type: "scenario_choice",
+                badge: "Complete",
+                title: "Revision complete · Bias-Variance mastered",
+                terminal: true,
+                prompt: "A model has Train AUC=0.99, Validation AUC=0.61. An interviewer asks you to walk through your diagnosis and name three concrete fixes. Which answer is most complete and accurate?",
+                code_snippet: `# Observation:
+train_auc = 0.99
+val_auc   = 0.61
+# Gap = 0.38 AUC points
+# Model: gradient boosted trees, 500 estimators, no max_depth limit
+# Training set: 8,000 samples`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "High variance. Fix 1: reduce tree depth/add max_depth. Fix 2: add L2 regularization (lambda/min_child_weight). Fix 3: collect more training data or use dropout-equivalent subsampling.",
+                    description: "Correct and complete. The 0.38 AUC gap with near-perfect train performance is textbook high variance. All three fixes directly reduce variance: capacity restriction, parameter regularization, and data augmentation / subsampling all move the model along the bias-variance curve toward lower variance.",
+                  },
+                  {
+                    id: "b",
+                    label: "High bias. Fix 1: add more features. Fix 2: use a deeper model. Fix 3: remove regularization.",
+                    description: "This diagnosis is backwards. Train AUC=0.99 means the model has MORE than enough capacity. High bias would show both train and val AUC being low. The proposed fixes would increase variance further.",
+                  },
+                  {
+                    id: "c",
+                    label: "Data leakage. Fix 1: check the validation pipeline. Fix 2: re-split the data. Fix 3: audit feature engineering.",
+                    description: "Data leakage would cause val performance to be spuriously HIGH, not low. A val AUC of 0.61 versus train 0.99 is the opposite of leakage — it's generalisation failure.",
+                  },
+                ],
+                branches: {
+                  a: "f2_terminal",
+                  b: "f2_terminal",
+                  c: "f2_terminal",
+                },
+                rationale: "The diagnostic pattern: train AUC near 1.0 + large train/val gap = high variance. The model has memorised training data. Three systematic fixes: (1) reduce model capacity (shallower trees, fewer estimators), (2) add regularization parameters (lambda, min_child_weight, min_samples_leaf), (3) more data or subsampling (row/column sampling reduces correlation between trees and lowers ensemble variance). Always report which metric you use and why when diagnosing in an interview.",
+              },
+            },
+          },
     knowledgeCheck: [
       {
         question:
@@ -528,6 +1166,329 @@ Take a dataset you know (or invent one: hospital readmission with multiple visit
 
 Then state the guarantee you'd forfeit by tuning a threshold on the test set. If you can do all three for an unfamiliar dataset, you can defend any validation-design question.`,
     tryGuidance: `In the lab, step through k-fold cross-validation fold by fold and watch which rows train vs validate, and how the per-fold score varies. **Predict first:** what happens to the validation score if you (mentally) move a preprocessing step *outside* the loop, or random-split data that's secretly time-ordered?`,
+    interviewGraph: {
+            initialStageId: "f3_leakage_click",
+            artifactDimensions: [
+              {
+                label: "Data Leakage Prevention",
+                recoveryStageId: "f3_recovery_leakage",
+              },
+              {
+                label: "Validation Reliability",
+                recoveryStageId: "f3_recovery_valreliability",
+              },
+              {
+                label: "Temporal & Pipeline Splits",
+                recoveryStageId: "f3_recovery_temporal",
+                passLabel: "Evaluation Mastery",
+              },
+            ],
+            stages: {
+              f3_leakage_click: {
+                id: "f3_leakage_click",
+                type: "click_target",
+                badge: "Stage 1",
+                title: "Stage 1 · Pipeline data leakage",
+                prompt: "A data scientist fitted a scaler on the full dataset before splitting into train and test sets. Click the line that introduces data leakage.",
+                code_snippet: `from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+
+X, y = load_data()
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)   # ds-target:fit_before_split
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y, test_size=0.2, random_state=42
+)
+
+model.fit(X_train, y_train)
+print("Test score:", model.score(X_test, y_test))`,
+                validationCopy: {
+                  fit_before_split: "Correct. Calling fit_transform on the full dataset before splitting means the scaler's mean and standard deviation are computed using test-set rows. The test set has now 'leaked' its statistics into the preprocessing step — your test score will be optimistically biased.",
+                },
+                branches: {
+                  fit_before_split: "f3_val_tuning_choice",
+                },
+              },
+              f3_val_tuning_choice: {
+                id: "f3_val_tuning_choice",
+                type: "scenario_choice",
+                badge: "Stage 2",
+                title: "Stage 2 · Validation set reliability",
+                prompt: "You tune hyperparameters 20 times using the same validation set, selecting the configuration with the best validation score. Is your final validation score a reliable estimate of test performance?",
+                code_snippet: `best_val_score = 0
+best_params = None
+
+for trial in range(20):
+    params = sample_hyperparameters()
+    model = train(X_train, y_train, **params)
+    val_score = evaluate(model, X_val, y_val)   # same val set, 20 times
+
+    if val_score > best_val_score:
+        best_val_score = val_score
+        best_params = params
+
+print("Best val score:", best_val_score)  # Is this trustworthy?`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "No — repeated selection on the same val set makes it an optimistic oracle",
+                    description: "Correct. Each time you evaluate on the validation set and keep the best result, you are effectively fitting to the val set's noise. After 20 trials, your best val score includes a lucky overfit to that specific val sample. The true generalisation estimate requires a held-out test set that was never used for selection.",
+                  },
+                  {
+                    id: "b",
+                    label: "Yes — you never used the val set for training, only evaluation",
+                    description: "Using the val set 20 times for selection IS a form of indirect training. You are selecting hyperparameters that happened to work well on this particular val sample — overfitting the selection process to the val set's idiosyncrasies.",
+                  },
+                  {
+                    id: "c",
+                    label: "Yes — as long as you use random search, not grid search",
+                    description: "The search strategy (random vs. grid) does not change the optimistic bias. The problem is the number of evaluations on the same held-out sample combined with always keeping the best.",
+                  },
+                  {
+                    id: "d",
+                    label: "Partially — it is reliable if the val set is large enough",
+                    description: "A larger val set reduces variance but does not eliminate the selection bias from 20 evaluations. The expected val score for the selected model is still systematically higher than its true generalisation error.",
+                  },
+                ],
+                branches: {
+                  a: "f3_timeseries_choice",
+                  b: "f3_recovery_valreliability",
+                  c: "f3_recovery_valreliability",
+                  d: "f3_recovery_valreliability",
+                },
+                rationale: "This is the 'multiple comparisons on the val set' problem — analogous to p-hacking. After k trials of selecting the best val score, you have implicitly optimised for that specific val sample. The fix is either nested cross-validation (inner loop for hyperparameters, outer loop for generalisation estimate) or a strictly held-out test set that is touched exactly once at the end.",
+              },
+              f3_timeseries_choice: {
+                id: "f3_timeseries_choice",
+                type: "scenario_choice",
+                badge: "Stage 3",
+                title: "Stage 3 · Time-series splitting",
+                prompt: "You have 3 years of daily stock price features and want to predict next-day returns. You apply sklearn's train_test_split with shuffle=True (default), using 80% train / 20% test. What is wrong with this approach?",
+                code_snippet: `import pandas as pd
+from sklearn.model_selection import train_test_split
+
+df = load_3_years_of_prices()   # 1095 rows, sorted by date
+X = df.drop("next_day_return", axis=1)
+y = df["next_day_return"]
+
+# Default split — random shuffle
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.20, random_state=42   # ds-target:random_split
+)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Temporal leakage — future data is included in the training set",
+                    description: "Correct. A random split ignores the time dimension. Training rows can include data from day 1000 while test rows contain data from day 50. The model effectively sees 'future' information during training, making the test score a massive overestimate of real-world performance.",
+                  },
+                  {
+                    id: "b",
+                    label: "The test set is too small at 20%",
+                    description: "Test set size is a separate concern. The fundamental error is the random shuffle, not the 80/20 ratio. Even a 50/50 random split would be wrong for time-series data.",
+                  },
+                  {
+                    id: "c",
+                    label: "train_test_split should not be used for regression problems",
+                    description: "train_test_split works for regression. The problem is the random ordering, which is valid for i.i.d. data but not for time-series data.",
+                  },
+                  {
+                    id: "d",
+                    label: "The random_state should be omitted for time-series data",
+                    description: "The random_state controls reproducibility. Removing it changes nothing about the fundamental problem — you still get a randomly shuffled split regardless of the seed.",
+                  },
+                ],
+                branches: {
+                  a: "f3_terminal",
+                  b: "f3_recovery_temporal",
+                  c: "f3_recovery_temporal",
+                  d: "f3_recovery_leakage",
+                },
+                rationale: "Time-series data violates the i.i.d. assumption that underpins random splitting. The correct approach is a chronological split: the first 80% of days for training, the last 20% for testing. For cross-validation, use TimeSeriesSplit which expands the training window forward in time. Never shuffle time-series data before splitting.",
+              },
+              f3_recovery_leakage: {
+                id: "f3_recovery_leakage",
+                type: "scenario_choice",
+                badge: "Recovery A",
+                title: "Recovery · Correct pipeline order",
+                prompt: "Which pipeline order correctly prevents data leakage when using a scaler and a classifier?",
+                code_snippet: `# Option A:
+scaler.fit_transform(X_all)
+X_train, X_test = split(X_all_scaled)
+clf.fit(X_train); clf.score(X_test)
+
+# Option B:
+X_train, X_test = split(X_all)
+scaler.fit(X_train)
+X_train_s = scaler.transform(X_train)
+X_test_s  = scaler.transform(X_test)
+clf.fit(X_train_s); clf.score(X_test_s)
+
+# Option C:
+X_train, X_test = split(X_all)
+scaler.fit_transform(X_train)
+scaler.fit_transform(X_test)
+clf.fit(X_train); clf.score(X_test)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Option B — split first, then fit scaler on training set only, then transform both",
+                    description: "Correct. Splitting before fitting the scaler ensures that the scaler's parameters (mean, std) are derived only from training data. The test set is then transformed using those same training-derived parameters — simulating a truly unseen deployment scenario.",
+                  },
+                  {
+                    id: "b",
+                    label: "Option A — fit scaler on all data first for the most stable statistics",
+                    description: "Fitting on all data leaks test set statistics into preprocessing. The 'more stable statistics' argument is wrong — using test data to inform preprocessing is always leakage, regardless of the benefit.",
+                  },
+                  {
+                    id: "c",
+                    label: "Option C — fit a separate scaler on the test set",
+                    description: "Fitting a separate scaler on the test set means train and test are on different scales. In deployment you won't have the luxury of fitting a new scaler for each incoming batch — you must use the training scaler.",
+                  },
+                  {
+                    id: "d",
+                    label: "Options A and B are equivalent because StandardScaler is deterministic",
+                    description: "They are not equivalent. Option A's scaler sees all 1000 rows; Option B's scaler sees only 800. The mean and std will differ, and Option A encodes test information into the transformation.",
+                  },
+                ],
+                branches: {
+                  a: "f3_val_tuning_choice",
+                  b: "f3_recovery_leakage",
+                  c: "f3_recovery_leakage",
+                  d: "f3_recovery_leakage",
+                },
+                rationale: "The golden rule: fit preprocessing on training data only, transform both train and test using training statistics. This mirrors production: you train a scaler once, save it, and apply it to incoming data at inference. Fitting on test data is always leakage — even if the improvement looks small in practice.",
+              },
+              f3_recovery_valreliability: {
+                id: "f3_recovery_valreliability",
+                type: "scenario_choice",
+                badge: "Recovery B",
+                title: "Recovery · K-fold cross-validation",
+                prompt: "Why does k-fold cross-validation produce a more reliable generalisation estimate than a single train/val split?",
+                code_snippet: `# Single split:
+# Train on 80%, evaluate on 20% → one val score
+
+# 5-fold CV:
+# Fold 1: train on folds 2-5, val on fold 1 → score_1
+# Fold 2: train on folds 1,3-5, val on fold 2 → score_2
+# Fold 3: train on folds 1-2,4-5, val on fold 3 → score_3
+# Fold 4: train on folds 1-3,5, val on fold 4 → score_4
+# Fold 5: train on folds 1-4, val on fold 5 → score_5
+# Final: mean(score_1..5) ± std(score_1..5)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Every data point serves as validation exactly once, reducing variance from unlucky splits",
+                    description: "Correct. A single val split may be unusually easy or hard depending on which 20% was randomly assigned to validation. K-fold averages over k different validation sets, giving a lower-variance estimate of true generalisation performance. The std across folds also quantifies stability.",
+                  },
+                  {
+                    id: "b",
+                    label: "K-fold trains on more data overall, so the models are stronger",
+                    description: "K-fold trains k separate models, each on (1-1/k) of the data. The purpose is a better estimate of generalisation, not stronger models. The final deployed model is typically retrained on all data using the best hyperparameters found.",
+                  },
+                  {
+                    id: "c",
+                    label: "K-fold prevents overfitting by training on smaller subsets",
+                    description: "K-fold is an evaluation technique, not a regularization technique. It does not prevent the model from overfitting — it gives a better estimate of whether the model has overfit.",
+                  },
+                  {
+                    id: "d",
+                    label: "K-fold automatically handles data leakage from preprocessing",
+                    description: "K-fold does not automatically handle preprocessing leakage. You must use sklearn Pipeline to ensure preprocessing is fit inside each fold. If you preprocess outside the CV loop, you still have leakage.",
+                  },
+                ],
+                branches: {
+                  a: "f3_timeseries_choice",
+                  b: "f3_recovery_valreliability",
+                  c: "f3_recovery_valreliability",
+                  d: "f3_recovery_valreliability",
+                },
+                rationale: "K-fold's key advantage is variance reduction in the evaluation estimate. One random split gives one data point about model quality; k folds give k data points. The mean is a more reliable estimate, and the std tells you how sensitive the model is to the particular training sample. For small datasets, k-fold is especially important because no single 20% split is representative.",
+              },
+              f3_recovery_temporal: {
+                id: "f3_recovery_temporal",
+                type: "scenario_choice",
+                badge: "Recovery C",
+                title: "Recovery · Temporal data splitting",
+                prompt: "For time-series cross-validation, which strategy is correct?",
+                code_snippet: `# Strategy A: shuffle all data, then use standard k-fold
+# Strategy B: TimeSeriesSplit — expanding window
+#   Fold 1: train [t1..t200], val [t201..t250]
+#   Fold 2: train [t1..t250], val [t251..t300]
+#   Fold 3: train [t1..t300], val [t301..t350]
+# Strategy C: fixed window
+#   Fold 1: train [t1..t200],   val [t201..t250]
+#   Fold 2: train [t51..t250],  val [t251..t300]
+#   Fold 3: train [t101..t300], val [t301..t350]`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Strategy B — TimeSeriesSplit with expanding training window",
+                    description: "Correct. The expanding window always trains on past data and validates on future data, mirroring real deployment. It grows the training set over time, which also tests whether more historical data improves performance.",
+                  },
+                  {
+                    id: "b",
+                    label: "Strategy A — shuffle then k-fold",
+                    description: "Shuffling destroys the temporal order, introducing future leakage into every fold. This is the mistake we want to avoid.",
+                  },
+                  {
+                    id: "c",
+                    label: "Strategy C — sliding window with fixed training size",
+                    description: "Sliding window is valid in some scenarios (concept drift, where old data is irrelevant), but it does not test how performance improves with more data and can underestimate generalisation error. TimeSeriesSplit is the standard default.",
+                  },
+                  {
+                    id: "d",
+                    label: "All strategies are equivalent if the data has no seasonality",
+                    description: "Temporal leakage occurs regardless of seasonality. Any strategy that allows future data into training is invalid for time-series, even if there is no cyclical pattern.",
+                  },
+                ],
+                branches: {
+                  a: "f3_terminal",
+                  b: "f3_recovery_temporal",
+                  c: "f3_recovery_temporal",
+                  d: "f3_recovery_temporal",
+                },
+                rationale: "TimeSeriesSplit ensures that the validation set is always in the future relative to the training set. This is the only honest evaluation strategy for sequential data. Shuffling destroys the causal ordering and produces optimistically biased estimates of real-world performance.",
+              },
+              f3_terminal: {
+                id: "f3_terminal",
+                type: "scenario_choice",
+                badge: "Complete",
+                title: "Revision complete · Evaluation Mastery",
+                terminal: true,
+                prompt: "A recruiter says: 'Your model hit 94% accuracy on the test set.' You are suspicious. Which set of three questions would best expose whether this score is reliable?",
+                code_snippet: `# Context:
+# - Binary classification (fraud detection, 5% positive rate)
+# - Test set used: unknown provenance
+# - Model selection: unknown process
+# - Preprocessing: unknown pipeline order`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "1) Was preprocessing fit on training data only? 2) Was the test set used more than once (for selection or tuning)? 3) Is accuracy the right metric for a 5% positive-rate problem?",
+                    description: "Correct and comprehensive. These three questions cover the three most common evaluation failures: preprocessing leakage, test set reuse, and metric mismatch. A 94% accuracy on a 5% positive-rate dataset is achievable by predicting all negatives — the model may have learned nothing useful.",
+                  },
+                  {
+                    id: "b",
+                    label: "1) What algorithm was used? 2) How large is the training set? 3) Was GPU training used?",
+                    description: "These questions are about model architecture, not evaluation reliability. They do not probe for leakage, test set reuse, or metric validity.",
+                  },
+                  {
+                    id: "c",
+                    label: "1) Was cross-validation used? 2) What is the test set size? 3) Did you use early stopping?",
+                    description: "Partially useful, but misses the critical leakage question. Knowing whether CV was used doesn't help if preprocessing was done outside the CV loop. Test set size and early stopping don't address the metric mismatch issue.",
+                  },
+                ],
+                branches: {
+                  a: "f3_terminal",
+                  b: "f3_terminal",
+                  c: "f3_terminal",
+                },
+                rationale: "Three red flags to always probe: (1) preprocessing leakage — fit_transform on full data before split inflates scores; (2) test set reuse — every time you peek at the test set and adjust something, it becomes part of your training signal; (3) metric relevance — accuracy on imbalanced data is misleading. For fraud detection, AUC-PR, F1, or cost-sensitive metrics are far more meaningful than raw accuracy.",
+              },
+            },
+          },
     knowledgeCheck: [
       {
         question:
@@ -730,6 +1691,306 @@ Take a single raw timestamp column, e.g. \`2026-06-02T23:40:00\` for an e-commer
 
 For each feature, answer the governing question out loud: **"Could I compute this, with the identical definition, at serving time, using only data available before the prediction?"** Cross out any that fail. The survivors are your real feature set — and the discipline of that one question is most of feature engineering.`,
     tryGuidance: `In the lab, pick a transform (raw, log, binned, or an interaction/ratio feature) and watch how a previously inseparable scatter becomes linearly separable — or how a fitted line snaps to the data. **Predict before you switch:** which transform will make these two classes separable with a single straight boundary?`,
+    interviewGraph: {
+            initialStageId: "f4_target_leakage_click",
+            artifactDimensions: [
+              {
+                label: "Target Leakage Detection",
+                recoveryStageId: "f4_recovery_targetleak",
+              },
+              {
+                label: "Regularization & Selection",
+                recoveryStageId: "f4_recovery_l1selection",
+              },
+              {
+                label: "High-Cardinality Encoding",
+                recoveryStageId: "f4_recovery_cardinality",
+                passLabel: "Feature Engineering Mastery",
+              },
+            ],
+            stages: {
+              f4_target_leakage_click: {
+                id: "f4_target_leakage_click",
+                type: "click_target",
+                badge: "Stage 1",
+                title: "Stage 1 · Target leakage in feature construction",
+                prompt: "An analyst is engineering features for a churn prediction model. The target variable is `churned` (1 if the account closed). Click the line that introduces target leakage.",
+                code_snippet: `import pandas as pd
+
+df = load_account_data()
+# df has: account_id, signup_date, event_date (churn event), churned (0/1)
+
+df["tenure_days"] = (df["event_date"] - df["signup_date"]).dt.days  # ds-target:tenure_days
+df["days_since_last_login"] = compute_days_since_login(df)          # ds-target:last_login
+df["days_until_churn"] = (df["event_date"] - df["snapshot_date"]).dt.days  # ds-target:days_until_churn
+
+X = df[["tenure_days", "days_since_last_login", "days_until_churn"]]
+y = df["churned"]`,
+                validationCopy: {
+                  tenure_days: "Not quite. Tenure (time since signup) is a legitimate feature — it doesn't use the churn event date to predict the outcome. Look for a feature that encodes information about when the churn event happened.",
+                  last_login: "Close, but days_since_last_login is valid if computed from the snapshot date, not the event date. The most blatant leakage is a feature that directly encodes the future event timestamp. Look for a feature that measures time relative to event_date.",
+                  days_until_churn: "Correct. `days_until_churn` is computed as (event_date - snapshot_date) — it directly encodes how far in the future the churn event occurs. This feature would only be available at the moment of churning, not before. Any model with this feature will appear perfect on training data but fail completely in production.",
+                },
+                branches: {
+                  tenure_days: "f4_recovery_targetleak",
+                  last_login: "f4_recovery_targetleak",
+                  days_until_churn: "f4_l1_choice",
+                },
+              },
+              f4_l1_choice: {
+                id: "f4_l1_choice",
+                type: "scenario_choice",
+                badge: "Stage 2",
+                title: "Stage 2 · L1 regularization effects",
+                prompt: "You have 500 raw features. After training a logistic regression with L1 (Lasso) regularization, 480 of the feature coefficients are exactly zero. Is this feature selection, overfitting prevention, or both?",
+                code_snippet: `from sklearn.linear_model import LogisticRegression
+
+lr = LogisticRegression(penalty="l1", solver="liblinear", C=0.01)
+lr.fit(X_train_500_features, y_train)
+
+non_zero = (lr.coef_ != 0).sum()
+print(f"Non-zero coefficients: {non_zero} / 500")
+# Output: Non-zero coefficients: 20 / 500`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Both — L1 simultaneously performs feature selection and reduces overfitting",
+                    description: "Correct. L1 regularization produces sparse solutions by driving many weights to exactly zero. This is simultaneously: feature selection (only 20 features survive) and regularization (the restricted model generalises better than an unregularised 500-feature model). L1 is unique among regularizers in producing true sparsity — L2 shrinks weights but rarely reaches exactly zero.",
+                  },
+                  {
+                    id: "b",
+                    label: "Feature selection only — L1 is a filter method, not a regularizer",
+                    description: "L1 is a wrapper/embedded method, not a filter method, and it is definitively a regularizer. It modifies the loss function during training, which directly affects both sparsity (selection) and generalisation (regularization).",
+                  },
+                  {
+                    id: "c",
+                    label: "Overfitting prevention only — the zero weights just happen to select features as a side effect",
+                    description: "The sparsity is not a side effect — it is the mechanism. L1's geometry (L1 ball has corners at axis points) causes the optimum to land at sparse solutions. Both effects are primary and intentional.",
+                  },
+                  {
+                    id: "d",
+                    label: "Neither — 480 zeroed features means the model has underfit",
+                    description: "Underfitting depends on whether the remaining 20 features are sufficient to represent the true relationship. It is possible to overfit (too complex) or underfit (too simple) with any number of features. L1 with a high regularization strength (low C) may underfit, but that is a tuning question, not an inherent property.",
+                  },
+                ],
+                branches: {
+                  a: "f4_cardinality_choice",
+                  b: "f4_recovery_l1selection",
+                  c: "f4_recovery_l1selection",
+                  d: "f4_recovery_l1selection",
+                },
+                rationale: "L1's defining property is exact sparsity — it produces coefficients that are exactly zero, unlike L2 which shrinks toward zero but rarely hits it. This makes L1 both a feature selection method (zero coefficients drop features) and a regularizer (restricted model weights generalise better). In high-dimensional settings, L1 is a principled way to simultaneously discover signal features and prevent overfitting.",
+              },
+              f4_cardinality_choice: {
+                id: "f4_cardinality_choice",
+                type: "scenario_choice",
+                badge: "Stage 3",
+                title: "Stage 3 · High-cardinality encoding risk",
+                prompt: "A feature `user_country` has 180 unique values. You apply pd.get_dummies() before training a gradient boosted tree. What is the primary risk of this approach?",
+                code_snippet: `import pandas as pd
+
+df = load_user_data()
+print(df["user_country"].nunique())  # 180 unique countries
+
+# One-hot encode
+df_encoded = pd.get_dummies(df, columns=["user_country"])
+# Result: adds 180 binary columns to the feature matrix
+
+X = df_encoded.drop("target", axis=1)
+# Training set has 5,000 rows, now ~200+ features`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "180 sparse binary columns → high dimensionality, overfitting risk, and poor generalisation for rare categories",
+                    description: "Correct. With 5,000 rows and 180 new binary columns, many country dummies will have fewer than 10 positive examples — the model can't learn a reliable signal for rare countries and may overfit to noise. Additionally, sparse high-dimensional representations slow training and hurt interpretability. Better approaches: target encoding (replace with mean target per category), frequency encoding, or grouping rare countries into 'Other'.",
+                  },
+                  {
+                    id: "b",
+                    label: "get_dummies will fail if the test set has unseen countries",
+                    description: "This is a real deployment risk, but it is a different problem from high cardinality overfitting. The question asks about the primary risk, which is the statistical quality of the encoding, not the engineering failure mode.",
+                  },
+                  {
+                    id: "c",
+                    label: "Tree models can't use one-hot encoded features",
+                    description: "Tree models handle one-hot encoded features. In fact, some tree implementations handle categorical features natively. The concern is not compatibility but statistical efficiency when cardinality is high.",
+                  },
+                  {
+                    id: "d",
+                    label: "One-hot encoding doubles the memory usage",
+                    description: "Memory usage increases, but for 5,000 rows and 180 columns this is manageable. The primary statistical risk — sparse representations and overfitting on rare categories — is the more important concern.",
+                  },
+                ],
+                branches: {
+                  a: "f4_terminal",
+                  b: "f4_recovery_cardinality",
+                  c: "f4_recovery_cardinality",
+                  d: "f4_recovery_cardinality",
+                },
+                rationale: "High-cardinality one-hot encoding creates a sparse, wide feature matrix. For rare categories (e.g., a country with 3 training examples), the model sees almost no signal and may memorise those few examples. Target encoding replaces each category with the mean target value in that category, collapsing 180 columns to 1. Regularised target encoding (with smoothing) prevents target leakage on low-frequency categories.",
+              },
+              f4_recovery_targetleak: {
+                id: "f4_recovery_targetleak",
+                type: "scenario_choice",
+                badge: "Recovery A",
+                title: "Recovery · Identifying target leakage",
+                prompt: "Which of these features would introduce target leakage in a loan default prediction model (target: will the borrower default within 12 months)?",
+                code_snippet: `# Features under consideration:
+# A) debt_to_income_ratio at time of application
+# B) number_of_late_payments in the 6 months AFTER the loan was issued
+# C) credit_score at time of application
+# D) annual_income at time of application`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "B — late payments AFTER loan issuance",
+                    description: "Correct. Information about events that occur after the prediction point (loan issuance) cannot be known at the time of prediction. Including these post-event features means the model is trained on future data — it will appear perfect in training but completely fail in production where those features don't exist yet.",
+                  },
+                  {
+                    id: "b",
+                    label: "A — debt-to-income ratio",
+                    description: "Debt-to-income ratio at application time is valid. It is known at the moment of the decision and captures the financial risk profile at prediction time.",
+                  },
+                  {
+                    id: "c",
+                    label: "C — credit score at application",
+                    description: "Credit score at application time is valid and one of the most predictive features for loan default. It is available before the target event.",
+                  },
+                  {
+                    id: "d",
+                    label: "D — annual income at application",
+                    description: "Annual income at application is a valid feature — it is known at prediction time and is a legitimate risk signal.",
+                  },
+                ],
+                branches: {
+                  a: "f4_l1_choice",
+                  b: "f4_recovery_targetleak",
+                  c: "f4_recovery_targetleak",
+                  d: "f4_recovery_targetleak",
+                },
+                rationale: "Target leakage occurs when a feature encodes information that is only available after the target event occurs. The test: 'Would I have this feature value at the time I need to make a prediction?' Post-event data (late payments after issuance, claims after underwriting) always leaks. Pre-event data (financial state at application time) is always valid.",
+              },
+              f4_recovery_l1selection: {
+                id: "f4_recovery_l1selection",
+                type: "scenario_choice",
+                badge: "Recovery B",
+                title: "Recovery · L1 vs L2 regularization",
+                prompt: "You want to automatically identify which features are irrelevant and remove them from your model. Which regularization penalty achieves this most directly?",
+                code_snippet: `# Option A: L1 (Lasso) penalty: add λ * Σ|w_i| to loss
+# Option B: L2 (Ridge) penalty: add λ * Σw_i² to loss
+# Option C: Elastic Net: add λ₁ * Σ|w_i| + λ₂ * Σw_i²
+# Option D: Dropout (neural network only)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "L1 (Lasso) — produces exactly-zero coefficients for irrelevant features",
+                    description: "Correct. L1's geometry creates exact sparsity. The L1 ball has corners at coordinate axes, so the optimal solution tends to land at points where some coefficients are exactly zero — effectively removing those features from the model. L2 shrinks all weights toward zero but almost never reaches exactly zero.",
+                  },
+                  {
+                    id: "b",
+                    label: "L2 (Ridge) — shrinks all weights toward zero equally",
+                    description: "L2 shrinks weights but keeps all features with non-zero (though small) coefficients. You cannot use L2 to identify irrelevant features because no coefficient is driven to exactly zero.",
+                  },
+                  {
+                    id: "c",
+                    label: "Elastic Net — best of both L1 and L2",
+                    description: "Elastic Net is good when you want sparse solutions but also stability under correlated features (a weakness of pure L1). However, if the primary goal is feature selection through sparsity, pure L1 is simpler and more directly applicable.",
+                  },
+                  {
+                    id: "d",
+                    label: "Dropout — random feature removal during training",
+                    description: "Dropout randomly deactivates neurons during training to prevent co-adaptation. It is a regularization technique for neural networks, not a feature selection method. It does not identify or remove specific features.",
+                  },
+                ],
+                branches: {
+                  a: "f4_cardinality_choice",
+                  b: "f4_recovery_l1selection",
+                  c: "f4_recovery_l1selection",
+                  d: "f4_recovery_l1selection",
+                },
+                rationale: "L1's unique property is exact zeros. This arises from the geometry of the L1 penalty ball: its non-smooth corners at the axes make the loss minimum often occur at a sparse point. In practice, L1 regularization is used as an embedded feature selection method for linear models — you get a model and a feature selection in one step.",
+              },
+              f4_recovery_cardinality: {
+                id: "f4_recovery_cardinality",
+                type: "scenario_choice",
+                badge: "Recovery C",
+                title: "Recovery · Encoding high-cardinality categories",
+                prompt: "Target encoding replaces each category value with the mean target value for that category. What is the main risk of naive target encoding, and how is it mitigated?",
+                code_snippet: `# Naive target encoding:
+# For each category c:
+#   encoding[c] = mean(y[X == c])
+
+# Example: user_country = "LU" appears 2 times in training
+# Both rows are positive (churned)
+# Naive encoding: 2/2 = 1.0 → perfect signal!
+# But this is just noise from a tiny sample.`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Target leakage for rare categories — mitigated by smoothing with the global mean",
+                    description: "Correct. Rare categories have very few samples, so their target mean is based on almost no data and will be noisy. This noise leaks target information directly into the feature. Smoothing blends the category mean toward the global mean proportional to sample size: encoding = (n_c * mean_c + k * global_mean) / (n_c + k). This shrinks rare categories toward the global mean and prevents overfitting on noise.",
+                  },
+                  {
+                    id: "b",
+                    label: "Model complexity — mitigated by using fewer categories",
+                    description: "Model complexity is not the primary concern with target encoding. The issue is noise in category estimates for rare values, not the number of categories in the model.",
+                  },
+                  {
+                    id: "c",
+                    label: "Scaling issues — target encoding produces values in [0,1] which confuse tree models",
+                    description: "Tree models are scale-invariant — they use rank-order splits. Target encoding values being in [0,1] is not a problem for tree-based models.",
+                  },
+                  {
+                    id: "d",
+                    label: "Collinearity with the target — mitigated by PCA after encoding",
+                    description: "PCA after encoding would destroy the semantic meaning of the encoded feature. The risk is target leakage on training data, not collinearity with the target in a PCA sense.",
+                  },
+                ],
+                branches: {
+                  a: "f4_terminal",
+                  b: "f4_recovery_cardinality",
+                  c: "f4_recovery_cardinality",
+                  d: "f4_recovery_cardinality",
+                },
+                rationale: "Smoothed target encoding is the industry standard for high-cardinality categoricals. The formula blends each category's empirical mean with the global mean, weighted by the category's sample count. For categories with hundreds of examples, the encoding is close to the empirical mean. For categories with 1-2 examples, the encoding is pulled toward the global mean — preventing the model from treating noise as a strong signal.",
+              },
+              f4_terminal: {
+                id: "f4_terminal",
+                type: "scenario_choice",
+                badge: "Complete",
+                title: "Revision complete · Feature Engineering Mastery",
+                terminal: true,
+                prompt: "You are predicting customer churn from raw clickstream data (page_viewed, timestamp, session_id, user_id, duration_seconds). Which set of engineered features best captures meaningful churn signals?",
+                code_snippet: `# Raw clickstream schema:
+# user_id, session_id, page_viewed, timestamp, duration_seconds
+
+# Your task: engineer predictive features for churn prediction
+# Target: will the user churn within the next 30 days?`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "1) days_since_last_session (recency of engagement) · 2) sessions_per_week_last_4w (frequency trend) · 3) avg_session_duration_last_4w (depth of engagement)",
+                    description: "Correct. These three features capture the RFM (Recency, Frequency, Monetary/depth) framework applied to clickstream: recency tells you if the user has gone quiet, frequency trend captures declining engagement, and session duration reflects how deeply users engage per visit. All are computable from historical data before the prediction point — no target leakage.",
+                  },
+                  {
+                    id: "b",
+                    label: "1) total_pages_ever_viewed · 2) account_age_days · 3) number_of_support_tickets",
+                    description: "These are valid but weaker features. Total pages ever viewed mixes historical and recent signal without distinguishing current engagement trend. Account age is a background feature. Support tickets are useful but not derived from clickstream. None captures the recency and frequency signals that best predict churn.",
+                  },
+                  {
+                    id: "c",
+                    label: "1) pages_viewed_after_churn_date · 2) final_session_duration · 3) days_until_account_close",
+                    description: "All three features are target leakage. They all require knowledge of the churn event date, which only exists after the user has already churned. These would never be available at prediction time.",
+                  },
+                ],
+                branches: {
+                  a: "f4_terminal",
+                  b: "f4_terminal",
+                  c: "f4_terminal",
+                },
+                rationale: "Effective churn features from clickstream follow the RFM pattern: Recency (how recently did the user engage?), Frequency (how often over recent windows?), and Depth (how long per session?). A user who was highly active 3 months ago but has not visited in 2 weeks is a churn risk — this shows in all three metrics. Always compute features at the snapshot date, never using information from after the prediction point.",
+              },
+            },
+          },
     knowledgeCheck: [
       {
         question:
@@ -920,6 +2181,374 @@ Build a two-column decision table from memory and fill it in:
 
 Finally, write the leakage rule in one sentence: *where* do you fit the scaler and target encoder, and *what* goes wrong if you fit them on all the data. If you can produce both tables and that sentence cold, you can defend any preprocessing question.`,
     tryGuidance: `Drag the blend slider in the lab to morph a skewed, outlier-stretched feature from raw units into z-scores, and watch how the points' relative positions change. **Predict first:** before you scale, which single feature would a k-NN model 'see' if you left everything in raw units?`,
+    interviewGraph: {
+            initialStageId: "f5_scaling_click",
+            artifactDimensions: [
+              {
+                label: "Scaler Pipeline Order",
+                recoveryStageId: "f5_recovery_pipeline",
+              },
+              {
+                label: "Scaler Selection",
+                recoveryStageId: "f5_recovery_scalerchoice",
+              },
+              {
+                label: "Encoding Correctness",
+                recoveryStageId: "f5_recovery_encoding",
+                passLabel: "Scaling & Encoding Mastery",
+              },
+            ],
+            stages: {
+              f5_scaling_click: {
+                id: "f5_scaling_click",
+                type: "click_target",
+                badge: "Stage 1",
+                title: "Stage 1 · Scaler before split",
+                prompt: "A data scientist applied MinMaxScaler to the full dataset before splitting. Click the line where the scaler first sees test data, causing leakage.",
+                code_snippet: `from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
+
+X, y = load_data()
+
+scaler = MinMaxScaler()
+X_scaled = scaler.fit_transform(X)     # ds-target:fit_all
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y, test_size=0.2
+)
+
+model.fit(X_train, y_train)
+test_score = model.score(X_test, y_test)`,
+                validationCopy: {
+                  fit_all: "Correct. fit_transform(X) computes the min and max from ALL rows — including the rows that will become the test set. MinMaxScaler maps values to [0,1] using these global min/max values, so the test set's scale information is baked into the transformation. The correct approach: split first, then fit the scaler on X_train only, then transform both X_train and X_test using the training min/max.",
+                },
+                branches: {
+                  fit_all: "f5_outlier_choice",
+                },
+              },
+              f5_outlier_choice: {
+                id: "f5_outlier_choice",
+                type: "scenario_choice",
+                badge: "Stage 2",
+                title: "Stage 2 · Scaler vs. outliers",
+                prompt: "A feature `transaction_amount` has a heavy right-skew: most values are between $5–$200, but 3 transactions are $50,000+. You apply StandardScaler. What happens to the majority of values?",
+                code_snippet: `import numpy as np
+from sklearn.preprocessing import StandardScaler
+
+# transaction_amount distribution:
+# 99.7% of values: $5 - $200   (mean ≈ $45, std ≈ $28 without outliers)
+# 0.3% of values:  $50,000+    (3 extreme outliers)
+
+# After StandardScaler:
+# mean_actual ≈ $192  (pulled up by outliers)
+# std_actual  ≈ $1,847 (inflated by outliers)
+
+# Most values get scaled to: (X - 192) / 1847`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Most values get squashed near zero — outliers dominate the mean and std",
+                    description: "Correct. The three $50,000+ outliers inflate the mean to ~$192 and the standard deviation to ~$1,847. For a typical $50 transaction: (50-192)/1847 ≈ -0.077. For a $100 transaction: (100-192)/1847 ≈ -0.050. Nearly all values land in a narrow band around zero, destroying the signal differences between normal transactions. Use RobustScaler (uses median and IQR instead of mean and std) or apply a log transform first.",
+                  },
+                  {
+                    id: "b",
+                    label: "Outliers get clipped to a maximum of 3 standard deviations",
+                    description: "StandardScaler does not clip outliers. It shifts and scales all values including outliers. The clipping behavior you describe is a separate step (e.g., Winsorization) that must be applied explicitly.",
+                  },
+                  {
+                    id: "c",
+                    label: "All values become normally distributed after scaling",
+                    description: "StandardScaler does not change the shape of the distribution — it only shifts (subtracts mean) and scales (divides by std). A right-skewed distribution remains right-skewed after StandardScaler. The normal distribution claim is a common misconception.",
+                  },
+                  {
+                    id: "d",
+                    label: "The outliers are automatically removed as they exceed 3 standard deviations",
+                    description: "StandardScaler does not remove any values. Every value, including extreme outliers, is transformed and retained. StandardScaler has no concept of outlier removal.",
+                  },
+                ],
+                branches: {
+                  a: "f5_tree_scaling_choice",
+                  b: "f5_recovery_scalerchoice",
+                  c: "f5_recovery_scalerchoice",
+                  d: "f5_recovery_scalerchoice",
+                },
+                rationale: "StandardScaler uses mean and std, both of which are sensitive to outliers. When outliers inflate these statistics, the transformation squashes the majority of values into a tiny band near zero. RobustScaler uses the median (50th percentile) and IQR (75th - 25th percentile), which are resistant to extreme values. Alternatively, a log or power transform applied before StandardScaler can reduce skew before scaling.",
+              },
+              f5_tree_scaling_choice: {
+                id: "f5_tree_scaling_choice",
+                type: "scenario_choice",
+                badge: "Stage 3",
+                title: "Stage 3 · Scaling and tree models",
+                prompt: "A teammate spends an hour carefully tuning a StandardScaler before training a Random Forest classifier. Is this time well spent?",
+                code_snippet: `from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+
+# Teammate's pipeline:
+pipe = Pipeline([
+    ("scaler", StandardScaler()),
+    ("rf", RandomForestClassifier(n_estimators=100))
+])
+pipe.fit(X_train, y_train)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "No — decision trees and random forests are scale-invariant; scaling has no effect on predictions",
+                    description: "Correct. Tree-based models make splits based on threshold comparisons (e.g., 'is feature X > 0.47?'). Whether X is in its original scale or standardised, the relative ordering of values is identical, so the optimal split threshold and the resulting tree structure are the same. StandardScaler will not change Random Forest predictions, feature importances, or performance metrics.",
+                  },
+                  {
+                    id: "b",
+                    label: "Yes — scaling improves the random forest's convergence speed",
+                    description: "Random forests do not use gradient-based optimisation, so there is no convergence to speed up. Trees are grown using greedy split search, which is purely based on value comparisons — completely unaffected by scale.",
+                  },
+                  {
+                    id: "c",
+                    label: "Yes — scaled features improve the quality of random splits in the forest",
+                    description: "'Random splits' in random forests refer to random feature sampling at each node, not random value splits. The split thresholds are optimised greedily regardless of scale.",
+                  },
+                  {
+                    id: "d",
+                    label: "It depends on whether the features have negative values",
+                    description: "Tree models handle negative values natively. Scale and sign of features have no effect on tree split decisions.",
+                  },
+                ],
+                branches: {
+                  a: "f5_ohe_choice",
+                  b: "f5_recovery_scalerchoice",
+                  c: "f5_recovery_scalerchoice",
+                  d: "f5_recovery_scalerchoice",
+                },
+                rationale: "Scale-invariant algorithms: decision trees, random forests, gradient boosted trees, and any algorithm based on rank-order comparisons. Scale-sensitive algorithms: linear models, SVM, k-NN, k-means, PCA, and neural networks (anything that uses distances, dot products, or gradient steps). Knowing which algorithms need scaling is a fundamental production ML skill.",
+              },
+              f5_ohe_choice: {
+                id: "f5_ohe_choice",
+                type: "scenario_choice",
+                badge: "Stage 4",
+                title: "Stage 4 · Dummy variable trap",
+                prompt: "You one-hot encode a categorical feature with k=50 categories for a logistic regression. What is the correct action regarding the encoded columns?",
+                code_snippet: `import pandas as pd
+from sklearn.linear_model import LogisticRegression
+
+df = load_data()
+# "product_category" has 50 unique values
+
+# One-hot encoding:
+df_ohe = pd.get_dummies(df, columns=["product_category"])
+# Creates 50 binary columns: product_category_A ... product_category_AX
+
+X = df_ohe.drop("target", axis=1)
+model = LogisticRegression()
+model.fit(X, y)  # ← is something missing?`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Drop one column (e.g., drop_first=True) to avoid perfect multicollinearity",
+                    description: "Correct. With 50 one-hot columns, they sum to exactly 1 for every row (exactly one category is active). This perfect multicollinearity means the design matrix is rank-deficient — the 50th column is a perfect linear combination of the other 49. For logistic regression this causes the dummy variable trap: coefficients are not uniquely identified. Dropping one reference column removes the linear dependency while preserving all information (the dropped category becomes the baseline).",
+                  },
+                  {
+                    id: "b",
+                    label: "Keep all 50 columns — regularization will handle multicollinearity",
+                    description: "Regularization reduces the magnitude of collinear coefficients but does not resolve the identification problem. With perfect multicollinearity (not just high correlation), the inverse of X^T X is undefined without regularization. While L2 regularization technically makes the system solvable by adding λI to the matrix, it obscures interpretation and the fix is better applied at the encoding step.",
+                  },
+                  {
+                    id: "c",
+                    label: "Keep all 50 columns — pandas get_dummies automatically handles this",
+                    description: "pandas get_dummies does NOT automatically drop a column. You must pass drop_first=True or handle the reference category manually.",
+                  },
+                  {
+                    id: "d",
+                    label: "Drop all columns and use label encoding instead",
+                    description: "Label encoding (mapping categories to integers 0–49) implies ordinal ordering that does not exist for nominal categories. Dropping all OHE columns removes the categorical information entirely.",
+                  },
+                ],
+                branches: {
+                  a: "f5_terminal",
+                  b: "f5_recovery_encoding",
+                  c: "f5_recovery_encoding",
+                  d: "f5_recovery_encoding",
+                },
+                rationale: "The dummy variable trap arises from perfect multicollinearity in one-hot encoded features. The k dummy columns always sum to 1, making one column a linear combination of the others. For linear and logistic regression, drop one reference column (drop_first=True in pandas, or handle via the encoder). For tree-based models, keeping all k columns is fine and sometimes preferred for interpretability.",
+              },
+              f5_recovery_pipeline: {
+                id: "f5_recovery_pipeline",
+                type: "scenario_choice",
+                badge: "Recovery A",
+                title: "Recovery · Correct scaler pipeline order",
+                prompt: "You are using 5-fold cross-validation to evaluate a pipeline with StandardScaler + LogisticRegression. Which implementation correctly avoids data leakage?",
+                code_snippet: `# Option A — scale outside CV loop:
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+scores = cross_val_score(LogisticRegression(), X_scaled, y, cv=5)
+
+# Option B — scale inside CV loop using Pipeline:
+from sklearn.pipeline import Pipeline
+pipe = Pipeline([("scaler", StandardScaler()), ("lr", LogisticRegression())])
+scores = cross_val_score(pipe, X, y, cv=5)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Option B — Pipeline ensures the scaler is fit inside each CV fold",
+                    description: "Correct. When you pass a Pipeline to cross_val_score, sklearn refits the entire pipeline (including the scaler) on each fold's training data. The validation fold is then transformed using the training fold's statistics only. Option A leaks: the scaler sees all 5 folds before any split.",
+                  },
+                  {
+                    id: "b",
+                    label: "Option A — scaling once is more efficient and equally correct",
+                    description: "Option A is NOT equally correct. Fitting the scaler before the CV loop means the scaler's mean and std are computed from all data including each fold's validation set. This is exactly the leakage we want to avoid.",
+                  },
+                  {
+                    id: "c",
+                    label: "Both are equivalent if you use StandardScaler (which is deterministic)",
+                    description: "Determinism is not the issue. The issue is whether the scaler's statistics are contaminated by test-fold data. Option A always contaminates; Option B never does.",
+                  },
+                  {
+                    id: "d",
+                    label: "Neither — you should always do manual CV to control the scaler",
+                    description: "sklearn Pipeline handles this correctly and is the recommended production approach. Manual CV with proper scaler handling is equivalent but more error-prone.",
+                  },
+                ],
+                branches: {
+                  a: "f5_outlier_choice",
+                  b: "f5_recovery_pipeline",
+                  c: "f5_recovery_pipeline",
+                  d: "f5_recovery_pipeline",
+                },
+                rationale: "sklearn Pipeline is the correct abstraction for preventing preprocessing leakage in cross-validation. It ensures that every step (scaler, encoder, selector, model) is fit only on the training fold and applied (not refit) on the validation fold. This is the production-grade pattern — always use Pipeline when combining preprocessing with a model.",
+              },
+              f5_recovery_scalerchoice: {
+                id: "f5_recovery_scalerchoice",
+                type: "scenario_choice",
+                badge: "Recovery B",
+                title: "Recovery · Choosing the right scaler",
+                prompt: "Match each situation to the best scaler choice.",
+                code_snippet: `# Situation A: features are roughly normally distributed, no extreme outliers
+# → Best: StandardScaler (zero mean, unit variance)
+
+# Situation B: feature has extreme outliers that should not dominate scaling
+# → Best: RobustScaler (uses median and IQR)
+
+# Situation C: features need to be in a bounded range [0,1] for sigmoid output
+# → Best: MinMaxScaler
+
+# Situation D: you are training a Random Forest on mixed numeric features
+# → Best: ???`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Situation D: No scaling needed — tree models are scale-invariant",
+                    description: "Correct. Decision trees and ensemble methods (Random Forest, Gradient Boosting) split on value thresholds, which depend only on relative order, not absolute scale. Scaling does not change predictions, feature importances, or performance. The time spent scaling is wasted.",
+                  },
+                  {
+                    id: "b",
+                    label: "Situation D: StandardScaler — consistent preprocessing is always good practice",
+                    description: "Consistent preprocessing is valuable for scale-sensitive algorithms. For tree models, it is unnecessary overhead. Applying it 'for consistency' adds computational cost and complexity without benefit.",
+                  },
+                  {
+                    id: "c",
+                    label: "Situation D: MinMaxScaler — tree splits work better in [0,1] range",
+                    description: "Tree splits are based on threshold comparisons, not distances or magnitudes. The [0,1] range has no benefit for tree models.",
+                  },
+                  {
+                    id: "d",
+                    label: "Situation D: RobustScaler — robust to the outliers that often appear in mixed features",
+                    description: "Robustness to outliers is only relevant when scale affects the algorithm. Since trees are scale-invariant, RobustScaler provides no benefit over no scaling at all.",
+                  },
+                ],
+                branches: {
+                  a: "f5_tree_scaling_choice",
+                  b: "f5_recovery_scalerchoice",
+                  c: "f5_recovery_scalerchoice",
+                  d: "f5_recovery_scalerchoice",
+                },
+                rationale: "Scaler selection should be driven by algorithm requirements: StandardScaler for normally-distributed features with gradient-based models, RobustScaler when outliers are present and the algorithm is distance-based, MinMaxScaler when a bounded range is required (e.g., neural network sigmoid outputs, image pixel values). For tree-based models, no scaling is needed — skip it entirely.",
+              },
+              f5_recovery_encoding: {
+                id: "f5_recovery_encoding",
+                type: "scenario_choice",
+                badge: "Recovery C",
+                title: "Recovery · Encoding strategies",
+                prompt: "A categorical feature has 3 ordered levels: Low, Medium, High. Which encoding is most appropriate for a linear regression?",
+                code_snippet: `# Feature: severity = ["Low", "Medium", "High"]
+# Three encoding options:
+
+# A) Label encoding: Low=0, Medium=1, High=2
+# B) One-hot encoding: [1,0,0], [0,1,0], [0,0,1]
+# C) Binary encoding: Low=[0,0], Medium=[0,1], High=[1,0]
+# D) Ordinal encoding with equal spacing: Low=-1, Medium=0, High=1`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Ordinal / label encoding (A or D) — the natural order should be preserved",
+                    description: "Correct. When a categorical feature has a meaningful order (Low < Medium < High), encoding it as an ordered integer preserves the ordinal relationship. A linear regression can then learn a coefficient that captures the monotonic relationship. One-hot encoding discards the ordering and is less efficient for ordinal features. The equal-spacing assumption (D) is a reasonable default unless domain knowledge suggests otherwise.",
+                  },
+                  {
+                    id: "b",
+                    label: "One-hot encoding (B) — always preferred for categorical features",
+                    description: "One-hot encoding is preferred for NOMINAL categories (no order). For ordinal categories like severity levels, it discards the meaningful ordering and requires 3 coefficients instead of 1 to represent a single feature, reducing efficiency.",
+                  },
+                  {
+                    id: "c",
+                    label: "Binary encoding (C) — most compact representation",
+                    description: "Binary encoding is useful for reducing dimensionality when cardinality is high. For a 3-level ordinal feature, it encodes the values in a way that loses the ordinal meaning. Ordinal encoding is simpler and more interpretable here.",
+                  },
+                  {
+                    id: "d",
+                    label: "No encoding needed — linear regression handles string features natively",
+                    description: "Linear regression requires numeric inputs. String features must be encoded before passing to any sklearn model.",
+                  },
+                ],
+                branches: {
+                  a: "f5_ohe_choice",
+                  b: "f5_recovery_encoding",
+                  c: "f5_recovery_encoding",
+                  d: "f5_recovery_encoding",
+                },
+                rationale: "Encoding strategy depends on the nature of the categorical variable: Nominal (no order) → one-hot encoding (or target encoding for high cardinality). Ordinal (meaningful order) → label/ordinal encoding preserving the order. High cardinality (100+ values) → target encoding or embeddings. The type of model also matters: tree models can handle label encoding for nominal features without implying order; linear models cannot.",
+              },
+              f5_terminal: {
+                id: "f5_terminal",
+                type: "scenario_choice",
+                badge: "Complete",
+                title: "Revision complete · Scaling & Encoding Mastery",
+                terminal: true,
+                prompt: "A teammate applies StandardScaler across the full dataset before cross-validation. What goes wrong, and how do you fix it?",
+                code_snippet: `# Teammate's code (flawed):
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import cross_val_score
+from sklearn.linear_model import LogisticRegression
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)   # ← fit on ALL data
+
+scores = cross_val_score(
+    LogisticRegression(), X_scaled, y, cv=5
+)
+print("CV score:", scores.mean())`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Problem: scaler sees validation fold statistics during fit, inflating CV scores. Fix: use sklearn Pipeline to fit scaler inside each fold.",
+                    description: "Correct and complete. The scaler's mean and std are computed from all rows including each fold's validation data. When that fold is later used for validation, it has already influenced the transformation — the validation set is no longer truly unseen. Fix: wrap the scaler and model in a Pipeline and pass the Pipeline to cross_val_score. sklearn will then refit the scaler on each fold's training data.",
+                  },
+                  {
+                    id: "b",
+                    label: "Problem: StandardScaler is slow on large datasets. Fix: use MinMaxScaler instead.",
+                    description: "Performance is not the issue here. Both scalers have the same data leakage problem when applied before CV. The problem is the pipeline order, not the choice of scaler.",
+                  },
+                  {
+                    id: "c",
+                    label: "Problem: the cross-validation uses too many folds. Fix: reduce to 3-fold CV.",
+                    description: "The number of folds is unrelated to the leakage issue. Whether you use 3, 5, or 10 folds, fitting the scaler before splitting leaks information in all cases.",
+                  },
+                ],
+                branches: {
+                  a: "f5_terminal",
+                  b: "f5_terminal",
+                  c: "f5_terminal",
+                },
+                rationale: "This is one of the most common preprocessing mistakes in practice. The fix is always the same: use sklearn Pipeline. The corrected code is: pipe = Pipeline([('scaler', StandardScaler()), ('lr', LogisticRegression())]); cross_val_score(pipe, X, y, cv=5). This guarantees that preprocessing is fit on the training fold only and applied (not refit) on the validation fold — mirroring the correct deployment pattern.",
+              },
+            },
+          },
     knowledgeCheck: [
       {
         question:

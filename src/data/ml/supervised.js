@@ -137,6 +137,322 @@ A regression summary reports, per coefficient, a **standard error**, a **t-stati
 2. **Break an assumption on purpose.** In the lab, drag points so the spread grows with x (a fan shape). Predict what the residual plot does *before* you look — that is heteroscedasticity.
 3. **Two sentences:** "OLS minimizes squared error, which is equivalent to ___ y onto the column space of X. I'd switch to gradient descent when ___." Fill the blanks and rehearse the answer.`,
     tryGuidance: `Before touching the lab, predict where the OLS line will sit, then drag the slope and intercept and watch SSE. Now move one point far off the trend and predict whether the line follows it — that is the leverage story.`,
+    interviewGraph: {
+            initialStageId: "s1_r2_click",
+            artifactDimensions: [
+              {
+                label: "R² Interpretation",
+                recoveryStageId: "s1_recovery_r2",
+              },
+              {
+                label: "Feature Scaling & Coefficients",
+                recoveryStageId: "s1_recovery_coef",
+              },
+              {
+                label: "Regression Assumptions",
+                recoveryStageId: "s1_recovery_assumptions",
+                passLabel: "OLS Mastery",
+              },
+            ],
+            stages: {
+              s1_r2_click: {
+                id: "s1_r2_click",
+                type: "click_target",
+                badge: "Stage 1",
+                title: "Stage 1 · Overoptimistic Evaluation",
+                prompt: "Your colleague reports the model quality using R² computed on the training set. Click the line that gives an overoptimistic — and misleading — measure of model quality.",
+                code_snippet: `from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score
+
+model = LinearRegression()
+model.fit(X_train, y_train)
+
+train_r2 = r2_score(y_train, model.predict(X_train))  # ds-target:train_r2_line
+print(f"Model R²: {train_r2:.3f}")   # reported as final quality`,
+                validationCopy: {
+                  train_r2_line: "Correct. R² on the training set is always optimistic — it rises as you add features even if they are noise. Report R² on a held-out set or use cross-validated R² to get an honest estimate of generalisation.",
+                },
+                branches: {
+                  train_r2_line: "s1_coef_choice",
+                },
+              },
+              s1_coef_choice: {
+                id: "s1_coef_choice",
+                type: "scenario_choice",
+                badge: "Stage 2",
+                title: "Stage 2 · Coefficient Interpretation",
+                prompt: "A linear regression yields: age=2.1, salary=-0.003. A colleague says salary is nearly unimportant because its coefficient is tiny. What is the correct interpretation?",
+                code_snippet: `# OLS fit — no standardisation applied
+# age measured in years (range ~20–70)
+# salary measured in dollars (range ~30000–200000)
+coef = {"age": 2.1, "salary": -0.003}`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Salary is unimportant — the coefficient is almost zero",
+                    description: "The raw magnitude of an OLS coefficient reflects the unit scale of the feature, not its importance.",
+                  },
+                  {
+                    id: "b",
+                    label: "Coefficient magnitude is meaningless without standardising features first",
+                    description: "A $1 change in salary is tiny; a 1-year change in age is substantial. Compare standardised coefficients or feature importances after scaling.",
+                  },
+                  {
+                    id: "c",
+                    label: "Use the p-value of salary to decide importance",
+                    description: "p-values test statistical significance, not practical importance, and do not fix the scale problem.",
+                  },
+                  {
+                    id: "d",
+                    label: "Multiply coefficient by mean feature value to normalise",
+                    description: "This is not the standard approach; standardising features before fitting (z-score) is the correct method.",
+                  },
+                ],
+                branches: {
+                  a: "s1_recovery_coef",
+                  b: "s1_irrelevant_choice",
+                  c: "s1_recovery_coef",
+                  d: "s1_recovery_coef",
+                },
+                rationale: "OLS coefficients are in units of (output / input). Because salary is measured in dollars and age in years, a one-unit change means very different things. Always standardise features before comparing coefficients, or use permutation importance on the original scale.",
+              },
+              s1_irrelevant_choice: {
+                id: "s1_irrelevant_choice",
+                type: "scenario_choice",
+                badge: "Stage 3",
+                title: "Stage 3 · Irrelevant Features & R²",
+                prompt: "You add 20 randomly generated (noise) features to a linear regression with no regularization. What happens to training R²?",
+                code_snippet: `import numpy as np
+from sklearn.linear_model import LinearRegression
+
+# original 5 features + 20 pure noise columns
+X_augmented = np.hstack([X_train, np.random.randn(len(X_train), 20)])
+model = LinearRegression().fit(X_augmented, y_train)
+print(model.score(X_augmented, y_train))  # training R²`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Training R² decreases — noise hurts the fit",
+                    description: "OLS minimises training error; adding any column (even noise) cannot make the in-sample fit worse.",
+                  },
+                  {
+                    id: "b",
+                    label: "Training R² stays the same — noise has no effect",
+                    description: "OLS can always fit noise columns; training R² will weakly increase.",
+                  },
+                  {
+                    id: "c",
+                    label: "Training R² never decreases; validation R² may drop significantly",
+                    description: "Adding noise features allows the model to fit the training set better spuriously. Adjusted R² or cross-validation reveals the truth.",
+                  },
+                  {
+                    id: "d",
+                    label: "Training R² increases and so does validation R²",
+                    description: "Noise features hurt out-of-sample performance even as they inflate training R².",
+                  },
+                ],
+                branches: {
+                  a: "s1_recovery_r2",
+                  b: "s1_recovery_r2",
+                  c: "s1_residuals_choice",
+                  d: "s1_recovery_r2",
+                },
+                rationale: "Ordinary R² never decreases on training data when you add features — OLS will find tiny coefficients that reduce residuals. Adjusted R² penalises for the number of predictors. On validation data the noise features hurt generalisation.",
+              },
+              s1_residuals_choice: {
+                id: "s1_residuals_choice",
+                type: "scenario_choice",
+                badge: "Stage 4",
+                title: "Stage 4 · Residual Diagnostics",
+                prompt: "After fitting a linear regression, the residual-vs-fitted plot shows a clear U-shape (curved pattern). What is the most important implication?",
+                code_snippet: `import matplotlib.pyplot as plt
+
+preds = model.predict(X_train)
+residuals = y_train - preds
+plt.scatter(preds, residuals)
+# Plot shows a clear upward-then-downward curve (U-shape)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Heteroscedasticity — variance is non-constant",
+                    description: "Heteroscedasticity shows as a funnel shape (widening spread), not a U-shape.",
+                  },
+                  {
+                    id: "b",
+                    label: "The linearity assumption is violated; the relationship is non-linear",
+                    description: "A systematic curve in residuals means the linear model is missing a curved relationship — add polynomial terms or use a non-linear model.",
+                  },
+                  {
+                    id: "c",
+                    label: "Multicollinearity is causing instability",
+                    description: "Multicollinearity inflates coefficient variance but does not produce a curved residual pattern.",
+                  },
+                  {
+                    id: "d",
+                    label: "Outliers are distorting the fit",
+                    description: "Outliers produce isolated extreme residuals, not a systematic curve across all fitted values.",
+                  },
+                ],
+                branches: {
+                  a: "s1_recovery_assumptions",
+                  b: "s1_terminal",
+                  c: "s1_recovery_assumptions",
+                  d: "s1_recovery_assumptions",
+                },
+                rationale: "A U-shape in residuals vs fitted values is the textbook sign of a violated linearity assumption — the true relationship is curved. Remedies: add x² terms, apply a log transform to the target, or use a nonlinear model.",
+              },
+              s1_recovery_r2: {
+                id: "s1_recovery_r2",
+                type: "scenario_choice",
+                badge: "Recovery 1",
+                title: "Recovery · R² and Adjusted R²",
+                prompt: "You fit two models. Model A has 3 features, R²=0.72. Model B has 25 features, R²=0.74. Which model is better, and what metric should you use to decide?",
+                code_snippet: `# Model A: 3 features, R²_train = 0.72
+# Model B: 25 features, R²_train = 0.74
+# n = 200 observations`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Model B — higher R² always means better",
+                    description: "Training R² always increases with more features; this comparison is misleading.",
+                  },
+                  {
+                    id: "b",
+                    label: "Use adjusted R² or cross-validated R² to penalise for model complexity",
+                    description: "Adjusted R² penalises for additional predictors. If adjusted R² for B is not materially higher, Model A is preferable for its parsimony.",
+                  },
+                  {
+                    id: "c",
+                    label: "Use AIC to compare — lowest AIC wins",
+                    description: "AIC is valid but is mainly used for maximum-likelihood models; adjusted R² or cross-val R² is more direct here.",
+                  },
+                  {
+                    id: "d",
+                    label: "Compare RMSE on training data",
+                    description: "Training RMSE has the same problem as training R² — more features always reduce it.",
+                  },
+                ],
+                branches: {
+                  a: "s1_recovery_r2",
+                  b: "s1_irrelevant_choice",
+                  c: "s1_recovery_r2",
+                  d: "s1_recovery_r2",
+                },
+                rationale: "Training R² is monotonically non-decreasing in the number of features. Adjusted R² and cross-validated metrics account for complexity. For prediction, hold-out or cross-validated RMSE is the gold standard.",
+              },
+              s1_recovery_coef: {
+                id: "s1_recovery_coef",
+                type: "scenario_choice",
+                badge: "Recovery 2",
+                title: "Recovery · Multicollinearity",
+                prompt: "Two features in your regression have a Pearson correlation of 0.97. What problem does this cause and what is a standard remedy?",
+                code_snippet: `import pandas as pd
+corr = X_train.corr()
+# corr['income']['education'] = 0.97`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "No problem — OLS handles correlated features automatically",
+                    description: "OLS can still produce a fit, but the coefficients become unstable and hard to interpret.",
+                  },
+                  {
+                    id: "b",
+                    label: "Multicollinearity inflates coefficient variance; fix by dropping one feature, PCA, or Ridge regularisation",
+                    description: "High VIF (>10) signals multicollinearity. Ridge regression shrinks correlated coefficients jointly; PCA creates orthogonal components.",
+                  },
+                  {
+                    id: "c",
+                    label: "Log-transform both features to reduce correlation",
+                    description: "Log transforms can sometimes reduce skew-driven correlation but are not a reliable fix for multicollinearity.",
+                  },
+                  {
+                    id: "d",
+                    label: "Increase sample size to resolve multicollinearity",
+                    description: "More data helps with noise but does not fix structural multicollinearity between features.",
+                  },
+                ],
+                branches: {
+                  a: "s1_recovery_coef",
+                  b: "s1_residuals_choice",
+                  c: "s1_recovery_coef",
+                  d: "s1_recovery_coef",
+                },
+                rationale: "Multicollinearity makes OLS coefficients sensitive to small data changes (high variance). Detection: Variance Inflation Factor (VIF). Remedies: remove one correlated feature, use PCA, or apply Ridge (L2) regularisation.",
+              },
+              s1_recovery_assumptions: {
+                id: "s1_recovery_assumptions",
+                type: "scenario_choice",
+                badge: "Recovery 3",
+                title: "Recovery · OLS Assumptions",
+                prompt: "Which assumption of OLS linear regression is violated when the variance of residuals grows with the fitted values (funnel shape in residual plot)?",
+                code_snippet: `# Residual plot shows funnel: small residuals at low predictions,
+# large residuals at high predictions`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Linearity",
+                    description: "Linearity violation produces a curved residual pattern, not a funnel.",
+                  },
+                  {
+                    id: "b",
+                    label: "Homoscedasticity (constant variance)",
+                    description: "A funnel shape is the classic signature of heteroscedasticity — variance is not constant across fitted values. Remedies: log-transform the target, use WLS, or robust standard errors.",
+                  },
+                  {
+                    id: "c",
+                    label: "Independence of errors",
+                    description: "Dependence (e.g., autocorrelation) shows up in time-ordered residual plots, not a funnel by fitted value.",
+                  },
+                  {
+                    id: "d",
+                    label: "Normality of residuals",
+                    description: "Normality violations are detected with Q-Q plots, not residual-vs-fitted plots.",
+                  },
+                ],
+                branches: {
+                  a: "s1_recovery_assumptions",
+                  b: "s1_terminal",
+                  c: "s1_recovery_assumptions",
+                  d: "s1_recovery_assumptions",
+                },
+                rationale: "Homoscedasticity means residual variance is constant. A funnel = heteroscedasticity. OLS is still unbiased but standard errors are wrong, making inference unreliable. Fix: log(y), Box-Cox, or weighted least squares.",
+              },
+              s1_terminal: {
+                id: "s1_terminal",
+                type: "scenario_choice",
+                badge: "Terminal",
+                title: "Revision complete · Linear Regression Mastered",
+                terminal: true,
+                prompt: "VIF for two predictors is 14. Explain what multicollinearity is, why a VIF of 14 is concerning, and name two concrete ways to handle it.",
+                code_snippet: `from statsmodels.stats.outliers_influence import variance_inflation_factor
+vifs = [variance_inflation_factor(X.values, i) for i in range(X.shape[1])]
+# Output: [14.2, 13.8, 1.4, 2.1]`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Multicollinearity = high correlation between predictors; VIF>10 is problematic; fix with Ridge or drop one feature",
+                    description: "VIF = 1/(1-R²_j) where R²_j is from regressing feature j on all others. VIF=14 means ~93% of feature j's variance is explained by other features — coefficients are unstable.",
+                  },
+                  {
+                    id: "b",
+                    label: "VIF=14 just means the features are useful; keep all of them",
+                    description: "High VIF indicates redundancy, not usefulness. Coefficients become unreliable even if predictions are stable.",
+                  },
+                  {
+                    id: "c",
+                    label: "Drop both features since both have high VIF",
+                    description: "Usually you only need to drop or combine one of the correlated pair. Ridge regression is often preferable to dropping.",
+                  },
+                ],
+                branches: {
+                  a: "s1_terminal",
+                  b: "s1_terminal",
+                  c: "s1_terminal",
+                },
+                rationale: "VIF = 1/(1−R²_j). VIF > 10 is a common threshold for concern. Consequences: inflated standard errors, unstable and sign-flipping coefficients. Fixes: (1) Drop the less theoretically important feature of the correlated pair. (2) Apply Ridge (L2) regularisation which shrinks correlated coefficients jointly. (3) PCA to create orthogonal components.",
+              },
+            },
+          },
     knowledgeCheck: [
       {
         question: "Geometrically, what does ordinary least squares compute?",
@@ -347,6 +663,334 @@ On a 99%-negative problem, AUC-ROC can look great while the model is useless at 
 2. **Calibration by hand.** Take 10 predictions, bin them into [0–0.5) and [0.5–1], and ask: of the points I called ">0.5", what fraction were actually positive? That ratio vs 0.75 is a one-bin reliability check.
 3. **Two sentences:** "I model log-odds linearly because ___. AUC measures ___ while calibration measures ___." Fill and rehearse.`,
     tryGuidance: `Predict, before sliding, how the sigmoid steepens as you increase the weight, and where the 0.5 decision boundary lands. Then shift the threshold and watch which points flip — that is precision-vs-recall in motion.`,
+    interviewGraph: {
+            initialStageId: "s2_loss_click",
+            artifactDimensions: [
+              {
+                label: "Loss Function Choice",
+                recoveryStageId: "s2_recovery_loss",
+              },
+              {
+                label: "Threshold & Class Imbalance",
+                recoveryStageId: "s2_recovery_threshold",
+              },
+              {
+                label: "Regularisation in Logistic Reg",
+                recoveryStageId: "s2_recovery_reg",
+                passLabel: "Logistic Regression Mastery",
+              },
+            ],
+            stages: {
+              s2_loss_click: {
+                id: "s2_loss_click",
+                type: "click_target",
+                badge: "Stage 1",
+                title: "Stage 1 · Wrong Loss Function",
+                prompt: "The following code trains a binary classifier using the wrong loss function. Click the line that uses an inappropriate loss for a classification task.",
+                code_snippet: `import torch
+import torch.nn as nn
+
+model = nn.Linear(10, 1)
+optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+
+criterion = nn.MSELoss()  # ds-target:wrong_loss
+# criterion = nn.BCEWithLogitsLoss()  # correct choice
+
+for X_batch, y_batch in loader:
+    pred = model(X_batch).squeeze()
+    loss = criterion(pred, y_batch.float())
+    loss.backward()
+    optimizer.step()`,
+                validationCopy: {
+                  wrong_loss: "Correct. MSE loss treats the output as a continuous value and its gradient does not match the probabilistic nature of binary labels. Binary cross-entropy (BCE) is the correct loss — it penalises confident wrong predictions much more steeply and is derived from maximum likelihood with a Bernoulli distribution.",
+                },
+                branches: {
+                  wrong_loss: "s2_threshold_choice",
+                },
+              },
+              s2_threshold_choice: {
+                id: "s2_threshold_choice",
+                type: "scenario_choice",
+                badge: "Stage 2",
+                title: "Stage 2 · Threshold Selection",
+                prompt: "A logistic regression outputs probability=0.6. The default threshold is 0.5, so the model predicts class 1. A colleague says this is 'the model's decision'. What is the more accurate framing?",
+                code_snippet: `prob = model.predict_proba(X_test)[:, 1]  # output: 0.6
+threshold = 0.5
+prediction = int(prob >= threshold)  # → 1`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "0.5 is the mathematically correct threshold for all problems",
+                    description: "0.5 minimises error only when classes are balanced and misclassification costs are equal — rarely true in practice.",
+                  },
+                  {
+                    id: "b",
+                    label: "The threshold is a design choice separate from the model; adjust based on cost of FP vs FN",
+                    description: "The model outputs a probability; the threshold converts it to a label. For fraud detection you might use 0.2 to catch more true positives; for medical screening even lower.",
+                  },
+                  {
+                    id: "c",
+                    label: "Probabilities above 0.5 always mean class 1 is correct",
+                    description: "The probability estimate is only as good as the model's calibration and the chosen operating point.",
+                  },
+                  {
+                    id: "d",
+                    label: "Use the ROC curve to find the threshold that maximises accuracy",
+                    description: "Maximising accuracy is often the wrong objective; prefer maximising F1, or minimising a cost-weighted error.",
+                  },
+                ],
+                branches: {
+                  a: "s2_recovery_threshold",
+                  b: "s2_imbalance_choice",
+                  c: "s2_recovery_threshold",
+                  d: "s2_recovery_threshold",
+                },
+                rationale: "Logistic regression learns probabilities. The threshold is a post-hoc decision that should be tuned to the business cost of false positives vs false negatives. The ROC and Precision-Recall curves visualise this trade-off across all thresholds.",
+              },
+              s2_imbalance_choice: {
+                id: "s2_imbalance_choice",
+                type: "scenario_choice",
+                badge: "Stage 3",
+                title: "Stage 3 · Class Imbalance & Accuracy",
+                prompt: "Training accuracy=99%, but 95% of labels are class 0 (not fraud). Is this a good model?",
+                code_snippet: `# Dataset: 950 class-0, 50 class-1
+# Model accuracy on training set: 99%
+from sklearn.metrics import classification_report
+print(classification_report(y_train, model.predict(X_train)))`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Yes — 99% is excellent in any context",
+                    description: "A model that always predicts class 0 achieves 95% accuracy on this dataset. Accuracy is a misleading metric for imbalanced data.",
+                  },
+                  {
+                    id: "b",
+                    label: "No — a trivial model predicting all-0 gets 95%; use precision, recall, and F1 on the minority class",
+                    description: "With 95% class-0 prevalence, accuracy is nearly useless. Check recall on class 1 (fraud): a model with recall=0 on fraud is worthless despite high accuracy.",
+                  },
+                  {
+                    id: "c",
+                    label: "No — but only because the model is overfitting",
+                    description: "Overfitting is a separate concern; the core issue here is that accuracy is misleading for imbalanced classes.",
+                  },
+                  {
+                    id: "d",
+                    label: "Yes, but retrain with more epochs to push accuracy to 100%",
+                    description: "Driving accuracy higher on imbalanced data will typically make the minority-class performance worse, not better.",
+                  },
+                ],
+                branches: {
+                  a: "s2_recovery_threshold",
+                  b: "s2_reg_choice",
+                  c: "s2_recovery_threshold",
+                  d: "s2_recovery_threshold",
+                },
+                rationale: "Accuracy = (TP+TN)/N is dominated by the majority class when labels are skewed. Prefer: F1 score (harmonic mean of precision and recall), ROC-AUC, or PR-AUC. Also consider class_weight='balanced' or oversampling the minority class.",
+              },
+              s2_reg_choice: {
+                id: "s2_reg_choice",
+                type: "scenario_choice",
+                badge: "Stage 4",
+                title: "Stage 4 · Regularisation & Multicollinearity",
+                prompt: "Two input features are highly correlated (r=0.95). You apply L2 regularisation (C=1.0 in sklearn) to logistic regression. What does L2 do to the correlated features' coefficients?",
+                code_snippet: `from sklearn.linear_model import LogisticRegression
+
+# penalty='l2' is the default in sklearn
+model = LogisticRegression(C=1.0, penalty='l2', solver='lbfgs')
+model.fit(X_train, y_train)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "L2 sets one correlated coefficient to zero, keeping only the more important one",
+                    description: "L1 (Lasso) tends to zero out one of a correlated pair. L2 does something different.",
+                  },
+                  {
+                    id: "b",
+                    label: "L2 spreads weight evenly between correlated features, shrinking both but keeping both non-zero",
+                    description: "L2 penalises the sum of squared weights, which encourages correlated features to share weight equally rather than one dominating. This stabilises the fit.",
+                  },
+                  {
+                    id: "c",
+                    label: "L2 has no effect on correlated features — use PCA instead",
+                    description: "L2 does help with multicollinearity by shrinking coefficients, even if PCA is also a valid option.",
+                  },
+                  {
+                    id: "d",
+                    label: "L2 increases the magnitude of correlated coefficients to compensate for shared information",
+                    description: "L2 always shrinks coefficients toward zero; it never increases their magnitude.",
+                  },
+                ],
+                branches: {
+                  a: "s2_recovery_reg",
+                  b: "s2_terminal",
+                  c: "s2_recovery_reg",
+                  d: "s2_recovery_reg",
+                },
+                rationale: "L2 (Ridge) adds λΣw² to the loss. Because the penalty is quadratic, it prefers to spread weight across correlated features equally rather than concentrating on one. L1 (Lasso) tends to pick one and zero out the other — useful for feature selection but can be arbitrary with highly correlated pairs.",
+              },
+              s2_recovery_loss: {
+                id: "s2_recovery_loss",
+                type: "scenario_choice",
+                badge: "Recovery 1",
+                title: "Recovery · Loss Functions for Classification",
+                prompt: "Why is binary cross-entropy preferred over MSE for binary classification?",
+                code_snippet: `# BCE: L = -[y*log(p) + (1-y)*log(1-p)]
+# MSE: L = (y - p)²
+# For y=1, p=0.01 (very wrong prediction):
+import math
+bce = -math.log(0.01)   # ≈ 4.6 (large penalty)
+mse = (1 - 0.01)**2     # ≈ 0.98 (small penalty)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "BCE is faster to compute",
+                    description: "Speed is not the reason; the mathematical properties matter more.",
+                  },
+                  {
+                    id: "b",
+                    label: "BCE is derived from maximum likelihood with Bernoulli outputs and penalises confident wrong predictions much more steeply",
+                    description: "For a confident wrong prediction (p≈0, y=1), BCE → ∞ while MSE ≈ 1. This creates much stronger gradients for correction.",
+                  },
+                  {
+                    id: "c",
+                    label: "MSE works fine for classification — the choice is stylistic",
+                    description: "MSE gradients vanish when the sigmoid output is near 0 or 1 (the saturation region), causing very slow learning.",
+                  },
+                  {
+                    id: "d",
+                    label: "BCE is used only in multi-class problems, not binary",
+                    description: "BCE (binary cross-entropy) is specifically for binary classification; categorical cross-entropy extends it to multi-class.",
+                  },
+                ],
+                branches: {
+                  a: "s2_recovery_loss",
+                  b: "s2_threshold_choice",
+                  c: "s2_recovery_loss",
+                  d: "s2_recovery_loss",
+                },
+                rationale: "BCE = -[y log p + (1-y) log(1-p)]. It is the negative log-likelihood of a Bernoulli distribution, so minimising BCE = maximising likelihood. Crucially, -log(0.01) ≈ 4.6 vs MSE ≈ 0.98 — BCE punishes confident mistakes far more severely.",
+              },
+              s2_recovery_threshold: {
+                id: "s2_recovery_threshold",
+                type: "scenario_choice",
+                badge: "Recovery 2",
+                title: "Recovery · Threshold & Metrics for Imbalanced Data",
+                prompt: "In a fraud detection system (1% fraud rate), which metric should you primarily optimise and why?",
+                code_snippet: `# 10000 transactions: 9900 legit, 100 fraud
+# Model A: accuracy=99.0%, recall_fraud=0%
+# Model B: accuracy=97.5%, recall_fraud=80%`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Accuracy — Model A wins with 99%",
+                    description: "Model A never detects fraud. High accuracy on imbalanced data is meaningless.",
+                  },
+                  {
+                    id: "b",
+                    label: "Recall on the fraud class (or F1 / PR-AUC), because missing a fraud is more costly than a false alarm",
+                    description: "Model B catches 80% of fraud at a small accuracy cost. In fraud/medical settings, false negatives carry high cost — optimise recall or a cost-weighted F1.",
+                  },
+                  {
+                    id: "c",
+                    label: "Precision — minimise false positives",
+                    description: "Pure precision optimisation can lead to predicting fraud only on near-certain cases, missing most fraud.",
+                  },
+                  {
+                    id: "d",
+                    label: "ROC-AUC alone, ignoring the threshold",
+                    description: "ROC-AUC is useful but does not account for the class imbalance directly; PR-AUC is more informative when positives are rare.",
+                  },
+                ],
+                branches: {
+                  a: "s2_recovery_threshold",
+                  b: "s2_reg_choice",
+                  c: "s2_recovery_threshold",
+                  d: "s2_recovery_threshold",
+                },
+                rationale: "With 1% fraud: a model predicting all-legit achieves 99% accuracy. PR-AUC and recall on the minority class are the meaningful metrics. Use class_weight='balanced', oversample (SMOTE), or adjust the decision threshold to improve minority-class recall.",
+              },
+              s2_recovery_reg: {
+                id: "s2_recovery_reg",
+                type: "scenario_choice",
+                badge: "Recovery 3",
+                title: "Recovery · L1 vs L2 Regularisation",
+                prompt: "You want to perform automatic feature selection in logistic regression. Should you use L1 or L2 regularisation, and why?",
+                code_snippet: `# sklearn LogisticRegression
+# L1: penalty='l1', solver='liblinear' or 'saga'
+# L2: penalty='l2', solver='lbfgs'  (default)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "L2 — it zeros out unimportant features",
+                    description: "L2 shrinks coefficients but rarely sets them exactly to zero. It does not perform feature selection.",
+                  },
+                  {
+                    id: "b",
+                    label: "L1 — it induces sparsity by driving some coefficients exactly to zero",
+                    description: "L1 (Lasso) adds λΣ|w| to the loss. The non-smooth L1 penalty creates a solution at corners of the constraint polytope where many weights are zero — this is built-in feature selection.",
+                  },
+                  {
+                    id: "c",
+                    label: "Neither — use a tree-based feature importance instead",
+                    description: "Tree-based importance is useful, but L1 logistic regression is a valid and commonly used feature selection approach.",
+                  },
+                  {
+                    id: "d",
+                    label: "L2 with a very small C value",
+                    description: "Very small C (strong L2) shrinks all weights toward zero but does not zero them out exactly.",
+                  },
+                ],
+                branches: {
+                  a: "s2_recovery_reg",
+                  b: "s2_terminal",
+                  c: "s2_recovery_reg",
+                  d: "s2_recovery_reg",
+                },
+                rationale: "L1 norm ‖w‖₁ creates sparsity because its gradient is ±1 (constant), which can exactly cancel a small weight's gradient and push it to zero. L2 norm ‖w‖₂² has gradient 2w, which only asymptotically approaches zero. Use L1 for feature selection, L2 for handling multicollinearity while keeping all features.",
+              },
+              s2_terminal: {
+                id: "s2_terminal",
+                type: "scenario_choice",
+                badge: "Terminal",
+                title: "Revision complete · Logistic Regression Mastered",
+                terminal: true,
+                prompt: "Your logistic regression has C=0.001 (very high regularisation). All coefficients are near zero and training accuracy barely exceeds the baseline. What is happening and what do you try next?",
+                code_snippet: `model = LogisticRegression(C=0.001, penalty='l2')
+model.fit(X_train, y_train)
+# training accuracy = 0.53, baseline (majority class) = 0.51
+# all |coef_| < 0.002`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Underfitting due to excessive regularisation — increase C (reduce penalty strength)",
+                    description: "C = 1/λ in sklearn. C=0.001 means λ=1000, an extremely strong penalty that drives all weights to zero. The model has no freedom to fit. Increase C (try 0.1, 1, 10) or use cross-validation to find the optimal C.",
+                  },
+                  {
+                    id: "b",
+                    label: "Overfitting — decrease C further",
+                    description: "The model is already underfitting (training ≈ baseline). Decreasing C further makes regularisation even stronger and the model even worse.",
+                  },
+                  {
+                    id: "c",
+                    label: "Scale the features — unscaled features cause near-zero coefficients",
+                    description: "Feature scaling is important for logistic regression, but the primary issue here is over-regularisation (C too small).",
+                  },
+                  {
+                    id: "d",
+                    label: "Add more training data to stabilise the coefficients",
+                    description: "More data helps generalisation but does not fix a model that is prevented from learning by extreme regularisation.",
+                  },
+                ],
+                branches: {
+                  a: "s2_terminal",
+                  b: "s2_terminal",
+                  c: "s2_terminal",
+                  d: "s2_terminal",
+                },
+                rationale: "C = 1/λ: small C = strong regularisation. C=0.001 (λ=1000) crushes all weights toward zero — the model underfits. Fix: grid-search C over [0.001, 0.01, 0.1, 1, 10, 100] with cross-validation. Also ensure features are standardised before fitting, as logistic regression is sensitive to scale.",
+              },
+            },
+          },
     knowledgeCheck: [
       {
         question: "Why does logistic regression model the log-odds as a linear function of the features?",
@@ -562,6 +1206,340 @@ The takeaway interviewers want: trees and linear models have **complementary ind
 2. **Provoke overfitting.** In the decision-tree lab, keep adding splits and narrate where train error hits zero while the boundary turns into a jagged staircase — that is variance.
 3. **Two sentences:** "A single tree is high variance because ___. I'd prefer post-pruning over early stopping because ___." Fill and rehearse.`,
     tryGuidance: `Predict which feature the greedy root split will choose before you step through the lab, then watch each new axis-aligned cut shrink impurity — and notice when extra splits start memorizing noise rather than finding signal.`,
+    interviewGraph: {
+            initialStageId: "s3_overfit_click",
+            artifactDimensions: [
+              {
+                label: "Overfitting & Depth Control",
+                recoveryStageId: "s3_recovery_depth",
+              },
+              {
+                label: "Split Criteria",
+                recoveryStageId: "s3_recovery_criteria",
+              },
+              {
+                label: "Feature Importance",
+                recoveryStageId: "s3_recovery_importance",
+                passLabel: "Decision Tree Mastery",
+              },
+            ],
+            stages: {
+              s3_overfit_click: {
+                id: "s3_overfit_click",
+                type: "click_target",
+                badge: "Stage 1",
+                title: "Stage 1 · Guaranteed Overfit",
+                prompt: "The following decision tree is trained for production use. Click the line that guarantees the tree will overfit the training data.",
+                code_snippet: `from sklearn.tree import DecisionTreeClassifier
+
+model = DecisionTreeClassifier(
+    max_depth=None,           # ds-target:no_depth_limit
+    min_samples_leaf=1,
+    criterion='gini'
+)
+model.fit(X_train, y_train)
+print(f"Train accuracy: {model.score(X_train, y_train):.3f}")`,
+                validationCopy: {
+                  no_depth_limit: "Correct. max_depth=None combined with min_samples_leaf=1 allows the tree to grow until every leaf is pure — it will perfectly memorise the training set (100% training accuracy) and almost certainly overfit. Set max_depth or min_samples_leaf to a meaningful value and validate on held-out data.",
+                },
+                branches: {
+                  no_depth_limit: "s3_criteria_choice",
+                },
+              },
+              s3_criteria_choice: {
+                id: "s3_criteria_choice",
+                type: "scenario_choice",
+                badge: "Stage 2",
+                title: "Stage 2 · Gini vs Entropy",
+                prompt: "Should you use Gini impurity or entropy as the split criterion for a decision tree? When does the choice actually matter?",
+                code_snippet: `# Gini: 1 - Σ p_i²
+# Entropy: -Σ p_i * log2(p_i)
+# Both measure class impurity at a node
+
+from sklearn.tree import DecisionTreeClassifier
+m1 = DecisionTreeClassifier(criterion='gini')
+m2 = DecisionTreeClassifier(criterion='entropy')`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Entropy is always better — it has a stronger theoretical basis",
+                    description: "Both criteria are theoretically justified. In practice they produce nearly identical trees.",
+                  },
+                  {
+                    id: "b",
+                    label: "Gini is always better — it avoids log calculations",
+                    description: "Gini is slightly faster (no log), but the choice rarely affects accuracy in practice.",
+                  },
+                  {
+                    id: "c",
+                    label: "The choice rarely matters in practice; both optimise similar objectives — Gini is faster, entropy may produce slightly more balanced splits on skewed classes",
+                    description: "Empirically, trees built with Gini vs entropy differ on only a few splits and have near-identical test performance. Entropy can produce slightly more balanced trees when class distributions are very skewed.",
+                  },
+                  {
+                    id: "d",
+                    label: "Use entropy for regression trees, Gini for classification trees",
+                    description: "Regression trees use MSE or MAE as the split criterion, not Gini or entropy. Both Gini and entropy are for classification.",
+                  },
+                ],
+                branches: {
+                  a: "s3_recovery_criteria",
+                  b: "s3_recovery_criteria",
+                  c: "s3_depth_choice",
+                  d: "s3_recovery_criteria",
+                },
+                rationale: "Both Gini and entropy measure node impurity and select very similar splits. The empirical differences in test accuracy are negligible. Gini avoids logarithm computations (faster). Entropy can favour slightly more balanced splits. Default to Gini (sklearn default) unless you have a specific reason.",
+              },
+              s3_depth_choice: {
+                id: "s3_depth_choice",
+                type: "scenario_choice",
+                badge: "Stage 3",
+                title: "Stage 3 · Depth Tuning",
+                prompt: "A tree trained with max_depth=None achieves val accuracy=0.63. You reduce max_depth to 4 and val accuracy rises to 0.71. What is the explanation?",
+                code_snippet: `from sklearn.tree import DecisionTreeClassifier
+
+deep_tree = DecisionTreeClassifier(max_depth=None)
+deep_tree.fit(X_train, y_train)
+print(deep_tree.score(X_val, y_val))   # 0.63
+
+shallow_tree = DecisionTreeClassifier(max_depth=4)
+shallow_tree.fit(X_train, y_train)
+print(shallow_tree.score(X_val, y_val))  # 0.71`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "The shallow tree found a luckier random split",
+                    description: "Decision trees are deterministic given the same data and parameters; there is no randomness here.",
+                  },
+                  {
+                    id: "b",
+                    label: "The deep tree was overfitting; restricting depth reduces variance and improves generalisation",
+                    description: "max_depth=None allows the tree to memorise the training set. By limiting depth to 4, the model captures only the most reliable patterns rather than noise.",
+                  },
+                  {
+                    id: "c",
+                    label: "The deep tree underfits because it creates too many small leaves",
+                    description: "More depth = more splits = more complex model = higher variance, not underfitting.",
+                  },
+                  {
+                    id: "d",
+                    label: "max_depth=4 is always the optimal depth for decision trees",
+                    description: "Optimal depth is dataset-dependent; always tune max_depth via cross-validation.",
+                  },
+                ],
+                branches: {
+                  a: "s3_recovery_depth",
+                  b: "s3_importance_choice",
+                  c: "s3_recovery_depth",
+                  d: "s3_recovery_depth",
+                },
+                rationale: "A deep unconstrained tree memorises training noise (high variance). Reducing max_depth is a form of regularisation that cuts off the branches that capture noise. The bias-variance tradeoff: shallower = more bias, less variance. Tune depth with cross-validation.",
+              },
+              s3_importance_choice: {
+                id: "s3_importance_choice",
+                type: "scenario_choice",
+                badge: "Stage 4",
+                title: "Stage 4 · Feature Importance",
+                prompt: "How does sklearn's feature_importances_ work for decision trees, and what is a known limitation?",
+                code_snippet: `model = DecisionTreeClassifier(max_depth=5)
+model.fit(X_train, y_train)
+
+importances = model.feature_importances_
+# [0.45, 0.30, 0.15, 0.07, 0.03]`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Counts the number of times each feature is used as a split",
+                    description: "Frequency of use is not weighted by the quality of the split; sklearn uses impurity decrease, not frequency.",
+                  },
+                  {
+                    id: "b",
+                    label: "Uses mean decrease in impurity (MDI); biased toward high-cardinality features",
+                    description: "MDI sums the weighted impurity decrease from all splits on a feature. But features with many unique values can create more and better splits by chance, inflating their importance.",
+                  },
+                  {
+                    id: "c",
+                    label: "Uses permutation importance — randomly shuffles each feature and measures accuracy drop",
+                    description: "Permutation importance is a different (and generally more reliable) method available in sklearn separately. feature_importances_ uses MDI.",
+                  },
+                  {
+                    id: "d",
+                    label: "Measures the depth of first split on each feature — earlier splits are more important",
+                    description: "Depth of first split correlates with importance but is not how feature_importances_ is computed.",
+                  },
+                ],
+                branches: {
+                  a: "s3_recovery_importance",
+                  b: "s3_terminal",
+                  c: "s3_recovery_importance",
+                  d: "s3_recovery_importance",
+                },
+                rationale: "sklearn feature_importances_ = Mean Decrease in Impurity (MDI): Σ (proportion of samples reaching node) × (impurity decrease) across all nodes using that feature. Known bias: high-cardinality features (many unique values) can achieve high MDI by chance. Use permutation importance or SHAP for more reliable rankings.",
+              },
+              s3_recovery_depth: {
+                id: "s3_recovery_depth",
+                type: "scenario_choice",
+                badge: "Recovery 1",
+                title: "Recovery · Depth & Overfitting",
+                prompt: "You are cross-validating max_depth over [1, 2, 4, 8, 16, None]. The CV curve peaks at max_depth=6 and then declines. What does this pattern tell you?",
+                code_snippet: `depths = [1, 2, 4, 6, 8, 16, None]
+cv_scores = [0.60, 0.65, 0.70, 0.73, 0.70, 0.66, 0.63]
+# Peak at depth=6`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "max_depth=6 is overfit — use max_depth=1 for simplicity",
+                    description: "max_depth=1 (a stump) is the most underfit option. The CV curve shows depth=6 has the best generalisation.",
+                  },
+                  {
+                    id: "b",
+                    label: "max_depth=6 is the bias-variance sweet spot for this dataset; shallower underfits, deeper overfits",
+                    description: "The inverted-U CV curve is the classic bias-variance tradeoff signature. Depth < 6 = high bias; depth > 6 = high variance. Choose the peak.",
+                  },
+                  {
+                    id: "c",
+                    label: "You need more data — the curve will shift right with more samples",
+                    description: "More data does shift the overfitting threshold, but the correct action here is to use depth=6 for this dataset.",
+                  },
+                  {
+                    id: "d",
+                    label: "Decision trees cannot overfit if max_depth is set explicitly",
+                    description: "Any finite max_depth can still overfit if it is too large for the signal-to-noise ratio in the data.",
+                  },
+                ],
+                branches: {
+                  a: "s3_recovery_depth",
+                  b: "s3_importance_choice",
+                  c: "s3_recovery_depth",
+                  d: "s3_recovery_depth",
+                },
+                rationale: "The CV accuracy curve peaks at depth=6 then decreases — classic high-variance overfitting for larger depths. Bias-variance tradeoff: low depth → high bias (underfits). High depth → high variance (memorises noise). Cross-validation finds the sweet spot.",
+              },
+              s3_recovery_criteria: {
+                id: "s3_recovery_criteria",
+                type: "scenario_choice",
+                badge: "Recovery 2",
+                title: "Recovery · Information Gain",
+                prompt: "A node has 50 class-0 and 50 class-1 samples (Gini=0.5). After splitting on feature A, left child has 40 class-0 and 10 class-1; right child has 10 class-0 and 40 class-1. Is this a good split?",
+                code_snippet: `# Before split: p0=0.5, p1=0.5
+# Gini = 1 - (0.5² + 0.5²) = 0.5
+
+# After split on A:
+# Left (50 samples): p0=0.8, p1=0.2 → Gini = 1-(0.64+0.04) = 0.32
+# Right (50 samples): p0=0.2, p1=0.8 → Gini = 0.32
+# Weighted Gini = 0.5*0.32 + 0.5*0.32 = 0.32`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "No — the children still have impurity > 0, so the split is bad",
+                    description: "A perfect split is rarely achievable. The question is whether impurity decreased — here it dropped from 0.5 to 0.32.",
+                  },
+                  {
+                    id: "b",
+                    label: "Yes — Gini decreased from 0.5 to 0.32; information gain = 0.18, a substantial improvement",
+                    description: "Information gain = parent Gini − weighted child Gini = 0.5 − 0.32 = 0.18. The split separates classes much better than the parent node.",
+                  },
+                  {
+                    id: "c",
+                    label: "Cannot tell without knowing the feature's data type",
+                    description: "The type of the feature affects how the split is found (threshold for numerical, set for categorical) but not whether the Gini decrease is meaningful.",
+                  },
+                  {
+                    id: "d",
+                    label: "Bad split — both children have equal Gini, meaning the split is symmetric and uninformative",
+                    description: "Symmetric splits are valid and informative. Both children have Gini=0.32, which is a substantial improvement over the parent's 0.5.",
+                  },
+                ],
+                branches: {
+                  a: "s3_recovery_criteria",
+                  b: "s3_depth_choice",
+                  c: "s3_recovery_criteria",
+                  d: "s3_recovery_criteria",
+                },
+                rationale: "Information gain (Gini) = parent Gini − weighted average of children's Gini = 0.5 − 0.32 = 0.18. This is a good split — each child is substantially more pure than the parent. Decision trees greedily choose the feature+threshold that maximises information gain at each node.",
+              },
+              s3_recovery_importance: {
+                id: "s3_recovery_importance",
+                type: "scenario_choice",
+                badge: "Recovery 3",
+                title: "Recovery · Tree Instability",
+                prompt: "You train the same decision tree twice on the same data and get different results. Why might this happen, and how do you fix it?",
+                code_snippet: `# Run 1
+m1 = DecisionTreeClassifier()
+m1.fit(X_train, y_train)
+
+# Run 2 — same data, same parameters
+m2 = DecisionTreeClassifier()
+m2.fit(X_train, y_train)
+
+# m1.tree_ != m2.tree_  ← different structures`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Decision trees are always deterministic — this cannot happen",
+                    description: "Without fixing random_state, when multiple features have equal information gain the tie-breaking is random.",
+                  },
+                  {
+                    id: "b",
+                    label: "When multiple features tie on information gain, sklearn breaks ties randomly; fix with random_state=42",
+                    description: "sklearn's splitter has a random component for tie-breaking. Setting random_state ensures reproducibility.",
+                  },
+                  {
+                    id: "c",
+                    label: "The data was shuffled between runs, producing a different tree",
+                    description: "If data order differs, the tree can differ. But even with identical data order, random tie-breaking can cause differences.",
+                  },
+                  {
+                    id: "d",
+                    label: "sklearn resamples training data each fit call by default",
+                    description: "sklearn DecisionTreeClassifier does not resample by default — it uses all training data. RandomForestClassifier uses bootstrapping.",
+                  },
+                ],
+                branches: {
+                  a: "s3_recovery_importance",
+                  b: "s3_terminal",
+                  c: "s3_recovery_importance",
+                  d: "s3_recovery_importance",
+                },
+                rationale: "sklearn decision trees use a random tie-breaker when multiple features have equal (or near-equal) information gain. This makes the tree non-deterministic across runs. Fix: set random_state=42 (or any integer). For production, always fix random_state for reproducibility.",
+              },
+              s3_terminal: {
+                id: "s3_terminal",
+                type: "scenario_choice",
+                badge: "Terminal",
+                title: "Revision complete · Decision Tree Mastered",
+                terminal: true,
+                prompt: "A decision tree with the same training data gives different structures on two runs. Why? How do you fix it? And why are individual decision trees considered 'high variance' models?",
+                code_snippet: `# Both runs use identical X_train, y_train
+# max_depth=10, random_state not set
+tree_a = DecisionTreeClassifier(max_depth=10).fit(X_train, y_train)
+tree_b = DecisionTreeClassifier(max_depth=10).fit(X_train, y_train)
+# tree_a.feature_importances_ != tree_b.feature_importances_`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Random tie-breaking in splits → set random_state; high variance because small data changes flip splits near the root, cascading through the whole tree",
+                    description: "Decision trees are greedy and non-robust: a small perturbation in training data can select a different feature at the root, producing a completely different tree. This is high variance. Random forests mitigate this by averaging many trees.",
+                  },
+                  {
+                    id: "b",
+                    label: "The model overfits — use max_depth=1 to fix both issues",
+                    description: "max_depth=1 fixes overfitting but does not explain the non-determinism, and a depth-1 stump underfits.",
+                  },
+                  {
+                    id: "c",
+                    label: "High variance comes from the Gini criterion — switch to entropy for stability",
+                    description: "Both Gini and entropy produce high-variance trees; the issue is the greedy recursive nature, not the criterion.",
+                  },
+                ],
+                branches: {
+                  a: "s3_terminal",
+                  b: "s3_terminal",
+                  c: "s3_terminal",
+                },
+                rationale: "Non-determinism: sklearn breaks ties in information gain randomly — fix with random_state. High variance: decision trees make hard splits greedily; small changes in data can change which feature is chosen at the root, causing the entire subtree to differ. This instability is why ensemble methods (Random Forests, Gradient Boosting) average many trees to reduce variance.",
+              },
+            },
+          },
     knowledgeCheck: [
       {
         question: "In practice, how different are trees built with Gini vs entropy as the splitting criterion?",
@@ -758,6 +1736,345 @@ RFs are forgiving, which is why they are the canonical "strong baseline." Practi
 2. **Watch the boundary smooth.** In the bagging lab, slide the number of trees up and narrate how the jagged single-tree boundary becomes a smooth ensemble boundary as variance drops.
 3. **Two sentences:** "Bagging reduces ___ by averaging ___ learners. Feature subsampling helps because ___." Fill and rehearse.`,
     tryGuidance: `Predict how the decision boundary changes as you raise the number of trees from 1 to many, then verify in the lab — watch the jagged single-tree boundary smooth out as variance falls toward the correlation floor.`,
+    interviewGraph: {
+            initialStageId: "s4_features_click",
+            artifactDimensions: [
+              {
+                label: "Bootstrap & OOB",
+                recoveryStageId: "s4_recovery_oob",
+              },
+              {
+                label: "Feature Importance Caveats",
+                recoveryStageId: "s4_recovery_importance",
+              },
+              {
+                label: "Bagging Theory",
+                recoveryStageId: "s4_recovery_bagging",
+                passLabel: "Random Forest Mastery",
+              },
+            ],
+            stages: {
+              s4_features_click: {
+                id: "s4_features_click",
+                type: "click_target",
+                badge: "Stage 1",
+                title: "Stage 1 · Correlated Trees",
+                prompt: "The following random forest is constructed in a way that maximises correlation between individual trees, defeating the purpose of the ensemble. Click the line responsible.",
+                code_snippet: `from sklearn.ensemble import RandomForestClassifier
+
+model = RandomForestClassifier(
+    n_estimators=100,
+    max_features=None,   # ds-target:all_features
+    bootstrap=True,
+    random_state=42
+)
+model.fit(X_train, y_train)`,
+                validationCopy: {
+                  all_features: "Correct. max_features=None means every tree considers all features at every split. This makes trees highly correlated — they all tend to pick the same dominant features early. The power of random forests comes from max_features='sqrt' (or 'log2'), which forces each tree to find the best split among a random subset of features, decorrelating the ensemble.",
+                },
+                branches: {
+                  all_features: "s4_oob_choice",
+                },
+              },
+              s4_oob_choice: {
+                id: "s4_oob_choice",
+                type: "scenario_choice",
+                badge: "Stage 2",
+                title: "Stage 2 · Out-of-Bag Score",
+                prompt: "A random forest reports an OOB score of 0.82. What does this mean, and when is it preferable to a separate validation set?",
+                code_snippet: `model = RandomForestClassifier(
+    n_estimators=200,
+    oob_score=True,
+    random_state=42
+)
+model.fit(X_train, y_train)
+print(model.oob_score_)  # 0.82`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "OOB score = training accuracy on 82% of the data that was bootstrapped",
+                    description: "OOB score is estimated on samples NOT in each tree's bootstrap sample, not on the bootstrap sample itself.",
+                  },
+                  {
+                    id: "b",
+                    label: "OOB score estimates generalisation accuracy using samples not seen by each tree; useful when data is too small to withhold a validation set",
+                    description: "Each bootstrap sample omits ~37% of training rows (OOB samples). Each tree is used to predict only its OOB samples. The aggregate is an almost-unbiased generalisation estimate — no data is 'wasted' on a validation split.",
+                  },
+                  {
+                    id: "c",
+                    label: "OOB score is the same as k-fold cross-validation accuracy",
+                    description: "OOB and k-fold are both unbiased generalisation estimates but computed differently. OOB is specific to bagging ensembles.",
+                  },
+                  {
+                    id: "d",
+                    label: "OOB score only works for classification, not regression",
+                    description: "OOB scoring works for both RandomForestClassifier and RandomForestRegressor.",
+                  },
+                ],
+                branches: {
+                  a: "s4_recovery_oob",
+                  b: "s4_corr_importance_choice",
+                  c: "s4_recovery_oob",
+                  d: "s4_recovery_oob",
+                },
+                rationale: "With bootstrap sampling, each tree sees ~63% of training rows. The remaining ~37% (OOB samples) are used to evaluate that tree. Averaging across all trees gives the OOB score — a low-bias estimate of generalisation performance at no extra computational cost. Particularly valuable for small datasets.",
+              },
+              s4_corr_importance_choice: {
+                id: "s4_corr_importance_choice",
+                type: "scenario_choice",
+                badge: "Stage 3",
+                title: "Stage 3 · Feature Importance with Correlated Features",
+                prompt: "Random forest feature importances: feature A=0.45, feature B=0.30, everything else near 0. Features A and B have correlation=0.92. Is this importance ranking reliable?",
+                code_snippet: `import pandas as pd
+fi = pd.Series(
+    model.feature_importances_,
+    index=feature_names
+).sort_values(ascending=False)
+# A: 0.45, B: 0.30, C: 0.03, ...
+# corr(A, B) = 0.92`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Yes — A is roughly 1.5x as important as B based on MDI",
+                    description: "When A and B are highly correlated, their MDI importances are split arbitrarily between them. The true combined importance is roughly 0.75, but the split 0.45/0.30 is unreliable.",
+                  },
+                  {
+                    id: "b",
+                    label: "No — correlated features split MDI importance between them; the individual rankings are unreliable; use SHAP or permutation importance",
+                    description: "When two features carry similar information, trees randomly choose between them. Each individual MDI looks smaller than the true feature contribution. SHAP values account for feature interactions and are more reliable.",
+                  },
+                  {
+                    id: "c",
+                    label: "Drop feature B since its importance is lower",
+                    description: "B may carry as much predictive information as A — the lower MDI is an artifact of their correlation, not a reliable signal of lower importance.",
+                  },
+                  {
+                    id: "d",
+                    label: "Run the model again with a different random_state to get stable importances",
+                    description: "Different random seeds will redistribute the 0.45/0.30 split arbitrarily between A and B — the instability is the problem, not a fixable side-effect.",
+                  },
+                ],
+                branches: {
+                  a: "s4_recovery_importance",
+                  b: "s4_interpretability_choice",
+                  c: "s4_recovery_importance",
+                  d: "s4_recovery_importance",
+                },
+                rationale: "MDI (Mean Decrease Impurity) is biased for correlated features: when A and B carry the same information, each tree may split on either one, distributing the importance arbitrarily. The combined importance (≈0.75) is meaningful but the 0.45 vs 0.30 split is not. Use permutation importance or SHAP (which handles collinearity via Shapley values) for reliable rankings.",
+              },
+              s4_interpretability_choice: {
+                id: "s4_interpretability_choice",
+                type: "scenario_choice",
+                badge: "Stage 4",
+                title: "Stage 4 · RF vs Gradient Boosting for Interpretability",
+                prompt: "A stakeholder needs both predictive accuracy and interpretability. You are choosing between Random Forest and Gradient Boosting. What is the right framing?",
+                code_snippet: `from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+import shap
+
+rf = RandomForestClassifier(n_estimators=200)
+gb = GradientBoostingClassifier(n_estimators=200, learning_rate=0.05)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Random forest is interpretable; gradient boosting is not",
+                    description: "Neither is directly interpretable as a black box; both require SHAP or similar post-hoc tools.",
+                  },
+                  {
+                    id: "b",
+                    label: "Gradient boosting typically wins on accuracy; random forest is faster and parallelisable; both need SHAP for interpretability",
+                    description: "Gradient boosting sequentially corrects errors and often achieves better accuracy. Random forests train trees in parallel and are more robust to hyperparameter choices. For interpretability, use SHAP for either model.",
+                  },
+                  {
+                    id: "c",
+                    label: "Use a single decision tree for interpretability — ensembles are always black boxes",
+                    description: "A single shallow tree is interpretable but sacrifices accuracy. SHAP allows ensembles to be interpreted nearly as well.",
+                  },
+                  {
+                    id: "d",
+                    label: "Random forest always outperforms gradient boosting on tabular data",
+                    description: "Gradient boosting (XGBoost, LightGBM) typically outperforms random forests on tabular data in practice.",
+                  },
+                ],
+                branches: {
+                  a: "s4_recovery_bagging",
+                  b: "s4_terminal",
+                  c: "s4_recovery_bagging",
+                  d: "s4_recovery_bagging",
+                },
+                rationale: "Gradient boosting generally achieves higher accuracy on tabular data by sequentially correcting residuals. Random forests are parallelisable, faster to train, and less sensitive to hyperparameters. Both are 'black boxes' without tools like SHAP; SHAP provides consistent, additive feature attribution for any ensemble.",
+              },
+              s4_recovery_oob: {
+                id: "s4_recovery_oob",
+                type: "scenario_choice",
+                badge: "Recovery 1",
+                title: "Recovery · Bootstrap Sampling",
+                prompt: "A random forest uses bootstrap sampling. Approximately what fraction of training samples is NOT included in a single bootstrap sample (i.e., the OOB fraction)?",
+                code_snippet: `# Bootstrap: sample n rows WITH replacement from n rows
+import numpy as np
+
+n = 1000
+bootstrap_idx = np.random.choice(n, size=n, replace=True)
+oob_fraction = len(set(range(n)) - set(bootstrap_idx)) / n
+# What is the expected value of oob_fraction?`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "~50% — half the data is left out",
+                    description: "The probability that a specific row is omitted from a bootstrap sample approaches 1/e ≈ 0.368, not 0.5.",
+                  },
+                  {
+                    id: "b",
+                    label: "~37% — because (1 - 1/n)^n → 1/e ≈ 0.368 as n→∞",
+                    description: "The probability that a single row is never selected in n draws with replacement = (1-1/n)^n → e^(-1) ≈ 0.368. So about 37% of rows are OOB for each tree.",
+                  },
+                  {
+                    id: "c",
+                    label: "~10% — most data is used",
+                    description: "Bootstrap samples have substantial overlap but not 90% coverage; approximately 63% are included, 37% excluded.",
+                  },
+                  {
+                    id: "d",
+                    label: "Exactly 0% — bootstrap uses all rows by definition",
+                    description: "Bootstrap samples n rows WITH replacement, meaning some rows appear multiple times and others not at all (~37% excluded).",
+                  },
+                ],
+                branches: {
+                  a: "s4_recovery_oob",
+                  b: "s4_corr_importance_choice",
+                  c: "s4_recovery_oob",
+                  d: "s4_recovery_oob",
+                },
+                rationale: "(1 - 1/n)^n → e^(-1) ≈ 0.368 as n → ∞. For practical sample sizes (n≥100), about 37% of training rows are OOB for each tree. This is why OOB score is a nearly unbiased generalisation estimate — each row is evaluated only by trees that did not train on it.",
+              },
+              s4_recovery_importance: {
+                id: "s4_recovery_importance",
+                type: "scenario_choice",
+                badge: "Recovery 2",
+                title: "Recovery · Permutation Importance",
+                prompt: "You suspect MDI importance is unreliable for your dataset. How does permutation importance work, and what are its advantages?",
+                code_snippet: `from sklearn.inspection import permutation_importance
+
+result = permutation_importance(
+    model, X_val, y_val,
+    n_repeats=10,
+    random_state=42
+)
+# Shuffles each feature column, measures accuracy drop`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Permutation importance retrains the model with each feature removed",
+                    description: "That would be LOCO (Leave-One-Covariate-Out) importance, not permutation importance. Permutation importance does not retrain.",
+                  },
+                  {
+                    id: "b",
+                    label: "Shuffles each feature column, measures accuracy drop on validation data; avoids MDI bias and works on any model",
+                    description: "By randomly permuting feature j, you break its relationship with the target. The drop in validation accuracy measures how much the model relied on feature j. Works on any model, measures validation-time importance.",
+                  },
+                  {
+                    id: "c",
+                    label: "Computes the correlation between each feature and the model output",
+                    description: "Correlation measures linear association, not the non-linear contribution captured by permutation importance.",
+                  },
+                  {
+                    id: "d",
+                    label: "Same as MDI but computed on validation data instead of training data",
+                    description: "Permutation importance is algorithmically different from MDI — it measures accuracy drop after shuffling, not impurity decrease during training.",
+                  },
+                ],
+                branches: {
+                  a: "s4_recovery_importance",
+                  b: "s4_interpretability_choice",
+                  c: "s4_recovery_importance",
+                  d: "s4_recovery_importance",
+                },
+                rationale: "Permutation importance: for each feature j, randomly shuffle its values in the validation set, re-evaluate the model, and record the accuracy drop. Advantages: (1) works on any model, (2) measures test-time importance (not training-time), (3) less biased for correlated/high-cardinality features than MDI.",
+              },
+              s4_recovery_bagging: {
+                id: "s4_recovery_bagging",
+                type: "scenario_choice",
+                badge: "Recovery 3",
+                title: "Recovery · Why Averaging Reduces Variance",
+                prompt: "You average 100 independent decision trees, each with variance σ². What is the variance of the average, and what assumption is violated in a random forest?",
+                code_snippet: `# If trees are independent with variance σ²:
+# Var(average) = σ²/n   ← n=100 trees
+# But in a random forest, trees share training data
+# and use similar features → trees are correlated`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Variance = σ²/100; random forests achieve this because bootstrap makes trees independent",
+                    description: "Bootstrap reduces but does not eliminate correlation — trees trained on overlapping data are still correlated.",
+                  },
+                  {
+                    id: "b",
+                    label: "Variance = σ²/100 only for independent trees; with correlation ρ, Var = ρσ² + (1-ρ)σ²/n — random forests reduce ρ via random feature selection but cannot reach σ²/100",
+                    description: "Correct. The variance of an average of n correlated trees = ρσ² + (1-ρ)σ²/n. Even with n→∞, variance does not go below ρσ². Reducing ρ (via max_features) is as important as increasing n.",
+                  },
+                  {
+                    id: "c",
+                    label: "Variance stays at σ² — averaging correlated trees does not help",
+                    description: "Even correlated trees reduce variance compared to a single tree, just not as much as independent trees would.",
+                  },
+                  {
+                    id: "d",
+                    label: "Variance = 0 for sufficiently many trees",
+                    description: "Averaging correlated estimators has an irreducible variance floor of ρσ² > 0.",
+                  },
+                ],
+                branches: {
+                  a: "s4_recovery_bagging",
+                  b: "s4_terminal",
+                  c: "s4_recovery_bagging",
+                  d: "s4_recovery_bagging",
+                },
+                rationale: "For n correlated estimators with pairwise correlation ρ and variance σ²: Var(mean) = ρσ² + (1-ρ)σ²/n. As n→∞, Var → ρσ². Random forests reduce ρ via random feature subsets (max_features), which is why this hyperparameter is critical. More trees (n) reduces the second term; lower correlation (smaller ρ) reduces the floor.",
+              },
+              s4_terminal: {
+                id: "s4_terminal",
+                type: "scenario_choice",
+                badge: "Terminal",
+                title: "Revision complete · Random Forest Mastered",
+                terminal: true,
+                prompt: "Why does increasing n_estimators in a random forest reduce variance but not bias? What is the theoretical guarantee, and when does adding more trees stop helping?",
+                code_snippet: `from sklearn.ensemble import RandomForestClassifier
+
+for n in [10, 50, 100, 500, 1000]:
+    rf = RandomForestClassifier(n_estimators=n, random_state=42)
+    rf.fit(X_train, y_train)
+    # val score stabilises after ~200 trees`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "More trees = more bias reduction — each tree is weaker so the average has lower bias",
+                    description: "Individual tree bias does not change with n_estimators. Each tree has the same expected value; averaging more of them does not shift that expectation.",
+                  },
+                  {
+                    id: "b",
+                    label: "Averaging reduces variance (Var ∝ 1/n for independent estimators) but each tree is still an unregularised (high-bias or low-bias) estimator; the average's bias = a single tree's bias; gains diminish once variance is low",
+                    description: "The expectation of the average equals the expectation of a single tree, so bias is unchanged. Variance decreases as Var ∝ ρσ² + (1-ρ)σ²/n. After ~200-500 trees, the variance term is negligible and extra trees yield diminishing returns.",
+                  },
+                  {
+                    id: "c",
+                    label: "More trees reduce both bias and variance — always use as many trees as computationally feasible",
+                    description: "Bias is not reduced by adding trees. Beyond a threshold (~200-500 trees), variance gains are negligible.",
+                  },
+                  {
+                    id: "d",
+                    label: "The theoretical guarantee is that with infinite trees a random forest converges to the Bayes error rate",
+                    description: "The law-of-large-numbers guarantee is that the average converges in variance, not that it achieves Bayes error. Bayes error depends on the individual trees' bias.",
+                  },
+                ],
+                branches: {
+                  a: "s4_terminal",
+                  b: "s4_terminal",
+                  c: "s4_terminal",
+                  d: "s4_terminal",
+                },
+                rationale: "E[mean of n trees] = E[single tree] → bias is identical to one tree. Var[mean] = ρσ² + (1-ρ)σ²/n → decreases with n. The law of large numbers guarantees convergence of the average, but to the expected value of a single tree (which may be biased). Adding trees beyond ~200-500 yields diminishing variance reduction while cost grows linearly.",
+              },
+            },
+          },
     knowledgeCheck: [
       {
         question: "Bagging primarily reduces which error component, and what base learner does it therefore want?",
@@ -956,6 +2273,341 @@ The original **AdaBoost** is a special case: it reweights *misclassified example
 2. **Feel the learning rate.** Set η high and add a few trees: the fit overshoots and gets jagged. Set η low: each step is gentle and you need more rounds — that is shrinkage as regularization.
 3. **Two sentences:** "Boosting fits each tree to the ___ of the loss. I prevent overfitting with ___ and ___." Fill and rehearse.`,
     tryGuidance: `Predict how many weak learners it takes before the fit tracks the curve, then step through the lab adding one at a time. Now raise the learning rate and predict whether you'll need more or fewer trees — and whether overfitting risk goes up.`,
+    interviewGraph: {
+            initialStageId: "s5_no_early_stop_click",
+            artifactDimensions: [
+              {
+                label: "Learning Rate vs n_estimators",
+                recoveryStageId: "s5_recovery_lr",
+              },
+              {
+                label: "Early Stopping",
+                recoveryStageId: "s5_recovery_early_stop",
+              },
+              {
+                label: "XGBoost Regularisation",
+                recoveryStageId: "s5_recovery_reg",
+                passLabel: "Gradient Boosting Mastery",
+              },
+            ],
+            stages: {
+              s5_no_early_stop_click: {
+                id: "s5_no_early_stop_click",
+                type: "click_target",
+                badge: "Stage 1",
+                title: "Stage 1 · Missing Early Stopping",
+                prompt: "The following XGBoost training loop is at high risk of overfitting. Click the line most responsible for the risk.",
+                code_snippet: `import xgboost as xgb
+
+model = xgb.XGBClassifier(
+    n_estimators=500,
+    learning_rate=0.3,   # ds-target:high_lr_no_stop
+    max_depth=6,
+    use_label_encoder=False,
+    eval_metric='logloss'
+)
+model.fit(X_train, y_train)
+# No early_stopping_rounds, no eval_set`,
+                validationCopy: {
+                  high_lr_no_stop: "Correct. learning_rate=0.3 with n_estimators=500 and no early stopping is a recipe for overfitting. A high learning rate means each tree makes large corrections; without early stopping the model will keep fitting noise. Fix: add early_stopping_rounds=50 and an eval_set=[(X_val, y_val)] so training halts when validation loss stops improving.",
+                },
+                branches: {
+                  high_lr_no_stop: "s5_lgbm_choice",
+                },
+              },
+              s5_lgbm_choice: {
+                id: "s5_lgbm_choice",
+                type: "scenario_choice",
+                badge: "Stage 2",
+                title: "Stage 2 · XGBoost vs LightGBM",
+                prompt: "You have a dataset with 5 million rows and 200 features. Should you use XGBoost or LightGBM, and what is the key algorithmic difference?",
+                code_snippet: `# XGBoost: level-wise tree growth
+# LightGBM: leaf-wise tree growth + histogram binning
+import lightgbm as lgb
+import xgboost as xgb`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "XGBoost — it is more accurate on large datasets",
+                    description: "LightGBM is generally faster and often matches or exceeds XGBoost accuracy on large tabular datasets.",
+                  },
+                  {
+                    id: "b",
+                    label: "LightGBM — histogram-based binning reduces feature values to discrete bins; leaf-wise growth is faster and uses less memory on large datasets",
+                    description: "LightGBM bins continuous features into ~255 bins (histogram), dramatically reducing computation. Leaf-wise growth expands the leaf with the highest gain, producing deeper unbalanced trees more efficiently than XGBoost's level-wise approach.",
+                  },
+                  {
+                    id: "c",
+                    label: "They are identical in speed and accuracy — choose based on API preference",
+                    description: "LightGBM is substantially faster on large datasets due to GOSS (Gradient-based One-Side Sampling) and histogram binning.",
+                  },
+                  {
+                    id: "d",
+                    label: "XGBoost — LightGBM is only for ranking problems",
+                    description: "LightGBM handles classification, regression, and ranking. It is not limited to ranking.",
+                  },
+                ],
+                branches: {
+                  a: "s5_recovery_lr",
+                  b: "s5_val_loss_choice",
+                  c: "s5_recovery_lr",
+                  d: "s5_recovery_lr",
+                },
+                rationale: "LightGBM advantages on large data: (1) Histogram binning: O(#bins) instead of O(#unique values) for split finding. (2) Leaf-wise growth: finds the best leaf to expand, achieving lower loss faster. (3) GOSS: down-samples low-gradient instances. Together these make LightGBM 5-20x faster than XGBoost on large datasets.",
+              },
+              s5_val_loss_choice: {
+                id: "s5_val_loss_choice",
+                type: "scenario_choice",
+                badge: "Stage 3",
+                title: "Stage 3 · Early Stopping",
+                prompt: "Training loss decreases every round. Validation loss decreases until round 45, then starts increasing. What is the correct action?",
+                code_snippet: `evals_result = {}
+model = xgb.XGBClassifier(
+    n_estimators=200,
+    learning_rate=0.1,
+    early_stopping_rounds=20,
+    eval_metric='logloss'
+)
+model.fit(
+    X_train, y_train,
+    eval_set=[(X_val, y_val)],
+    verbose=True
+)
+print(model.best_iteration)  # → 45`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Continue training — val loss may decrease again after round 45",
+                    description: "If val loss increases for 20+ consecutive rounds after round 45, it is overfitting. More rounds will likely make it worse.",
+                  },
+                  {
+                    id: "b",
+                    label: "Use early_stopping_rounds to stop at the best validation round and set n_estimators=best_iteration for final model",
+                    description: "early_stopping_rounds=20 stops training when val loss has not improved for 20 rounds. model.best_iteration gives the optimal number of trees. For the final model, retrain with n_estimators=45 or use model.predict with iteration_range=(0, model.best_iteration).",
+                  },
+                  {
+                    id: "c",
+                    label: "Increase learning_rate to converge faster and avoid the overfitting region",
+                    description: "Higher learning rate makes overfitting worse, not better — each tree makes larger corrections, overfitting the noise faster.",
+                  },
+                  {
+                    id: "d",
+                    label: "Add more data — overfitting is always a data size problem",
+                    description: "More data helps but is not always available. Early stopping is a direct and effective remedy.",
+                  },
+                ],
+                branches: {
+                  a: "s5_recovery_early_stop",
+                  b: "s5_reg_choice",
+                  c: "s5_recovery_early_stop",
+                  d: "s5_recovery_early_stop",
+                },
+                rationale: "The divergence between training and validation loss after round 45 is the classic overfitting signature. Early stopping: stop adding trees when validation metric stops improving for N rounds (patience). best_iteration=45 is the optimal model. For deployment: use n_estimators=45 or XGBoost's predict with ntree_limit=45.",
+              },
+              s5_reg_choice: {
+                id: "s5_reg_choice",
+                type: "scenario_choice",
+                badge: "Stage 4",
+                title: "Stage 4 · XGBoost Regularisation Parameters",
+                prompt: "XGBoost has alpha (L1) and lambda (L2) regularisation parameters. What does each penalise, and what is the practical effect?",
+                code_snippet: `model = xgb.XGBClassifier(
+    n_estimators=100,
+    reg_alpha=0.5,    # L1 regularisation
+    reg_lambda=1.0,   # L2 regularisation
+    learning_rate=0.1
+)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "alpha=L1 penalises large individual leaf weights (induces sparsity); lambda=L2 penalises all weights smoothly (prevents any weight from being too large)",
+                    description: "In XGBoost's objective: Ω(f) = γT + ½λΣwⱼ² + αΣ|wⱼ| where T=number of leaves, wⱼ=leaf weights. L1 (alpha) encourages sparse leaf weights; L2 (lambda) smoothly shrinks all leaf weights.",
+                  },
+                  {
+                    id: "b",
+                    label: "alpha controls tree depth; lambda controls the number of trees",
+                    description: "max_depth controls tree depth; n_estimators controls tree count. alpha and lambda are weight regularisation terms.",
+                  },
+                  {
+                    id: "c",
+                    label: "Both do the same thing — use one or the other, not both",
+                    description: "L1 and L2 have different mathematical properties and can be used together. XGBoost defaults: alpha=0, lambda=1.",
+                  },
+                  {
+                    id: "d",
+                    label: "lambda=L1 (lasso) and alpha=L2 (ridge) — note the reversed naming",
+                    description: "In XGBoost: alpha=L1, lambda=L2. This matches the mathematical convention (α for L1 in elastic net terminology used by XGBoost).",
+                  },
+                ],
+                branches: {
+                  a: "s5_terminal",
+                  b: "s5_recovery_reg",
+                  c: "s5_recovery_reg",
+                  d: "s5_recovery_reg",
+                },
+                rationale: "XGBoost tree objective: L(θ) + Ω(f) where Ω = γT + ½λΣwⱼ² + αΣ|wⱼ|. γ: minimum gain to split (controls tree complexity), λ (reg_lambda): L2 on leaf weights (default=1, always on), α (reg_alpha): L1 on leaf weights (default=0). L1 promotes sparse leaves; L2 smoothly regularises. Both are applied to leaf scores, not feature weights.",
+              },
+              s5_recovery_lr: {
+                id: "s5_recovery_lr",
+                type: "scenario_choice",
+                badge: "Recovery 1",
+                title: "Recovery · Learning Rate vs n_estimators Tradeoff",
+                prompt: "What is the fundamental tradeoff between learning_rate and n_estimators in gradient boosting?",
+                code_snippet: `# Config A: fast but risky
+xgb_a = xgb.XGBClassifier(learning_rate=0.3, n_estimators=100)
+
+# Config B: slow but safer
+xgb_b = xgb.XGBClassifier(learning_rate=0.01, n_estimators=3000)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Higher learning rate always gives better accuracy",
+                    description: "High learning rate causes large jumps that overshoot minima and overfit. Lower learning_rate with more estimators typically achieves better generalisation.",
+                  },
+                  {
+                    id: "b",
+                    label: "Lower learning_rate requires more trees to achieve the same training loss but typically generalises better; always use early stopping to find the right n_estimators",
+                    description: "Each tree corrects a fraction (learning_rate) of the residual. Small steps + many trees = smoother optimisation path with better generalisation. Use early stopping to avoid manually guessing n_estimators.",
+                  },
+                  {
+                    id: "c",
+                    label: "learning_rate and n_estimators are independent — tuning one does not affect the other",
+                    description: "They are strongly coupled. Halving learning_rate roughly doubles the n_estimators needed to reach the same training loss.",
+                  },
+                  {
+                    id: "d",
+                    label: "Use learning_rate=1.0 for maximum speed and reduce n_estimators to compensate",
+                    description: "learning_rate=1.0 means no shrinkage — equivalent to non-regularised boosting, which overfits severely.",
+                  },
+                ],
+                branches: {
+                  a: "s5_recovery_lr",
+                  b: "s5_val_loss_choice",
+                  c: "s5_recovery_lr",
+                  d: "s5_recovery_lr",
+                },
+                rationale: "Gradient boosting update: F_m(x) = F_{m-1}(x) + η·h_m(x) where η=learning_rate. Small η: model changes slowly, needs more trees (n_estimators), but each step is more conservative. Empirical rule: lower learning_rate + more trees + early stopping often yields best test performance. Typical: η=0.05, n_estimators up to 3000 with early stopping.",
+              },
+              s5_recovery_early_stop: {
+                id: "s5_recovery_early_stop",
+                type: "scenario_choice",
+                badge: "Recovery 2",
+                title: "Recovery · Overfitting Diagnosis in Boosting",
+                prompt: "Training AUC increases to 0.98 and stays there. Validation AUC peaks at 0.83 at round 60 and slowly declines to 0.79 by round 200. What are the key diagnostics and what should you try?",
+                code_snippet: `# Round 60:  train_auc=0.94, val_auc=0.83  ← best val
+# Round 100: train_auc=0.97, val_auc=0.81
+# Round 200: train_auc=0.98, val_auc=0.79`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "The model is underfitting — increase max_depth",
+                    description: "Training AUC=0.98 indicates the model fits training data very well. The gap between train (0.98) and val (0.79) is overfitting, not underfitting.",
+                  },
+                  {
+                    id: "b",
+                    label: "Classic overfitting: use early stopping at round 60; then try reducing max_depth, increasing min_child_weight, adding subsampling, or increasing reg_lambda",
+                    description: "Three diagnostic signs: (1) high train/val gap, (2) val metric peaked and declined, (3) training kept improving. Early stopping at best_iteration=60. Regularisation options: smaller max_depth, larger min_child_weight (min samples per leaf), subsample < 1.0, reg_lambda > 1.",
+                  },
+                  {
+                    id: "c",
+                    label: "Increase n_estimators to 1000 — the model needs more trees to converge",
+                    description: "More trees will worsen overfitting here — the model is already overfitting by round 60.",
+                  },
+                  {
+                    id: "d",
+                    label: "Lower learning_rate to 0.001 without early stopping",
+                    description: "Lower learning_rate helps but without early stopping the model will still overfit eventually — just more slowly.",
+                  },
+                ],
+                branches: {
+                  a: "s5_recovery_early_stop",
+                  b: "s5_reg_choice",
+                  c: "s5_recovery_early_stop",
+                  d: "s5_recovery_early_stop",
+                },
+                rationale: "Train AUC 0.98, val AUC 0.79 = large generalisation gap = overfitting. Prioritised remedies: (1) Early stopping at best_iteration=60 (most impactful). (2) Reduce max_depth (smaller, simpler trees). (3) Increase min_child_weight (require more samples per leaf). (4) Add colsample_bytree/subsample (stochastic boosting). (5) Increase reg_lambda/reg_alpha.",
+              },
+              s5_recovery_reg: {
+                id: "s5_recovery_reg",
+                type: "scenario_choice",
+                badge: "Recovery 3",
+                title: "Recovery · Boosting vs Bagging",
+                prompt: "What is the fundamental difference between boosting (XGBoost) and bagging (Random Forest)?",
+                code_snippet: `# Bagging: trees trained in parallel on bootstrap samples
+# Boosting: trees trained sequentially, each on residuals of the previous
+
+# Random Forest: average of independent trees → reduces variance
+# XGBoost: sum of trees correcting previous errors → reduces bias`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Both train trees in parallel — boosting just uses more trees",
+                    description: "Boosting is sequential by definition: each tree learns from the errors of all previous trees.",
+                  },
+                  {
+                    id: "b",
+                    label: "Bagging reduces variance by averaging independent models; boosting reduces bias by sequentially correcting errors — both risk overfitting but through different mechanisms",
+                    description: "Bagging: Var(mean) ≈ ρσ²/n — lowers variance. Boosting: each tree fits residuals → reduces bias. Bagging overfits slowly (many independent high-variance trees average out). Boosting overfits when it starts fitting noise in the residuals.",
+                  },
+                  {
+                    id: "c",
+                    label: "Boosting is always better — it reduces both bias and variance",
+                    description: "Boosting primarily reduces bias. It can overfit (increase variance) if too many trees are added without regularisation.",
+                  },
+                  {
+                    id: "d",
+                    label: "Bagging is better for noisy data; boosting only works on clean data",
+                    description: "Both work on noisy data; boosting requires more careful regularisation (early stopping, learning rate) on noisy data.",
+                  },
+                ],
+                branches: {
+                  a: "s5_recovery_reg",
+                  b: "s5_terminal",
+                  c: "s5_recovery_reg",
+                  d: "s5_recovery_reg",
+                },
+                rationale: "Bagging: parallel training on bootstrap samples → average reduces variance (each tree is independent). Boosting: sequential, each tree fits the gradient of the loss on the residuals → reduces bias. Random forests rarely overfit catastrophically; gradient boosting can overfit badly without regularisation (early stopping, depth limits, shrinkage).",
+              },
+              s5_terminal: {
+                id: "s5_terminal",
+                type: "scenario_choice",
+                badge: "Terminal",
+                title: "Revision complete · Gradient Boosting Mastered",
+                terminal: true,
+                prompt: "An XGBoost model with 500 trees has train AUC=0.98, val AUC=0.71. Name 3 interventions in the order you would try them and explain the reasoning.",
+                code_snippet: `model = xgb.XGBClassifier(
+    n_estimators=500,
+    learning_rate=0.1,
+    max_depth=8,
+    # no early stopping
+    # no subsampling
+    # reg_lambda=1 (default)
+)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "(1) Add early stopping to find best_iteration; (2) reduce max_depth from 8 to 4-6; (3) add subsampling (subsample=0.8, colsample_bytree=0.8)",
+                    description: "Ordered by impact and ease: Early stopping is free and immediately identifies the optimal tree count (likely well below 500). max_depth reduction simplifies trees structurally. Subsampling introduces randomness similar to random forests, reducing overfitting.",
+                  },
+                  {
+                    id: "b",
+                    label: "(1) Increase n_estimators to 2000; (2) lower learning_rate; (3) collect more data",
+                    description: "More trees at the same learning_rate will worsen the existing overfitting. The problem is too many trees, not too few.",
+                  },
+                  {
+                    id: "c",
+                    label: "(1) Switch to Random Forest; (2) use SHAP for feature selection; (3) retrain XGBoost",
+                    description: "Switching models is a last resort; standard regularisation should be tried first.",
+                  },
+                ],
+                branches: {
+                  a: "s5_terminal",
+                  b: "s5_terminal",
+                  c: "s5_terminal",
+                },
+                rationale: "Train AUC 0.98 / val AUC 0.71 = severe overfitting (0.27 gap). Ordered interventions: (1) Early stopping (eval_set + early_stopping_rounds=50) — identifies if fewer trees fix it; lowest cost change. (2) Reduce max_depth to 4-6 — shallower trees have lower variance. (3) Stochastic boosting: subsample=0.8 (row sampling), colsample_bytree=0.8 (column sampling) — adds regularisation via randomness. If still overfitting: increase reg_lambda, reduce learning_rate and increase trees with early stopping.",
+              },
+            },
+          },
     knowledgeCheck: [
       {
         question: "What is each new tree in gradient boosting trained to predict?",
@@ -1160,6 +2812,346 @@ SVMs are inherently binary, so multiclass uses **one-vs-rest** (K classifiers) o
 2. **Feel C and γ.** Slide C up: the margin narrows and the boundary hugs points (overfit). Toggle to RBF and raise γ: the boundary turns wiggly. Predict each effect before you move the control.
 3. **Two sentences:** "An SVM maximizes ___, which generalizes because ___. Large C means ___ regularization." Fill and rehearse.`,
     tryGuidance: `Before sliding C, predict whether a larger C widens or narrows the margin and which way overfitting risk moves. Then toggle the kernel: predict whether linear or RBF can separate the encircled points, and verify which become support vectors.`,
+    interviewGraph: {
+            initialStageId: "s6_high_c_click",
+            artifactDimensions: [
+              {
+                label: "C Parameter & Margin",
+                recoveryStageId: "s6_recovery_c",
+              },
+              {
+                label: "Kernel Trick",
+                recoveryStageId: "s6_recovery_kernel",
+              },
+              {
+                label: "SVM Limitations",
+                recoveryStageId: "s6_recovery_scale",
+                passLabel: "SVM Mastery",
+              },
+            ],
+            stages: {
+              s6_high_c_click: {
+                id: "s6_high_c_click",
+                type: "click_target",
+                badge: "Stage 1",
+                title: "Stage 1 · Over-penalising Misclassifications",
+                prompt: "An SVM is applied to a dataset with overlapping classes and significant noise. Click the line that makes the model prone to overfitting by not tolerating any margin violations.",
+                code_snippet: `from sklearn.svm import SVC
+
+model = SVC(
+    C=1000,           # ds-target:extreme_c
+    kernel='rbf',
+    gamma='scale'
+)
+model.fit(X_train, y_train)
+print(f"Train accuracy: {model.score(X_train, y_train):.3f}")`,
+                validationCopy: {
+                  extreme_c: "Correct. C=1000 (extremely high) forces the SVM to classify every training point correctly, allowing almost no margin violations. On a noisy, overlapping dataset this means the decision boundary contorts to fit outliers — a classic overfit. Reduce C (try C=0.1 or C=1.0) to allow a wider margin and tolerance for misclassifications, which improves generalisation.",
+                },
+                branches: {
+                  extreme_c: "s6_c_choice",
+                },
+              },
+              s6_c_choice: {
+                id: "s6_c_choice",
+                type: "scenario_choice",
+                badge: "Stage 2",
+                title: "Stage 2 · C Parameter Interpretation",
+                prompt: "In an SVM, a high value of C means:",
+                code_snippet: `# SVM objective: minimise ½‖w‖² + C·Σξᵢ
+# ‖w‖²: margin term (want to maximise margin)
+# C·Σξᵢ: penalty for misclassifications / margin violations
+# C controls the tradeoff
+
+from sklearn.svm import SVC
+svc_low_c  = SVC(C=0.01)   # soft margin
+svc_high_c = SVC(C=1000)   # hard margin`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Wide margin, many violations allowed, underfits training data",
+                    description: "Wide margin and tolerance for violations is the effect of LOW C. High C does the opposite.",
+                  },
+                  {
+                    id: "b",
+                    label: "Small margin, few violations allowed, can overfit to training data",
+                    description: "High C heavily penalises misclassifications (Σξᵢ term is large), so the optimiser sacrifices margin width to correctly classify training points. This can memorise noise.",
+                  },
+                  {
+                    id: "c",
+                    label: "Faster training — C controls the convergence rate of the optimiser",
+                    description: "C is a regularisation parameter, not a learning rate. It affects the shape of the decision boundary, not convergence speed.",
+                  },
+                  {
+                    id: "d",
+                    label: "More support vectors — high C selects more points to define the boundary",
+                    description: "High C often leads to FEWER support vectors because the boundary fits tightly. Low C (wide margin) tends to have more support vectors.",
+                  },
+                ],
+                branches: {
+                  a: "s6_recovery_c",
+                  b: "s6_kernel_choice",
+                  c: "s6_recovery_c",
+                  d: "s6_recovery_c",
+                },
+                rationale: "SVM objective: min ½‖w‖² + CΣξᵢ. The ‖w‖² term maximises margin; CΣξᵢ penalises violations. High C: violations are heavily penalised → narrow margin, fits training data closely → risk overfitting. Low C: violations tolerated → wide, smooth margin → better generalisation on noisy data. C is the inverse of regularisation strength.",
+              },
+              s6_kernel_choice: {
+                id: "s6_kernel_choice",
+                type: "scenario_choice",
+                badge: "Stage 3",
+                title: "Stage 3 · The Kernel Trick",
+                prompt: "Data is not linearly separable in 2D. You apply an RBF kernel to an SVM. What happens mathematically?",
+                code_snippet: `# Linear SVM: finds hyperplane w·x + b = 0 in input space
+# RBF kernel: K(x, x') = exp(-γ‖x - x'‖²)
+# The kernel computes dot products in a high-dimensional space
+# without explicitly computing the mapping φ(x)
+
+from sklearn.svm import SVC
+model = SVC(kernel='rbf', C=1.0, gamma='scale')`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "The RBF kernel adds polynomial features up to degree 3 to make data separable",
+                    description: "Polynomial features are added by the polynomial kernel. RBF corresponds to an infinite-dimensional feature space.",
+                  },
+                  {
+                    id: "b",
+                    label: "The kernel implicitly maps data to a higher-dimensional (potentially infinite) space where linear separation may exist; the SVM finds the max-margin hyperplane in that space without explicitly computing the mapping",
+                    description: "K(x,x') = φ(x)·φ(x'). The RBF kernel corresponds to infinite-dimensional feature space. The kernel trick computes dot products in that space via a simple exponential function, making the computation tractable.",
+                  },
+                  {
+                    id: "c",
+                    label: "The RBF kernel normalises the feature vectors, making them linearly separable",
+                    description: "Normalisation is a preprocessing step, not what a kernel does. The kernel defines a similarity function that enables non-linear decision boundaries.",
+                  },
+                  {
+                    id: "d",
+                    label: "The kernel randomly projects data into a higher-dimensional space",
+                    description: "Random projection is a different technique (e.g., Random Kitchen Sinks). The RBF kernel uses a specific, deterministic similarity function.",
+                  },
+                ],
+                branches: {
+                  a: "s6_recovery_kernel",
+                  b: "s6_scale_choice",
+                  c: "s6_recovery_kernel",
+                  d: "s6_recovery_kernel",
+                },
+                rationale: "Kernel trick: instead of explicitly computing φ(x) (which may be infinite-dimensional), we define K(x,x') = φ(x)·φ(x'). The SVM only needs dot products in the feature space (for the dual formulation), which the kernel provides cheaply. RBF kernel K(x,x') = exp(-γ‖x-x'‖²) corresponds to infinite-dimensional Gaussian features — any compact dataset is separable in this space for appropriate γ.",
+              },
+              s6_scale_choice: {
+                id: "s6_scale_choice",
+                type: "scenario_choice",
+                badge: "Stage 4",
+                title: "Stage 4 · SVM Scalability",
+                prompt: "You have a dataset with 1 million rows. Comparing SVM with RBF kernel vs Logistic Regression — which is more practical and why?",
+                code_snippet: `# SVM training complexity: O(n²) to O(n³)
+# Logistic regression (SGD): O(n) per epoch
+
+from sklearn.svm import SVC
+from sklearn.linear_model import SGDClassifier
+
+# SVC(kernel='rbf').fit(X, y)  ← n=1M rows: hours/days?
+# SGDClassifier(loss='log_loss').fit(X, y)  ← n=1M: minutes`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "SVM with RBF kernel — kernels handle large datasets efficiently",
+                    description: "Standard SVM scales as O(n²) to O(n³) in training time and O(n_sv) in prediction, where n_sv can be large. This is impractical for 1M rows.",
+                  },
+                  {
+                    id: "b",
+                    label: "Logistic Regression (SGD) is more practical — SVMs do not scale well to large n; use LinearSVC or gradient boosting if non-linearity is needed",
+                    description: "SVM training requires solving a quadratic program whose cost grows quadratically with n. For 1M rows, use: (1) SGD-based logistic regression, (2) LinearSVC (kernel-free, scales to large n), or (3) gradient boosting (XGBoost/LightGBM) for non-linear problems.",
+                  },
+                  {
+                    id: "c",
+                    label: "Both scale equally — use whichever has better default accuracy",
+                    description: "SVM scales as O(n²–n³); logistic regression with SGD scales as O(n) per epoch. The difference at n=1M is enormous.",
+                  },
+                  {
+                    id: "d",
+                    label: "Use SVM with a linear kernel — it scales the same as logistic regression",
+                    description: "LinearSVC (linear kernel SVM) does scale better and is a reasonable choice. But RBF-kernel SVC specifically does not scale well, and the question specifies RBF.",
+                  },
+                ],
+                branches: {
+                  a: "s6_recovery_scale",
+                  b: "s6_terminal",
+                  c: "s6_recovery_scale",
+                  d: "s6_recovery_scale",
+                },
+                rationale: "SVM (kernel) training solves a QP problem: O(n²) memory, O(n²–n³) time. For n=1M: impractical. Alternatives: LinearSVC (O(n) per iteration), SGDClassifier with hinge loss (= online SVM), or approximate kernel methods (Nyström, Random Features). For non-linear large-scale problems, gradient boosting (XGBoost/LightGBM) is the practical choice.",
+              },
+              s6_recovery_c: {
+                id: "s6_recovery_c",
+                type: "scenario_choice",
+                badge: "Recovery 1",
+                title: "Recovery · Margin Intuition",
+                prompt: "Explain the concept of a 'margin' in SVM. What are support vectors, and why does maximising the margin improve generalisation?",
+                code_snippet: `# Margin = 2/‖w‖ (distance between the two margin hyperplanes)
+# Support vectors: training points closest to the decision boundary
+# SVM objective: max margin = min ‖w‖² subject to constraints`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "The margin is the training accuracy — higher accuracy = larger margin",
+                    description: "The margin is a geometric concept (distance), not accuracy. A model can have high training accuracy with a tiny margin (overfit).",
+                  },
+                  {
+                    id: "b",
+                    label: "The margin is the minimum distance between the decision boundary and the nearest training points (support vectors); larger margin = less sensitive to small perturbations in input, better generalisation by VC theory",
+                    description: "Margin = 2/‖w‖. By VC theory, maximising the margin minimises an upper bound on the generalisation error. Support vectors are the only training points that influence the boundary — all other points can be removed without changing the SVM.",
+                  },
+                  {
+                    id: "c",
+                    label: "The margin is the number of support vectors — fewer support vectors = larger margin",
+                    description: "Fewer support vectors often correlates with a larger margin but is not the definition. The margin is a geometric distance, not a count.",
+                  },
+                  {
+                    id: "d",
+                    label: "Maximising the margin reduces training error — it is a direct optimisation of accuracy",
+                    description: "SVM maximises margin, which is a regularisation objective. It does not directly minimise training error (unlike ERM models).",
+                  },
+                ],
+                branches: {
+                  a: "s6_recovery_c",
+                  b: "s6_kernel_choice",
+                  c: "s6_recovery_c",
+                  d: "s6_recovery_c",
+                },
+                rationale: "Margin = 2/‖w‖ = twice the distance from the boundary to the nearest points. Maximising margin minimises ‖w‖², which (by VC dimension theory) minimises the generalisation error bound. Support vectors are the training points on the margin — they are the only points that determine the decision boundary. This is an elegant property: the SVM ignores non-support-vector points entirely.",
+              },
+              s6_recovery_kernel: {
+                id: "s6_recovery_kernel",
+                type: "scenario_choice",
+                badge: "Recovery 2",
+                title: "Recovery · Gamma Parameter in RBF Kernel",
+                prompt: "RBF kernel has parameter gamma (γ). High gamma means the kernel has a very small radius of influence. What is the practical effect on the decision boundary?",
+                code_snippet: `# RBF: K(x, x') = exp(-γ‖x - x'‖²)
+# High γ: only nearby points have non-zero similarity
+# Low γ: distant points still have significant similarity
+
+svc_high_gamma = SVC(kernel='rbf', C=1.0, gamma=100)
+svc_low_gamma  = SVC(kernel='rbf', C=1.0, gamma=0.001)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "High gamma creates a very smooth, global decision boundary",
+                    description: "High gamma is the opposite: each training point influences only a tiny region, creating a bumpy, local decision boundary.",
+                  },
+                  {
+                    id: "b",
+                    label: "High gamma creates a very complex, wiggly boundary that fits tightly around each training point — tends to overfit",
+                    description: "With high γ, each support vector's influence decays rapidly. The model creates small 'bubbles' around each training point rather than a smooth boundary — classic overfit behaviour.",
+                  },
+                  {
+                    id: "c",
+                    label: "High gamma makes the SVM equivalent to a linear SVM",
+                    description: "Low gamma (γ→0) makes all pairwise similarities equal, approximating a linear kernel. High gamma creates the most non-linear boundary.",
+                  },
+                  {
+                    id: "d",
+                    label: "High gamma is always preferred — it captures more complex patterns",
+                    description: "High gamma overfits to training data. The optimal gamma balances complexity and generalisation — tune with cross-validation.",
+                  },
+                ],
+                branches: {
+                  a: "s6_recovery_kernel",
+                  b: "s6_scale_choice",
+                  c: "s6_recovery_kernel",
+                  d: "s6_recovery_kernel",
+                },
+                rationale: "γ in K(x,x') = exp(-γ‖x-x'‖²) controls the 'reach' of each training point. High γ: kernel decays rapidly → each support vector affects only nearby predictions → complex, local decision boundary → overfitting. Low γ: slow decay → smooth, global boundary → may underfit. Jointly tune C and gamma with grid search or RandomizedSearchCV.",
+              },
+              s6_recovery_scale: {
+                id: "s6_recovery_scale",
+                type: "scenario_choice",
+                badge: "Recovery 3",
+                title: "Recovery · SVM Preprocessing Requirements",
+                prompt: "Why must features be scaled (standardised) before training an SVM, and what happens if you skip this step?",
+                code_snippet: `from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+
+# Correct: scale first
+pipe = Pipeline([
+    ('scaler', StandardScaler()),
+    ('svm', SVC(kernel='rbf', C=1.0))
+])
+
+# Incorrect: raw features with very different scales
+# svc.fit(X_raw, y)  ← feature_1 in [0,1], feature_2 in [0,10000]`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Scaling is optional for SVMs — the kernel handles different scales automatically",
+                    description: "The RBF kernel computes ‖x-x'‖². If feature scales differ by orders of magnitude, the distance is dominated by the large-scale feature, effectively ignoring all others.",
+                  },
+                  {
+                    id: "b",
+                    label: "SVMs are sensitive to feature scale because the RBF kernel uses Euclidean distance; unscaled features cause the model to ignore small-scale features entirely",
+                    description: "‖x-x'‖² = Σ(xᵢ-xᵢ')². A feature with range [0,10000] contributes ~10^8 to the squared distance; a feature in [0,1] contributes at most 1. Without scaling, the kernel is blind to the small features.",
+                  },
+                  {
+                    id: "c",
+                    label: "Scaling is needed only for linear SVMs, not RBF kernels",
+                    description: "RBF kernels are especially sensitive to scale because they use Euclidean distance explicitly. Linear SVMs also benefit from scaling for similar reasons.",
+                  },
+                  {
+                    id: "d",
+                    label: "Scaling hurts SVM performance by removing important magnitude information",
+                    description: "Magnitude differences between features are arbitrary (unit choices) and should not determine which features the model attends to. Scaling removes this arbitrary bias.",
+                  },
+                ],
+                branches: {
+                  a: "s6_recovery_scale",
+                  b: "s6_terminal",
+                  c: "s6_recovery_scale",
+                  d: "s6_recovery_scale",
+                },
+                rationale: "RBF kernel: K(x,x') = exp(-γ‖x-x'‖²). If feature A ∈ [0,1] and feature B ∈ [0,10,000], then ‖x-x'‖² ≈ (A-A')² + (B-B')² ≈ (B-B')² — the model effectively only uses feature B. StandardScaler (z-score normalisation) or MinMaxScaler ensures all features contribute equally to the distance calculation.",
+              },
+              s6_terminal: {
+                id: "s6_terminal",
+                type: "scenario_choice",
+                badge: "Terminal",
+                title: "Revision complete · SVM Mastered",
+                terminal: true,
+                prompt: "Explain the kernel trick to a junior engineer without using math jargon. What problem does it solve, and why is it computationally elegant?",
+                code_snippet: `# Without kernel: you'd have to manually create
+# millions of new features (x1², x2², x1*x2, x1³, ...)
+# then train a linear SVM on those expanded features
+
+# With kernel: you just change one line
+model = SVC(kernel='rbf')  # magic happens inside
+# The kernel secretly computes dot products in that
+# high-dimensional space without creating the features`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "The kernel trick transforms data by normalising it, so a linear boundary always works",
+                    description: "Normalisation and the kernel trick are different operations. The kernel trick enables non-linear boundaries, not normalisation.",
+                  },
+                  {
+                    id: "b",
+                    label: "The kernel trick lets you find non-linear boundaries by imagining your data in a higher-dimensional space where they DO separate linearly — but it computes this without ever creating those extra dimensions, making it fast",
+                    description: "Intuition: imagine your 2D data can't be separated by a line. In 3D (add x² feature), it can. The kernel 'asks': how similar are two points in that high-dimensional space? It answers this question using only the original features — no explicit expansion needed.",
+                  },
+                  {
+                    id: "c",
+                    label: "The kernel trick is a way to avoid cross-validation by estimating the best C and gamma automatically",
+                    description: "The kernel trick is about feature space expansion, not hyperparameter selection. C and gamma still need to be tuned via cross-validation.",
+                  },
+                ],
+                branches: {
+                  a: "s6_terminal",
+                  b: "s6_terminal",
+                  c: "s6_terminal",
+                },
+                rationale: "Simple explanation: 'Sometimes data can't be separated by a straight line. If we could add extra dimensions (like squaring the features), it might become separable. But adding millions of features is expensive. The kernel trick says: I don't need to actually create those features — I just need to know how similar two data points are in that higher-dimensional space, which I can calculate directly from the original features using a simple formula.' Computationally elegant: the SVM dual formulation only needs pairwise dot products φ(x)·φ(x'), and the kernel provides these without computing φ(x) explicitly.",
+              },
+            },
+          },
     knowledgeCheck: [
       {
         question: "What does a Support Vector Machine maximize, and why does that aid generalization?",

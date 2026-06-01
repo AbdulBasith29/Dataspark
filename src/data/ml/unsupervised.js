@@ -122,6 +122,340 @@ Sketch eight points on paper in two obvious blobs, then **deliberately seed both
 
 Then change the geometry: redraw the points as **two concentric rings**. Try to find *any* placement of two centroids that separates inner from outer ring. You cannot — the Voronoi boundary is always a straight line. Write one sentence explaining why this single fact forces you to DBSCAN or spectral clustering for non-convex shapes.`,
     tryGuidance: `Step through **Lloyd's algorithm** one iteration at a time and watch the crosshair centroids slide to the mean of their colored points. First set **k = 3** and step to convergence. Then set **k = 2** and **k = 4** and predict, before stepping, which natural blob will get split or merged. Notice that the same k can converge to different partitions depending on where the seeds landed — that is the local-minimum story made visible.`,
+    interviewGraph: {
+            initialStageId: "u1_click_conclusion",
+            artifactDimensions: [
+              {
+                label: "K Selection",
+                recoveryStageId: "u1_recovery_k_selection",
+              },
+              {
+                label: "Initialization & Scaling",
+                recoveryStageId: "u1_recovery_init",
+              },
+              {
+                label: "Cluster Evaluation",
+                recoveryStageId: "u1_recovery_eval",
+                passLabel: "K-Means Mastery",
+              },
+            ],
+            stages: {
+              u1_click_conclusion: {
+                id: "u1_click_conclusion",
+                type: "click_target",
+                badge: "Stage 1",
+                title: "Stage 1 · Spotting invalid conclusions",
+                prompt: "The code below chooses k by silhouette score on training data and then draws a hard business conclusion from it. Click the line that treats a statistical heuristic as objective ground truth without domain validation.",
+                code_snippet: `from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+
+best_k, best_score = 2, -1
+for k in range(2, 9):
+    km = KMeans(n_clusters=k, random_state=42).fit(X_train)
+    s = silhouette_score(X_train, km.labels_)
+    if s > best_score:
+        best_k, best_score = k, s
+
+final_model = KMeans(n_clusters=best_k, random_state=42).fit(X_train)
+print(f"We found k={best_k} distinct user segments in our data.")  # ds-target:hard_conclusion
+report_to_stakeholders(k=best_k)`,
+                validationCopy: {
+                  hard_conclusion: "Correct. The silhouette score is a geometric heuristic — it does not confirm that these are meaningful business segments. Reporting k=5 as an objective fact to stakeholders skips domain validation and interpretability checks.",
+                },
+                branches: {
+                  hard_conclusion: "u1_choice_imbalanced",
+                },
+              },
+              u1_choice_imbalanced: {
+                id: "u1_choice_imbalanced",
+                type: "scenario_choice",
+                badge: "Stage 2",
+                title: "Stage 2 · Diagnosing degenerate clusters",
+                prompt: "K-means assigns user sessions to 4 clusters. After fitting, one cluster contains 95% of all data points. What is most likely wrong and what should you try?",
+                code_snippet: `km = KMeans(n_clusters=4, init="random", n_init=1, random_state=0)
+km.fit(X)
+sizes = pd.Series(km.labels_).value_counts()
+# cluster 0: 95 012  cluster 1: 1 203
+# cluster 2:    890  cluster 3:    451`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "k is too small, or data has no natural structure at k=4",
+                    description: "Try k-means++ initialisation, scale the features, sweep over different k values, or consider DBSCAN if clusters are not spherical.",
+                  },
+                  {
+                    id: "b",
+                    label: "The model converged perfectly — 95% of users genuinely belong to one group",
+                    description: "Possible in theory, but a 95/5 split almost always signals a problem with k, initialisation, or unscaled features, not a genuine business insight.",
+                  },
+                  {
+                    id: "c",
+                    label: "Increase n_init to 10 and the problem will disappear",
+                    description: "More random restarts reduce bad initialisations but won't fix the wrong choice of k or unscaled features that cause one centroid to dominate.",
+                  },
+                  {
+                    id: "d",
+                    label: "Normalise labels with LabelEncoder before clustering",
+                    description: "K-means operates on numeric feature vectors, not labels. Label encoding the target column is irrelevant here.",
+                  },
+                ],
+                branches: {
+                  a: "u1_choice_scaling",
+                  b: "u1_recovery_k_selection",
+                  c: "u1_recovery_k_selection",
+                  d: "u1_recovery_k_selection",
+                },
+                rationale: "A 95% cluster is a classic sign that k is too small, centroids started poorly, or features are unscaled so one axis dominates. The fix is k-means++ init, feature scaling, elbow/silhouette sweep over k, or switching to DBSCAN for non-spherical data.",
+              },
+              u1_recovery_k_selection: {
+                id: "u1_recovery_k_selection",
+                type: "scenario_choice",
+                badge: "Recovery 1",
+                title: "Recovery · Choosing k correctly",
+                prompt: "Which combination of techniques is most reliable for choosing k in a production K-means pipeline?",
+                code_snippet: `# Which approach is most robust?
+# A: Pick k where inertia drops most steeply (elbow)
+# B: Sweep k, compute silhouette score, pick max
+# C: Use domain knowledge about expected segments,
+#    then validate with silhouette + business review
+# D: Always use k=10 for large datasets`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Elbow method only",
+                    description: "The elbow often has no clear bend and is subjective — using it alone is unreliable.",
+                  },
+                  {
+                    id: "b",
+                    label: "Silhouette score sweep only",
+                    description: "Better than elbow, but still a purely geometric heuristic that ignores business meaning.",
+                  },
+                  {
+                    id: "c",
+                    label: "Domain knowledge + silhouette + business review",
+                    description: "Correct. Start with a plausible range from domain context, use silhouette to narrow it, then validate cluster interpretability with stakeholders.",
+                  },
+                  {
+                    id: "d",
+                    label: "Always k=10",
+                    description: "Fixed k with no data-driven or domain justification will produce arbitrary, uninterpretable clusters.",
+                  },
+                ],
+                branches: {
+                  a: "u1_choice_scaling",
+                  b: "u1_choice_scaling",
+                  c: "u1_choice_scaling",
+                  d: "u1_choice_scaling",
+                },
+                rationale: "No single metric chooses k reliably. Combining domain knowledge (plausible number of segments), a geometric measure (silhouette), and business interpretability is the robust approach.",
+              },
+              u1_choice_scaling: {
+                id: "u1_choice_scaling",
+                type: "scenario_choice",
+                badge: "Stage 3",
+                title: "Stage 3 · Feature scaling and Euclidean distance",
+                prompt: "You run K-means on latitude/longitude coordinates alongside a revenue feature (range: 0–5,000,000). A colleague skips StandardScaler. Does it matter?",
+                code_snippet: `# lat/lon range: -90 to 90 / -180 to 180
+# revenue range: 0 to 5_000_000
+
+X = df[["latitude", "longitude", "revenue"]]
+km = KMeans(n_clusters=5, random_state=42)
+km.fit(X)   # no scaling applied`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Yes — revenue's large range will dominate Euclidean distance, making lat/lon irrelevant",
+                    description: "Correct. Euclidean distance is scale-sensitive. An unscaled revenue column with range 5M will dwarf coordinates with range ~360, effectively clustering purely on revenue.",
+                  },
+                  {
+                    id: "b",
+                    label: "No — K-means automatically normalises features internally",
+                    description: "K-means does not normalise features. It uses raw Euclidean distances, so high-magnitude features dominate.",
+                  },
+                  {
+                    id: "c",
+                    label: "No — lat/lon are already on a meaningful scale",
+                    description: "The issue is the relative scale difference between features. Lat/lon vs millions-range revenue will always produce biased distances.",
+                  },
+                  {
+                    id: "d",
+                    label: "It depends on the random seed",
+                    description: "The random seed affects initialisation, not how scale distorts the distance metric. Scaling is always needed when features have very different ranges.",
+                  },
+                ],
+                branches: {
+                  a: "u1_choice_elbow",
+                  b: "u1_recovery_init",
+                  c: "u1_recovery_init",
+                  d: "u1_recovery_init",
+                },
+                rationale: "K-means minimises within-cluster sum of squared Euclidean distances. Features with much larger numeric ranges contribute disproportionately. Always StandardScale (or MinMaxScale) before K-means when features are on different scales.",
+              },
+              u1_recovery_init: {
+                id: "u1_recovery_init",
+                type: "scenario_choice",
+                badge: "Recovery 2",
+                title: "Recovery · Initialisation & distance sensitivity",
+                prompt: "Which statement best describes why k-means++ initialisation outperforms random initialisation?",
+                code_snippet: `# random init
+KMeans(n_clusters=5, init="random", n_init=1)
+
+# k-means++ init
+KMeans(n_clusters=5, init="k-means++", n_init=10)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "k-means++ spreads initial centroids far apart probabilistically, avoiding degenerate starts",
+                    description: "Correct. k-means++ samples the first centroid randomly then picks each subsequent centroid with probability proportional to its squared distance from the nearest existing centroid — ensuring spread-out initialisation.",
+                  },
+                  {
+                    id: "b",
+                    label: "k-means++ uses gradient descent instead of EM-style updates",
+                    description: "Both use the same assignment/update EM loop. The difference is only in centroid initialisation.",
+                  },
+                  {
+                    id: "c",
+                    label: "k-means++ scales features before running",
+                    description: "Initialisation method has nothing to do with feature scaling — that must be done separately.",
+                  },
+                  {
+                    id: "d",
+                    label: "k-means++ adds regularisation to prevent overfitting",
+                    description: "K-means has no regularisation parameter. k-means++ is purely about centroid placement.",
+                  },
+                ],
+                branches: {
+                  a: "u1_choice_elbow",
+                  b: "u1_choice_elbow",
+                  c: "u1_choice_elbow",
+                  d: "u1_choice_elbow",
+                },
+                rationale: "k-means++ uses a distance-weighted probability to place initial centroids far apart, dramatically reducing the chance of converging to a poor local minimum.",
+              },
+              u1_choice_elbow: {
+                id: "u1_choice_elbow",
+                type: "scenario_choice",
+                badge: "Stage 4",
+                title: "Stage 4 · When the elbow method fails",
+                prompt: "You plot inertia vs k for k=2 to 15. The curve smoothly decreases with no obvious bend. What is your next move?",
+                code_snippet: `inertias = []
+for k in range(2, 16):
+    km = KMeans(n_clusters=k, init="k-means++",
+                n_init=10, random_state=42)
+    km.fit(X_scaled)
+    inertias.append(km.inertia_)
+# plot shows no clear elbow — smooth monotone decrease`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Compute silhouette scores, try the gap statistic, and use domain knowledge to narrow the range",
+                    description: "Correct. When the elbow is ambiguous, silhouette score (higher is better), gap statistic (compares inertia to random baseline), and subject-matter knowledge about expected cluster count together provide a more principled choice.",
+                  },
+                  {
+                    id: "b",
+                    label: "The data has no clusters — stop and use regression",
+                    description: "A smooth inertia curve doesn't confirm absence of clusters; it may mean clusters overlap or the elbow is subtle. Try other metrics before abandoning clustering.",
+                  },
+                  {
+                    id: "c",
+                    label: "Pick k=2 because the first large inertia drop is there",
+                    description: "Defaulting to k=2 ignores the actual structure in the data and the business question.",
+                  },
+                  {
+                    id: "d",
+                    label: "Increase n_init until an elbow appears",
+                    description: "n_init controls the number of random restarts per k, not the shape of the inertia curve. A smooth curve is a property of the data distribution, not of how many restarts you use.",
+                  },
+                ],
+                branches: {
+                  a: "u1_terminal",
+                  b: "u1_recovery_eval",
+                  c: "u1_recovery_eval",
+                  d: "u1_recovery_eval",
+                },
+                rationale: "The elbow method is heuristic and often ambiguous. Silhouette score, gap statistic, and domain knowledge are complementary tools that together give a more reliable choice of k.",
+              },
+              u1_recovery_eval: {
+                id: "u1_recovery_eval",
+                type: "scenario_choice",
+                badge: "Recovery 3",
+                title: "Recovery · Evaluating clustering quality",
+                prompt: "Which metric for evaluating K-means clusters does NOT require ground truth labels?",
+                code_snippet: `from sklearn.metrics import (
+    silhouette_score,      # internal
+    adjusted_rand_score,   # external
+    fowlkes_mallows_score, # external
+    calinski_harabasz_score # internal
+)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Adjusted Rand Score",
+                    description: "ARI compares predicted clusters to true labels — it requires ground truth.",
+                  },
+                  {
+                    id: "b",
+                    label: "Silhouette score",
+                    description: "Correct. Silhouette is an internal metric — it measures cohesion (within-cluster tightness) and separation (between-cluster distance) using only the data and cluster assignments.",
+                  },
+                  {
+                    id: "c",
+                    label: "Fowlkes-Mallows score",
+                    description: "Fowlkes-Mallows is an external metric requiring true labels.",
+                  },
+                  {
+                    id: "d",
+                    label: "Accuracy",
+                    description: "Accuracy requires ground truth class labels — not applicable in unsupervised settings.",
+                  },
+                ],
+                branches: {
+                  a: "u1_terminal",
+                  b: "u1_terminal",
+                  c: "u1_terminal",
+                  d: "u1_terminal",
+                },
+                rationale: "Internal metrics (silhouette, Calinski-Harabasz, Davies-Bouldin) evaluate cluster quality using only the data itself. External metrics (ARI, NMI, Fowlkes-Mallows) require ground truth labels.",
+              },
+              u1_terminal: {
+                id: "u1_terminal",
+                type: "scenario_choice",
+                badge: "Final",
+                title: "Revision complete · K-Means Mastery",
+                terminal: true,
+                prompt: "K-means is run 5 times on the same dataset with different random seeds. The cluster assignments differ across runs. Why does this happen, and how do you handle it in a production pipeline?",
+                code_snippet: `for seed in [0, 7, 13, 42, 99]:
+    km = KMeans(n_clusters=5, init="random", n_init=1,
+                random_state=seed)
+    km.fit(X_scaled)
+    print(seed, km.inertia_, km.labels_[:5])
+# Each run produces different label assignments and inertia`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "K-means converges to a local minimum that depends on initial centroids; fix by using k-means++ with n_init≥10 and persisting the best model by lowest inertia",
+                    description: "Correct. K-means is non-convex — different starts reach different local minima. k-means++ + multiple restarts (n_init) dramatically reduces this; you then keep the run with lowest inertia and serialise that model.",
+                  },
+                  {
+                    id: "b",
+                    label: "It's a bug in sklearn; pin the library version to get reproducibility",
+                    description: "This is expected K-means behaviour, not a bug. Library version doesn't control convergence to local minima.",
+                  },
+                  {
+                    id: "c",
+                    label: "Always set random_state=42 and use n_init=1 — one run is enough",
+                    description: "A single run with fixed seed is reproducible but not robust — you may consistently land on a bad local minimum.",
+                  },
+                ],
+                branches: {
+                  a: "u1_terminal",
+                  b: "u1_terminal",
+                  c: "u1_terminal",
+                },
+                rationale: "K-means is sensitive to initialisation because the objective is non-convex with many local minima. k-means++ initialisation combined with n_init≥10 (sklearn's default) samples multiple starts and returns the best result by inertia. In production, persist the fitted model object so cluster assignments remain stable.",
+              },
+            },
+          },
     knowledgeCheck: [
       {
         question: "Why is k-means guaranteed to converge but not guaranteed to find the best clustering?",
@@ -320,6 +654,343 @@ Draw two interleaving crescents (the "two moons" shape). Pick a small \`eps\` an
 
 Now shrink \`eps\` and re-mark: notice cores demote to noise and the crescent fragments. Enlarge it and the two crescents merge. Write one sentence on why a single global \`eps\` is DBSCAN's Achilles heel — the motivation for HDBSCAN.`,
     tryGuidance: `Drag **eps** and **minPts** and watch each point recolor as **core**, **border**, or **noise**, with clusters spreading along chains of dense points. Start with the default and confirm the two non-spherical shapes are recovered cleanly — something k-means cannot do. Then shrink \`eps\` until clusters fragment into noise, and enlarge it until they merge into one blob. Raise \`minPts\` and watch the cluster edges thin out as border points demote to noise. Narrate the eps/minPts tradeoff before reading the caption.`,
+    interviewGraph: {
+            initialStageId: "u2_click_epsilon",
+            artifactDimensions: [
+              {
+                label: "DBSCAN Parameters",
+                recoveryStageId: "u2_recovery_params",
+              },
+              {
+                label: "Noise Handling",
+                recoveryStageId: "u2_recovery_noise",
+              },
+              {
+                label: "Algorithm Selection",
+                recoveryStageId: "u2_recovery_scale",
+                passLabel: "Density Clustering Mastery",
+              },
+            ],
+            stages: {
+              u2_click_epsilon: {
+                id: "u2_click_epsilon",
+                type: "click_target",
+                badge: "Stage 1",
+                title: "Stage 1 · Spotting a meaningless epsilon",
+                prompt: "The code below runs DBSCAN on raw, unscaled data with a hardcoded epsilon. Click the line that makes the epsilon value geometrically meaningless.",
+                code_snippet: `import pandas as pd
+from sklearn.cluster import DBSCAN
+
+df = pd.read_csv("customers.csv")
+# Features: age (18-80), annual_spend (500-250000), tenure_days (1-3650)
+
+X = df[["age", "annual_spend", "tenure_days"]]  # ds-target:unscaled_data
+db = DBSCAN(eps=0.5, min_samples=5)
+db.fit(X)
+
+labels = db.labels_
+n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
+print(f"Found {n_clusters} clusters")`,
+                validationCopy: {
+                  unscaled_data: "Correct. With unscaled features spanning ranges of 62, 249,500, and 3,649 respectively, an epsilon of 0.5 is geometrically meaningless — all points appear as noise because no two points are within 0.5 units in raw annual_spend space. Always scale before DBSCAN.",
+                },
+                branches: {
+                  unscaled_data: "u2_choice_noise",
+                },
+              },
+              u2_choice_noise: {
+                id: "u2_choice_noise",
+                type: "scenario_choice",
+                badge: "Stage 2",
+                title: "Stage 2 · Interpreting DBSCAN noise points",
+                prompt: "After tuning DBSCAN on a fraud dataset, 30% of transactions are labelled -1 (noise). Is this good or bad?",
+                code_snippet: `db = DBSCAN(eps=0.08, min_samples=3)
+db.fit(X_scaled)
+
+noise_pct = (db.labels_ == -1).mean()
+print(f"Noise fraction: {noise_pct:.1%}")  # 30.2%`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "It depends — in fraud detection, noise points may be exactly the anomalies you want to flag",
+                    description: "Correct. DBSCAN's noise label (-1) marks points that don't belong to any dense cluster. In fraud, anomalous transactions are genuinely sparse — the 30% noise fraction may be the signal, not a problem.",
+                  },
+                  {
+                    id: "b",
+                    label: "Always bad — epsilon is too small and needs to increase",
+                    description: "Increasing epsilon reduces noise by enlarging neighbourhoods, but if the noise points are real anomalies (e.g., fraud), this would merge them into clusters and destroy the signal.",
+                  },
+                  {
+                    id: "c",
+                    label: "Always bad — min_samples is too large and needs to decrease",
+                    description: "Lowering min_samples makes cluster formation easier, but again blindly reducing noise fraction may hide real outliers depending on the domain.",
+                  },
+                  {
+                    id: "d",
+                    label: "Good — 30% noise proves DBSCAN found perfect density separation",
+                    description: "Noise fraction alone does not prove anything. The meaning of noise points is domain-dependent and must be interpreted in context.",
+                  },
+                ],
+                branches: {
+                  a: "u2_choice_linkage",
+                  b: "u2_recovery_noise",
+                  c: "u2_recovery_noise",
+                  d: "u2_recovery_noise",
+                },
+                rationale: "DBSCAN noise points are a feature, not always a bug. In anomaly detection or fraud, the -1 labels are the interesting output. In customer segmentation, a 30% noise fraction likely means epsilon needs tuning. Domain context determines which.",
+              },
+              u2_recovery_noise: {
+                id: "u2_recovery_noise",
+                type: "scenario_choice",
+                badge: "Recovery 1",
+                title: "Recovery · DBSCAN noise in context",
+                prompt: "You run DBSCAN for customer segmentation and 40% of customers are labelled as noise. What is the correct diagnostic and fix?",
+                code_snippet: `# Customer segmentation — goal: assign every customer
+# to a meaningful segment
+db = DBSCAN(eps=0.1, min_samples=10)
+db.fit(X_scaled)
+# 40% labelled -1`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Switch to K-means immediately — DBSCAN can't do segmentation",
+                    description: "DBSCAN can do segmentation, but 40% noise in a segmentation task signals parameter mistuning — try increasing epsilon or reducing min_samples before abandoning the algorithm.",
+                  },
+                  {
+                    id: "b",
+                    label: "Tune epsilon upward and/or reduce min_samples; use k-distance plot to find the right epsilon",
+                    description: "Correct. A k-distance plot sorts points by their distance to the k-th nearest neighbour. The 'knee' in this plot is a good epsilon estimate. Adjusting min_samples controls sensitivity to dense core regions.",
+                  },
+                  {
+                    id: "c",
+                    label: "Assign all noise points to the nearest cluster post-hoc",
+                    description: "Possible as a workaround, but it converts DBSCAN into something closer to k-means and removes the geometric meaning of noise. Better to tune parameters first.",
+                  },
+                  {
+                    id: "d",
+                    label: "Increase min_samples to reduce noise",
+                    description: "Increasing min_samples makes it harder to form core points — this would increase noise fraction, not decrease it.",
+                  },
+                ],
+                branches: {
+                  a: "u2_choice_linkage",
+                  b: "u2_choice_linkage",
+                  c: "u2_choice_linkage",
+                  d: "u2_choice_linkage",
+                },
+                rationale: "For segmentation, high noise fraction usually means epsilon is too small. The k-distance plot provides a principled way to select epsilon: sort all points by their distance to the k-th nearest neighbour and pick the 'knee' as epsilon.",
+              },
+              u2_choice_linkage: {
+                id: "u2_choice_linkage",
+                type: "scenario_choice",
+                badge: "Stage 3",
+                title: "Stage 3 · Linkage and cluster shape",
+                prompt: "Hierarchical clustering with Ward linkage vs single linkage. Which handles elongated, non-spherical clusters better?",
+                code_snippet: `from sklearn.cluster import AgglomerativeClustering
+
+ward   = AgglomerativeClustering(n_clusters=4, linkage="ward")
+single = AgglomerativeClustering(n_clusters=4, linkage="single")
+
+ward.fit(X)
+single.fit(X)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Single linkage — it can chain elongated clusters by connecting nearest boundary points",
+                    description: "Correct. Single linkage merges clusters based on the minimum distance between any two points across clusters, allowing it to follow elongated or irregularly shaped chains. Ward linkage minimises within-cluster variance, producing compact, spherical clusters.",
+                  },
+                  {
+                    id: "b",
+                    label: "Ward linkage — minimising variance always produces better-shaped clusters",
+                    description: "Ward produces compact spherical clusters, which is ideal when clusters are roughly globular, but it splits elongated structures into multiple spherical pieces.",
+                  },
+                  {
+                    id: "c",
+                    label: "Complete linkage — maximum distance between clusters handles elongation",
+                    description: "Complete linkage uses the maximum distance between points in two clusters, which tends to break elongated structures into roughly equal-diameter groups — not ideal for elongated chains.",
+                  },
+                  {
+                    id: "d",
+                    label: "Average linkage — it averages all pairwise distances and handles all shapes equally",
+                    description: "Average linkage is a compromise, but it still favours somewhat compact clusters and doesn't match single linkage's ability to follow elongated chains.",
+                  },
+                ],
+                branches: {
+                  a: "u2_choice_scale",
+                  b: "u2_recovery_params",
+                  c: "u2_recovery_params",
+                  d: "u2_recovery_params",
+                },
+                rationale: "Single linkage can detect elongated or chain-like clusters through nearest-neighbour chaining. Its weakness is the 'chaining effect' — noise can cause unintended merges. Ward linkage is best for compact spherical clusters and is often the default choice in practice.",
+              },
+              u2_recovery_params: {
+                id: "u2_recovery_params",
+                type: "scenario_choice",
+                badge: "Recovery 2",
+                title: "Recovery · DBSCAN parameters deep dive",
+                prompt: "How do epsilon and min_samples jointly control what DBSCAN considers a 'core point'?",
+                code_snippet: `# Core point definition:
+# A point p is a core point if at least min_samples
+# other points lie within distance epsilon of p.
+#
+# epsilon=0.3, min_samples=5  →  ?
+# epsilon=1.0, min_samples=5  →  ?
+# epsilon=0.3, min_samples=2  →  ?`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Larger epsilon and smaller min_samples → easier to form core points → fewer noise points, larger clusters",
+                    description: "Correct. Epsilon defines the neighbourhood radius; min_samples sets the density threshold. Relaxing either (bigger eps or smaller min_samples) makes it easier to qualify as a core point, merging more points into clusters.",
+                  },
+                  {
+                    id: "b",
+                    label: "Larger epsilon always produces more clusters",
+                    description: "Larger epsilon merges points that were previously noise or separate clusters — it typically reduces the number of clusters, not increases them.",
+                  },
+                  {
+                    id: "c",
+                    label: "min_samples only affects noise points, not cluster shapes",
+                    description: "min_samples affects which points are classified as core, border, or noise — directly changing cluster membership and shape.",
+                  },
+                  {
+                    id: "d",
+                    label: "Epsilon and min_samples are independent — you can tune them one at a time",
+                    description: "They interact: their ratio determines effective density sensitivity. Changing one changes the meaning of the other in relative terms.",
+                  },
+                ],
+                branches: {
+                  a: "u2_choice_scale",
+                  b: "u2_choice_scale",
+                  c: "u2_choice_scale",
+                  d: "u2_choice_scale",
+                },
+                rationale: "A core point requires at least min_samples points within radius epsilon. Together they define density: larger eps = bigger neighbourhoods, smaller min_samples = lower density threshold. Use the k-distance plot to calibrate epsilon, then tune min_samples relative to data density.",
+              },
+              u2_choice_scale: {
+                id: "u2_choice_scale",
+                type: "scenario_choice",
+                badge: "Stage 4",
+                title: "Stage 4 · Scalability",
+                prompt: "You need to cluster 5 million records in a production pipeline that must run in under 10 minutes. Which algorithm is most appropriate?",
+                code_snippet: `# Dataset: 5_000_000 rows, 20 features, mixed scales
+# Latency budget: < 10 minutes
+# Goal: assign each record to a named segment
+
+# Option A: KMeans(n_clusters=8, init="k-means++", n_init=10)
+# Option B: DBSCAN(eps=0.2, min_samples=5)
+# Option C: AgglomerativeClustering(n_clusters=8, linkage="ward")
+# Option D: MiniBatchKMeans(n_clusters=8, batch_size=10000)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "MiniBatchKMeans — processes mini-batches, O(n) per epoch, handles millions of records",
+                    description: "Correct. MiniBatchKMeans is designed for large datasets — it updates centroids on random mini-batches, making each epoch O(n) with much lower memory usage. Standard KMeans with n_init=10 on 5M rows may be slow; DBSCAN and Agglomerative are O(n²) or worse without approximations.",
+                  },
+                  {
+                    id: "b",
+                    label: "DBSCAN — density-based, no need to choose k in advance",
+                    description: "Standard DBSCAN is O(n log n) with a spatial index but in practice struggles with 5M points in a strict time budget. It also requires careful epsilon tuning.",
+                  },
+                  {
+                    id: "c",
+                    label: "AgglomerativeClustering — Ward linkage gives the best-quality clusters",
+                    description: "Agglomerative clustering is O(n² log n) in memory and time. It is infeasible for 5M records without approximate methods.",
+                  },
+                  {
+                    id: "d",
+                    label: "Standard KMeans with n_init=1 to save time",
+                    description: "Reducing n_init saves time but risks a poor local minimum. MiniBatchKMeans is the architecturally correct solution for scale.",
+                  },
+                ],
+                branches: {
+                  a: "u2_terminal",
+                  b: "u2_recovery_scale",
+                  c: "u2_recovery_scale",
+                  d: "u2_recovery_scale",
+                },
+                rationale: "MiniBatchKMeans is sklearn's scalable answer to large datasets — each mini-batch update is O(batch_size), making full passes much faster than standard KMeans. For truly massive data, approximate DBSCAN variants (HDBSCAN, OPTICS with sampling) exist but MiniBatchKMeans is usually the first practical choice.",
+              },
+              u2_recovery_scale: {
+                id: "u2_recovery_scale",
+                type: "scenario_choice",
+                badge: "Recovery 3",
+                title: "Recovery · Algorithm scalability",
+                prompt: "Why is standard AgglomerativeClustering impractical for datasets with more than ~50,000 rows?",
+                code_snippet: `# Agglomerative: at each step merge the two closest clusters
+# Start: N singleton clusters
+# Step 1: N-1 clusters (1 merge)
+# Step 2: N-2 clusters
+# ...
+# Final: 1 cluster (dendrogram)
+#
+# Memory: O(?)  |  Time: O(?)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "It requires storing an N×N distance matrix — O(n²) memory",
+                    description: "Correct. Agglomerative clustering computes pairwise distances between all points, requiring O(n²) memory and O(n² log n) or O(n³) time. For n=50,000 that is 2.5B distance values — impractical without approximations.",
+                  },
+                  {
+                    id: "b",
+                    label: "It requires more than 1,000 clusters to work correctly",
+                    description: "The number of target clusters doesn't affect scalability — the bottleneck is the pairwise distance computation regardless of k.",
+                  },
+                  {
+                    id: "c",
+                    label: "It can only run on balanced datasets",
+                    description: "Class balance is not a constraint for agglomerative clustering. The scalability issue is purely algorithmic.",
+                  },
+                  {
+                    id: "d",
+                    label: "It only works on 2D data",
+                    description: "Agglomerative clustering works in any dimensionality. The constraint is scale, not dimensionality.",
+                  },
+                ],
+                branches: {
+                  a: "u2_terminal",
+                  b: "u2_terminal",
+                  c: "u2_terminal",
+                  d: "u2_terminal",
+                },
+                rationale: "Agglomerative clustering's O(n²) memory and O(n² log n) time complexity come from building the full pairwise distance matrix. For large datasets, use MiniBatchKMeans, HDBSCAN (approximate), or pre-cluster with k-means then run hierarchical on centroids.",
+              },
+              u2_terminal: {
+                id: "u2_terminal",
+                type: "scenario_choice",
+                badge: "Final",
+                title: "Revision complete · Density Clustering Mastery",
+                terminal: true,
+                prompt: "When would you choose DBSCAN over K-Means? Give the clearest case where K-Means would produce wrong results.",
+                code_snippet: `# Dataset A: concentric ring clusters
+# Dataset B: two interlocking crescent shapes
+# Dataset C: varying-density Gaussian blobs
+# Dataset D: 8 spherical clusters, balanced size`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "DBSCAN for A/B/C — K-Means fails on non-spherical, varying-density, or cluster-with-noise data; K-Means only works well on D",
+                    description: "Correct. K-Means assumes convex, equally-sized, spherical clusters and is sensitive to noise. DBSCAN discovers arbitrary shapes, handles noise natively, and adapts to varying density (with tuning). Dataset D (spherical balanced blobs) is the canonical K-Means sweet spot.",
+                  },
+                  {
+                    id: "b",
+                    label: "K-Means always outperforms DBSCAN because it has a well-defined objective function",
+                    description: "Having an objective function does not mean it fits the data. K-Means' inertia objective assumes spherical clusters — it will produce misleading results on non-spherical data regardless of how well it minimises inertia.",
+                  },
+                  {
+                    id: "c",
+                    label: "DBSCAN only for datasets with fewer than 10,000 rows",
+                    description: "Dataset size is a practical concern (DBSCAN scales as O(n log n) with KD-trees) but not the conceptual criterion for choosing DBSCAN. Shape and noise requirements drive the choice.",
+                  },
+                ],
+                branches: {
+                  a: "u2_terminal",
+                  b: "u2_terminal",
+                  c: "u2_terminal",
+                },
+                rationale: "DBSCAN's key advantage over K-Means: (1) finds arbitrary-shaped clusters via density reachability, (2) labels true outliers as noise rather than forcing them into a cluster, (3) does not require specifying k. Use K-Means when clusters are expected to be roughly spherical and similarly sized; use DBSCAN when shape is complex or anomaly detection is part of the goal.",
+              },
+            },
+          },
     knowledgeCheck: [
       {
         question: "In DBSCAN, what distinguishes a border point from a core point?",
@@ -506,6 +1177,348 @@ Plot a diagonal cloud of points on paper. By eye, draw the line the points sprea
 
 Then sabotage it: stretch the x-axis by 100× (imagine salary in dollars vs age in years). Watch PC1 swing to point almost entirely along x. Write one sentence on why this forces you to standardize before PCA whenever features have different units.`,
     tryGuidance: `Rotate the projection axis and watch the **variance of the projected coordinates** rise and fall. Find the angle where projected variance **peaks** — that is exactly the first principal component, the eigenvector of the covariance matrix with the largest eigenvalue. Use **Snap to PC1** to confirm your eyeball estimate. The green segments are each point's orthogonal drop onto your axis; the spread of those projections *is* the variance PCA maximizes. Predict, before snapping, which direction the cloud is most elongated along.`,
+    interviewGraph: {
+            initialStageId: "u3_click_leakage",
+            artifactDimensions: [
+              {
+                label: "Data Leakage with PCA",
+                recoveryStageId: "u3_recovery_leakage",
+              },
+              {
+                label: "Explained Variance",
+                recoveryStageId: "u3_recovery_variance",
+              },
+              {
+                label: "PCA vs Feature Selection",
+                recoveryStageId: "u3_recovery_selection",
+                passLabel: "PCA Mastery",
+              },
+            ],
+            stages: {
+              u3_click_leakage: {
+                id: "u3_click_leakage",
+                type: "click_target",
+                badge: "Stage 1",
+                title: "Stage 1 · Spotting PCA data leakage",
+                prompt: "The code below applies PCA before splitting the dataset. Click the line that introduces data leakage from test into training.",
+                code_snippet: `from sklearn.decomposition import PCA
+from sklearn.model_selection import train_test_split
+
+X, y = load_dataset()
+
+pca = PCA(n_components=10)
+X_reduced = pca.fit_transform(X)   # ds-target:pca_leakage
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X_reduced, y, test_size=0.2, random_state=42
+)
+
+model = LogisticRegression()
+model.fit(X_train, y_train)
+print(model.score(X_test, y_test))`,
+                validationCopy: {
+                  pca_leakage: "Correct. PCA is fitted on the entire dataset X before the split. The principal components are therefore influenced by test set observations — their means, variances, and covariance structure all leak into the transformation. PCA must be fitted only on X_train and then applied (transform-only) to X_test.",
+                },
+                branches: {
+                  pca_leakage: "u3_choice_variance",
+                },
+              },
+              u3_choice_variance: {
+                id: "u3_choice_variance",
+                type: "scenario_choice",
+                badge: "Stage 2",
+                title: "Stage 2 · Sufficiency of explained variance",
+                prompt: "The first 3 principal components of a 50-feature dataset explain 85% of total variance. Is 85% always enough to retain?",
+                code_snippet: `pca = PCA()
+pca.fit(X_train)
+cumvar = pca.explained_variance_ratio_.cumsum()
+# cumvar[2] = 0.85  (3 components → 85%)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "It depends — for visualisation often yes; if the last 15% contains rare but critical signal, no",
+                    description: "Correct. 85% is a popular threshold but not a universal rule. For a 2D/3D plot, 85% is usually fine. For a predictive task where rare events (fraud, failure modes) lie in low-variance directions, discarding 15% can lose the most important signal.",
+                  },
+                  {
+                    id: "b",
+                    label: "Yes — 85% is the standard data science threshold and always sufficient",
+                    description: "There is no universal threshold. 85%, 90%, 95%, and 99% are all common choices depending on context. Always evaluate downstream task performance.",
+                  },
+                  {
+                    id: "c",
+                    label: "No — you should always keep all components",
+                    description: "Keeping all components defeats the purpose of PCA. Dimensionality reduction is the goal; the question is where to draw the line.",
+                  },
+                  {
+                    id: "d",
+                    label: "Yes — the remaining 15% is always noise",
+                    description: "Low-variance components are not necessarily noise. In signal processing or anomaly detection, rare but informative patterns often live in low-variance directions.",
+                  },
+                ],
+                branches: {
+                  a: "u3_choice_loadings",
+                  b: "u3_recovery_variance",
+                  c: "u3_recovery_variance",
+                  d: "u3_recovery_variance",
+                },
+                rationale: "Explained variance ratio tells you how much of the total variation is captured, not how much predictive signal is retained. Always validate the reduced representation on a held-out set before committing to a component count.",
+              },
+              u3_recovery_variance: {
+                id: "u3_recovery_variance",
+                type: "scenario_choice",
+                badge: "Recovery 1",
+                title: "Recovery · Reading explained variance",
+                prompt: "After fitting PCA, how do you decide how many components to keep for a classification task?",
+                code_snippet: `pca = PCA().fit(X_train)
+evr = pca.explained_variance_ratio_
+cumvar = evr.cumsum()
+# How many components k to keep?`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Pick k where cumulative variance crosses 95%, then validate downstream classifier accuracy",
+                    description: "Correct. The 95% threshold is a reasonable starting point, but you must then measure classifier performance (e.g., cross-val accuracy) across different k values — the variance threshold alone may not be the performance-optimal choice.",
+                  },
+                  {
+                    id: "b",
+                    label: "Always keep k = sqrt(n_features)",
+                    description: "There is no theoretical basis for this rule of thumb in general classification tasks.",
+                  },
+                  {
+                    id: "c",
+                    label: "Keep k = n_features - 1 to remove only the least informative component",
+                    description: "Removing only one component provides negligible dimensionality reduction — this misses the point of PCA.",
+                  },
+                  {
+                    id: "d",
+                    label: "Keep all components where individual explained variance > 1% (Kaiser criterion)",
+                    description: "The Kaiser criterion (eigenvalue > 1) is used in factor analysis and is not directly applicable to PCA in predictive modelling contexts without validation.",
+                  },
+                ],
+                branches: {
+                  a: "u3_choice_loadings",
+                  b: "u3_choice_loadings",
+                  c: "u3_choice_loadings",
+                  d: "u3_choice_loadings",
+                },
+                rationale: "A common workflow: (1) plot cumulative explained variance, (2) choose a candidate k at a variance threshold (e.g., 95%), (3) run cross-validation on the downstream task across nearby k values to find the performance-optimal number of components.",
+              },
+              u3_choice_loadings: {
+                id: "u3_choice_loadings",
+                type: "scenario_choice",
+                badge: "Stage 3",
+                title: "Stage 3 · Interpreting principal component loadings",
+                prompt: "PCA output shows PC1 has large positive loadings on features A, B, and C, and near-zero loadings on all others. What does this tell you?",
+                code_snippet: `pca = PCA(n_components=3).fit(X_train)
+loadings = pd.DataFrame(
+    pca.components_.T,
+    index=feature_names,
+    columns=["PC1", "PC2", "PC3"]
+)
+# PC1: A=0.71, B=0.68, C=0.65, D=0.02, E=-0.01`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "A, B, C are correlated and co-vary — PC1 captures their shared variance",
+                    description: "Correct. Large loadings on A, B, C mean these features move together in the data. PC1 is essentially an index of the joint direction they all share. This often reveals multicollinearity.",
+                  },
+                  {
+                    id: "b",
+                    label: "A, B, C are the most important features for prediction",
+                    description: "PCA loadings reflect directions of maximum variance, not predictive importance. A feature with small variance might still be a strong predictor. Loadings ≠ feature importance.",
+                  },
+                  {
+                    id: "c",
+                    label: "PC1 is the average of A, B, and C",
+                    description: "PC1 is a weighted linear combination, but the weights are chosen to maximise variance, not to compute a simple average. The loadings are eigenvectors of the covariance matrix.",
+                  },
+                  {
+                    id: "d",
+                    label: "A, B, C have the highest variance individually",
+                    description: "PC1 loadings reflect how features contribute to the first principal component direction, not individual feature variances. A low-variance feature could have a large loading if it co-varies with others.",
+                  },
+                ],
+                branches: {
+                  a: "u3_choice_l1",
+                  b: "u3_recovery_leakage",
+                  c: "u3_recovery_leakage",
+                  d: "u3_recovery_leakage",
+                },
+                rationale: "PC loadings are the coefficients of the linear combination that defines each principal component. Large loadings on a group of features mean those features are correlated and move together — the component captures their shared variance. This is often used to detect multicollinearity or group semantically related features.",
+              },
+              u3_recovery_leakage: {
+                id: "u3_recovery_leakage",
+                type: "scenario_choice",
+                badge: "Recovery 2",
+                title: "Recovery · Correct PCA pipeline order",
+                prompt: "Which pipeline correctly prevents data leakage when using PCA?",
+                code_snippet: `# Pipeline A
+pca.fit(X_all); X_r = pca.transform(X_all)
+X_train, X_test = train_test_split(X_r)
+
+# Pipeline B
+X_train, X_test = train_test_split(X)
+pca.fit(X_train); X_tr = pca.transform(X_train)
+X_te = pca.transform(X_test)
+
+# Pipeline C
+X_train, X_test = train_test_split(X)
+pca.fit_transform(X_train); pca.fit_transform(X_test)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Pipeline A — fit PCA on all data for maximum information",
+                    description: "Pipeline A leaks test data into the PCA transformation. The principal components are influenced by test set statistics.",
+                  },
+                  {
+                    id: "b",
+                    label: "Pipeline B — fit PCA only on training data, then transform both splits separately",
+                    description: "Correct. PCA is fitted exclusively on X_train; X_test is only transformed (not fitted). This ensures test data never influences the learned principal directions.",
+                  },
+                  {
+                    id: "c",
+                    label: "Pipeline C — fit PCA independently on train and test for tailored components",
+                    description: "Pipeline C fits PCA separately on X_test, which means the test representation uses a different coordinate system than training — the model trained on PC coordinates from train cannot generalize to test's different PCs.",
+                  },
+                  {
+                    id: "d",
+                    label: "All pipelines are equivalent because PCA is unsupervised",
+                    description: "Being unsupervised doesn't prevent leakage. Test-set statistics (covariance structure) can still leak into the PCA transformation and inflate evaluation metrics.",
+                  },
+                ],
+                branches: {
+                  a: "u3_choice_l1",
+                  b: "u3_choice_l1",
+                  c: "u3_choice_l1",
+                  d: "u3_choice_l1",
+                },
+                rationale: "The golden rule: fit transformations only on training data, then apply the fitted transformer to test/validation data. Use sklearn Pipeline to automate this — it automatically calls fit_transform on train and transform-only on test during cross-validation.",
+              },
+              u3_choice_l1: {
+                id: "u3_choice_l1",
+                type: "scenario_choice",
+                badge: "Stage 4",
+                title: "Stage 4 · PCA vs L1 regularisation for feature reduction",
+                prompt: "You use PCA before logistic regression to reduce 200 features to 15. A colleague argues you should just use L1 (Lasso) regularisation instead. Who is right?",
+                code_snippet: `# Approach A: PCA + LogisticRegression
+pipe_a = Pipeline([("pca", PCA(n_components=15)),
+                   ("lr", LogisticRegression())])
+
+# Approach B: L1 LogisticRegression
+pipe_b = Pipeline([("lr", LogisticRegression(penalty="l1",
+                                              solver="saga"))])`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "L1 if interpretability matters — it selects original features; PCA if multicollinearity is the problem — it creates uncorrelated axes",
+                    description: "Correct. L1 zeroes out irrelevant features, keeping a sparse subset of the original interpretable features. PCA creates new synthetic axes that are linear combinations of all features — not interpretable but optimal for handling multicollinearity and compressing correlated features.",
+                  },
+                  {
+                    id: "b",
+                    label: "PCA is always better because it captures more variance",
+                    description: "Capturing variance is not the same as retaining predictive signal. L1 can outperform PCA when the predictive features are a sparse subset of the original set.",
+                  },
+                  {
+                    id: "c",
+                    label: "L1 is always better because it keeps original feature names",
+                    description: "Interpretability is one consideration, not the only one. If features are highly correlated, L1 may select one arbitrarily from a correlated group. PCA handles this more gracefully.",
+                  },
+                  {
+                    id: "d",
+                    label: "They are equivalent — both reduce to 15 features",
+                    description: "L1 selects a sparse subset of original features. PCA constructs 15 new orthogonal axes from all 200. The representations, interpretation, and performance are fundamentally different.",
+                  },
+                ],
+                branches: {
+                  a: "u3_terminal",
+                  b: "u3_recovery_selection",
+                  c: "u3_recovery_selection",
+                  d: "u3_recovery_selection",
+                },
+                rationale: "Use L1 when you want sparse, interpretable models that retain original feature names. Use PCA when features are highly correlated (multicollinearity), you want to decorrelate inputs, or you need compact representations. In practice, try both and compare cross-validation performance.",
+              },
+              u3_recovery_selection: {
+                id: "u3_recovery_selection",
+                type: "scenario_choice",
+                badge: "Recovery 3",
+                title: "Recovery · When PCA hurts",
+                prompt: "Which scenario is most likely to produce worse performance with PCA than without it?",
+                code_snippet: `# Dataset: 500 features, 1000 samples
+# Target: binary classification (rare disease: 2% prevalence)
+# Hypothesis: most informative features are low-variance biomarkers
+
+# Option A: Keep all 500 features, use L1 LogReg
+# Option B: PCA to 20 components (95% variance), then LogReg
+# Option C: PCA to 50 components (99% variance), then LogReg`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Option B — PCA discards low-variance components that may contain the rare-disease signal",
+                    description: "Correct. Rare disease biomarkers often have low population variance (only 2% of samples carry the signal). PCA to 95% variance discards the last 5% — which may include the very low-variance but high-signal biomarkers that separate the rare cases from controls.",
+                  },
+                  {
+                    id: "b",
+                    label: "Option A — too many features will always cause overfitting",
+                    description: "With 1000 samples and the right regularisation (L1), 500 features is tractable. PCA may discard more signal than regularisation would.",
+                  },
+                  {
+                    id: "c",
+                    label: "Option C — 99% variance is never sufficient",
+                    description: "99% variance retained is rarely the problem. The issue is specifically when the rare signal lives in the discarded 1-5% of variance.",
+                  },
+                  {
+                    id: "d",
+                    label: "All options perform equally — PCA is always information-preserving",
+                    description: "PCA preserves total variance, not predictive signal. If the discriminative features have low variance in the population, PCA can actively discard them.",
+                  },
+                ],
+                branches: {
+                  a: "u3_terminal",
+                  b: "u3_terminal",
+                  c: "u3_terminal",
+                  d: "u3_terminal",
+                },
+                rationale: "PCA optimises for variance, not for class discrimination. In rare-event classification, the most discriminative directions often have low population variance. Always validate with cross-validation before committing to PCA in such settings.",
+              },
+              u3_terminal: {
+                id: "u3_terminal",
+                type: "scenario_choice",
+                badge: "Final",
+                title: "Revision complete · PCA Mastery",
+                terminal: true,
+                prompt: "You reduce 200 features to 10 PCA components. A model trained on those 10 PCs underperforms a model trained on all 200 raw features. What went wrong?",
+                code_snippet: `# Model A: LogReg on 200 raw features (L2)  → val AUC 0.88
+# Model B: LogReg on 10 PCA components       → val AUC 0.71
+
+pca = PCA(n_components=10)
+X_pca = pca.fit_transform(X_train)   # <-- what might be wrong here?
+# 10 components explain 72% of variance`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "72% variance retained — the discarded 28% contained predictive signal; PCA was fitted on all data (leakage); or 10 components was too aggressive a reduction",
+                    description: "Correct. Three compounding issues: (1) only 72% variance kept means meaningful signal was discarded, (2) if PCA was fitted on full data it leaked test statistics, (3) the predictive features may be in low-variance directions. Fix: fit PCA on train only, sweep component count by cross-val AUC, consider PCA + original features or just use regularisation.",
+                  },
+                  {
+                    id: "b",
+                    label: "Logistic regression cannot handle PCA output — use a tree model instead",
+                    description: "Logistic regression works perfectly on PCA output (the components are continuous, uncorrelated features). The model class is not the issue.",
+                  },
+                  {
+                    id: "c",
+                    label: "PCA is not compatible with L2 regularisation",
+                    description: "PCA and L2 regularisation are fully compatible — PCA decorrelates features, which can actually make L2 regularisation more well-behaved.",
+                  },
+                ],
+                branches: {
+                  a: "u3_terminal",
+                  b: "u3_terminal",
+                  c: "u3_terminal",
+                },
+                rationale: "When PCA hurts performance: (1) you may be discarding signal-rich variance, (2) data leakage inflates training metrics but hurts test metrics, (3) the component count was chosen by variance threshold rather than cross-validated task performance. Use sklearn Pipeline to prevent leakage and tune n_components as a hyperparameter.",
+              },
+            },
+          },
     knowledgeCheck: [
       {
         question: "What are the principal components, in terms of the covariance matrix?",
@@ -695,6 +1708,342 @@ Take a dataset you understand — say handwritten digits 0–9 — and predict w
 
 Finally, imagine running it twice with different random seeds. The two plots look different but tell the same local story. Write one sentence on why that means you should fix \`random_state\` and trust only structure that survives multiple perplexities.`,
     tryGuidance: `Slide the **perplexity / neighbors** knob and watch the same high-dimensional structure re-embed into 2D — the clusters visibly rearrange even though the underlying data never changed. At **low** settings the embedding fragments and over-separates; at **high** settings clusters smooth together and look more global. Critically, watch the **gaps between clusters** shift with the knob: that movement is the proof that **inter-cluster distance is not meaningful**. Before moving the slider, predict whether detail or global structure will dominate, then read the warning caption.`,
+    interviewGraph: {
+            initialStageId: "u4_click_tsne_features",
+            artifactDimensions: [
+              {
+                label: "t-SNE Interpretation",
+                recoveryStageId: "u4_recovery_interpretation",
+              },
+              {
+                label: "Perplexity & Reproducibility",
+                recoveryStageId: "u4_recovery_perplexity",
+              },
+              {
+                label: "Viz vs Production Use",
+                recoveryStageId: "u4_recovery_production",
+                passLabel: "Dimensionality Viz Mastery",
+              },
+            ],
+            stages: {
+              u4_click_tsne_features: {
+                id: "u4_click_tsne_features",
+                type: "click_target",
+                badge: "Stage 1",
+                title: "Stage 1 · t-SNE used as predictive features",
+                prompt: "The code below runs t-SNE and then feeds the 2D coordinates directly into a classifier for production use. Click the line that misuses t-SNE as a feature engineering step.",
+                code_snippet: `from sklearn.manifold import TSNE
+from sklearn.ensemble import RandomForestClassifier
+
+tsne = TSNE(n_components=2, perplexity=30, random_state=42)
+X_2d = tsne.fit_transform(X_train)   # ds-target:tsne_as_features
+
+clf = RandomForestClassifier(n_estimators=200, random_state=42)
+clf.fit(X_2d, y_train)
+
+# Deployment: transform new data and predict
+X_new_2d = TSNE(n_components=2).fit_transform(X_new)
+preds = clf.predict(X_new_2d)`,
+                validationCopy: {
+                  tsne_as_features: "Correct. t-SNE is a visualisation technique, not a feature extractor for predictive models. It has no out-of-sample extension — you cannot transform new data using a previously fitted t-SNE model. Each call to fit_transform creates a completely new and different embedding, so the coordinates for X_new are on a different axis than X_train. Using them as classifier features will produce random predictions.",
+                },
+                branches: {
+                  tsne_as_features: "u4_choice_perplexity",
+                },
+              },
+              u4_choice_perplexity: {
+                id: "u4_choice_perplexity",
+                type: "scenario_choice",
+                badge: "Stage 2",
+                title: "Stage 2 · Perplexity effects on t-SNE layout",
+                prompt: "You run t-SNE with perplexity=5 and then with perplexity=50 on the same 10,000-point dataset. What changes in the visualisation?",
+                code_snippet: `tsne_5  = TSNE(n_components=2, perplexity=5,  random_state=1)
+tsne_50 = TSNE(n_components=2, perplexity=50, random_state=1)
+
+emb_5  = tsne_5.fit_transform(X)
+emb_50 = tsne_50.fit_transform(X)`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "perplexity=5 shows very local micro-structure with tight scattered blobs; perplexity=50 shows more global cohesion; neither is the definitive truth",
+                    description: "Correct. Perplexity controls the effective number of neighbours t-SNE considers for each point. Low perplexity → tiny local neighbourhoods → fragmented, scattered dots. High perplexity → larger neighbourhoods → more global structure, smoother clusters. Both are legitimate but partial views of the data.",
+                  },
+                  {
+                    id: "b",
+                    label: "perplexity=50 is always better because it uses more neighbours",
+                    description: "Neither perplexity is universally better. perplexity=50 with only 10,000 points may over-smooth structure; perplexity=5 may fragment genuine clusters. The right value depends on data density.",
+                  },
+                  {
+                    id: "c",
+                    label: "They produce identical layouts because random_state is the same",
+                    description: "Same random_state ensures reproducibility within one run, but changing perplexity fundamentally changes the probability model and produces a different optimisation landscape and result.",
+                  },
+                  {
+                    id: "d",
+                    label: "perplexity=5 gives global structure; perplexity=50 gives local structure",
+                    description: "This is reversed. Higher perplexity considers more neighbours → captures more global structure. Lower perplexity uses fewer neighbours → captures local micro-structure.",
+                  },
+                ],
+                branches: {
+                  a: "u4_choice_determinism",
+                  b: "u4_recovery_perplexity",
+                  c: "u4_recovery_perplexity",
+                  d: "u4_recovery_perplexity",
+                },
+                rationale: "Perplexity is roughly the number of effective nearest neighbours t-SNE balances for each point. Typical guidance: perplexity between 5–50 for most datasets; rule of thumb: sqrt(n) ≈ 100 for 10,000 points. Always run multiple perplexity values — and multiple random seeds — before drawing conclusions.",
+              },
+              u4_recovery_perplexity: {
+                id: "u4_recovery_perplexity",
+                type: "scenario_choice",
+                badge: "Recovery 1",
+                title: "Recovery · t-SNE parameters and their meaning",
+                prompt: "Which of the following is a valid reason to run t-SNE multiple times with different random seeds on the same data?",
+                code_snippet: `for seed in [0, 7, 42, 99, 123]:
+    emb = TSNE(n_components=2, perplexity=30,
+               random_state=seed).fit_transform(X)
+    plot_embedding(emb, title=f"seed={seed}")`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "To verify that consistent cluster groupings appear across seeds — only stable patterns are trustworthy",
+                    description: "Correct. t-SNE is non-deterministic (even with random_state, different seeds → different initialisations → different local minima). Cluster patterns that appear consistently across seeds are more likely to reflect genuine structure in the data.",
+                  },
+                  {
+                    id: "b",
+                    label: "To pick the seed that produces the most separated clusters",
+                    description: "Cherry-picking the 'best-looking' seed is p-hacking for visualisations. Separated clusters don't necessarily mean more structure — they may just mean a lucky initialisation.",
+                  },
+                  {
+                    id: "c",
+                    label: "Different seeds produce completely independent visualisations with no shared information",
+                    description: "Different seeds produce different layouts of the same underlying data. The high-dimensional proximity structure is the same; what varies is the 2D projection's orientation and local geometry.",
+                  },
+                  {
+                    id: "d",
+                    label: "Random state has no effect on t-SNE — all seeds give identical results",
+                    description: "Random state controls initialisation. Different initialisations lead to different gradient descent paths and different final embeddings.",
+                  },
+                ],
+                branches: {
+                  a: "u4_choice_determinism",
+                  b: "u4_choice_determinism",
+                  c: "u4_choice_determinism",
+                  d: "u4_choice_determinism",
+                },
+                rationale: "t-SNE's stochastic gradient descent optimisation means it can converge to different local minima from different initialisations. The scientific practice is to run multiple seeds and report only patterns that are stable across runs — these are robust features of the data, not artefacts of one lucky seed.",
+              },
+              u4_choice_determinism: {
+                id: "u4_choice_determinism",
+                type: "scenario_choice",
+                badge: "Stage 3",
+                title: "Stage 3 · t-SNE reproducibility",
+                prompt: "Two runs of t-SNE on the same data with different random seeds produce different cluster arrangements. A junior analyst says this is a bug. Is it?",
+                code_snippet: `run1 = TSNE(n_components=2, perplexity=30, random_state=1).fit_transform(X)
+run2 = TSNE(n_components=2, perplexity=30, random_state=99).fit_transform(X)
+
+# Cluster A appears top-left in run1, bottom-right in run2
+# Cluster A appears merged with B in run2`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Not a bug — t-SNE is non-deterministic by default; fix with a consistent random_state, but note inter-run cluster distances are meaningless",
+                    description: "Correct. t-SNE uses stochastic gradient descent without a globally convex objective. Different random seeds → different local minima → different 2D layouts. This is expected. To get reproducible plots, set random_state. Crucially, the spatial distance between clusters in t-SNE has no meaning — only within-cluster tightness is interpretable.",
+                  },
+                  {
+                    id: "b",
+                    label: "A bug — t-SNE should always produce the same output given the same input",
+                    description: "t-SNE is intentionally non-deterministic due to its stochastic optimisation. This is documented behaviour, not a bug.",
+                  },
+                  {
+                    id: "c",
+                    label: "The data changed between runs — re-check the input",
+                    description: "With the same dataset and different random_state values, the input data is identical. Variation is in the optimisation path, not the data.",
+                  },
+                  {
+                    id: "d",
+                    label: "Run with n_iter=1000 — more iterations will make runs converge to the same solution",
+                    description: "More iterations help convergence within a run, but cannot guarantee two runs with different seeds converge to the same 2D layout because the objective is non-convex.",
+                  },
+                ],
+                branches: {
+                  a: "u4_choice_distance",
+                  b: "u4_recovery_interpretation",
+                  c: "u4_recovery_interpretation",
+                  d: "u4_recovery_interpretation",
+                },
+                rationale: "t-SNE uses random initialisation + stochastic gradient descent → non-convex objective → multiple local minima. Fix reproducibility with random_state. But even reproducible t-SNE plots must not be used to interpret inter-cluster distances — only local neighbourhood structure (within-cluster density) is meaningful.",
+              },
+              u4_recovery_interpretation: {
+                id: "u4_recovery_interpretation",
+                type: "scenario_choice",
+                badge: "Recovery 2",
+                title: "Recovery · What t-SNE visualisations mean",
+                prompt: "Which interpretation of a t-SNE plot is valid?",
+                code_snippet: `# t-SNE 2D embedding of 10,000 single-cell RNA sequences
+# Visible: 8 distinct point clouds (clusters)
+# Observation 1: Cluster A and Cluster B are close together
+# Observation 2: Cluster C points are tightly packed
+# Observation 3: Cluster D is much larger than Cluster E`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "Clusters A and B are similar in high-dimensional space because they are close in the t-SNE plot",
+                    description: "Invalid. t-SNE does not preserve global distances. Cluster proximity in 2D t-SNE is a visualisation artefact and does not indicate similarity in the original high-dimensional space.",
+                  },
+                  {
+                    id: "b",
+                    label: "Cluster C points are locally similar to each other — tight packing suggests high within-cluster cohesion",
+                    description: "Valid. t-SNE does preserve local neighbourhood structure well. Tight packing in t-SNE indicates those points are genuinely close in high-dimensional space.",
+                  },
+                  {
+                    id: "c",
+                    label: "Cluster D has more cells than Cluster E because it is larger in the plot",
+                    description: "Invalid. t-SNE distorts cluster sizes — the visual size of a cluster does not directly correspond to the number of points. Point density within a cluster is also compressed by the algorithm.",
+                  },
+                  {
+                    id: "d",
+                    label: "t-SNE proves there are exactly 8 distinct cell types",
+                    description: "Invalid. t-SNE can create apparent clusters from continuous data, especially at suboptimal perplexity. The number of visible blobs is not a ground truth for the number of true clusters.",
+                  },
+                ],
+                branches: {
+                  a: "u4_choice_distance",
+                  b: "u4_choice_distance",
+                  c: "u4_choice_distance",
+                  d: "u4_choice_distance",
+                },
+                rationale: "t-SNE reliably preserves local neighbourhood structure (within-cluster cohesion) but does NOT preserve: global distances between clusters, cluster sizes, or absolute point counts. Valid use: 'these points cluster together locally'. Invalid use: 'these two clusters are more similar to each other than to a third cluster'.",
+              },
+              u4_choice_distance: {
+                id: "u4_choice_distance",
+                type: "scenario_choice",
+                badge: "Stage 4",
+                title: "Stage 4 · t-SNE distance validity",
+                prompt: "A teammate uses a t-SNE plot to argue: 'Customer segment X is farther from segment Y than from segment Z — so X and Z should be merged first.' Is this reasoning valid?",
+                code_snippet: `tsne = TSNE(n_components=2, perplexity=30, random_state=42)
+X_2d = tsne.fit_transform(X_scaled)
+
+# In 2D plot:
+# dist(X, Y) ≈ 4.2 units
+# dist(X, Z) ≈ 1.8 units
+# Teammate concludes: merge X and Z`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "No — t-SNE does not preserve global distances; 2D distances between clusters are meaningless",
+                    description: "Correct. t-SNE optimises local neighbourhood preservation (KL divergence between local probability distributions). It actively distorts global distances to achieve this. Euclidean distances between clusters in t-SNE space have no reliable relationship to high-dimensional distances.",
+                  },
+                  {
+                    id: "b",
+                    label: "Yes — t-SNE is a distance-preserving dimensionality reduction",
+                    description: "t-SNE is NOT distance-preserving. MDS (multidimensional scaling) and UMAP (to a degree) better preserve global structure. t-SNE explicitly sacrifices global distance preservation for local structure fidelity.",
+                  },
+                  {
+                    id: "c",
+                    label: "Yes — if perplexity is set correctly, t-SNE distances are valid",
+                    description: "No perplexity setting makes t-SNE distances globally valid. Perplexity controls local neighbourhood size, not global distance accuracy.",
+                  },
+                  {
+                    id: "d",
+                    label: "Only valid if you normalise the 2D coordinates first",
+                    description: "Normalising the coordinates doesn't recover information that t-SNE discarded. The problem is algorithmic, not a scaling issue.",
+                  },
+                ],
+                branches: {
+                  a: "u4_terminal",
+                  b: "u4_recovery_production",
+                  c: "u4_recovery_production",
+                  d: "u4_recovery_production",
+                },
+                rationale: "t-SNE's objective (minimising KL divergence between high-dim and low-dim neighbourhoods) means it compresses and expands space non-linearly. Two clusters that appear close in 2D may be far apart in the original space. For distance-preserving 2D views, use UMAP (which better preserves global topology) or MDS.",
+              },
+              u4_recovery_production: {
+                id: "u4_recovery_production",
+                type: "scenario_choice",
+                badge: "Recovery 3",
+                title: "Recovery · t-SNE vs UMAP for production use",
+                prompt: "You need a 2D embedding of high-dimensional text features to (1) visualise cluster structure and (2) serve as input features to a downstream classifier. Which embedding technique is appropriate for each task?",
+                code_snippet: `# Task 1: Visualisation only
+# Task 2: Production feature input for a classifier
+
+# Options:
+# A: t-SNE for both tasks
+# B: UMAP for both tasks
+# C: t-SNE for Task 1, UMAP for Task 2
+# D: Neither — use PCA for both`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "t-SNE for Task 1 (visualisation), UMAP for Task 2 (features) — they serve different purposes",
+                    description: "Correct. t-SNE is excellent for visualisation but has no out-of-sample extension (cannot embed new points consistently). UMAP learns a parametric mapping that can transform new points into the same embedding space — making it suitable as a feature extractor. For Task 1, t-SNE's local structure fidelity is ideal; for Task 2, UMAP's stable, consistent mapping is required.",
+                  },
+                  {
+                    id: "b",
+                    label: "t-SNE for both — it creates the most visually distinct clusters",
+                    description: "t-SNE cannot serve as production features because it has no out-of-sample extension. You cannot reliably embed new points into an existing t-SNE space.",
+                  },
+                  {
+                    id: "c",
+                    label: "UMAP for both — UMAP is strictly better than t-SNE",
+                    description: "UMAP is faster and has out-of-sample extension, but t-SNE often produces visually crisper local cluster separation for exploration. Both have appropriate use cases.",
+                  },
+                  {
+                    id: "d",
+                    label: "PCA for both — it is the only transformation with a stable inverse",
+                    description: "PCA is stable but produces linear projections that may miss non-linear structure. UMAP is preferable for non-linear feature extraction while preserving more structure than PCA.",
+                  },
+                ],
+                branches: {
+                  a: "u4_terminal",
+                  b: "u4_terminal",
+                  c: "u4_terminal",
+                  d: "u4_terminal",
+                },
+                rationale: "Key distinction: t-SNE is transductive (no out-of-sample), UMAP is inductive (parametric, can embed new points). For visualisation, both work; t-SNE often gives crisper local separation. For production features, use UMAP (or a parametric autoencoder). Never use t-SNE coordinates as classifier inputs.",
+              },
+              u4_terminal: {
+                id: "u4_terminal",
+                type: "scenario_choice",
+                badge: "Final",
+                title: "Revision complete · Dimensionality Viz Mastery",
+                terminal: true,
+                prompt: "Why can't you use t-SNE embeddings as features for a production classifier? What would you use instead?",
+                code_snippet: `# Scenario: you trained a RandomForest on t-SNE(X_train)
+# Now a new batch X_new arrives every hour.
+tsne = TSNE(n_components=2, random_state=42)
+
+# Attempt 1: refit t-SNE on X_new alone
+X_new_2d = tsne.fit_transform(X_new)   # Different space!
+
+# Attempt 2: refit t-SNE on X_train + X_new
+X_all_2d = tsne.fit_transform(
+    np.vstack([X_train, X_new]))       # Coordinates shift!`,
+                choices: [
+                  {
+                    id: "a",
+                    label: "t-SNE has no out-of-sample extension — each call creates a new coordinate system; use UMAP (parametric), PCA, or an autoencoder for production feature extraction",
+                    description: "Correct. t-SNE embeds a fixed dataset — you cannot add new points to an existing embedding without re-running on all data, which changes all coordinates. UMAP with parametric=True learns a neural network mapping that can embed new points into the same space. PCA's linear projection is also stable across new data.",
+                  },
+                  {
+                    id: "b",
+                    label: "t-SNE works fine — just refit on the new data each hour and the classifier will adapt",
+                    description: "Refitting t-SNE hourly on new data produces a different coordinate system each time. A classifier trained on yesterday's t-SNE coordinates cannot interpret today's differently-rotated embedding.",
+                  },
+                  {
+                    id: "c",
+                    label: "Use t-SNE but add a calibration step to align embeddings across runs",
+                    description: "Procrustes alignment can partially align two embeddings, but this is fragile and error-prone in production. Parametric UMAP or PCA are fundamentally more reliable solutions.",
+                  },
+                ],
+                branches: {
+                  a: "u4_terminal",
+                  b: "u4_terminal",
+                  c: "u4_terminal",
+                },
+                rationale: "Production ML requires stable feature spaces: new data must be embeddable into the same coordinate system the model was trained on. t-SNE is a global batch algorithm with no parametric mapping. UMAP (with parametric mode), PCA, or autoencoders all provide stable out-of-sample transformations suitable for production pipelines.",
+              },
+            },
+          },
     knowledgeCheck: [
       {
         question: "What do t-SNE and UMAP primarily try to preserve when they map high-D data to 2D?",
