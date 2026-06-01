@@ -48,6 +48,32 @@ import DecoratorForge from "../visualizations/DecoratorForge.jsx";
 import PandasDataLab from "../visualizations/PandasDataLab.jsx";
 import VectorizationRace from "../visualizations/VectorizationRace.jsx";
 import GroupByMergeForge from "../visualizations/GroupByMergeForge.jsx";
+import SQLOrderOfExecution from "../visualizations/SQLOrderOfExecution.jsx";
+import SQLNullLogic from "../visualizations/SQLNullLogic.jsx";
+import SQLGroupByViz from "../visualizations/SQLGroupByViz.jsx";
+import SQLSubqueryVsJoin from "../visualizations/SQLSubqueryVsJoin.jsx";
+import SQLWindowFunctionsViz from "../visualizations/SQLWindowFunctionsViz.jsx";
+import SQLLagLeadViz from "../visualizations/SQLLagLeadViz.jsx";
+import SQLCteExplorer from "../visualizations/SQLCteExplorer.jsx";
+import SQLPivotViz from "../visualizations/SQLPivotViz.jsx";
+import SQLExplainPlanViz from "../visualizations/SQLExplainPlanViz.jsx";
+import SQLNormalizationViz from "../visualizations/SQLNormalizationViz.jsx";
+import SQLIndexingViz from "../visualizations/SQLIndexingViz.jsx";
+import SQLStarSnowflakeViz from "../visualizations/SQLStarSnowflakeViz.jsx";
+import SQLOltpOlapViz from "../visualizations/SQLOltpOlapViz.jsx";
+import StatMeanMedianModeViz from "../visualizations/StatMeanMedianModeViz.jsx";
+import StatPercentileIQRViz from "../visualizations/StatPercentileIQRViz.jsx";
+import StatCorrelationViz from "../visualizations/StatCorrelationViz.jsx";
+import StatBinomialPoissonViz from "../visualizations/StatBinomialPoissonViz.jsx";
+import StatCLTViz from "../visualizations/StatCLTViz.jsx";
+import StatPValueViz from "../visualizations/StatPValueViz.jsx";
+import StatTestsViz from "../visualizations/StatTestsViz.jsx";
+import StatConfidenceIntervalViz from "../visualizations/StatConfidenceIntervalViz.jsx";
+import StatTypeErrorsViz from "../visualizations/StatTypeErrorsViz.jsx";
+import StatPowerAnalysisViz from "../visualizations/StatPowerAnalysisViz.jsx";
+import StatMultipleTestingViz from "../visualizations/StatMultipleTestingViz.jsx";
+import StatBootstrapViz from "../visualizations/StatBootstrapViz.jsx";
+import StatBayesFrequentistViz from "../visualizations/StatBayesFrequentistViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import LessonModule from "../components/platform/LessonModule.jsx";
 import { getResolvedLessonModule, auditPythonLessonIntegrity, PYTHON_CLUSTER_MILESTONES } from "../data/lesson-modules.js";
@@ -174,14 +200,13 @@ const CURRICULUM = [
     description: "The language of data. From basic queries to advanced window functions, CTEs, and query optimization.",
     topics: [
       {
-        id: "sql-basics",
-        title: "SQL Fundamentals",
+        id: "sql-revision",
+        title: "Rapid Revision & Foundations",
         lessons: [
-          { id: "sq-b1", title: "SELECT, WHERE, ORDER BY", duration: "12 min", hasViz: false },
-          { id: "sq-b2", title: "JOINs Visualized: INNER, LEFT, RIGHT, FULL", duration: "20 min", hasViz: true },
-          { id: "sq-b3", title: "GROUP BY & Aggregation Functions", duration: "15 min", hasViz: true },
-          { id: "sq-b4", title: "HAVING vs WHERE: When to Filter", duration: "10 min", hasViz: true },
-          { id: "sq-b5", title: "Subqueries & Correlated Subqueries", duration: "18 min", hasViz: true },
+          { id: "sql-found-01", title: "SQL Order of Execution", duration: "12 min", hasViz: true },
+          { id: "sql-found-02", title: "Three-Valued Logic of NULL", duration: "12 min", hasViz: true },
+          { id: "sql-found-03", title: "GROUP BY & Aggregations", duration: "12 min", hasViz: true },
+          { id: "sql-found-04", title: "Subqueries vs Basic Joins", duration: "12 min", hasViz: true },
         ]
       },
       {
@@ -191,7 +216,7 @@ const CURRICULUM = [
           { id: "sq-a1", title: "Window Functions: ROW_NUMBER, RANK, DENSE_RANK", duration: "22 min", hasViz: true },
           { id: "sq-a2", title: "LAG, LEAD & Running Calculations", duration: "18 min", hasViz: true },
           { id: "sq-a3", title: "CTEs & Recursive Queries", duration: "20 min", hasViz: true },
-          { id: "sq-a4", title: "PIVOT, UNPIVOT & Conditional Aggregation", duration: "15 min", hasViz: false },
+          { id: "sq-a4", title: "PIVOT, UNPIVOT & Conditional Aggregation", duration: "15 min", hasViz: true },
           { id: "sq-a5", title: "Query Optimization & EXPLAIN Plans", duration: "25 min", hasViz: true },
         ]
       },
@@ -199,7 +224,7 @@ const CURRICULUM = [
         id: "sql-design",
         title: "Database Design",
         lessons: [
-          { id: "sq-d1", title: "Normalization: 1NF â†’ 3NF â†’ BCNF", duration: "20 min", hasViz: true },
+          { id: "sq-d1", title: "Normalization: 1NF → 3NF → BCNF", duration: "20 min", hasViz: true },
           { id: "sq-d2", title: "Indexing Strategies", duration: "18 min", hasViz: true },
           { id: "sq-d3", title: "Star Schema vs Snowflake Schema", duration: "15 min", hasViz: true },
           { id: "sq-d4", title: "OLTP vs OLAP: Choosing the Right DB", duration: "12 min", hasViz: true },
@@ -262,7 +287,7 @@ const CURRICULUM = [
           { id: "st-a1", title: "A/B Testing: Design to Decision", duration: "25 min", hasViz: true },
           { id: "st-a2", title: "Multiple Testing & Bonferroni Correction", duration: "12 min", hasViz: true },
           { id: "st-a3", title: "Bootstrap Methods", duration: "15 min", hasViz: true },
-          { id: "st-a4", title: "Bayesian vs Frequentist: The Debate", duration: "18 min", hasViz: false },
+          { id: "st-a4", title: "Bayesian vs Frequentist: The Debate", duration: "18 min", hasViz: true },
         ]
       }
     ],
@@ -966,6 +991,32 @@ const VISUALIZATIONS = {
   "sd-m2": FeatureStoreViz,
   "sd-m3": BatchVsStreaming,
   "sd-m4": RecSysCollaborativeFiltering,
+  "sql-found-01": SQLOrderOfExecution,
+  "sql-found-02": SQLNullLogic,
+  "sql-found-03": SQLGroupByViz,
+  "sql-found-04": SQLSubqueryVsJoin,
+  "sq-a1": SQLWindowFunctionsViz,
+  "sq-a2": SQLLagLeadViz,
+  "sq-a3": SQLCteExplorer,
+  "sq-a4": SQLPivotViz,
+  "sq-a5": SQLExplainPlanViz,
+  "sq-d1": SQLNormalizationViz,
+  "sq-d2": SQLIndexingViz,
+  "sq-d3": SQLStarSnowflakeViz,
+  "sq-d4": SQLOltpOlapViz,
+  "st-f1": StatMeanMedianModeViz,
+  "st-f3": StatPercentileIQRViz,
+  "st-f4": StatCorrelationViz,
+  "st-p3": StatBinomialPoissonViz,
+  "st-p4": StatCLTViz,
+  "st-i2": StatPValueViz,
+  "st-i3": StatTestsViz,
+  "st-i4": StatConfidenceIntervalViz,
+  "st-i5": StatTypeErrorsViz,
+  "st-i6": StatPowerAnalysisViz,
+  "st-a2": StatMultipleTestingViz,
+  "st-a3": StatBootstrapViz,
+  "st-a4": StatBayesFrequentistViz,
 };
 
 const ML_VIZ_FALLBACK = [
