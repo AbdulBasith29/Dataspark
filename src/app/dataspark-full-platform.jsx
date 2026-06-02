@@ -74,6 +74,8 @@ import StatPowerAnalysisViz from "../visualizations/StatPowerAnalysisViz.jsx";
 import StatMultipleTestingViz from "../visualizations/StatMultipleTestingViz.jsx";
 import StatBootstrapViz from "../visualizations/StatBootstrapViz.jsx";
 import StatBayesFrequentistViz from "../visualizations/StatBayesFrequentistViz.jsx";
+import DLRNNLSTMViz from "../visualizations/DLRNNLSTMViz.jsx";
+import DLTransferLearningViz from "../visualizations/DLTransferLearningViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import LessonModule from "../components/platform/LessonModule.jsx";
 import { getResolvedLessonModule, auditPythonLessonIntegrity, PYTHON_CLUSTER_MILESTONES } from "../data/lesson-modules.js";
@@ -944,6 +946,8 @@ const VISUALIZATIONS = {
   "dl-f3": ActivationFunctions,
   "dl-f4": GradientDescentViz,
   "dl-a1": ConvolutionFilter,
+  "dl-a2": DLRNNLSTMViz,
+  "dl-a4": DLTransferLearningViz,
   "dl-f5": RegularizationEffect,
   "ml-f2": BiasVarianceViz,
   "ml-f3": TrainValTestSplit,

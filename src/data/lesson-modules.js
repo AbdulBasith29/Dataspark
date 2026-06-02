@@ -12024,6 +12024,3159 @@ for day in experiment:
   ],
 },
 
+
+"dl-f1": {
+  durationLabel: "18 min",
+  outcomes: [
+    "Explain the **universal approximation theorem** and why it matters — and why it's not the whole story.",
+    "Describe how a single perceptron functions as a **linear classifier** and where it fails.",
+    "Articulate why **depth** beats raw width in practice through hierarchical feature learning.",
+    "Recognize when a network architecture is ignoring depth in favor of brute-force width.",
+  ],
+  learnMarkdown: `## The Perceptron: A Single Neuron
+
+A **perceptron** is the atomic unit of any neural network. It computes a weighted sum of its inputs, adds a bias, then passes the result through an activation function:
+
+\`\`\`
+y = σ(w₁x₁ + w₂x₂ + ... + wₙxₙ + b)
+  = σ(w · x + b)
+\`\`\`
+
+Without an activation function σ, this is just a linear transformation — you get a **hyperplane** slicing through input space. That makes the perceptron a linear classifier: it can separate classes only when they are **linearly separable**. The classic failure case is XOR: no single straight line can separate the four XOR outputs. This limits the perceptron to problems where the decision boundary is a hyperplane.
+
+## Adding Nonlinearity Changes Everything
+
+The activation function σ is what breaks linearity. Common choices include sigmoid, tanh, and ReLU (covered in dl-f3). Stacking layers with nonlinear activations allows the network to bend and fold input space, creating arbitrarily complex decision boundaries.
+
+A single hidden layer with a nonlinear activation can already separate XOR — the first layer learns a new representation of the inputs where the classes become linearly separable, and the output layer draws the boundary in that new space.
+
+## The Universal Approximation Theorem
+
+The **Universal Approximation Theorem (UAT)** states that a feedforward network with a single hidden layer containing a sufficient number of neurons with a nonlinear activation can approximate any continuous function on a compact subset of ℝⁿ to arbitrary precision.
+
+\`\`\`
+f(x) ≈ Σᵢ αᵢ σ(wᵢ · x + bᵢ)    (sum over N hidden units)
+\`\`\`
+
+This sounds powerful — and it is, theoretically. But the UAT comes with a critical asterisk: it guarantees existence, not learnability or efficiency. The number of neurons required for a given approximation can be **exponentially large**. A single wide layer might need millions of units to approximate what a modest deep network learns with thousands.
+
+## Why Depth Beats Width in Practice
+
+Here is where theory meets reality. Empirically and theoretically, **deep networks outperform equivalently-expressive wide networks** for structured tasks like vision, language, and speech.
+
+The core intuition is **hierarchical feature learning**. In a deep convolutional network trained on images:
+
+- Layer 1 learns edges and color gradients
+- Layer 2 combines edges into textures and corners
+- Layer 3 combines textures into parts (eyes, wheels)
+- Layer 4 combines parts into objects
+
+Each layer builds on the previous. A single wide layer has no such compositional structure — every hidden unit directly sees raw pixels, with no mechanism to reuse intermediate representations.
+
+Mathematically, deep networks can represent certain function classes (like polynomials of the input) with exponentially fewer parameters than shallow networks. This is the **depth efficiency** argument.
+
+## Practical Consequences
+
+**Optimization**: Wide shallow networks are harder to optimize. All the representational power sits in one layer, creating a harder loss landscape. Deep networks decompose the problem into stages, each with an easier local objective.
+
+**Generalization**: Depth acts as an implicit inductive bias. A deep network with good architecture encodes structural assumptions about the problem (hierarchy, locality, compositionality) that constrain the hypothesis space and improve generalization.
+
+**Gradient flow**: Very wide layers can slow training by making gradient updates diffuse across many parameters with little structured signal.
+
+The practical rule of thumb: prefer **moderate width, greater depth** for most structured tasks. Start with established depth patterns (ResNet, Transformer block counts) rather than guessing single-layer width.
+
+## Interview hook (answer like a senior)
+
+"The universal approximation theorem tells us a single hidden layer is theoretically sufficient, but in practice it's nearly useless as a design principle — the required width can be exponential in problem complexity, optimization becomes much harder with flat wide layers, and you lose the hierarchical feature reuse that makes deep networks data-efficient. Depth isn't just an engineering trick; it's an inductive bias that matches the compositional structure of most real-world problems."`,
+
+  video: null,
+  videoFallbackMarkdown: `## Deep dive
+
+### Why the UAT Doesn't Justify Shallow Networks
+
+The UAT is an **existence proof**, not a construction. It says a shallow network with enough neurons *can* represent any function — but it says nothing about:
+
+1. **How many neurons are needed** (often exponential in the input dimension)
+2. **Whether gradient descent will find the right weights** (optimization hardness grows with width)
+3. **Whether the learned function will generalize** (more parameters without structure → weaker inductive bias)
+
+### Depth and the VC Dimension
+
+Deep networks achieve high VC dimension (expressive power) with **far fewer parameters** than comparably expressive shallow networks. A depth-L network with width W has VC dimension roughly O(W²L log W), while a single-layer network needs O((WL)²) neurons to match — exponential scaling.
+
+### The XOR Proof (Constructive)
+
+Given inputs (x₁, x₂) ∈ {0,1}², XOR outputs 1 iff exactly one input is 1.
+
+A two-layer solution:
+- Neuron 1: fires if x₁ OR x₂ (w=[1,1], b=-0.5)
+- Neuron 2: fires if x₁ AND x₂ (w=[1,1], b=-1.5)
+- Output: Neuron 1 minus Neuron 2 (XOR = OR minus AND)
+
+This demonstrates that a hidden layer creates a new coordinate system where the problem becomes linearly separable.`,
+
+  tryGuidance: "Use the network diagram to add and remove hidden layers. Observe how the decision boundary changes for the XOR dataset as you increase depth vs. width. Try matching the performance of a 2-hidden-layer network using only a single wide layer — note how many neurons you need.",
+
+  interviewGraph: {
+    initialStageId: "f1_wide_click",
+    artifactDimensions: [
+      { label: "Universal Approximation", recoveryStageId: "f1_recovery_uat" },
+      { label: "Depth vs Width", recoveryStageId: "f1_recovery_depth" },
+      { label: "Linear Separability", recoveryStageId: "f1_recovery_linear", passLabel: "Architecture Mastery" },
+    ],
+    stages: {
+      f1_wide_click: {
+        id: "f1_wide_click",
+        type: "click_target",
+        badge: "Stage 1 · Architecture",
+        title: "Stage 1 · Spot the depth problem",
+        prompt: "This network is tasked with classifying ImageNet images. Click the line that trades hierarchical depth for brute-force width.",
+        code_snippet: `import tensorflow as tf
+
+model = tf.keras.Sequential([
+    tf.keras.layers.Flatten(input_shape=(224, 224, 3)),
+    tf.keras.layers.Dense(1000, activation='relu'),  # ds-target:f1_wide_layer
+    tf.keras.layers.Dense(1000, activation='softmax')
+])
+
+model.compile(optimizer='adam', loss='categorical_crossentropy')`,
+        validationCopy: {
+          f1_wide_layer: "Correct. A single Dense(1000) hidden layer forces all 150,000 pixels to be combined in one step — no hierarchy, no reuse of intermediate features. A deep network would stack many layers of moderate width to learn progressively abstract representations.",
+        },
+        branches: { f1_wide_layer: "f1_uaf_choice" },
+      },
+      f1_uaf_choice: {
+        id: "f1_uaf_choice",
+        type: "scenario_choice",
+        badge: "Stage 2 · UAT",
+        title: "Stage 2 · Universal approximation in practice",
+        prompt: "An interviewer says: 'The universal approximation theorem proves a single hidden layer is sufficient for any task. So why use deep networks?' What is the best response?",
+        code_snippet: `# Single hidden layer "universal" network
+model = Sequential([
+    Dense(10000, activation='sigmoid'),  # very wide
+    Dense(num_classes, activation='softmax')
+])
+
+# Deep alternative
+deep_model = Sequential([
+    Dense(256, activation='relu'),
+    Dense(256, activation='relu'),
+    Dense(256, activation='relu'),
+    Dense(num_classes, activation='softmax')
+])`,
+        choices: [
+          {
+            id: "a",
+            label: "The UAT guarantees existence, not learnability — required width can be exponential and optimization is harder.",
+            description: "This is the core rebuttal. The UAT is an existence proof, not a practical design principle.",
+          },
+          {
+            id: "b",
+            label: "The UAT only applies to regression tasks, not classification.",
+            description: "Incorrect. The UAT applies broadly to continuous function approximation, regardless of task type.",
+          },
+          {
+            id: "c",
+            label: "Deep networks use less memory, which is the real reason.",
+            description: "Memory is a secondary concern. The primary issues are optimization hardness and lack of hierarchical inductive bias.",
+          },
+          {
+            id: "d",
+            label: "Shallow networks cannot use backpropagation.",
+            description: "Incorrect. Backpropagation works fine on shallow networks — the issue is not the algorithm but the structural properties.",
+          },
+        ],
+        branches: { a: "f1_hierarchy_choice", b: "f1_recovery_uat", c: "f1_recovery_uat", d: "f1_recovery_uat" },
+        rationale: "The UAT is a mathematical existence result: it says a solution *exists* with enough neurons. It makes no promise about how many neurons are needed (often exponential), whether gradient descent will find the weights, or whether the model will generalize. Deep networks earn their advantage through hierarchical feature reuse, better optimization landscapes, and implicit inductive bias.",
+      },
+      f1_recovery_uat: {
+        id: "f1_recovery_uat",
+        type: "scenario_choice",
+        badge: "Recovery · UAT",
+        title: "Recovery · What the UAT actually promises",
+        prompt: "Which statement about the Universal Approximation Theorem is TRUE?",
+        code_snippet: `# UAT says: for any continuous f and ε > 0,
+# there exist weights W such that:
+# |network(x; W) - f(x)| < ε  for all x in domain
+#
+# It does NOT say:
+# - how large the network must be
+# - that gradient descent finds W
+# - that the network generalizes`,
+        choices: [
+          {
+            id: "a",
+            label: "A single hidden layer with enough neurons can approximate any continuous function.",
+            description: "True — this is precisely what the UAT states, for a compact domain.",
+          },
+          {
+            id: "b",
+            label: "The UAT guarantees gradient descent will converge to the optimal approximation.",
+            description: "False. The UAT says nothing about optimization — it's a pure existence result.",
+          },
+          {
+            id: "c",
+            label: "The UAT means shallow networks are preferable to deep ones.",
+            description: "False. The UAT shows theoretical possibility, not practical superiority.",
+          },
+        ],
+        branches: { a: "f1_hierarchy_choice", b: "f1_recovery_uat", c: "f1_recovery_uat" },
+        rationale: "The UAT states that a single hidden layer is a universal function approximator — but width may need to grow exponentially, and the theorem says nothing about optimization or generalization.",
+      },
+      f1_hierarchy_choice: {
+        id: "f1_hierarchy_choice",
+        type: "scenario_choice",
+        badge: "Stage 3 · Depth",
+        title: "Stage 3 · What deeper layers actually learn",
+        prompt: "You add a second hidden layer to a network trained on images. Relative to the first hidden layer, what does the second hidden layer typically learn?",
+        code_snippet: `model = Sequential([
+    Dense(256, activation='relu'),  # Layer 1
+    Dense(256, activation='relu'),  # Layer 2 — what does this learn?
+    Dense(10, activation='softmax')
+])`,
+        choices: [
+          {
+            id: "a",
+            label: "Higher-level combinations of Layer 1 features — more abstract representations.",
+            description: "Correct. Each layer composes the previous layer's features into increasingly abstract concepts.",
+          },
+          {
+            id: "b",
+            label: "The same features as Layer 1 but with different random initialization.",
+            description: "Incorrect. Without nonlinearity, yes — but with activations and depth, each layer specializes to a different abstraction level.",
+          },
+          {
+            id: "c",
+            label: "Raw pixel patterns, since all layers see the same input.",
+            description: "Incorrect. Only Layer 1 sees raw pixels. Layer 2 sees Layer 1's activations — a transformed representation.",
+          },
+          {
+            id: "d",
+            label: "Lower-level features to provide redundancy.",
+            description: "Incorrect. Depth creates a hierarchy of abstraction, not redundancy.",
+          },
+        ],
+        branches: { a: "f1_xor_choice", b: "f1_recovery_depth", c: "f1_recovery_depth", d: "f1_recovery_depth" },
+        rationale: "In deep networks, each layer transforms the representation from the previous layer. Layer 1 might learn edges; Layer 2 learns textures (combinations of edges); Layer 3 learns parts (combinations of textures). This compositional hierarchy is the core advantage of depth.",
+      },
+      f1_recovery_depth: {
+        id: "f1_recovery_depth",
+        type: "scenario_choice",
+        badge: "Recovery · Depth",
+        title: "Recovery · Hierarchical representations",
+        prompt: "In a deep image classification network, which ordering of learned representations is most accurate?",
+        code_snippet: `# Empirically observed in deep CNNs (e.g., Zeiler & Fergus 2014):
+# Layer 1: edges, color blobs
+# Layer 2: textures, corners, simple shapes
+# Layer 3: object parts (eyes, wheels, handles)
+# Layer 4+: whole objects, semantic categories`,
+        choices: [
+          {
+            id: "a",
+            label: "Early layers: abstract semantics. Later layers: raw pixel patterns.",
+            description: "Backwards. Early layers are closest to the input and learn low-level features.",
+          },
+          {
+            id: "b",
+            label: "Early layers: low-level features (edges). Later layers: abstract semantics (objects).",
+            description: "Correct. The hierarchy of abstraction increases with depth.",
+          },
+          {
+            id: "c",
+            label: "All layers learn the same mix of low-level and high-level features.",
+            description: "Incorrect. Depth creates specialization — each layer occupies a different level of abstraction.",
+          },
+        ],
+        branches: { a: "f1_recovery_depth", b: "f1_xor_choice", c: "f1_recovery_depth" },
+        rationale: "Depth creates a hierarchy: early layers detect simple patterns, later layers compose them into abstract concepts. This matches the compositional structure of natural data.",
+      },
+      f1_xor_choice: {
+        id: "f1_xor_choice",
+        type: "scenario_choice",
+        badge: "Stage 4 · Perceptron Limits",
+        title: "Stage 4 · Why perceptrons fail on XOR",
+        prompt: "A single perceptron (no hidden layers) is trained on the XOR problem and never converges to zero training error. What is the fundamental reason?",
+        code_snippet: `# XOR truth table
+# x1=0, x2=0 -> y=0
+# x1=0, x2=1 -> y=1
+# x1=1, x2=0 -> y=1
+# x1=1, x2=1 -> y=0
+
+# Perceptron decision boundary:
+# w1*x1 + w2*x2 + b > 0  =>  class 1
+
+perceptron = Sequential([Dense(1, activation='sigmoid')])`,
+        choices: [
+          {
+            id: "a",
+            label: "The perceptron is a linear classifier and XOR is not linearly separable.",
+            description: "Correct. No single hyperplane can separate the XOR outputs — (0,1) and (1,0) are class 1, while (0,0) and (1,1) are class 0.",
+          },
+          {
+            id: "b",
+            label: "The sigmoid activation saturates and prevents convergence.",
+            description: "Saturation is a gradient issue, not the root cause. Even a linear threshold unit (step function) cannot solve XOR.",
+          },
+          {
+            id: "c",
+            label: "XOR requires more data than two binary inputs provide.",
+            description: "Incorrect. The failure is about decision boundary geometry, not dataset size.",
+          },
+          {
+            id: "d",
+            label: "The perceptron learning rule only works for regression tasks.",
+            description: "Incorrect. The perceptron learning rule is specifically designed for binary classification.",
+          },
+        ],
+        branches: { a: "f1_terminal", b: "f1_recovery_linear", c: "f1_recovery_linear", d: "f1_recovery_linear" },
+        rationale: "A single-layer perceptron defines one linear decision boundary. XOR requires a non-linear boundary — specifically, two half-planes. Adding a hidden layer allows the network to first transform the input space into a linearly separable representation.",
+      },
+      f1_recovery_linear: {
+        id: "f1_recovery_linear",
+        type: "scenario_choice",
+        badge: "Recovery · Linear Separability",
+        title: "Recovery · Linear separability",
+        prompt: "Which dataset can a single perceptron (no hidden layers) classify perfectly?",
+        code_snippet: `# Dataset A: AND gate
+# (0,0)->0, (0,1)->0, (1,0)->0, (1,1)->1
+
+# Dataset B: XOR gate
+# (0,0)->0, (0,1)->1, (1,0)->1, (1,1)->0
+
+# Dataset C: Circle classification
+# Points inside unit circle -> 1
+# Points outside unit circle -> 0`,
+        choices: [
+          {
+            id: "a",
+            label: "Dataset A (AND gate).",
+            description: "Correct. AND is linearly separable — a single line separates (1,1) from all other inputs.",
+          },
+          {
+            id: "b",
+            label: "Dataset B (XOR gate).",
+            description: "Incorrect. XOR requires two decision boundaries and is not linearly separable.",
+          },
+          {
+            id: "c",
+            label: "Dataset C (circle classification).",
+            description: "Incorrect. A circle boundary is nonlinear — no single hyperplane can separate inside from outside.",
+          },
+        ],
+        branches: { a: "f1_terminal", b: "f1_recovery_linear", c: "f1_recovery_linear" },
+        rationale: "AND is linearly separable: the hyperplane w₁x₁ + w₂x₂ = 1.5 correctly classifies all four inputs. XOR and circle classification require nonlinear boundaries that a single perceptron cannot form.",
+      },
+      f1_terminal: {
+        id: "f1_terminal",
+        type: "scenario_choice",
+        badge: "Terminal · Synthesis",
+        title: "Revision complete · Architecture mastered",
+        terminal: true,
+        prompt: "Final check: Why do deep networks generalize better than equivalently-expressive wide networks, empirically?",
+        code_snippet: `# Equivalent parameter counts:
+wide_model = Sequential([
+    Dense(8192, activation='relu'),  # ~600M params
+    Dense(num_classes)
+])
+
+deep_model = Sequential([
+    Dense(512, activation='relu'),   # ~400K params each
+    Dense(512, activation='relu'),
+    Dense(512, activation='relu'),
+    # ... 10 layers total, still far fewer params
+    Dense(num_classes)
+])`,
+        choices: [
+          {
+            id: "a",
+            label: "Depth introduces hierarchical inductive bias matching problem structure, and each layer's gradient signal is more focused.",
+            description: "Correct. This captures both the structural and optimization advantages of depth.",
+          },
+          {
+            id: "b",
+            label: "Deep networks always use fewer parameters, so they overfit less by default.",
+            description: "Parameter count is not the whole story — a wide network can have fewer parameters than a deep one. The advantage of depth is structural, not just quantitative.",
+          },
+          {
+            id: "c",
+            label: "Wide networks cannot use dropout, so they overfit more.",
+            description: "Incorrect. Dropout can be applied to any layer regardless of width or depth.",
+          },
+        ],
+        branches: { a: "f1_terminal", b: "f1_terminal", c: "f1_terminal" },
+        rationale: "Deep networks generalize better because: (1) hierarchical inductive bias matches the compositional structure of real data, (2) each layer has a focused learning objective (local representations), (3) gradient updates are more structured than in wide layers, and (4) depth-efficient representations require fewer parameters for the same expressivity.",
+      },
+    },
+  },
+
+  knowledgeCheck: [
+    {
+      question: "The Universal Approximation Theorem states that a single hidden layer can approximate any continuous function. Why is this NOT a practical justification for using shallow networks?",
+      options: [
+        "The required number of neurons can be exponentially large, and optimization becomes significantly harder without hierarchical structure.",
+        "The UAT only applies to networks with sigmoid activations, not modern activations like ReLU.",
+        "Shallow networks cannot use gradient descent because the loss landscape is always non-convex.",
+      ],
+      correctIndex: 0,
+      explanation: "The UAT is an existence proof — it guarantees a solution exists but says nothing about how large the network must be (potentially exponential) or whether gradient descent will find the weights. Deep networks achieve the same expressivity with far fewer parameters by exploiting compositional structure.",
+    },
+    {
+      question: "A single perceptron trained on XOR fails to reach zero training error regardless of learning rate or epochs. What is the correct diagnosis?",
+      options: [
+        "The learning rate is too high, causing the weights to oscillate.",
+        "XOR is not linearly separable, so no single hyperplane can correctly classify all four input patterns.",
+        "The perceptron needs more training data to learn the XOR pattern.",
+      ],
+      correctIndex: 1,
+      explanation: "The perceptron defines a single linear decision boundary. XOR requires two separating hyperplanes — (1,0) and (0,1) must be on one side while (0,0) and (1,1) are on the other. No single straight line achieves this, regardless of training. A hidden layer is needed to transform input space into a linearly separable representation.",
+    },
+    {
+      question: "What does the second hidden layer in a deep vision network primarily learn relative to the first?",
+      options: [
+        "Duplicate copies of first-layer features for redundancy.",
+        "Raw pixel statistics that the first layer missed.",
+        "Higher-level combinations of first-layer features, such as textures composed from edges.",
+      ],
+      correctIndex: 2,
+      explanation: "Each layer in a deep network operates on the output of the previous layer, composing features into progressively abstract representations. Layer 1 detects edges; Layer 2 combines edges into textures and corners; later layers build object parts and whole objects. This hierarchical composition is the core advantage of depth over width.",
+    },
+  ],
+},
+
+"dl-f2": {
+  durationLabel: "25 min",
+  outcomes: [
+    "Trace a complete **forward pass** and explain how loss is computed from network outputs.",
+    "Apply the **chain rule** to derive how gradients flow backward through a multi-layer network.",
+    "Diagnose **vanishing and exploding gradients** by understanding sigmoid saturation and gradient magnitude accumulation.",
+    "Explain why **ReLU** improves gradient flow and when **gradient clipping** is the right tool.",
+  ],
+  learnMarkdown: `## The Forward Pass
+
+Training a neural network is a two-phase loop: **forward pass** then **backward pass**. During the forward pass, input data flows through each layer, producing an output prediction:
+
+\`\`\`
+z₁ = W₁x + b₁          # linear transform, layer 1
+a₁ = σ(z₁)             # activation
+z₂ = W₂a₁ + b₂         # linear transform, layer 2
+ŷ  = σ(z₂)             # final prediction
+L  = loss(ŷ, y)        # compare to ground truth
+\`\`\`
+
+The loss L — cross-entropy for classification, MSE for regression — is a scalar measuring how wrong the prediction is. Backpropagation uses this scalar to compute the gradient of L with respect to every weight in the network.
+
+## The Chain Rule: Gradient Flow
+
+Backpropagation is the chain rule from calculus, applied to a composition of functions. Given L = f(g(h(x))):
+
+\`\`\`
+dL/dx = (dL/df) · (df/dg) · (dg/dh) · (dh/dx)
+\`\`\`
+
+In a neural network, each layer is a function. The gradient of the loss with respect to a weight in layer k is the product of all the local gradients from the output layer back to layer k. Concretely, for a weight W in layer k of an L-layer network:
+
+\`\`\`
+∂L/∂Wₖ = (∂L/∂aₗ) · (∂aₗ/∂aₗ₋₁) · ... · (∂aₖ₊₁/∂aₖ) · (∂aₖ/∂Wₖ)
+\`\`\`
+
+Each term \`∂aₙ/∂aₙ₋₁\` includes the **derivative of the activation function** at that layer's pre-activation value.
+
+## Vanishing Gradients: Death by a Thousand Sigmoids
+
+The sigmoid activation saturates at both ends of its output range (0 and 1), and its derivative has a maximum of **0.25** at zero:
+
+\`\`\`
+σ(z)  = 1 / (1 + e^(-z))
+σ'(z) = σ(z)(1 - σ(z))   # max value: 0.25 at z=0
+\`\`\`
+
+In a 10-layer sigmoid network, the gradient reaching layer 1 is roughly the product of 10 local derivatives — each at most 0.25:
+
+\`\`\`
+|∂L/∂W₁| ≤ (0.25)^10 ≈ 9.5 × 10⁻⁷
+\`\`\`
+
+This is the **vanishing gradient problem**: early layers receive essentially zero gradient signal and stop learning. The network's early layers — which learn fundamental low-level features — stagnate while later layers continue to update. Tanh suffers the same problem (max derivative: 1.0, but still saturates at the tails).
+
+## Exploding Gradients
+
+The mirror pathology: if local gradients are consistently greater than 1, the product of many such gradients grows exponentially. A 10-layer network where each Jacobian has spectral norm 2 produces gradients with magnitude 2¹⁰ = 1024×. This causes **weight updates so large that training diverges**.
+
+Exploding gradients are most common in **recurrent neural networks** (long temporal sequences) and poorly initialized deep networks.
+
+## ReLU: The Gradient Highway
+
+**ReLU** (Rectified Linear Unit) was a breakthrough for deep learning in part because of its gradient properties:
+
+\`\`\`
+ReLU(z) = max(0, z)
+ReLU'(z) = 1  if z > 0
+           0  if z ≤ 0
+\`\`\`
+
+For positive pre-activations, the derivative is exactly **1** — the gradient passes through unchanged. The product of ten such derivatives is still 1, not 10⁻⁷. This is why deep networks became practically trainable at scale after the adoption of ReLU (Nair & Hinton, 2010; Krizhevsky et al., AlexNet 2012).
+
+The trade-off: neurons with negative pre-activations have zero gradient — they contribute nothing to learning. If a neuron's pre-activation is negative for all training examples, it becomes a **dead ReLU**: permanently stuck, contributing zero gradient regardless of input.
+
+## Gradient Clipping
+
+For scenarios where exploding gradients are unavoidable (deep RNNs, large batch training), **gradient clipping** caps the gradient norm before the optimizer step:
+
+\`\`\`python
+# Clip by global norm
+optimizer = tf.keras.optimizers.Adam(clipnorm=1.0)
+
+# Manual clip
+grads = [tf.clip_by_norm(g, 1.0) for g in grads]
+\`\`\`
+
+Clipping by norm (rescaling the entire gradient vector when its norm exceeds a threshold) is preferred over clipping by value (clipping each gradient independently), as it preserves gradient direction while constraining magnitude.
+
+## Architectural Implications
+
+Vanishing gradients led directly to modern architecture innovations:
+
+- **Batch Normalization**: normalizes layer inputs, keeping pre-activations in a regime where gradients are healthy
+- **Residual connections (ResNets)**: add an identity shortcut so gradient has a direct path from output to early layers — ∂L/∂W₁ includes a term that doesn't pass through any activations
+- **Careful initialization**: Xavier/Glorot for sigmoid/tanh, He initialization for ReLU — ensures initial gradient magnitudes are well-scaled
+
+## Interview hook (answer like a senior)
+
+"Backpropagation is just the chain rule applied to a composition of differentiable functions — the gradient of the loss with respect to any weight is the product of all local Jacobians from the output back to that weight. The vanishing gradient problem emerges when those local Jacobians are consistently less than 1, as with sigmoid's maximum derivative of 0.25 — after 10 layers, the product is near zero. ReLU fixes this by having a derivative of exactly 1 for positive inputs, so the gradient chain doesn't shrink. When exploding gradients are the problem instead, gradient clipping by norm is the standard fix."`,
+
+  video: null,
+  videoFallbackMarkdown: `## Deep dive
+
+### Computing Gradients by Hand (2-Layer Example)
+
+Given a 2-layer network with MSE loss:
+
+\`\`\`
+Forward:  z₁ = W₁x,  a₁ = ReLU(z₁),  ŷ = W₂a₁,  L = (ŷ - y)²
+
+Backward:
+∂L/∂ŷ  = 2(ŷ - y)
+∂L/∂W₂ = ∂L/∂ŷ · a₁ᵀ
+∂L/∂a₁ = W₂ᵀ · ∂L/∂ŷ
+∂L/∂z₁ = ∂L/∂a₁ ⊙ ReLU'(z₁)    # element-wise, ReLU' is 0 or 1
+∂L/∂W₁ = ∂L/∂z₁ · xᵀ
+\`\`\`
+
+This shows the clean matrix form: each layer's gradient is the upstream gradient multiplied by the local Jacobian.
+
+### Residual Connections as a Gradient Shortcut
+
+In a ResNet block: y = F(x) + x (F is a stack of conv layers). The gradient:
+
+\`\`\`
+∂L/∂x = ∂L/∂y · (∂F/∂x + I)
+\`\`\`
+
+The identity term I means there is always a gradient path that bypasses F entirely — even if ∂F/∂x vanishes, ∂L/∂x includes a direct copy of the upstream gradient. This is why ResNets can be trained with hundreds of layers.`,
+
+  tryGuidance: "Use the gradient flow visualizer to step through backpropagation layer by layer. Change the activation function between sigmoid and ReLU and observe how gradient magnitudes change at each layer. Try a 10-layer sigmoid network and a 10-layer ReLU network — compare the gradient norms at layer 1.",
+
+  interviewGraph: {
+    initialStageId: "f2_sigmoid_click",
+    artifactDimensions: [
+      { label: "Chain Rule & Backprop", recoveryStageId: "f2_recovery_chain" },
+      { label: "Vanishing Gradients", recoveryStageId: "f2_recovery_vanish" },
+      { label: "Architectural Fixes", recoveryStageId: "f2_recovery_fixes", passLabel: "Backprop Mastery" },
+    ],
+    stages: {
+      f2_sigmoid_click: {
+        id: "f2_sigmoid_click",
+        type: "click_target",
+        badge: "Stage 1 · Vanishing Gradient",
+        title: "Stage 1 · Spot the gradient killer",
+        prompt: "This 10-layer network trains very slowly and gradients in the first layer are near zero. Click the activation function line that is causing the vanishing gradient problem.",
+        code_snippet: `model = tf.keras.Sequential([
+    Dense(256, activation='sigmoid'),  # ds-target:f2_sig1
+    Dense(256, activation='sigmoid'),
+    Dense(256, activation='sigmoid'),
+    Dense(256, activation='sigmoid'),
+    Dense(256, activation='sigmoid'),
+    Dense(256, activation='sigmoid'),
+    Dense(256, activation='sigmoid'),
+    Dense(256, activation='sigmoid'),
+    Dense(256, activation='sigmoid'),
+    Dense(256, activation='sigmoid'),
+    Dense(1, activation='sigmoid')
+])`,
+        validationCopy: {
+          f2_sig1: "Correct. Each sigmoid layer has a maximum gradient of 0.25. Multiplied across 10 layers, the gradient reaching layer 1 is at most (0.25)^10 ≈ 10⁻⁶ — essentially zero. Early layers stop learning entirely.",
+        },
+        branches: { f2_sig1: "f2_vanish_choice" },
+      },
+      f2_vanish_choice: {
+        id: "f2_vanish_choice",
+        type: "scenario_choice",
+        badge: "Stage 2 · Diagnosis",
+        title: "Stage 2 · Diagnose the vanishing gradient",
+        prompt: "In a 10-layer sigmoid network, gradients at layer 1 are approximately 1e-10 after 100 training steps. What is the precise mathematical cause?",
+        code_snippet: `# Sigmoid and its derivative:
+# σ(z)  = 1 / (1 + exp(-z))
+# σ'(z) = σ(z) * (1 - σ(z))
+# max(σ'(z)) = 0.25  (at z = 0)
+
+# Gradient at layer 1 via chain rule:
+# ∂L/∂W₁ ∝ σ'(z₁₀) * σ'(z₉) * ... * σ'(z₁)
+# worst case magnitude: (0.25)^10 ≈ 9.5e-7`,
+        choices: [
+          {
+            id: "a",
+            label: "The sigmoid derivative is at most 0.25; multiplying 10 such terms produces a near-zero gradient via the chain rule.",
+            description: "Correct. This is the precise mechanism: each backward pass through a sigmoid layer multiplies the gradient by at most 0.25.",
+          },
+          {
+            id: "b",
+            label: "The learning rate is too small, causing gradients to appear near zero.",
+            description: "A small learning rate scales gradient *updates*, not the gradients themselves. The gradient magnitude of 1e-10 before the learning rate is applied is the actual problem.",
+          },
+          {
+            id: "c",
+            label: "The network is overfitting, so it deliberately reduces gradients to prevent further weight updates.",
+            description: "Incorrect. Overfitting is about generalization, not gradient magnitude. Vanishing gradients occur even with underfitting networks.",
+          },
+          {
+            id: "d",
+            label: "Sigmoid outputs are not zero-centered, causing zig-zagging gradient updates.",
+            description: "Non-zero-centered outputs cause inefficient optimization, but that's a separate issue from vanishing gradients. The root cause here is the derivative magnitude.",
+          },
+        ],
+        branches: { a: "f2_explode_choice", b: "f2_recovery_vanish", c: "f2_recovery_vanish", d: "f2_recovery_vanish" },
+        rationale: "Vanishing gradients are a direct consequence of the chain rule applied to saturating activations. Sigmoid's derivative σ'(z) = σ(z)(1-σ(z)) achieves a maximum of only 0.25. When multiplied across L layers, this produces exponentially small gradients: (0.25)^L. For L=10, that's ~10^-6. Early layers receive essentially zero training signal.",
+      },
+      f2_recovery_vanish: {
+        id: "f2_recovery_vanish",
+        type: "scenario_choice",
+        badge: "Recovery · Vanishing Gradient",
+        title: "Recovery · Sigmoid saturation mechanics",
+        prompt: "Why does the sigmoid activation cause vanishing gradients, while ReLU does not (for positive inputs)?",
+        code_snippet: `# Sigmoid derivative: max 0.25
+import numpy as np
+z = np.linspace(-5, 5, 100)
+sigmoid = 1 / (1 + np.exp(-z))
+sigmoid_grad = sigmoid * (1 - sigmoid)  # max: 0.25
+
+# ReLU derivative: 1 (for z > 0)
+relu_grad = np.where(z > 0, 1.0, 0.0)  # max: 1.0`,
+        choices: [
+          {
+            id: "a",
+            label: "Sigmoid compresses all inputs into (0,1), making its derivative always less than 1, while ReLU has derivative exactly 1 for positive inputs.",
+            description: "Correct. ReLU's gradient of 1 for positive inputs means the chain rule product doesn't shrink.",
+          },
+          {
+            id: "b",
+            label: "ReLU is faster to compute, so gradient updates arrive sooner.",
+            description: "Computational speed is not the reason for better gradient flow — it's the derivative magnitude.",
+          },
+          {
+            id: "c",
+            label: "Sigmoid is used only in output layers, where gradient magnitude doesn't matter.",
+            description: "Incorrect. Sigmoid was historically used in hidden layers, which is exactly where vanishing gradients cause damage.",
+          },
+        ],
+        branches: { a: "f2_explode_choice", b: "f2_recovery_vanish", c: "f2_recovery_vanish" },
+        rationale: "The derivative of sigmoid is bounded by 0.25, meaning every backward pass through a sigmoid layer multiplies the gradient by at most 0.25. ReLU's derivative is exactly 1 for positive inputs — the gradient passes through unchanged, preventing exponential decay.",
+      },
+      f2_explode_choice: {
+        id: "f2_explode_choice",
+        type: "scenario_choice",
+        badge: "Stage 3 · Exploding Gradients",
+        title: "Stage 3 · Fix exploding gradients",
+        prompt: "During training of a deep RNN, you observe that the gradient norm reaches 1e6 after just 50 steps and loss diverges to NaN. What is the most appropriate immediate fix?",
+        code_snippet: `# Gradient norm history:
+# Step 10:  ||∇|| = 12.3
+# Step 20:  ||∇|| = 847.2
+# Step 30:  ||∇|| = 41,203
+# Step 40:  ||∇|| = 1,892,441
+# Step 50:  ||∇|| = 1.2e9
+# Loss: NaN
+
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)`,
+        choices: [
+          {
+            id: "a",
+            label: "Apply gradient clipping by norm (e.g., clipnorm=1.0) to rescale large gradient vectors.",
+            description: "Correct. Gradient clipping by norm rescales the entire gradient vector when its norm exceeds the threshold, preserving direction while bounding magnitude.",
+          },
+          {
+            id: "b",
+            label: "Switch from Adam to SGD — Adam amplifies gradients.",
+            description: "Incorrect. Adam normalizes gradients using second-moment estimates, which actually helps with exploding gradients. Switching to SGD without clipping would make things worse.",
+          },
+          {
+            id: "c",
+            label: "Add more hidden layers to distribute the gradient across more parameters.",
+            description: "Adding depth to a network with exploding gradients will worsen the problem — more layers means more multiplications of large Jacobians.",
+          },
+          {
+            id: "d",
+            label: "Reduce the batch size to stabilize gradient estimates.",
+            description: "Batch size affects gradient variance (noise), not gradient magnitude from the chain rule. Clipping is the right fix here.",
+          },
+        ],
+        branches: { a: "f2_relu_choice", b: "f2_recovery_fixes", c: "f2_recovery_fixes", d: "f2_recovery_fixes" },
+        rationale: "Gradient clipping by norm is the standard fix for exploding gradients. When ||g|| > threshold, the gradient is rescaled: g = g * (threshold / ||g||). This preserves the direction of the gradient while capping its magnitude. It's particularly important for RNNs where long sequence dependencies make gradient explosion nearly inevitable without clipping.",
+      },
+      f2_recovery_fixes: {
+        id: "f2_recovery_fixes",
+        type: "scenario_choice",
+        badge: "Recovery · Architectural Fixes",
+        title: "Recovery · Solutions to gradient problems",
+        prompt: "Which technique provides a direct gradient highway from the output layer to early layers, bypassing the vanishing gradient problem architecturally?",
+        code_snippet: `# Option A: Batch Normalization
+x = BatchNormalization()(x)
+
+# Option B: Residual Connection
+residual = x
+x = Dense(256, activation='relu')(x)
+x = x + residual  # skip connection
+
+# Option C: Dropout
+x = Dropout(0.5)(x)
+
+# Option D: L2 Regularization
+layer = Dense(256, activation='relu', kernel_regularizer='l2')`,
+        choices: [
+          {
+            id: "a",
+            label: "Residual connections — the identity shortcut provides a direct gradient path.",
+            description: "Correct. In y = F(x) + x, the gradient ∂L/∂x includes an identity term that bypasses F entirely.",
+          },
+          {
+            id: "b",
+            label: "Dropout — randomly zeroing neurons prevents gradient buildup.",
+            description: "Dropout is a regularization technique. It has no architectural mechanism for routing gradients around vanishing regions.",
+          },
+          {
+            id: "c",
+            label: "L2 regularization — penalizing large weights prevents gradient explosion.",
+            description: "L2 regularization addresses weight magnitude, not gradient flow paths. It doesn't solve vanishing gradients.",
+          },
+        ],
+        branches: { a: "f2_relu_choice", b: "f2_recovery_fixes", c: "f2_recovery_fixes" },
+        rationale: "Residual connections (He et al., 2016) solve vanishing gradients architecturally by adding an identity shortcut: y = F(x) + x. The gradient ∂L/∂x = ∂L/∂y · (∂F/∂x + I). The identity term I ensures the gradient always has a direct path, regardless of whether F's gradient vanishes.",
+      },
+      f2_relu_choice: {
+        id: "f2_relu_choice",
+        type: "scenario_choice",
+        badge: "Stage 4 · ReLU vs Sigmoid",
+        title: "Stage 4 · Why ReLU helps gradient flow",
+        prompt: "You replace all sigmoid activations in a 20-layer network with ReLU. Training accelerates significantly. Which property of ReLU is primarily responsible?",
+        code_snippet: `# Before: sigmoid throughout
+# ∂L/∂W₁ ≈ (0.25)^20 ≈ 10^-12
+
+# After: ReLU throughout (for active neurons)
+# ∂L/∂W₁ ≈ (1.0)^20 = 1.0
+
+def relu(z): return np.maximum(0, z)
+def relu_grad(z): return (z > 0).astype(float)  # exactly 0 or 1`,
+        choices: [
+          {
+            id: "a",
+            label: "ReLU's derivative is exactly 1 for positive inputs, so the gradient product across 20 layers doesn't shrink.",
+            description: "Correct. The chain rule product of twenty 1s is still 1 — gradient flows without exponential decay.",
+          },
+          {
+            id: "b",
+            label: "ReLU outputs are always positive, making gradients positive and easier to optimize.",
+            description: "ReLU outputs are non-negative (not always positive), but this doesn't directly explain gradient flow — it's about the derivative magnitude, not the output sign.",
+          },
+          {
+            id: "c",
+            label: "ReLU is a linear function, so the network effectively reduces to a linear model with better gradient flow.",
+            description: "Incorrect. ReLU is piecewise linear — the nonlinearity comes from different neurons being active for different inputs. The network remains nonlinear.",
+          },
+          {
+            id: "d",
+            label: "ReLU avoids the vanishing gradient problem by using a larger learning rate.",
+            description: "Learning rate is a hyperparameter choice, not a property of ReLU itself. The gradient flow improvement is intrinsic to ReLU's derivative being 1.",
+          },
+        ],
+        branches: { a: "f2_terminal", b: "f2_recovery_chain", c: "f2_recovery_chain", d: "f2_recovery_chain" },
+        rationale: "ReLU's key property for gradient flow is that its derivative equals 1 for all positive inputs. In a 20-layer network using ReLU, the chain rule product through active neurons is (1)^20 = 1 — no shrinkage. Compare to sigmoid's (0.25)^20 ≈ 10^-12. Dead ReLU neurons (derivative 0) are the trade-off, addressed by careful initialization and learning rate choice.",
+      },
+      f2_recovery_chain: {
+        id: "f2_recovery_chain",
+        type: "scenario_choice",
+        badge: "Recovery · Chain Rule",
+        title: "Recovery · The chain rule in backpropagation",
+        prompt: "In a 3-layer network, what does the chain rule say about the gradient of the loss with respect to weights in Layer 1?",
+        code_snippet: `# 3-layer network:
+# x -> [Layer1] -> a1 -> [Layer2] -> a2 -> [Layer3] -> ŷ -> L
+
+# Chain rule expansion:
+# ∂L/∂W₁ = ∂L/∂ŷ · ∂ŷ/∂a₂ · ∂a₂/∂a₁ · ∂a₁/∂W₁
+#          (output)  (L3 grad)  (L2 grad)  (L1 local)`,
+        choices: [
+          {
+            id: "a",
+            label: "It is the product of all local gradients from the output layer back to Layer 1.",
+            description: "Correct. Each term in the chain rule product is the local gradient of one layer's output with respect to its input.",
+          },
+          {
+            id: "b",
+            label: "It is computed only from the loss and Layer 1's weights, ignoring intermediate layers.",
+            description: "Incorrect. Intermediate layers are part of the composition — their gradients appear as factors in the chain rule product.",
+          },
+          {
+            id: "c",
+            label: "It is the average of gradients across all layers.",
+            description: "Incorrect. The chain rule involves multiplication, not averaging, of local gradients.",
+          },
+        ],
+        branches: { a: "f2_terminal", b: "f2_recovery_chain", c: "f2_recovery_chain" },
+        rationale: "Backpropagation applies the chain rule: ∂L/∂W₁ = ∂L/∂ŷ · ∂ŷ/∂a₂ · ∂a₂/∂a₁ · ∂a₁/∂W₁. Each factor is a local Jacobian at one layer. This product structure is why deep networks can have vanishing gradients — if any factor is small, the product shrinks.",
+      },
+      f2_terminal: {
+        id: "f2_terminal",
+        type: "scenario_choice",
+        badge: "Terminal · Synthesis",
+        title: "Revision complete · Backprop mastered",
+        terminal: true,
+        prompt: "A 20-layer network with sigmoid activations has zero gradient updates in the first 5 layers after 1,000 training steps. Name the problem, its sigmoid-specific cause, and two architectural solutions.",
+        code_snippet: `# Diagnosis log:
+# Layer 20 gradient norm: 0.842
+# Layer 15 gradient norm: 0.003
+# Layer 10 gradient norm: 1.1e-6
+# Layer 5  gradient norm: 4.3e-11  # ← effectively zero
+# Layer 1  gradient norm: 1.8e-14  # ← zero
+
+# Early layers have learned nothing after 1000 steps.`,
+        choices: [
+          {
+            id: "a",
+            label: "Vanishing gradients; sigmoid max derivative 0.25 multiplied 20× ≈ 0; fix with ReLU activations and residual connections.",
+            description: "Complete and precise. This covers the problem name, the exact mechanism, and two valid architectural solutions.",
+          },
+          {
+            id: "b",
+            label: "Overfitting; too many parameters; fix with dropout and L2 regularization.",
+            description: "The gradient norm pattern (decreasing toward early layers, not all-large) is the signature of vanishing gradients, not overfitting. Overfitting would show high training accuracy with high validation loss, not zero gradient updates.",
+          },
+          {
+            id: "c",
+            label: "Exploding gradients; weights are too large; fix with gradient clipping and lower learning rate.",
+            description: "Exploding gradients produce very large gradient norms, not near-zero ones. The pattern here (norms shrinking toward early layers) is the signature of vanishing, not exploding, gradients.",
+          },
+        ],
+        branches: { a: "f2_terminal", b: "f2_terminal", c: "f2_terminal" },
+        rationale: "This is the classic vanishing gradient pattern: gradient norm decays exponentially toward early layers. The cause is sigmoid's derivative being bounded by 0.25 — the chain rule product (0.25)^20 ≈ 10^-12. Solutions: (1) Replace sigmoid with ReLU in hidden layers — derivative of 1 prevents decay. (2) Add residual connections — identity shortcuts provide direct gradient paths that bypass activation layers. (3) Batch normalization can also help by keeping pre-activations in the healthy gradient regime.",
+      },
+    },
+  },
+
+  knowledgeCheck: [
+    {
+      question: "In a 10-layer network using sigmoid activations, why do gradients at layer 1 become negligibly small?",
+      options: [
+        "The learning rate is scaled down automatically for early layers by the optimizer.",
+        "Each sigmoid backward pass multiplies the gradient by at most 0.25; across 10 layers, (0.25)^10 ≈ 10^-6.",
+        "Early layers have fewer parameters, so they receive proportionally less gradient.",
+      ],
+      correctIndex: 1,
+      explanation: "The chain rule requires multiplying local gradients across all layers. Sigmoid's derivative σ'(z) = σ(z)(1-σ(z)) has a maximum of 0.25. Multiplied across 10 layers: (0.25)^10 ≈ 9.5×10^-7. This exponential decay means early layers receive essentially no gradient signal and stop learning — this is the vanishing gradient problem.",
+    },
+    {
+      question: "Why does ReLU improve gradient flow compared to sigmoid in deep networks?",
+      options: [
+        "ReLU outputs larger values, making the network more expressive.",
+        "For positive pre-activations, ReLU's derivative is exactly 1, so the gradient product across layers does not decay exponentially.",
+        "ReLU is differentiable everywhere, making backpropagation more numerically stable.",
+      ],
+      correctIndex: 1,
+      explanation: "ReLU'(z) = 1 for z > 0. In a 20-layer ReLU network with active neurons, the chain rule product is (1)^20 = 1 — no exponential decay. Compare to sigmoid's (0.25)^20 ≈ 10^-12. Note: ReLU is not differentiable at zero (but this is handled by convention) and can produce dead neurons, but the gradient flow benefit for active neurons is decisive.",
+    },
+    {
+      question: "Gradient norm explodes to 10^8 during training of a deep RNN. What is the correct fix?",
+      options: [
+        "Gradient clipping by norm — rescale the gradient vector when its norm exceeds a threshold.",
+        "Increase the learning rate to push past the region of large gradients faster.",
+        "Add more layers to distribute the large gradients across more parameters.",
+      ],
+      correctIndex: 0,
+      explanation: "Gradient clipping by norm rescales the gradient vector g to g * (threshold / ||g||) whenever ||g|| exceeds the threshold. This preserves the gradient direction while bounding magnitude, stabilizing training. Increasing the learning rate would amplify the already-explosive updates. Adding layers would introduce more large Jacobian multiplications, worsening explosion.",
+    },
+  ],
+},
+
+"dl-f3": {
+  durationLabel: "15 min",
+  outcomes: [
+    "Explain why neural networks require **nonlinear activation functions** and what happens without them.",
+    "Compare **sigmoid, tanh, and ReLU** on saturation, gradient flow, and practical use cases.",
+    "Diagnose and fix **dead ReLU neurons** caused by initialization or learning rate issues.",
+    "Select the correct **output layer activation** for binary classification, multiclass, and regression tasks.",
+  ],
+  learnMarkdown: `## Why Activations Must Be Nonlinear
+
+Without an activation function, a neural network collapses into a single linear transformation regardless of depth:
+
+\`\`\`
+y = W₃(W₂(W₁x)) = (W₃W₂W₁)x = Wx
+\`\`\`
+
+Three linear layers are equivalent to one. You can stack as many as you like — the result is always a linear function. **Nonlinear activations are what make depth meaningful.** They allow layers to represent and compose complex, nonlinear mappings of the input.
+
+## Sigmoid: The Classic, With Baggage
+
+\`\`\`
+σ(z) = 1 / (1 + e^(-z))     # output ∈ (0, 1)
+σ'(z) = σ(z)(1 - σ(z))      # max: 0.25 at z=0
+\`\`\`
+
+**Strengths**: Smooth, differentiable, outputs interpretable as probabilities.
+
+**Problems**:
+1. **Saturation**: For |z| > 4, σ(z) ≈ 0 or 1, and σ'(z) ≈ 0. Gradients are killed.
+2. **Not zero-centered**: Outputs are always in (0,1), meaning gradients are always the same sign — causing inefficient zig-zagging updates.
+3. **Computationally expensive**: Requires exponentiation.
+
+**When to use**: Output layer for binary classification only.
+
+## Tanh: Better, Still Saturates
+
+\`\`\`
+tanh(z) = (e^z - e^(-z)) / (e^z + e^(-z))    # output ∈ (-1, 1)
+tanh'(z) = 1 - tanh²(z)                        # max: 1.0 at z=0
+\`\`\`
+
+**Strengths over sigmoid**: Zero-centered outputs (mean near 0) — gradients can be positive or negative, enabling more efficient weight updates. Max derivative of 1 is better than sigmoid's 0.25.
+
+**Same core problem**: Still saturates at the tails. For |z| > 3, tanh'(z) ≈ 0. In deep networks with many layers, vanishing gradients still occur.
+
+**When to use**: Hidden layers where zero-centering matters (e.g., RNNs), output layers for regression to (-1, 1).
+
+## ReLU: The Default Choice
+
+\`\`\`
+ReLU(z) = max(0, z)
+ReLU'(z) = 1 if z > 0, else 0
+\`\`\`
+
+**Strengths**:
+- No saturation for positive inputs — gradient is exactly 1
+- Computationally trivial (threshold operation)
+- Sparse activations (many neurons output 0) — efficient representations
+
+**The Dead Neuron Problem**: If a neuron's pre-activation is negative for all training examples, its gradient is always 0 — it never updates. Causes:
+- **High learning rate**: A large weight update drives weights to produce permanently negative pre-activations
+- **Poor initialization**: Bias initialized too negative, pre-activations start negative
+- **Monitoring**: Check the fraction of activations that are zero per layer
+
+**When to use**: Default for hidden layers in feedforward and convolutional networks.
+
+## Leaky ReLU, ELU, and GELU
+
+**Leaky ReLU** fixes dead neurons by allowing a small gradient for negative inputs:
+
+\`\`\`
+LeakyReLU(z) = z if z > 0, else αz    # α typically 0.01
+\`\`\`
+
+**ELU (Exponential Linear Unit)** produces smoother outputs for negative inputs:
+
+\`\`\`
+ELU(z) = z if z > 0, else α(e^z - 1)
+\`\`\`
+
+**GELU (Gaussian Error Linear Unit)** is the dominant activation in Transformers (BERT, GPT):
+
+\`\`\`
+GELU(z) ≈ z · Φ(z)    # Φ is the standard normal CDF
+\`\`\`
+
+GELU smoothly gates inputs — it stochastically multiplies an input by 0 or 1 depending on the magnitude. This probabilistic interpretation aligns well with the stochastic nature of dropout and the attention mechanisms in Transformers.
+
+## Output Layer Activations: A Hard Rule
+
+The output activation is determined by the task, not by gradient flow considerations:
+
+\`\`\`
+# Binary classification  → sigmoid (output: probability in (0,1))
+Dense(1, activation='sigmoid')
+
+# Multi-class (K classes) → softmax (outputs sum to 1)
+Dense(K, activation='softmax')
+
+# Regression             → linear / no activation
+Dense(1)
+
+# Multi-label            → sigmoid per output (independent probabilities)
+Dense(K, activation='sigmoid')
+\`\`\`
+
+Using ReLU on an output layer for binary classification is a critical error: ReLU outputs are unbounded and non-probabilistic. Binary cross-entropy loss with ReLU output is numerically undefined when predictions are > 1.
+
+## Interview hook (answer like a senior)
+
+"Activations need to be nonlinear because linear layers compose into a single linear transformation — depth without nonlinearity is meaningless. For hidden layers, ReLU is the practical default: its derivative of 1 for positive inputs avoids vanishing gradients, and it's computationally cheap. The tradeoff is dead neurons from negative pre-activations, which Leaky ReLU and careful initialization address. For Transformers, GELU's smooth probabilistic gating is empirically superior. For output layers, the activation is determined by the task: sigmoid for binary classification, softmax for multiclass, linear for regression — getting this wrong is a common interview pitfall."`,
+
+  video: null,
+  videoFallbackMarkdown: `## Deep dive
+
+### Why GELU Works So Well in Transformers
+
+GELU(z) = z · Φ(z) where Φ is the Gaussian CDF. Intuitively, GELU stochastically decides to pass or gate an input based on how large it is relative to other inputs. This is conceptually related to dropout (stochastic zeroing) but in a smooth, differentiable form.
+
+In practice, GELU provides:
+1. **Smoother gradient landscape** than ReLU — no hard kink at zero
+2. **Non-zero gradient for all inputs** — no dead neurons
+3. **Probabilistic regularization** built into the activation
+
+BERT, GPT-2, GPT-3, and virtually all modern large language models use GELU in their feedforward layers.
+
+### Softmax: Multinomial Probability Distribution
+
+\`\`\`
+softmax(z)ₖ = exp(zₖ) / Σⱼ exp(zⱼ)
+\`\`\`
+
+Softmax guarantees: (1) all outputs > 0, (2) outputs sum to 1. Combined with cross-entropy loss, it produces the correct gradient for multi-class classification. The numerically stable implementation shifts by max(z) before exponentiating to prevent overflow.
+
+### Choosing Activations: Quick Decision Table
+
+| Hidden layers | → | ReLU (default), Leaky ReLU if dead neurons are a problem, GELU for Transformers |
+| Binary output | → | Sigmoid |
+| Multi-class output | → | Softmax |
+| Regression output | → | Linear (none) |
+| Multi-label output | → | Sigmoid per unit |`,
+
+  tryGuidance: "Use the activation function explorer to plot σ, tanh, and ReLU alongside their derivatives. Then build a small classification network and switch output activations — observe the loss curve behavior when using ReLU instead of sigmoid on the output layer. Use the dead neuron monitor to watch what fraction of ReLU neurons output zero as you vary the learning rate.",
+
+  interviewGraph: {
+    initialStageId: "f3_output_click",
+    artifactDimensions: [
+      { label: "Output Activation Selection", recoveryStageId: "f3_recovery_output" },
+      { label: "Dead ReLU Diagnosis", recoveryStageId: "f3_recovery_dead" },
+      { label: "Activation Tradeoffs", recoveryStageId: "f3_recovery_tradeoffs", passLabel: "Activation Mastery" },
+    ],
+    stages: {
+      f3_output_click: {
+        id: "f3_output_click",
+        type: "click_target",
+        badge: "Stage 1 · Output Activation",
+        title: "Stage 1 · Spot the wrong output activation",
+        prompt: "This binary classification model fails to converge — predictions are always outside [0,1] and binary cross-entropy loss returns NaN. Click the line with the incorrect output activation.",
+        code_snippet: `model = tf.keras.Sequential([
+    Dense(128, activation='relu'),
+    Dense(64, activation='relu'),
+    Dense(32, activation='relu'),
+    Dense(1, activation='relu')   # ds-target:f3_wrong_output
+])
+
+model.compile(
+    optimizer='adam',
+    loss='binary_crossentropy',
+    metrics=['accuracy']
+)`,
+        validationCopy: {
+          f3_wrong_output: "Correct. ReLU on a binary classification output is a critical error. ReLU outputs are unbounded non-negative values — not probabilities. Binary cross-entropy is undefined (log of values > 1 is negative, log of values = 0 is -infinity). The output activation should be sigmoid, which maps to (0, 1).",
+        },
+        branches: { f3_wrong_output: "f3_dead_choice" },
+      },
+      f3_dead_choice: {
+        id: "f3_dead_choice",
+        type: "scenario_choice",
+        badge: "Stage 2 · Dead ReLU",
+        title: "Stage 2 · Diagnose dead ReLU neurons",
+        prompt: "After 500 training steps, 30% of neurons in a hidden ReLU layer output 0 for every training example and never activate. What is the most likely cause?",
+        code_snippet: `# Monitoring hook output:
+# Layer 2 activation sparsity: 30.4% dead (always 0)
+# Layer 2 weight norms: large (some > 10.0)
+# Training loss: plateaued at 0.68 (near random chance)
+
+model = Sequential([
+    Dense(512, activation='relu'),
+    Dense(512, activation='relu'),   # ← 30% dead here
+    Dense(1, activation='sigmoid')
+])
+optimizer = Adam(learning_rate=0.1)  # note: high LR`,
+        choices: [
+          {
+            id: "a",
+            label: "The learning rate is too high — large weight updates drove pre-activations permanently negative.",
+            description: "Correct. A high learning rate causes large weight updates that can permanently push weights into a regime where all inputs produce negative pre-activations for a neuron, giving it zero gradient forever.",
+          },
+          {
+            id: "b",
+            label: "The network has too many layers, causing gradient interference between neurons.",
+            description: "Layer count doesn't cause dead neurons directly. Dead neurons are caused by negative pre-activations across all inputs, typically from initialization or large updates.",
+          },
+          {
+            id: "c",
+            label: "ReLU is inherently unstable with more than 512 neurons per layer.",
+            description: "Incorrect. There is no inherent width limit for ReLU stability. The issue is learning rate and initialization, not layer width.",
+          },
+          {
+            id: "d",
+            label: "The dataset has too many zero values, causing neurons to output zero to match the data.",
+            description: "Neurons don't output zero to 'match' the data — dead neurons arise from the gradient of ReLU being zero when pre-activations are negative.",
+          },
+        ],
+        branches: { a: "f3_softmax_choice", b: "f3_recovery_dead", c: "f3_recovery_dead", d: "f3_recovery_dead" },
+        rationale: "Dead ReLU neurons occur when a neuron's pre-activation (z = Wx + b) is negative for every training example. ReLU'(z) = 0 for z ≤ 0, so the neuron receives zero gradient and never updates. Common causes: (1) high learning rate causing large weight updates that lock weights into producing negative z, (2) negative bias initialization. Fixes: lower learning rate, He initialization, Leaky ReLU, or ELU.",
+      },
+      f3_recovery_dead: {
+        id: "f3_recovery_dead",
+        type: "scenario_choice",
+        badge: "Recovery · Dead ReLU",
+        title: "Recovery · Preventing and fixing dead neurons",
+        prompt: "You notice 40% of your ReLU neurons are dead. Which combination of fixes directly addresses dead ReLU neurons?",
+        code_snippet: `# Current config (problematic):
+model = Sequential([Dense(256, activation='relu') for _ in range(5)])
+optimizer = SGD(learning_rate=0.5)  # very high LR
+initializer = tf.initializers.Zeros()  # zero init
+
+# Proposed fixes — which combination works?`,
+        choices: [
+          {
+            id: "a",
+            label: "Lower the learning rate AND switch to He initialization (or use Leaky ReLU).",
+            description: "Correct. Lower LR prevents large updates from creating permanent negative pre-activations. He initialization ensures initial pre-activations have healthy variance for ReLU.",
+          },
+          {
+            id: "b",
+            label: "Add batch normalization before the output layer only.",
+            description: "Batch normalization before the output layer doesn't help neurons in middle layers. You'd need it before ReLU layers to normalize pre-activations.",
+          },
+          {
+            id: "c",
+            label: "Increase the number of neurons per layer to compensate for dead ones.",
+            description: "Adding neurons adds capacity but doesn't fix the underlying problem — the new neurons will die too under the same conditions.",
+          },
+        ],
+        branches: { a: "f3_softmax_choice", b: "f3_recovery_dead", c: "f3_recovery_dead" },
+        rationale: "The two most effective fixes for dead ReLUs: (1) Reduce learning rate — prevents large weight updates from driving pre-activations to permanent negatives. (2) Use He initialization — designed for ReLU, ensures initial weights produce pre-activations with variance ≈ 1. Alternatively, switch to Leaky ReLU or ELU, which have non-zero gradients for negative inputs.",
+      },
+      f3_softmax_choice: {
+        id: "f3_softmax_choice",
+        type: "scenario_choice",
+        badge: "Stage 3 · Softmax",
+        title: "Stage 3 · Multi-class output activation",
+        prompt: "You're building a model to classify images into 10 categories (digits 0-9). What output layer configuration is correct?",
+        code_snippet: `# Option A
+Dense(10, activation='softmax')
+
+# Option B
+Dense(10, activation='sigmoid')
+
+# Option C
+Dense(10, activation='relu')
+
+# Option D
+Dense(1, activation='sigmoid')`,
+        choices: [
+          {
+            id: "a",
+            label: "Option A: Dense(10, activation='softmax') — outputs a probability distribution over 10 classes.",
+            description: "Correct. Softmax produces 10 outputs that are all positive and sum to 1 — a valid probability distribution over mutually exclusive classes.",
+          },
+          {
+            id: "b",
+            label: "Option B: Dense(10, activation='sigmoid') — one sigmoid output per class.",
+            description: "Sigmoid on each output independently treats classes as non-exclusive (multi-label). For single-label 10-class classification, the outputs won't sum to 1 and the model won't learn a proper distribution.",
+          },
+          {
+            id: "c",
+            label: "Option C: Dense(10, activation='relu') — positive activations for each class.",
+            description: "ReLU outputs are unbounded and don't sum to 1. This cannot produce class probabilities.",
+          },
+          {
+            id: "d",
+            label: "Option D: Dense(1, activation='sigmoid') — single output for 10 classes.",
+            description: "A single sigmoid output represents binary classification. For 10 classes you need 10 outputs.",
+          },
+        ],
+        branches: { a: "f3_gelu_choice", b: "f3_recovery_output", c: "f3_recovery_output", d: "f3_recovery_output" },
+        rationale: "Softmax is the canonical output activation for multi-class classification: softmax(z)ₖ = exp(zₖ)/Σexp(zⱼ). It guarantees all outputs are positive and sum to 1 — a proper probability distribution. Use categorical cross-entropy loss with softmax. Sigmoid is for binary or multi-label (independent classes) outputs.",
+      },
+      f3_recovery_output: {
+        id: "f3_recovery_output",
+        type: "scenario_choice",
+        badge: "Recovery · Output Activation",
+        title: "Recovery · Matching activation to task",
+        prompt: "Match the task to its correct output activation: regression predicting house prices (continuous), binary spam detection, 5-class sentiment classification.",
+        code_snippet: `# Task 1: House price prediction
+# Target: $450,000 (unbounded positive number)
+
+# Task 2: Spam detection
+# Target: 0 (not spam) or 1 (spam)
+
+# Task 3: Sentiment (very negative, negative, neutral, positive, very positive)
+# Target: one of 5 mutually exclusive classes`,
+        choices: [
+          {
+            id: "a",
+            label: "Regression: linear. Binary: sigmoid. 5-class: softmax.",
+            description: "Correct. Linear for unbounded regression, sigmoid for binary probability, softmax for mutually exclusive multiclass.",
+          },
+          {
+            id: "b",
+            label: "Regression: ReLU (prices are positive). Binary: sigmoid. 5-class: softmax.",
+            description: "House prices are positive, but ReLU on a regression output prevents predicting via negative pre-activations and introduces a kink. Linear output is standard — the loss function handles the scale.",
+          },
+          {
+            id: "c",
+            label: "Regression: sigmoid (scale to 0-1). Binary: softmax. 5-class: sigmoid.",
+            description: "Sigmoid for regression would bound predictions in (0,1), requiring manual rescaling. Softmax for binary is technically valid but adds unnecessary complexity. Sigmoid per unit for 5-class treats classes as independent.",
+          },
+        ],
+        branches: { a: "f3_gelu_choice", b: "f3_recovery_output", c: "f3_recovery_output" },
+        rationale: "Output activations are task-specific: (1) Regression: linear (no activation) — let the loss handle the range. (2) Binary classification: sigmoid — outputs probability in (0,1). (3) Multi-class (mutually exclusive): softmax — probability distribution summing to 1. (4) Multi-label: sigmoid per unit — independent probabilities.",
+      },
+      f3_gelu_choice: {
+        id: "f3_gelu_choice",
+        type: "scenario_choice",
+        badge: "Stage 4 · GELU vs ReLU",
+        title: "Stage 4 · When GELU beats ReLU",
+        prompt: "You're implementing the feedforward layers of a Transformer (like BERT or GPT). Should you use ReLU or GELU, and why?",
+        code_snippet: `# Transformer feedforward block:
+class FeedForward(tf.keras.layers.Layer):
+    def __init__(self, d_model, d_ff):
+        super().__init__()
+        self.dense1 = Dense(d_ff, activation=???)  # ReLU or GELU?
+        self.dense2 = Dense(d_model)
+
+# BERT uses: activation='gelu'
+# GPT uses:  activation='gelu'
+# Original Transformer (Vaswani 2017): activation='relu'`,
+        choices: [
+          {
+            id: "a",
+            label: "GELU — smoother gradient landscape, no dead neurons, and the probabilistic gating aligns with Transformer attention.",
+            description: "Correct. GELU = z·Φ(z) provides smooth gradients, non-zero derivatives everywhere, and stochastic gating that complements the attention mechanism's learned weighting.",
+          },
+          {
+            id: "b",
+            label: "ReLU — simpler and just as effective; the original Transformer used ReLU.",
+            description: "The original Transformer did use ReLU, but BERT, GPT, and all modern large language models switched to GELU. Empirically GELU consistently outperforms ReLU on language tasks.",
+          },
+          {
+            id: "c",
+            label: "Neither — Transformers use softmax activations in feedforward layers.",
+            description: "Softmax is used in the attention mechanism for weighting attention scores, not in the feedforward layers. Feedforward layers use ReLU or GELU.",
+          },
+          {
+            id: "d",
+            label: "Sigmoid — it was the original deep learning activation and is most reliable.",
+            description: "Sigmoid is avoided in hidden layers of deep networks due to vanishing gradients. It's appropriate only at output layers for binary classification.",
+          },
+        ],
+        branches: { a: "f3_terminal", b: "f3_recovery_tradeoffs", c: "f3_recovery_tradeoffs", d: "f3_recovery_tradeoffs" },
+        rationale: "GELU (Gaussian Error Linear Unit) is the standard for Transformers. Unlike ReLU's hard gate (0 or 1), GELU's soft gate z·Φ(z) provides: (1) smooth gradients at all points, (2) non-zero gradient for negative inputs (no dead neurons), (3) a probabilistic interpretation — larger inputs pass through more reliably. BERT, GPT-2/3/4, and virtually all modern LLMs use GELU in feedforward blocks.",
+      },
+      f3_recovery_tradeoffs: {
+        id: "f3_recovery_tradeoffs",
+        type: "scenario_choice",
+        badge: "Recovery · Activation Tradeoffs",
+        title: "Recovery · Comparing activation functions",
+        prompt: "A colleague argues: 'We should always use tanh instead of ReLU in hidden layers because tanh is zero-centered and bounded.' What is the best counter-argument?",
+        code_snippet: `# tanh properties:
+# Range: (-1, 1)  — zero-centered ✓
+# Saturates: yes, for |z| > 3  ✗
+# Max derivative: 1.0
+
+# ReLU properties:
+# Range: [0, ∞)  — not zero-centered ✗
+# Saturates: no (for z > 0)  ✓
+# Derivative: 1 for z > 0, 0 for z ≤ 0`,
+        choices: [
+          {
+            id: "a",
+            label: "Tanh still saturates at the tails, causing vanishing gradients in deep networks — ReLU avoids saturation for positive inputs.",
+            description: "Correct. Zero-centering is a real advantage of tanh, but tail saturation causes vanishing gradients in deep networks — the same fundamental problem as sigmoid.",
+          },
+          {
+            id: "b",
+            label: "ReLU is always preferable because it's computationally simpler.",
+            description: "Computational simplicity is a minor practical advantage, not the core argument. The main issue with tanh is gradient vanishing from saturation.",
+          },
+          {
+            id: "c",
+            label: "Tanh and ReLU are equivalent — the choice doesn't affect training.",
+            description: "Incorrect. In deep networks, the saturation behavior of tanh versus the non-saturation of ReLU for positive inputs produces significantly different gradient flow characteristics.",
+          },
+        ],
+        branches: { a: "f3_terminal", b: "f3_recovery_tradeoffs", c: "f3_recovery_tradeoffs" },
+        rationale: "Tanh is better than sigmoid (zero-centered, max derivative of 1 vs 0.25), but still saturates for |z| > 3. In a 20-layer tanh network, gradients can still vanish. ReLU's non-saturation for positive inputs is the decisive advantage for deep networks. Tanh remains useful in RNNs and in contexts where zero-centered outputs matter.",
+      },
+      f3_terminal: {
+        id: "f3_terminal",
+        type: "scenario_choice",
+        badge: "Terminal · Synthesis",
+        title: "Revision complete · Activation mastery",
+        terminal: true,
+        prompt: "You're debugging a network where 40% of hidden layer neurons never activate. Walk me through 3 causes and their corresponding fixes.",
+        code_snippet: `# Symptoms:
+# - 40% of ReLU neurons output 0 for all inputs
+# - These neurons' weights never change
+# - Training loss has plateaued early
+# - Effective network capacity is 60% of designed capacity
+
+model = Sequential([
+    Dense(512, activation='relu'),
+    Dense(512, activation='relu'),  # 40% dead here
+    Dense(10, activation='softmax')
+])`,
+        choices: [
+          {
+            id: "a",
+            label: "Causes: high LR (fix: lower LR), zero/negative bias init (fix: He init), no gradient for negative z (fix: Leaky ReLU or ELU).",
+            description: "Complete answer covering all three cause-fix pairs for dead ReLU neurons.",
+          },
+          {
+            id: "b",
+            label: "Cause: network is too wide. Fix: reduce layer width to 256 neurons.",
+            description: "Width doesn't cause dead neurons. The problem is negative pre-activations causing zero gradients — reducing width would just give you fewer total neurons without fixing the underlying issue.",
+          },
+          {
+            id: "c",
+            label: "Cause: the ReLU activation itself. Fix: switch to sigmoid throughout.",
+            description: "Switching to sigmoid introduces vanishing gradients — a different but equally serious problem. The issue isn't ReLU itself but the conditions causing pre-activations to be permanently negative.",
+          },
+        ],
+        branches: { a: "f3_terminal", b: "f3_terminal", c: "f3_terminal" },
+        rationale: "Dead ReLU neurons have 3 main causes and fixes: (1) High learning rate → large weight updates lock pre-activations negative → lower the learning rate or use learning rate warmup. (2) Poor initialization (zeros or large negative biases) → pre-activations negative from the start → use He initialization (variance = 2/fan_in). (3) The ReLU function itself is zero for all negative inputs → switch to Leaky ReLU (αz for z<0, α≈0.01), ELU, or add batch normalization before ReLU to keep pre-activations well-distributed.",
+      },
+    },
+  },
+
+  knowledgeCheck: [
+    {
+      question: "A binary classification model outputs values of 1.7 and 2.4, and binary cross-entropy loss returns NaN. What is the likely cause?",
+      options: [
+        "The model is using ReLU on the output layer instead of sigmoid, producing unbounded outputs outside [0,1].",
+        "The learning rate is too high, causing numerical instability in the loss computation.",
+        "Binary cross-entropy requires normalized input features — the inputs weren't scaled.",
+      ],
+      correctIndex: 0,
+      explanation: "Binary cross-entropy expects predictions in (0,1) to compute log(p) and log(1-p). ReLU on the output layer produces unbounded non-negative values — log(1.7) is negative and defined, but loss semantics break down, and values > 1 mean log(1-p) involves log of a negative number. The fix is to replace ReLU with sigmoid on the output layer.",
+    },
+    {
+      question: "After training for 200 steps, 35% of neurons in a hidden ReLU layer output zero for every input and have stopped updating. What is the most direct fix?",
+      options: [
+        "Add more training data so the neurons encounter positive pre-activations.",
+        "Reduce the learning rate and switch to He initialization to prevent pre-activations from becoming permanently negative.",
+        "Replace the ReLU layers with sigmoid layers to ensure all neurons always have non-zero gradients.",
+      ],
+      correctIndex: 1,
+      explanation: "Dead ReLU neurons occur when pre-activations are negative for all inputs, giving zero gradient. The causes are typically high learning rate (causing large updates that drive weights into negative pre-activation regimes) and poor initialization. Fixes: lower learning rate, He initialization (variance 2/fan_in, designed for ReLU), or switch to Leaky ReLU. Replacing with sigmoid introduces vanishing gradients — a different problem.",
+    },
+    {
+      question: "BERT and GPT use GELU instead of ReLU in their feedforward layers. What is the primary reason?",
+      options: [
+        "GELU is faster to compute than ReLU on GPU hardware.",
+        "GELU provides smooth gradients and non-zero derivatives for all inputs, with a probabilistic gating interpretation that empirically improves Transformer training.",
+        "ReLU is not differentiable, making it incompatible with Transformer attention mechanisms.",
+      ],
+      correctIndex: 1,
+      explanation: "GELU = z·Φ(z) is smoother than ReLU (no hard kink at zero), has non-zero gradient for negative inputs (no dead neurons), and has a stochastic interpretation where larger inputs are more reliably passed through. Empirically, GELU consistently outperforms ReLU on language modeling benchmarks. ReLU is fully differentiable almost everywhere (undefined only at z=0 by convention) — its non-differentiability is not the issue.",
+    },
+  ],
+},
+
+"dl-f4": {
+  durationLabel: "22 min",
+  outcomes: [
+    "Explain the difference between vanilla SGD, mini-batch SGD, and adaptive optimizers like Adam",
+    "Describe how momentum and Adam's moving averages shape the optimization trajectory",
+    "Identify when to prefer SGD+momentum over Adam (and vice versa)",
+    "Apply learning rate schedules (warmup, cosine decay) and explain why they matter",
+  ],
+  learnMarkdown: `## The Loss Landscape
+
+Training a neural network is an optimization problem: find the weight values that minimize a loss function over your data. Visualize the loss as a hilly terrain — your goal is to roll a ball to the lowest valley. The challenge is that this landscape is high-dimensional, non-convex, and riddled with saddle points, sharp ravines, and flat plateaus.
+
+**Gradient descent** moves in the direction of steepest descent — the negative gradient of the loss with respect to the weights. The fundamental update rule is:
+
+\`\`\`
+w ← w − η · ∇L(w)
+\`\`\`
+
+where η (eta) is the **learning rate** — the single most important hyperparameter you will tune.
+
+## Vanilla SGD and Mini-Batch Gradient Descent
+
+**Pure (stochastic) gradient descent** computes the gradient on a single sample at a time. It is very noisy — each step points in a slightly wrong direction — but that noise can help escape shallow local minima. The problem: with 1M rows, you make 1M weight updates per epoch, each requiring a forward and backward pass. This is catastrophically slow on modern hardware, which is built for parallelism.
+
+**Batch gradient descent** computes the gradient over the entire dataset before taking a step. Stable, but for large datasets you wait forever between updates and the memory cost is prohibitive.
+
+**Mini-batch gradient descent** splits the data into small batches (32–512 samples). Each batch gives a noisy-but-useful gradient estimate, and modern GPUs can process a whole batch in parallel. This is what everyone means when they say "SGD" in practice. Typical batch sizes: 32–256 for vision, up to 2048+ with gradient accumulation for language models.
+
+## Momentum
+
+Raw mini-batch SGD can oscillate in narrow ravines — bouncing back and forth across the valley floor while barely advancing toward the minimum. **Momentum** fixes this by accumulating a velocity vector:
+
+\`\`\`
+v ← β·v + ∇L(w)
+w ← w − η·v
+\`\`\`
+
+With β ≈ 0.9, the optimizer "remembers" the last ~10 gradients. Consistent directions accumulate; oscillating directions cancel. The ball rolls faster along the ravine floor and slower across it. Momentum also helps escape shallow local minima and saddle points.
+
+## Adam: Adaptive Learning Rates
+
+**Adam** (Adaptive Moment Estimation) extends momentum with per-parameter learning rate adaptation. It tracks two exponential moving averages of the gradient:
+
+\`\`\`
+m ← β₁·m + (1−β₁)·g        # first moment (mean)
+v ← β₂·v + (1−β₂)·g²       # second moment (variance)
+ŵ ← w − η · m̂ / (√v̂ + ε)   # bias-corrected update
+\`\`\`
+
+Defaults: β₁=0.9, β₂=0.999, ε=1e-8, η=0.001. Parameters with large, consistent gradients get smaller effective learning rates; rare, small-gradient parameters get larger updates. This makes Adam nearly **hyperparameter-agnostic in the early stages** — the default lr=0.001 works out of the box for most tasks.
+
+**AdamW** decouples weight decay from the gradient update (applying it directly to weights rather than the gradient), which is the standard choice for transformer training.
+
+## Learning Rate Schedules
+
+Even with Adam, a fixed learning rate is rarely optimal. Common schedules:
+
+- **Warmup**: start with a tiny lr (e.g., 1e-6) and ramp linearly to the target over the first few hundred steps. Prevents early, large gradient steps from destabilizing freshly initialized heads.
+- **Cosine decay**: after warmup, decay lr following a cosine curve to near-zero. Smooth, widely used for language models and vision transformers.
+- **Step decay**: halve the lr every N epochs. Simple and effective for ResNets.
+
+## Adam vs SGD+Momentum: When to Choose Which
+
+| Situation | Recommendation |
+|---|---|
+| Default starting point | Adam (AdamW) |
+| Fine-tuning a pretrained model | Adam with low lr (1e-5 to 5e-5) + warmup |
+| Training ResNets from scratch | SGD + momentum (0.9) + cosine schedule |
+| Transformers / NLP | AdamW + warmup + cosine decay |
+
+Research has shown that **SGD+momentum often finds flatter minima** with better generalization on vision benchmarks, but it requires more careful lr tuning. Adam gets you to a good solution faster with less tuning.
+
+## Interview Hook (answer like a senior)
+
+*"Adam is my default — it's robust and converges quickly. But for large vision models trained from scratch, I'll often switch to SGD with momentum and a cosine schedule, because the literature consistently shows better generalization. The most important thing I tune is the learning rate: too high and the loss diverges or oscillates; too low and you waste compute or get stuck. I always pair any schedule with a warmup phase to stabilize early training, especially when fine-tuning pretrained weights."*
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Adam Internals
+
+Adam's bias correction terms (1−β₁ᵗ) and (1−β₂ᵗ) compensate for the fact that m and v are initialized at zero. At step t=1 with β₁=0.9, the raw first moment m is 10× smaller than the true gradient — bias correction rescales it. After ~50 steps the correction becomes negligible.
+
+**Gradient clipping** is orthogonal to optimizer choice: clip the global gradient norm to (e.g.) 1.0 before any optimizer step. This prevents exploding gradients from blowing up training, especially in RNNs and transformers.
+
+**Learning rate finder**: a diagnostic tool that runs a mini-training loop while exponentially increasing the lr, then plots loss vs lr. The optimal starting lr is just before the loss starts to diverge.
+`,
+  tryGuidance: "Open a Colab notebook. Train a small MLP on MNIST using (a) SGD batch_size=1, (b) SGD batch_size=256, (c) Adam batch_size=256. Compare wall-clock time per epoch and final accuracy. Then try multiplying Adam's default lr by 10 and observe what happens to the loss curve.",
+  interviewGraph: {
+    initialStageId: "f4_batch_click",
+    artifactDimensions: [
+      { label: "Batch size & SGD mechanics", recoveryStageId: "f4_rec_batch" },
+      { label: "Adam & learning rate selection", recoveryStageId: "f4_rec_adam" },
+      { label: "Optimizer trade-offs", recoveryStageId: "f4_rec_tradeoff", passLabel: "Optimizer Mastery" },
+    ],
+    stages: {
+      f4_batch_click: {
+        id: "f4_batch_click",
+        type: "click_target",
+        badge: "Stage 1 · Batch Size",
+        title: "Stage 1 · Spot the performance bottleneck",
+        prompt: "This training loop runs on a 1,000,000-row dataset. One line makes it catastrophically slow because it processes a single sample per weight update instead of leveraging GPU parallelism. Click that line.",
+        code_snippet: `import tensorflow as tf
+
+model = tf.keras.Sequential([
+    tf.keras.layers.Dense(128, activation='relu'),
+    tf.keras.layers.Dense(1)
+])
+optimizer = tf.keras.optimizers.SGD(learning_rate=0.01)
+model.compile(optimizer=optimizer, loss='mse')
+
+model.fit(X_train, y_train, batch_size=1, epochs=10)  # ds-target:pure_sgd_slow`,
+        validationCopy: {
+          pure_sgd_slow: "Correct. batch_size=1 means one forward + backward pass per sample — 1,000,000 gradient steps per epoch. GPUs are designed to process hundreds of samples in parallel; a batch_size of 1 wastes ~99% of compute capacity and makes each epoch orders of magnitude slower than mini-batch training with batch_size=256 or higher.",
+        },
+        branches: { pure_sgd_slow: "f4_adam_finetune_choice" },
+      },
+
+      f4_adam_finetune_choice: {
+        id: "f4_adam_finetune_choice",
+        type: "scenario_choice",
+        badge: "Stage 2 · Adam Fine-Tuning Risk",
+        title: "Stage 2 · Fine-tuning with default Adam",
+        prompt: "You load a ResNet-50 pretrained on ImageNet and fine-tune it on a 5,000-image medical dataset using Adam with its default learning rate (lr=0.001). Training accuracy climbs in epoch 1, then collapses. What is the most likely cause?",
+        code_snippet: `base_model = tf.keras.applications.ResNet50(weights='imagenet', include_top=False)
+x = tf.keras.layers.GlobalAveragePooling2D()(base_model.output)
+output = tf.keras.layers.Dense(2, activation='softmax')(x)
+model = tf.keras.Model(base_model.input, output)
+
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)  # default lr
+model.compile(optimizer=optimizer, loss='categorical_crossentropy')
+model.fit(train_ds, epochs=20)`,
+        choices: [
+          { id: "a", label: "Learning rate too high for fine-tuning", description: "lr=0.001 is appropriate for training from scratch but is ~100× too large for fine-tuning. It destroys the pretrained weight representations in early epochs before the new head can learn anything useful." },
+          { id: "b", label: "Model is too large for the small dataset", description: "Model capacity can cause overfitting, but that shows up as a train/val gap — not a training accuracy collapse in epoch 1." },
+          { id: "c", label: "Adam is not suitable for transfer learning", description: "Adam works well for fine-tuning. The problem is configuration (lr), not the optimizer family." },
+          { id: "d", label: "The dataset is too small for any fine-tuning to work", description: "5,000 images is a common and workable fine-tuning dataset size. The problem is the learning rate, not the dataset size." },
+        ],
+        branches: { a: "f4_oscillation_choice", b: "f4_rec_adam", c: "f4_rec_adam", d: "f4_rec_batch" },
+        rationale: "When fine-tuning a pretrained model, use a much lower learning rate — typically 1e-5 to 5e-5 — with a warmup schedule. The pretrained weights encode years of training; a large lr overwrites them with noise. A common practice is to first freeze the backbone and train only the head for a few epochs, then unfreeze with a low lr.",
+      },
+
+      f4_oscillation_choice: {
+        id: "f4_oscillation_choice",
+        type: "scenario_choice",
+        badge: "Stage 3 · Loss Oscillation",
+        title: "Stage 3 · Diagnosing an unstable training run",
+        prompt: "A model's training loss oscillates wildly between epochs — spiking up and then partially recovering — but never converges. The architecture looks correct and the data is clean. What is the most likely cause?",
+        code_snippet: `# Training log:
+# Epoch 1: loss=2.31
+# Epoch 2: loss=0.85
+# Epoch 3: loss=3.12
+# Epoch 4: loss=1.02
+# Epoch 5: loss=4.78
+# ...
+
+model.compile(
+    optimizer=tf.keras.optimizers.Adam(learning_rate=0.1),
+    loss='sparse_categorical_crossentropy'
+)`,
+        choices: [
+          { id: "a", label: "Learning rate is too high — gradients overshoot the minimum", description: "With lr=0.1 for Adam (100× the usual default), each update step jumps across the loss valley. The model lands on the other side, takes another giant step back, and never settles. Reducing to 0.001 or adding a warmup + decay schedule will fix this." },
+          { id: "b", label: "The model has too many layers and is vanishing the gradient", description: "Vanishing gradients cause training to stall (loss plateaus), not oscillate. The pattern here — large swings — points to overshooting, not undershooting." },
+          { id: "c", label: "The dataset has too much label noise", description: "Label noise increases irreducible loss and can slow convergence, but it does not cause the oscillating spike-and-recover pattern seen here." },
+          { id: "d", label: "Batch normalization is computing incorrect statistics", description: "BatchNorm issues typically cause slower convergence or subtle accuracy problems — not the dramatic epoch-to-epoch oscillation pattern shown." },
+        ],
+        branches: { a: "f4_sgd_vs_adam_choice", b: "f4_rec_adam", c: "f4_rec_batch", d: "f4_rec_adam" },
+        rationale: "Loss oscillation is the canonical symptom of a learning rate that is too large. The optimizer takes steps so large that it repeatedly overshoots the loss minimum. The fix is to lower the lr (start with 10× smaller), add gradient clipping (clip_norm=1.0), or introduce a warmup schedule that ramps from a tiny lr to the target over the first few hundred steps.",
+      },
+
+      f4_sgd_vs_adam_choice: {
+        id: "f4_sgd_vs_adam_choice",
+        type: "scenario_choice",
+        badge: "Stage 4 · SGD vs Adam",
+        title: "Stage 4 · Optimizer generalization trade-off",
+        prompt: "You are training a ResNet-50 from scratch on ImageNet (1.2M images, 1000 classes). A colleague argues you should use Adam because it converges faster. You disagree. What is your best argument for SGD with momentum instead?",
+        code_snippet: `# Option A — Adam
+optimizer_a = tf.keras.optimizers.Adam(learning_rate=0.001)
+
+# Option B — SGD + momentum
+optimizer_b = tf.keras.optimizers.SGD(
+    learning_rate=0.1,
+    momentum=0.9,
+    nesterov=True
+)
+# paired with cosine decay schedule`,
+        choices: [
+          { id: "a", label: "SGD+momentum finds flatter minima, which generalize better", description: "Multiple papers (including He et al. ResNet, Keskar et al. 2017) show that well-tuned SGD+momentum reaches flatter regions of the loss landscape on large vision benchmarks, correlating with better test accuracy. Adam converges faster but often to sharper minima with slightly worse generalization." },
+          { id: "b", label: "Adam cannot handle large datasets like ImageNet", description: "Adam works fine on large datasets. The generalization gap, not dataset size handling, is the reason to prefer SGD for this task." },
+          { id: "c", label: "SGD is faster per step because it computes fewer operations", description: "SGD is marginally cheaper per step (no m/v tracking), but the difference is negligible compared to the forward/backward pass. Speed is not the argument here." },
+          { id: "d", label: "Adam's adaptive learning rates break on image data specifically", description: "Adam works on image data — it is widely used in vision (CLIP, ViTs). The issue is generalization quality, not a fundamental incompatibility." },
+        ],
+        branches: { a: "f4_terminal", b: "f4_rec_tradeoff", c: "f4_rec_tradeoff", d: "f4_rec_tradeoff" },
+        rationale: "This is a nuanced trade-off that interviewers love. Adam wins on speed and ease of tuning. SGD+momentum (with careful lr scheduling) wins on final generalization for large-scale vision. In practice: use Adam for fast prototyping and NLP; consider SGD+momentum for production vision models trained from scratch.",
+      },
+
+      f4_rec_batch: {
+        id: "f4_rec_batch",
+        type: "scenario_choice",
+        badge: "Recovery · Batch Size",
+        title: "Recovery · Batch size effects on training",
+        prompt: "You double the batch size from 256 to 512 while keeping all other hyperparameters the same. What is the most likely effect on training?",
+        code_snippet: `# Before
+model.fit(X, y, batch_size=256, epochs=100)
+
+# After
+model.fit(X, y, batch_size=512, epochs=100)`,
+        choices: [
+          { id: "a", label: "Faster wall-clock time per epoch, but may need a higher learning rate to maintain convergence speed", description: "Larger batches give more stable gradient estimates (less noise), so you can often scale the lr proportionally (linear scaling rule: 2× batch → 2× lr). Each epoch takes fewer steps but each step uses more data, so per-epoch time improves on GPUs." },
+          { id: "b", label: "The model will overfit more because it sees less data per update", description: "Larger batches see more data per update, not less. Overfitting risk is more related to model capacity and regularization than batch size directly." },
+          { id: "c", label: "Training will always be slower because more data must be processed per step", description: "GPUs parallelize within a batch. Processing 512 samples takes roughly the same time as 256 on modern hardware (up to memory limits), so wall-clock time per epoch decreases." },
+        ],
+        branches: { a: "f4_adam_finetune_choice", b: "f4_rec_batch", c: "f4_rec_batch" },
+        rationale: "The linear scaling rule: when you multiply batch size by k, multiply the learning rate by k (warmup still advised). This preserves the effective gradient step size. Beyond a certain batch size, you get diminishing GPU parallelism returns and potentially worse generalization (sharp minima).",
+      },
+
+      f4_rec_adam: {
+        id: "f4_rec_adam",
+        type: "scenario_choice",
+        badge: "Recovery · Adam Mechanics",
+        title: "Recovery · How Adam adapts learning rates",
+        prompt: "In Adam, what happens to the effective learning rate of a parameter that has received consistently large gradients over many steps?",
+        code_snippet: `# Adam update (simplified):
+# m = beta1*m + (1-beta1)*g        # 1st moment
+# v = beta2*v + (1-beta2)*g**2     # 2nd moment (variance)
+# w = w - lr * m / (sqrt(v) + eps)`,
+        choices: [
+          { id: "a", label: "Its effective learning rate decreases — large v in the denominator shrinks the step size", description: "Correct. If a parameter consistently receives large gradients, v (the second moment estimate) grows large, making sqrt(v) large, which shrinks lr / sqrt(v). This prevents any single parameter from taking runaway steps." },
+          { id: "b", label: "Its effective learning rate increases — momentum m builds up", description: "m does grow, but v grows proportionally faster for large gradients (it accumulates g²). The net effect is a smaller effective lr for high-gradient parameters, not a larger one." },
+          { id: "c", label: "Its effective learning rate stays constant — Adam normalizes all parameters equally", description: "Adam does not normalize equally. Parameters with large gradient variance get smaller steps; parameters with small, rare gradients get relatively larger steps. That is the entire point of adaptive learning rates." },
+        ],
+        branches: { a: "f4_oscillation_choice", b: "f4_rec_adam", c: "f4_rec_adam" },
+        rationale: "Adam's adaptive property means: common, high-amplitude gradient dimensions (like biases in dense layers) get conservative updates; rare, small-gradient dimensions (like embeddings for infrequent tokens) get larger updates. This is why Adam is so effective for sparse problems like NLP.",
+      },
+
+      f4_rec_tradeoff: {
+        id: "f4_rec_tradeoff",
+        type: "scenario_choice",
+        badge: "Recovery · Optimizer Trade-offs",
+        title: "Recovery · Choosing the right optimizer",
+        prompt: "For a transformer-based language model being trained from scratch, which optimizer configuration is considered the industry standard?",
+        code_snippet: `# Which of these is the standard recipe for training transformers?`,
+        choices: [
+          { id: "a", label: "AdamW + linear warmup + cosine decay schedule", description: "This is the standard recipe from GPT, BERT, and subsequent large language models. AdamW decouples weight decay from the adaptive learning rate (fixing a subtle bug in Adam). Warmup stabilizes early training. Cosine decay smoothly reduces lr as training matures." },
+          { id: "b", label: "SGD with momentum=0.9 and a fixed learning rate", description: "SGD with a fixed lr will struggle with transformer training — the adaptive rates in Adam/AdamW are particularly beneficial for the attention mechanism's diverse gradient scales." },
+          { id: "c", label: "RMSprop with no weight decay", description: "RMSprop is an older adaptive optimizer predating Adam. It lacks the first-moment (momentum) term and is rarely used for modern large-model training." },
+        ],
+        branches: { a: "f4_sgd_vs_adam_choice", b: "f4_rec_tradeoff", c: "f4_rec_tradeoff" },
+        rationale: "AdamW with warmup+cosine is the default in HuggingFace Trainer, PyTorch Lightning, and every major language model paper since 2018. The weight decay in AdamW is applied directly to weights (not absorbed into the gradient), which is mathematically cleaner and empirically better than vanilla Adam with L2 regularization.",
+      },
+
+      f4_terminal: {
+        id: "f4_terminal",
+        type: "scenario_choice",
+        badge: "Terminal · Mastery Check",
+        title: "Mastery complete · Optimizer expertise",
+        terminal: true,
+        prompt: "A model's training loss stops decreasing after epoch 10. Validation loss is still improving slightly. What does this pattern indicate, and what is the most appropriate next action?",
+        code_snippet: `# Training metrics:
+# Epoch  8: train_loss=0.42, val_loss=0.51
+# Epoch  9: train_loss=0.41, val_loss=0.50
+# Epoch 10: train_loss=0.41, val_loss=0.49
+# Epoch 11: train_loss=0.41, val_loss=0.48
+# Epoch 12: train_loss=0.41, val_loss=0.47
+# (train loss flat, val loss still falling)`,
+        choices: [
+          { id: "a", label: "Training loss hit a plateau — reduce the learning rate to escape it and allow finer convergence", description: "This is the right read. The optimizer has found a region where gradients are near-zero at the current lr. A learning rate reduction (or activating cosine decay) allows finer steps that can still improve the model. The fact that val loss is still improving confirms the model has not overfit — it is still generalizing, just not optimizing the training loss further at this lr." },
+          { id: "b", label: "The model has overfit — stop training immediately", description: "Overfitting shows as training loss continuing to drop while validation loss rises. Here val loss is still improving, so the model is not overfit. Stopping now would leave performance on the table." },
+          { id: "c", label: "The loss function is wrong — switch to a different objective", description: "A flat training loss plateau is almost never caused by a wrong loss function. It is a learning rate / optimization dynamics issue. Changing the loss function would be premature and likely counterproductive." },
+        ],
+        branches: { a: "f4_terminal", b: "f4_terminal", c: "f4_terminal" },
+        rationale: "A flat training loss with still-improving validation loss is a classic learning rate plateau signal — the optimizer is taking steps too small to escape the current basin, but the basin itself is still generalizing. Reduce the lr by 5–10× (or switch to cosine decay), monitor for a few epochs, and the training loss should resume decreasing. If it does not, check for gradient flow issues (dead ReLUs, vanishing gradients) or data pipeline bottlenecks.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "In Adam, the second moment estimate v accumulates the squared gradients. What is the direct effect of a large v value on the parameter update?",
+      options: [
+        "It shrinks the effective learning rate for that parameter",
+        "It increases the effective learning rate for that parameter",
+        "It reverses the sign of the gradient update",
+      ],
+      correctIndex: 0,
+      explanation: "The Adam update is lr * m / (sqrt(v) + eps). A large v makes sqrt(v) large, which divides the step size down. Parameters with consistently large gradient magnitudes get conservative updates — Adam's core adaptive mechanism.",
+    },
+    {
+      question: "You are fine-tuning GPT-2 on a domain-specific text corpus. Which learning rate is most appropriate?",
+      options: [
+        "0.1 — same as training from scratch on vision benchmarks",
+        "0.001 — Adam's default, safe for any task",
+        "2e-5 — a small value with warmup to preserve pretrained representations",
+      ],
+      correctIndex: 2,
+      explanation: "Fine-tuning requires a much smaller lr than training from scratch. lr=0.001 (Adam default) will overwrite pretrained weights too aggressively. A value around 1e-5 to 5e-5 with a warmup schedule is the standard HuggingFace recipe for fine-tuning language models.",
+    },
+    {
+      question: "Doubling the mini-batch size from 256 to 512 (with a linear lr scaling rule applied). What is the expected effect?",
+      options: [
+        "Fewer gradient updates per epoch, but each update uses a more accurate gradient estimate — overall training stability improves",
+        "More gradient updates per epoch because there are more samples per step",
+        "The model will overfit faster because each batch contains more repeated patterns",
+      ],
+      correctIndex: 0,
+      explanation: "With 512-sample batches on the same dataset, you take half as many gradient steps per epoch. Each step's gradient is computed over more samples, giving a lower-variance (more accurate) estimate. With linear lr scaling (2× lr), effective optimization speed is preserved. Generalization can sometimes degrade at very large batch sizes (sharp minima), but this is a separate concern from the mechanics.",
+    },
+  ],
+},
+
+"dl-f5": {
+  durationLabel: "18 min",
+  outcomes: [
+    "Explain dropout's ensemble interpretation and why you must disable it at inference",
+    "Describe how batch normalization differs between training and inference modes",
+    "Apply weight decay (L2 regularization) and explain its connection to a Gaussian prior on weights",
+    "Choose the appropriate regularization technique given network architecture and task",
+  ],
+  learnMarkdown: `## Why Regularization?
+
+A neural network with enough parameters can memorize any training set — achieving near-zero training loss while performing poorly on unseen data. This is **overfitting**: the model learns noise and idiosyncrasies of the training data rather than the underlying pattern. Regularization is any technique that reduces this gap between training and generalization performance.
+
+## Dropout
+
+**Dropout** randomly sets a fraction p of neurons to zero during each forward pass in training. With a dropout rate of 0.5, each neuron is independently zeroed with 50% probability.
+
+\`\`\`python
+# PyTorch
+self.dropout = nn.Dropout(p=0.5)
+x = self.dropout(x)  # zeros ~50% of neurons, but only during training
+\`\`\`
+
+**Why it works — the ensemble interpretation**: Each training step effectively trains a different sub-network (a random subset of neurons). By the end of training, you have implicitly trained an exponential number of overlapping sub-networks. At inference, the full network acts as an ensemble of these sub-networks, which tends to be more robust.
+
+**Inverted dropout** (the standard modern implementation): during training, surviving neuron activations are scaled up by 1/(1−p) so their expected value is preserved. This means at inference you can use the network exactly as-is — no scaling adjustment needed. This is the default in PyTorch and TensorFlow/Keras.
+
+**Critical detail**: dropout must be **disabled at inference**. In PyTorch: \`model.eval()\`. In Keras: Dropout layers automatically use inference mode during \`model.predict()\`. Forgetting this is a common production bug — activating dropout at inference introduces randomness and degrades predictions.
+
+Where to use dropout: after fully-connected (dense) layers. Using it after conv layers is less common and often less effective (use spatial dropout or batch norm instead for convolutional networks).
+
+## Batch Normalization
+
+**Batch Normalization** (BatchNorm) normalizes the inputs to each layer across the batch dimension, then applies a learned scale (γ) and shift (β):
+
+\`\`\`
+x_norm = (x − μ_batch) / sqrt(σ²_batch + ε)
+y = γ · x_norm + β
+\`\`\`
+
+During training, μ and σ² are computed from the current mini-batch. Simultaneously, BatchNorm maintains **running estimates** of the mean and variance via exponential moving average.
+
+At **inference**, BatchNorm switches to those running estimates — it does not compute statistics from the (potentially single-sample) inference batch. This is why \`model.eval()\` in PyTorch is critical: it switches BatchNorm from "use batch stats" mode to "use running stats" mode.
+
+**Why BatchNorm helps training**:
+- Reduces **internal covariate shift** — normalizing layer inputs keeps the distribution consistent as weights update, so later layers do not need to constantly re-adapt to shifting input distributions.
+- Allows much **higher learning rates** without divergence.
+- Acts as a mild regularizer (the batch-level noise in μ and σ² adds stochasticity).
+- Placed **after conv layers, before activation** (or after activation — both are used in practice).
+
+## Weight Decay (L2 Regularization)
+
+**Weight decay** adds a penalty proportional to the squared magnitude of weights to the loss:
+
+\`\`\`
+L_total = L_task + λ · Σ wᵢ²
+\`\`\`
+
+This pushes weights toward zero, preventing any single weight from dominating. Equivalently, it corresponds to placing a **Gaussian prior** on the weights (Bayesian interpretation: you believe weights are likely small). In SGD, the gradient of the penalty term simply subtracts λ·w from each weight at every step — the "decay."
+
+In Adam, weight decay should be applied as **AdamW** (decoupled weight decay) rather than L2 in the loss, because Adam's adaptive scaling interferes with how L2 interacts with the gradient update.
+
+Typical values: λ = 1e-4 to 1e-2. Too large: underfitting. Too small: no regularization benefit.
+
+## Label Smoothing
+
+Instead of using hard one-hot targets (0 or 1), **label smoothing** distributes a small probability ε across incorrect classes:
+
+\`\`\`
+y_smooth = (1 − ε) · y_onehot + ε / K
+\`\`\`
+
+This prevents the model from becoming overconfident and improves calibration. Common in image classification (ε=0.1) and neural machine translation.
+
+## Choosing the Right Regularization
+
+| Technique | Best for | Notes |
+|---|---|---|
+| Dropout | After dense layers, transformers | Rate 0.1–0.5; disable at inference |
+| Batch Normalization | After conv layers | Use eval() mode at inference |
+| Weight Decay | Almost always | AdamW for adaptive optimizers |
+| Label Smoothing | Classification heads | ε=0.1 is a safe default |
+
+## Interview Hook (answer like a senior)
+
+*"The most important thing I check when regularization is in the code is whether training/inference modes are set correctly. A model in train mode at inference has both dropout randomly zeroing neurons and batch norm using noisy batch statistics — your predictions become non-deterministic and degraded. Beyond that, my default recipe is: BatchNorm after conv layers, dropout after dense layers, weight decay everywhere via AdamW. I add label smoothing for classification heads when calibration matters."*
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Batch Norm vs Layer Norm vs Group Norm
+
+BatchNorm normalizes across the batch dimension — it needs a reasonable batch size (≥16 recommended) to compute stable statistics. This makes it unsuitable for small-batch or sequence tasks.
+
+**Layer Normalization** normalizes across the feature dimension for a single sample — no batch dependency. This is why transformers use LayerNorm: self-attention already processes one sequence at a time and batch size shouldn't affect normalization.
+
+**Group Normalization** is a middle ground: normalize across groups of channels within a single sample. Works well for object detection with small batch sizes.
+
+**Spectral Normalization** constrains weight matrices to have spectral norm ≤1, stabilizing GAN training without the training/inference mode switch.
+`,
+  tryGuidance: "Train a small MLP on MNIST without regularization until it overfits. Then add dropout(0.3) after each hidden layer and retrain. Finally, compare model.predict() outputs with model in train() mode vs eval() mode — you will see different (random) outputs for dropout in train mode. This makes the inference-mode bug viscerally concrete.",
+  interviewGraph: {
+    initialStageId: "f5_eval_click",
+    artifactDimensions: [
+      { label: "Dropout train/inference modes", recoveryStageId: "f5_rec_dropout" },
+      { label: "Batch normalization mechanics", recoveryStageId: "f5_rec_batchnorm" },
+      { label: "Regularization selection", recoveryStageId: "f5_rec_selection", passLabel: "Regularization Mastery" },
+    ],
+    stages: {
+      f5_eval_click: {
+        id: "f5_eval_click",
+        type: "click_target",
+        badge: "Stage 1 · Inference Mode Bug",
+        title: "Stage 1 · Find the inference-time mistake",
+        prompt: "This PyTorch inference function has a bug that activates dropout during prediction, making outputs non-deterministic and degraded. Click the line responsible for the incorrect behavior.",
+        code_snippet: `import torch
+
+def predict(model, dataloader):
+    model.train()  # ds-target:wrong_mode
+    predictions = []
+    with torch.no_grad():
+        for batch in dataloader:
+            outputs = model(batch)
+            predictions.append(outputs.argmax(dim=1))
+    return torch.cat(predictions)`,
+        validationCopy: {
+          wrong_mode: "Correct. model.train() activates dropout (randomly zeroing neurons) and makes BatchNorm use current-batch statistics — both behaviors are harmful at inference. model.eval() must be called before inference to disable dropout and switch BatchNorm to its accumulated running statistics. The torch.no_grad() context manager only disables gradient tracking; it does not affect dropout or BatchNorm behavior.",
+        },
+        branches: { wrong_mode: "f5_dropout_scale_choice" },
+      },
+
+      f5_dropout_scale_choice: {
+        id: "f5_dropout_scale_choice",
+        type: "scenario_choice",
+        badge: "Stage 2 · Inverted Dropout",
+        title: "Stage 2 · Dropout scaling at inference",
+        prompt: "A model uses dropout with rate p=0.5 during training. Using the standard inverted dropout implementation, what happens to neuron activations at inference time?",
+        code_snippet: `# During training (inverted dropout):
+# - Each neuron zeroed with probability p=0.5
+# - Surviving neurons scaled by 1/(1-p) = 2.0
+# - Expected activation = original activation
+
+# At inference:
+# model.eval()
+# What happens to the dropout layer?`,
+        choices: [
+          { id: "a", label: "Dropout is disabled — all neurons pass through unchanged, no scaling needed", description: "With inverted dropout, surviving neurons are scaled up during training to preserve expected activation magnitude. So at inference, you can pass activations through without any adjustment — the full network's output matches the expected output of the trained sub-networks." },
+          { id: "b", label: "Activations are multiplied by 0.5 (the keep probability) at inference", description: "This describes the older non-inverted dropout approach. Inverted dropout does the scaling at training time so that inference requires no modification. Modern libraries (PyTorch, Keras) use inverted dropout by default." },
+          { id: "c", label: "Activations are multiplied by 2.0 (1/(1-p)) at inference", description: "The 2.0 scaling factor is applied during training in inverted dropout, not at inference. Applying it again at inference would double the activations and break the model." },
+          { id: "d", label: "Half of neurons are still randomly zeroed, but with a different random seed", description: "At inference with model.eval(), dropout is completely disabled — no neurons are zeroed. Random zeroing is a training-only behavior." },
+        ],
+        branches: { a: "f5_batchnorm_stats_choice", b: "f5_rec_dropout", c: "f5_rec_dropout", d: "f5_rec_dropout" },
+        rationale: "Inverted dropout is the key insight: scale up during training, so inference is clean. This makes model deployment simpler — you don't need inference-time scaling logic. Always check your framework's default: both PyTorch nn.Dropout and Keras Dropout use inverted dropout.",
+      },
+
+      f5_batchnorm_stats_choice: {
+        id: "f5_batchnorm_stats_choice",
+        type: "scenario_choice",
+        badge: "Stage 3 · BatchNorm at Inference",
+        title: "Stage 3 · Which statistics does BatchNorm use at test time?",
+        prompt: "A ResNet model uses BatchNorm throughout. During training, BatchNorm normalizes using batch statistics. A single image is passed at inference time. What statistics does BatchNorm use to normalize the activations?",
+        code_snippet: `model = ResNet50()
+model.eval()  # switches BatchNorm to inference mode
+
+# Single image inference
+with torch.no_grad():
+    image = torch.randn(1, 3, 224, 224)  # batch_size=1
+    output = model(image)
+    # What does BatchNorm do here?`,
+        choices: [
+          { id: "a", label: "Running mean and running variance accumulated during training", description: "Correct. During training, BatchNorm maintains exponential moving averages of mean and variance across all seen batches. At inference (model.eval()), it uses these stable population statistics instead of the current batch — which would be meaningless with a batch size of 1." },
+          { id: "b", label: "Mean and variance of the single inference image's activations", description: "Using single-sample statistics would make normalization meaningless and inconsistent — every image would be normalized to the same distribution regardless of its actual content. This would destroy the model's ability to distinguish different inputs." },
+          { id: "c", label: "The learned γ and β parameters only — no normalization is applied", description: "γ and β are the learned scale and shift applied after normalization. The normalization step itself (subtract mean, divide by std) still occurs at inference — but using running statistics, not batch statistics." },
+          { id: "d", label: "BatchNorm is automatically disabled at inference, like dropout", description: "Unlike dropout (which is fully disabled at inference), BatchNorm still normalizes at inference — it just switches from batch statistics to running statistics. The normalization step is always active; only the source of statistics changes." },
+        ],
+        branches: { a: "f5_batchnorm_benefit_choice", b: "f5_rec_batchnorm", c: "f5_rec_batchnorm", d: "f5_rec_dropout" },
+        rationale: "The running stats are accumulated via: running_mean = (1-momentum)*running_mean + momentum*batch_mean, typically with momentum=0.1. After sufficient training, these estimates are stable representations of the population statistics. This is why fine-tuning with a tiny dataset can corrupt BatchNorm running stats — the few batches overwrite good running stats with noisy ones.",
+      },
+
+      f5_batchnorm_benefit_choice: {
+        id: "f5_batchnorm_benefit_choice",
+        type: "scenario_choice",
+        badge: "Stage 4 · Why BatchNorm Enables Higher LR",
+        title: "Stage 4 · The mechanism behind BatchNorm's training speedup",
+        prompt: "After adding BatchNorm before every activation in your CNN, training is dramatically faster and you can use a 10× higher learning rate without divergence. What is the primary mechanism behind this improvement?",
+        code_snippet: `# Before BatchNorm:
+# model.compile(optimizer=Adam(lr=0.0001))  # must use small lr
+
+# After BatchNorm:
+model = Sequential([
+    Conv2D(64, 3, padding='same'),
+    BatchNormalization(),
+    Activation('relu'),
+    Conv2D(128, 3, padding='same'),
+    BatchNormalization(),
+    Activation('relu'),
+    # ...
+])
+# model.compile(optimizer=Adam(lr=0.001))  # 10x larger lr is now stable`,
+        choices: [
+          { id: "a", label: "BatchNorm reduces internal covariate shift — layer inputs stay in a consistent distribution as weights update, stabilizing gradient magnitudes throughout the network", description: "Without BatchNorm, as earlier layers' weights update, the distribution of inputs to later layers shifts constantly ('internal covariate shift'). Later layers must perpetually re-adapt. BatchNorm pins the input distribution to each layer, making the effective optimization landscape smoother and allowing larger gradient steps without instability." },
+          { id: "b", label: "BatchNorm reduces the number of trainable parameters, making optimization easier", description: "BatchNorm actually adds parameters (γ and β per channel). It does not reduce parameters — its benefit is distributional stability, not parameter efficiency." },
+          { id: "c", label: "BatchNorm acts as strong L2 regularization, shrinking weights and preventing gradient explosion", description: "BatchNorm has a mild regularization effect (due to batch-level noise), but it is not equivalent to L2 regularization. Its primary benefit is distributional normalization of layer inputs, not weight penalization." },
+          { id: "d", label: "BatchNorm replaces the activation function, removing the gradient saturation problem", description: "BatchNorm is placed before or after activation functions — it does not replace them. Gradient saturation (in sigmoid/tanh) is addressed by activation function choice (ReLU), not BatchNorm." },
+        ],
+        branches: { a: "f5_terminal", b: "f5_rec_batchnorm", c: "f5_rec_selection", d: "f5_rec_batchnorm" },
+        rationale: "Ioffe and Szegedy's original BatchNorm paper (2015) framed this as reducing internal covariate shift. More recent analysis (e.g., Santurkar et al. 2018) suggests the primary benefit may actually be smoothing the loss landscape — making gradient directions more reliable across steps. Either way, the empirical result is clear: BatchNorm allows higher learning rates and faster convergence.",
+      },
+
+      f5_rec_dropout: {
+        id: "f5_rec_dropout",
+        type: "scenario_choice",
+        badge: "Recovery · Dropout Mechanics",
+        title: "Recovery · Dropout behavior during training vs inference",
+        prompt: "A Keras model includes a Dropout(0.4) layer. During training, a neuron produces activation value 1.0. What activation value propagates forward if this neuron survives the dropout mask?",
+        code_snippet: `# Keras Dropout(rate=0.4) — inverted dropout
+# rate=0.4 means 40% of neurons are zeroed
+# Surviving neurons are scaled
+
+layer = tf.keras.layers.Dropout(rate=0.4)
+x = tf.constant([[1.0, 1.0, 1.0, 1.0, 1.0]])
+output = layer(x, training=True)
+# What are the non-zero values?`,
+        choices: [
+          { id: "a", label: "1.667 (scaled by 1/(1-0.4) = 1/0.6 ≈ 1.667)", description: "Correct. Inverted dropout scales surviving neurons by 1/(1-p) to preserve the expected activation. With p=0.4, keep probability is 0.6, so surviving activations are multiplied by 1/0.6 ≈ 1.667. At inference, no scaling is needed — the full network is used as-is." },
+          { id: "b", label: "1.0 (unchanged — dropout only zeros neurons, no scaling)", description: "Without scaling, the total activation reaching the next layer would be ~60% of normal (since 40% are zeroed). This would create a train/inference mismatch — inference uses all neurons and would have ~1.67× the expected activation." },
+          { id: "c", label: "0.6 (scaled by 1-p = the keep probability)", description: "Scaling by keep probability (0.6) is the non-inverted approach: train unchanged, scale down at inference. Modern libraries invert this: scale up at train time so inference needs no modification." },
+        ],
+        branches: { a: "f5_dropout_scale_choice", b: "f5_rec_dropout", c: "f5_rec_dropout" },
+        rationale: "The key invariant inverted dropout preserves: E[output during training] = output during inference. Scaling by 1/(1-p) at train time achieves this. Without it, you'd need to multiply all activations by (1-p) at inference — which is error-prone in deployment.",
+      },
+
+      f5_rec_batchnorm: {
+        id: "f5_rec_batchnorm",
+        type: "scenario_choice",
+        badge: "Recovery · BatchNorm Mechanics",
+        title: "Recovery · BatchNorm training vs inference statistics",
+        prompt: "You fine-tune a pretrained model on a tiny dataset (100 samples, batch_size=32 — only 3 mini-batches per epoch). Training loss improves but inference quality is terrible. BatchNorm is suspected. What is the most likely cause?",
+        code_snippet: `# Pretrained model has BatchNorm layers throughout
+# Fine-tuning setup:
+model.trainable = True  # unfreeze all layers including BatchNorm
+optimizer = Adam(1e-4)
+model.fit(tiny_dataset, epochs=50, batch_size=32)
+# Inference is bad despite good training loss`,
+        choices: [
+          { id: "a", label: "The tiny fine-tuning batches are corrupting the BatchNorm running statistics accumulated during pretraining", description: "Correct. With only 3 batches per epoch over 50 epochs, the running mean/variance estimates are quickly overwritten by the tiny fine-tuning distribution. At inference, the model uses these corrupted running stats, which no longer represent the true data distribution. Fix: freeze BatchNorm layers during fine-tuning (set layer.trainable=False for BN layers, or use model.layers[i].training=False)." },
+          { id: "b", label: "BatchNorm cannot function with batch sizes smaller than 32", description: "BatchNorm works with any batch size during training — though very small batches (≤4) give noisy statistics. The issue here is not the batch size itself but the small number of batches overwriting pretrained running stats." },
+          { id: "c", label: "The learning rate is too high for fine-tuning with BatchNorm", description: "A high learning rate can destabilize fine-tuning generally, but the symptom would be training loss not converging — not good training loss with bad inference. The train/inference gap strongly points to BatchNorm running stat corruption." },
+        ],
+        branches: { a: "f5_batchnorm_stats_choice", b: "f5_rec_batchnorm", c: "f5_rec_batchnorm" },
+        rationale: "A common fine-tuning best practice: freeze BatchNorm layers (keep them in eval mode with pretrained running stats) while fine-tuning other layers. In PyTorch: model.apply(lambda m: m.eval() if isinstance(m, nn.BatchNorm2d) else None). This preserves the pretraining-era normalization statistics.",
+      },
+
+      f5_rec_selection: {
+        id: "f5_rec_selection",
+        type: "scenario_choice",
+        badge: "Recovery · Regularization Selection",
+        title: "Recovery · Choosing the right regularization",
+        prompt: "You are building a transformer-based text classifier. The architecture has multi-head attention and feedforward sublayers, no convolutional layers. Which regularization approach is most appropriate?",
+        code_snippet: `class TransformerBlock(nn.Module):
+    def __init__(self, d_model, nhead, dropout_rate):
+        super().__init__()
+        self.attention = nn.MultiheadAttention(d_model, nhead)
+        self.norm1 = ???  # What normalization?
+        self.dropout = nn.Dropout(dropout_rate)
+        self.ffn = nn.Sequential(
+            nn.Linear(d_model, 4*d_model),
+            nn.GELU(),
+            nn.Linear(4*d_model, d_model)
+        )`,
+        choices: [
+          { id: "a", label: "LayerNorm (not BatchNorm) + dropout in attention and FFN sublayers + weight decay via AdamW", description: "Transformers use LayerNorm because it normalizes per-sample across features (no batch dependency), which is correct for variable-length sequences and works with any batch size. Dropout is applied in attention weights and after FFN layers. AdamW handles weight decay." },
+          { id: "b", label: "BatchNorm after attention + no dropout (transformers don't overfit)", description: "BatchNorm is poorly suited for transformers: it normalizes across the batch, which creates dependencies between sequence positions and breaks with variable-length inputs. Transformers absolutely overfit without regularization." },
+          { id: "c", label: "Dropout only — normalization layers are not needed in transformers", description: "All modern transformer architectures (BERT, GPT, T5) include normalization layers. Without normalization, training large transformers is extremely unstable." },
+        ],
+        branches: { a: "f5_batchnorm_benefit_choice", b: "f5_rec_selection", c: "f5_rec_selection" },
+        rationale: "LayerNorm over BatchNorm for transformers is a fundamental architectural decision, not a preference. The original 'Attention is All You Need' paper used LayerNorm. Every major LLM since uses LayerNorm (often pre-norm: applied before the sublayer, not after). Dropout rates of 0.1-0.2 are standard for transformers.",
+      },
+
+      f5_terminal: {
+        id: "f5_terminal",
+        type: "scenario_choice",
+        badge: "Terminal · Mastery Check",
+        title: "Mastery complete · Regularization expertise",
+        terminal: true,
+        prompt: "A deployed model performs well during offline evaluation but produces inconsistent predictions in production — the same input sometimes yields different outputs. Dropout and BatchNorm are both used in the model. What inference-time mistake do you check first?",
+        code_snippet: `# Production inference service (Python/Flask):
+def get_prediction(image_bytes):
+    image = preprocess(image_bytes)
+    tensor = torch.from_numpy(image).unsqueeze(0)
+
+    # Is something wrong here?
+    output = model(tensor)  # model state not explicitly set
+    return output.softmax(dim=1).tolist()`,
+        choices: [
+          { id: "a", label: "model.eval() is never called — the model may be in training mode with dropout active", description: "This is the first thing to check. PyTorch models default to training mode. Without model.eval() (ideally called once at startup, before any inference), dropout randomly zeros neurons on every call — producing different outputs for the same input. BatchNorm also uses noisy batch statistics instead of stable running stats. Add model.eval() and torch.no_grad() to fix both issues." },
+          { id: "b", label: "The model is not wrapped in torch.no_grad() — gradient computation adds randomness", description: "torch.no_grad() disables gradient tracking to save memory and speed up inference — it does not affect dropout or BatchNorm behavior. The randomness symptom points specifically to dropout being active, not gradient tracking." },
+          { id: "c", label: "The softmax is being applied incorrectly — it should be in the model's forward pass", description: "Applying softmax post-hoc is fine and common in deployment. Softmax is deterministic — it does not introduce the randomness described. The non-determinism symptom points to dropout." },
+        ],
+        branches: { a: "f5_terminal", b: "f5_terminal", c: "f5_terminal" },
+        rationale: "model.eval() is the most critical inference-time call in PyTorch. Best practice for deployment: call model.eval() once when loading the model, wrap all inference in torch.no_grad(), and verify outputs are deterministic for the same input before shipping. This bug is extremely common in production ML code written by engineers who learned from training-focused tutorials.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "A model uses Dropout(p=0.5) with inverted dropout. At inference time, what is the expected output of a neuron that had activation 2.0 during the equivalent training-time forward pass?",
+      options: [
+        "2.0 — inverted dropout scales at train time so inference output is unchanged",
+        "1.0 — the output is multiplied by keep probability (0.5) at inference",
+        "4.0 — the output is multiplied by 1/(1-p) = 2.0 at inference",
+      ],
+      correctIndex: 0,
+      explanation: "Inverted dropout scales surviving neurons by 1/(1-p) during training to preserve expected activation magnitude. This means inference requires no adjustment — all neurons pass through unchanged at eval time. The 2.0 activation would have been 4.0 if it survived training-time dropout (2.0 × 1/0.5 = 4.0), and at inference it passes through as 2.0 from the un-dropped network.",
+    },
+    {
+      question: "BatchNorm is in eval() mode. Which statistics does it use to normalize activations?",
+      options: [
+        "Mean and variance of the current inference batch",
+        "Running mean and running variance accumulated across training batches",
+        "The learned γ (scale) and β (shift) parameters only",
+      ],
+      correctIndex: 1,
+      explanation: "In eval mode, BatchNorm uses the running mean and running variance — exponential moving averages accumulated across all training mini-batches. It does NOT use current-batch statistics (which would be meaningless for a single inference sample). γ and β are still applied, but after normalization with the running stats.",
+    },
+    {
+      question: "You have a deep CNN for image classification. Where should you add regularization layers?",
+      options: [
+        "BatchNorm after convolutional layers; Dropout after fully-connected layers",
+        "Dropout after every layer including conv layers; no BatchNorm needed",
+        "BatchNorm after fully-connected layers; Dropout after convolutional layers",
+      ],
+      correctIndex: 0,
+      explanation: "The standard CNN regularization recipe: BatchNorm after conv layers (normalizes spatial feature maps, allows higher learning rates), Dropout after dense/fully-connected layers (acts as ensemble regularizer for the classifier head). Applying Dropout to conv layers is less effective and can disrupt spatial feature learning — use Spatial Dropout or BatchNorm there instead.",
+    },
+  ],
+},
+
+"dl-a1": {
+  durationLabel: "25 min",
+  outcomes: [
+    "Describe how a convolution operation produces a feature map and explain parameter sharing",
+    "Calculate the output shape of a conv layer given input dimensions, kernel size, padding, and stride",
+    "Explain why CNNs need far fewer parameters than fully-connected networks for image tasks",
+    "Identify the function of pooling layers and compare max pooling vs average pooling",
+  ],
+  learnMarkdown: `## Why Not Fully-Connected Layers for Images?
+
+A 224×224 RGB image has 224×224×3 = 150,528 input values. A fully-connected layer with 1,024 hidden units would require 150,528 × 1,024 ≈ **154 million parameters** — just for the first layer. This is computationally expensive, prone to overfitting, and ignores the fundamental structure of images: nearby pixels are related, and the same pattern (an edge, a curve) can appear anywhere in the image.
+
+**Convolutional Neural Networks** exploit two key properties of images: **locality** (features are defined by nearby pixels) and **translation invariance** (a cat is a cat whether it's in the top-left or bottom-right of the frame).
+
+## The Convolution Operation
+
+A **convolution** slides a small filter (kernel) over the input image and computes a dot product at each position. For a 3×3 filter:
+
+\`\`\`
+Input patch (3×3):    Filter (3×3):      Output value:
+1  2  1               0  1  0            1·0+2·1+1·0
+0  0  0          ×    0  0  0    →     + 0·0+0·0+0·0
+1  2  1               0  1  0          + 1·0+2·1+1·0 = 4
+\`\`\`
+
+The filter slides across every position, producing a 2D **feature map**. One filter detects one type of feature (horizontal edges, diagonal lines, color blobs). A conv layer uses multiple filters in parallel, producing multiple feature maps — one per filter.
+
+**Output shape** (no padding, stride 1):
+\`\`\`
+H_out = H_in − K + 1
+W_out = W_in − K + 1
+\`\`\`
+
+With **same padding** (zero-pad the input): H_out = H_in. With **stride s**: H_out = floor((H_in − K) / s) + 1.
+
+**Example**: 28×28×1 input, 32 filters of size 3×3, valid padding, stride 1:
+Output shape = 26×26×32 (26 = 28 − 3 + 1, 32 channels from 32 filters).
+
+## Parameter Sharing and Why It Matters
+
+The critical insight: the **same filter weights are reused at every spatial position**. A 3×3×1 filter detecting horizontal edges has only 9 parameters — and those 9 numbers detect horizontal edges anywhere in the image. Compare this to a fully-connected layer where each output neuron has its own connection to every input pixel.
+
+Total parameters in a conv layer:
+\`\`\`
+Params = (K × K × C_in + 1) × C_out
+\`\`\`
+
+Where K is kernel size, C_in is input channels, C_out is number of filters. A 3×3 layer going from 1 to 32 channels: (9 × 1 + 1) × 32 = 320 parameters. The equivalent fully-connected layer: 784 × 832 ≈ 652,288 parameters.
+
+## Receptive Field
+
+Each output cell in a feature map "sees" a small patch of the input — its **receptive field**. A single 3×3 conv has a 3×3 receptive field. Stack two 3×3 convs: each cell now sees a 5×5 patch. Stack three: 7×7. **This is why deep networks with small kernels are preferred** — two 3×3 convs (18 parameters, 5×5 receptive field, two nonlinearities) beats one 5×5 conv (25 parameters, same receptive field, one nonlinearity).
+
+## Pooling: Spatial Downsampling
+
+**Pooling** reduces the spatial dimensions of feature maps, compressing information and making the representation more robust to small translations.
+
+- **Max pooling**: takes the maximum value in each pooling window. Preserves the strongest activation — "was this feature present here?" Preferred in early and middle layers.
+- **Average pooling**: takes the mean. Smoother; commonly used as **Global Average Pooling** (GAP) at the end of a network to collapse the spatial dimensions before the classifier head.
+
+A 2×2 max pool with stride 2 halves each spatial dimension: 26×26 → 13×13.
+
+## Typical CNN Architecture
+
+\`\`\`
+Input (28×28×1)
+  → Conv2D(32, 3×3) + ReLU → (26×26×32)
+  → MaxPool(2×2)            → (13×13×32)
+  → Conv2D(64, 3×3) + ReLU → (11×11×64)
+  → MaxPool(2×2)            → (5×5×64)
+  → Flatten                 → (1600,)
+  → Dense(128) + ReLU       → (128,)
+  → Dense(10) + Softmax     → (10,)
+\`\`\`
+
+Early conv layers learn low-level features (edges, colors). Deeper layers combine these into high-level concepts (eyes, wheels, faces). The fully-connected head at the end does classification using the extracted features.
+
+## Key Takeaways
+
+| Property | Fully-Connected | CNN |
+|---|---|---|
+| Parameter count | O(H × W × C × units) | O(K² × C_in × C_out) |
+| Translation invariance | No | Yes (parameter sharing) |
+| Exploits spatial structure | No | Yes (local connectivity) |
+| Good for images | Poorly | Designed for this |
+
+## Interview Hook (answer like a senior)
+
+*"The two innovations in CNNs that matter most are parameter sharing and local connectivity. Parameter sharing means one edge detector works anywhere in the image — the same 9 weights detect a horizontal edge in the top-left and bottom-right corner. Local connectivity means we only connect each output to a small neighborhood, which massively cuts parameters and encodes the inductive bias that nearby pixels are more related than distant ones. Together, these give CNNs translation equivariance — shift the input, the feature map shifts the same way — which is a fundamentally better inductive bias for image data than a fully-connected layer, which treats all pixels as completely independent inputs."*
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Modern CNN Design Patterns
+
+**Depthwise Separable Convolutions** (MobileNet): split a standard conv into a depthwise conv (one filter per input channel) + pointwise conv (1×1 conv combining channels). This reduces parameters by ~8-9× for a 3×3 conv with negligible accuracy loss.
+
+**Skip connections** (ResNet): add the input directly to the conv layer's output (x → F(x) + x). This creates identity shortcuts that let gradients flow directly to early layers, enabling training of 100+ layer networks.
+
+**Global Average Pooling** replaces the final Flatten + Dense layers with a single average over the spatial dimensions per channel. This dramatically reduces parameters in the classifier head and improves regularization.
+
+**Dilated convolutions**: insert gaps between kernel values to increase receptive field without increasing parameters or losing resolution. Used in segmentation (DeepLab) and WaveNet.
+`,
+  tryGuidance: "In a Colab notebook: (1) Build a simple model that flattens a 28×28 image directly and connects to Dense layers. Count parameters. (2) Build the equivalent CNN with two Conv2D layers. Count parameters. (3) Run both on MNIST for 5 epochs. Compare parameter counts, training speed, and final accuracy. The CNN should match or beat the MLP with 10× fewer parameters.",
+  interviewGraph: {
+    initialStageId: "a1_flatten_click",
+    artifactDimensions: [
+      { label: "Spatial structure & feature maps", recoveryStageId: "a1_rec_spatial" },
+      { label: "Conv output shape & parameters", recoveryStageId: "a1_rec_shapes" },
+      { label: "Pooling & architectural choices", recoveryStageId: "a1_rec_pooling", passLabel: "CNN Mastery" },
+    ],
+    stages: {
+      a1_flatten_click: {
+        id: "a1_flatten_click",
+        type: "click_target",
+        badge: "Stage 1 · Spatial Structure",
+        title: "Stage 1 · Find the line that discards spatial structure",
+        prompt: "This model processes 28×28 images. One line immediately destroys the 2D spatial structure — treating the image as a flat 1D vector before any feature extraction can occur. Click that line.",
+        code_snippet: `import tensorflow as tf
+
+model = tf.keras.Sequential([
+    tf.keras.layers.InputLayer(input_shape=(28, 28, 1)),
+    tf.keras.layers.Flatten(),  # ds-target:early_flatten
+    tf.keras.layers.Dense(512, activation='relu'),
+    tf.keras.layers.Dense(256, activation='relu'),
+    tf.keras.layers.Dense(10, activation='softmax')
+])`,
+        validationCopy: {
+          early_flatten: "Correct. Flattening immediately after the input collapses the 28×28 spatial grid into a 784-element vector, discarding all information about which pixels are neighbors. The subsequent Dense layers treat pixel (0,0) and pixel (27,27) as equally related as pixel (0,0) and pixel (0,1). Convolutional layers should process the image first — extracting spatial features — before Flatten is used to connect to the Dense classifier head.",
+        },
+        branches: { early_flatten: "a1_output_shape_choice" },
+      },
+
+      a1_output_shape_choice: {
+        id: "a1_output_shape_choice",
+        type: "scenario_choice",
+        badge: "Stage 2 · Output Shape Calculation",
+        title: "Stage 2 · Calculate the conv layer output shape",
+        prompt: "A Conv2D layer with 32 filters of size 3×3 is applied to a 28×28×1 input with valid padding (no padding) and stride 1. What is the output shape?",
+        code_snippet: `model = tf.keras.Sequential([
+    tf.keras.layers.InputLayer(input_shape=(28, 28, 1)),
+    tf.keras.layers.Conv2D(
+        filters=32,
+        kernel_size=(3, 3),
+        padding='valid',  # no padding
+        strides=(1, 1)
+    ),
+    # Output shape = ???
+])`,
+        choices: [
+          { id: "a", label: "26×26×32", description: "Correct. With valid padding and stride 1: H_out = H_in − K + 1 = 28 − 3 + 1 = 26. Same for width. The 32 filters each produce one feature map, so depth becomes 32. Output: 26×26×32." },
+          { id: "b", label: "28×28×32", description: "This would be the output with same padding (padding='same'), which zero-pads the input to preserve spatial dimensions. With valid padding (no padding), the output is smaller than the input by (K−1) = 2 in each spatial dimension." },
+          { id: "c", label: "26×26×1", description: "The depth of the output is determined by the number of filters, not the input channels. 32 filters produce 32 feature maps, so depth = 32." },
+          { id: "d", label: "14×14×32", description: "This would be the output after a MaxPool2D(2,2) with stride 2 applied to the conv output. The conv layer itself (stride=1, valid padding) produces 26×26×32." },
+        ],
+        branches: { a: "a1_maxpool_choice", b: "a1_rec_shapes", c: "a1_rec_shapes", d: "a1_rec_pooling" },
+        rationale: "The formula H_out = floor((H_in − K + 2P) / S) + 1 is essential. With valid padding P=0 and stride S=1: H_out = H_in − K + 1. For 'same' padding, P = floor(K/2), giving H_out = ceil(H_in / S). Number of parameters in this layer: (3×3×1 + 1) × 32 = 320 — compare to the equivalent dense layer: 784 × input_units.",
+      },
+
+      a1_maxpool_choice: {
+        id: "a1_maxpool_choice",
+        type: "scenario_choice",
+        badge: "Stage 3 · Pooling Strategy",
+        title: "Stage 3 · Max pooling vs average pooling in early layers",
+        prompt: "In the early convolutional layers of an image classifier, max pooling is almost universally preferred over average pooling. What is the primary reason?",
+        code_snippet: `# Which pooling and why?
+model = tf.keras.Sequential([
+    tf.keras.layers.Conv2D(64, 3, activation='relu', padding='same'),
+    tf.keras.layers.MaxPool2D(pool_size=2, strides=2),  # Option A
+    # vs:
+    # tf.keras.layers.AveragePooling2D(pool_size=2, strides=2),  # Option B
+    tf.keras.layers.Conv2D(128, 3, activation='relu', padding='same'),
+    # ...
+])`,
+        choices: [
+          { id: "a", label: "Max pooling captures the strongest feature activations and is more robust to small spatial translations", description: "A conv filter produces a high activation when it detects its target feature (e.g., a vertical edge). Max pooling preserves this strong signal — 'yes, this feature was strongly present somewhere in this region' — regardless of the exact pixel position. This introduces spatial invariance. Average pooling dilutes strong activations with surrounding weaker values, potentially losing the detection signal." },
+          { id: "b", label: "Max pooling reduces the feature map to fewer channels", description: "Pooling does not change the number of channels — it only reduces spatial dimensions (H and W). Both max and average pooling maintain the same channel count." },
+          { id: "c", label: "Max pooling uses fewer parameters than average pooling", description: "Neither max pooling nor average pooling has trainable parameters. Both are parameter-free operations. The choice between them is about information preservation, not parameter count." },
+          { id: "d", label: "Average pooling discards too much information by halving the spatial dimensions", description: "Both max and average pooling with stride 2 halve the spatial dimensions equally. The spatial downsampling ratio is the same — what differs is how information is aggregated within each pooling window." },
+        ],
+        branches: { a: "a1_kernel_stacking_choice", b: "a1_rec_pooling", c: "a1_rec_shapes", d: "a1_rec_pooling" },
+        rationale: "Max pooling is the standard for intermediate layers. Global Average Pooling (GAP) is used at the end of modern CNNs to collapse the spatial dimensions before the classifier — it averages each feature map to a single number, creating a compact representation without the large Dense layers that follow Flatten. GAP also acts as a regularizer.",
+      },
+
+      a1_kernel_stacking_choice: {
+        id: "a1_kernel_stacking_choice",
+        type: "scenario_choice",
+        badge: "Stage 4 · Kernel Size Trade-offs",
+        title: "Stage 4 · Two 3×3 convs vs one 5×5 conv",
+        prompt: "Modern CNNs (VGG, ResNet) use stacked 3×3 convolutions instead of single larger kernels. A colleague proposes replacing two stacked 3×3 conv layers with a single 5×5 conv layer, arguing they have the same receptive field. Why is the stacked approach preferred?",
+        code_snippet: `# Option A: one 5x5 conv
+# Receptive field: 5x5
+# Params (64→64 channels): 5*5*64*64 = 102,400
+layer_a = tf.keras.layers.Conv2D(64, kernel_size=5, activation='relu')
+
+# Option B: two stacked 3x3 convs
+# Receptive field: also 5x5 (3x3 then another 3x3)
+# Params: 2 * (3*3*64*64) = 73,728
+layer_b1 = tf.keras.layers.Conv2D(64, kernel_size=3, activation='relu')
+layer_b2 = tf.keras.layers.Conv2D(64, kernel_size=3, activation='relu')`,
+        choices: [
+          { id: "a", label: "Two 3×3 convs have fewer parameters, more nonlinearity (two ReLUs), and learn a richer feature hierarchy", description: "Three advantages: (1) Fewer parameters: 2×(9×64×64)=73,728 vs 25×64×64=102,400 — 28% fewer. (2) Two ReLU nonlinearities instead of one, giving the network greater representational power. (3) Deeper feature hierarchy — first 3×3 learns simple features, second 3×3 composes them into more complex patterns." },
+          { id: "b", label: "A single 5×5 conv is more efficient because it processes the receptive field in one pass", description: "A single pass through a 5×5 conv is slightly faster in compute, but the parameter inefficiency and loss of nonlinearity make it worse overall. This is why VGGNet (2014) moved entirely to 3×3 convs and outperformed architectures using larger kernels." },
+          { id: "c", label: "Two 3×3 convs can be parallelized across GPUs but a single 5×5 conv cannot", description: "Both single and stacked conv layers can be parallelized across GPUs. GPU parallelism is not the reason to prefer stacked 3×3 convs." },
+          { id: "d", label: "A 5×5 kernel cannot detect the same features as two 3×3 kernels because the mathematical operations differ", description: "Two stacked 3×3 convs do have the same 5×5 receptive field as a single 5×5 conv — and can theoretically approximate the same functions. The preference for stacked 3×3 is about parameter efficiency and nonlinearity, not an inability to detect the same features." },
+        ],
+        branches: { a: "a1_terminal", b: "a1_rec_pooling", c: "a1_rec_spatial", d: "a1_rec_shapes" },
+        rationale: "The Simonyan & Zisserman (VGG) paper (2014) systematically showed that replacing large kernels (7×7, 5×5) with stacks of 3×3 convs improves accuracy. This principle — small kernels stacked deep — became a defining pattern of modern CNN design. ResNet, EfficientNet, and ConvNeXt all follow it.",
+      },
+
+      a1_rec_spatial: {
+        id: "a1_rec_spatial",
+        type: "scenario_choice",
+        badge: "Recovery · Spatial Structure",
+        title: "Recovery · Parameter sharing and translation invariance",
+        prompt: "A CNN is trained to detect stop signs in images. After training, a stop sign at the top-left of an image is correctly classified. Why does the same CNN also correctly classify a stop sign at the bottom-right, without any additional training?",
+        code_snippet: `# The same CNN model processes:
+# Image A: stop sign in top-left     → correctly classified ✓
+# Image B: stop sign in bottom-right → also correctly classified ✓
+# The model was NOT specifically trained on bottom-right examples.
+# Why?`,
+        choices: [
+          { id: "a", label: "Parameter sharing — the same filter weights slide across every position, so a feature learned at one location is automatically detected everywhere", description: "The filter that learned to detect stop-sign edges uses identical weights at every spatial position. When those weights slide over the bottom-right of the image, they produce the same activations as when they were over the top-left. This is translation equivariance: shift the input → the feature map shifts by the same amount. Pooling then adds invariance (small shifts don't change the pooled output)." },
+          { id: "b", label: "The network memorizes all possible positions of stop signs during training", description: "CNNs do not memorize positions — they share weights across positions. A fully-connected network would need to see every position during training to generalize; a CNN gets translation equivariance for free from its architecture." },
+          { id: "c", label: "Data augmentation during training ensures all positions are covered", description: "Data augmentation can help, but it is not the fundamental reason. Even without augmentation, CNNs have architectural translation equivariance from parameter sharing. The question is asking about the mechanism, not the training technique." },
+        ],
+        branches: { a: "a1_output_shape_choice", b: "a1_rec_spatial", c: "a1_rec_spatial" },
+        rationale: "Translation equivariance (conv layers) + translation invariance (pooling layers) together explain why CNNs generalize spatially. Equivariance: the feature map output shifts when the input shifts. Invariance: pooling absorbs small shifts so the final representation is position-agnostic. This is the core inductive bias that makes CNNs so powerful for image tasks.",
+      },
+
+      a1_rec_shapes: {
+        id: "a1_rec_shapes",
+        type: "scenario_choice",
+        badge: "Recovery · Shapes & Parameters",
+        title: "Recovery · Parameter count in conv layers",
+        prompt: "A Conv2D layer with 64 filters of size 3×3 processes an input with 32 channels. How many trainable parameters does this layer have (including bias terms)?",
+        code_snippet: `# Conv2D layer:
+# - kernel_size: 3×3
+# - input_channels (C_in): 32
+# - num_filters (C_out): 64
+# - bias: one per filter
+
+layer = tf.keras.layers.Conv2D(
+    filters=64,
+    kernel_size=(3, 3),
+    use_bias=True
+)
+# How many parameters?`,
+        choices: [
+          { id: "a", label: "18,496 — (3×3×32 + 1) × 64", description: "Correct. Each filter has 3×3×32 = 288 weights (3×3 spatial, 32 input channels) plus 1 bias = 289 values. With 64 filters: 289 × 64 = 18,496 parameters. Compare to a Dense layer connecting 32-channel 28×28 input to 64 outputs: 32×28×28×64 + 64 = 1,605,696 parameters — 87× more." },
+          { id: "b", label: "576 — 3×3×64", description: "This omits the input channels dimension. Each filter must cover all C_in=32 input channels — it's a 3×3×32 volume, not a 3×3 matrix. Also ignores bias terms." },
+          { id: "c", label: "9,216 — 3×3×32×32 (treating output channels as input channels)", description: "The filter count (C_out=64) is not multiplied by itself. The formula is (K×K×C_in + 1) × C_out = (9×32+1)×64 = 18,496." },
+        ],
+        branches: { a: "a1_maxpool_choice", b: "a1_rec_shapes", c: "a1_rec_shapes" },
+        rationale: "The parameter formula (K×K×C_in + 1) × C_out is worth memorizing. The +1 is the bias per filter. Notice that this does not depend on the input spatial dimensions (H_in, W_in) — the same filter slides across all positions. This is why a conv layer trained on 28×28 images can be applied to 224×224 images at test time (fully convolutional inference).",
+      },
+
+      a1_rec_pooling: {
+        id: "a1_rec_pooling",
+        type: "scenario_choice",
+        badge: "Recovery · Pooling Mechanics",
+        title: "Recovery · How pooling affects spatial dimensions",
+        prompt: "A feature map of shape 26×26×32 is passed through MaxPool2D with pool_size=(2,2) and strides=(2,2). What is the output shape?",
+        code_snippet: `x = tf.random.normal([1, 26, 26, 32])  # batch, H, W, channels
+
+pool = tf.keras.layers.MaxPool2D(
+    pool_size=(2, 2),
+    strides=(2, 2)
+)
+output = pool(x)
+# output.shape = ???`,
+        choices: [
+          { id: "a", label: "(1, 13, 13, 32) — spatial dimensions halved, channels unchanged", description: "Correct. MaxPool2D with pool_size=2 and stride=2 takes the max over each non-overlapping 2×2 window. Spatial dimensions: floor(26/2)=13 for both H and W. Channel count (32) is unchanged — pooling operates independently within each channel." },
+          { id: "b", label: "(1, 13, 13, 16) — channels also halved because of the 2×2 pooling", description: "Pooling only reduces spatial dimensions (H and W). It never changes the number of channels. To change channel count, you need a conv layer (or pointwise 1×1 conv)." },
+          { id: "c", label: "(1, 24, 24, 32) — spatial dimensions reduced by pool_size−1=1 in each dim", description: "This formula applies to convolutions (H_out = H_in − K + 1), not pooling. MaxPool with pool_size=2 and stride=2 halves spatial dimensions: H_out = floor(H_in / stride) = floor(26/2) = 13." },
+        ],
+        branches: { a: "a1_kernel_stacking_choice", b: "a1_rec_pooling", c: "a1_rec_pooling" },
+        rationale: "Pooling is channel-independent — it processes each channel's spatial feature map separately. Pool size controls the window size; stride controls how far the window moves between steps. Stride=2 with pool_size=2 gives non-overlapping windows and halves each spatial dimension. With stride=1, windows overlap (used in some segmentation architectures to preserve spatial resolution).",
+      },
+
+      a1_terminal: {
+        id: "a1_terminal",
+        type: "scenario_choice",
+        badge: "Terminal · Mastery Check",
+        title: "Mastery complete · CNN expertise",
+        terminal: true,
+        prompt: "How does a CNN achieve translation invariance for image classification, and why does a fully-connected network lack this property?",
+        code_snippet: `# CNN approach:
+cnn = Sequential([
+    Conv2D(32, 3, activation='relu'),   # parameter sharing
+    MaxPool2D(2),                        # spatial invariance
+    Conv2D(64, 3, activation='relu'),
+    GlobalAveragePooling2D(),
+    Dense(10, activation='softmax')
+])
+
+# FC approach:
+fc = Sequential([
+    Flatten(),
+    Dense(512, activation='relu'),
+    Dense(10, activation='softmax')
+])`,
+        choices: [
+          { id: "a", label: "CNNs use parameter sharing (same filter at all positions) + pooling (absorbs small shifts); FC networks have independent weights per pixel so cannot generalize across locations", description: "Precisely. Parameter sharing gives translation equivariance: shift the input, the feature map shifts the same amount. Pooling converts equivariance to invariance: small shifts within the pooling window produce identical pooled outputs. An FC network has a unique weight for every (input pixel, output neuron) pair — detecting a feature at position (5,5) requires different weights than at position (10,10). It can learn translation invariance from augmented data, but it's not architecturally guaranteed." },
+          { id: "b", label: "CNNs use ReLU activations which are location-invariant; FC networks use linear activations that are location-sensitive", description: "ReLU is used in both CNNs and FC networks. The activation function is not the source of translation invariance — the architecture (weight sharing + pooling) is." },
+          { id: "c", label: "CNNs process the image in overlapping patches, which forces the network to see every location equally; FC networks favor earlier pixels due to their weight initialization", description: "CNN translation invariance comes from weight sharing and pooling, not from processing order or initialization. FC networks don't favor earlier pixels due to initialization either." },
+        ],
+        branches: { a: "a1_terminal", b: "a1_terminal", c: "a1_terminal" },
+        rationale: "The architectural inductive biases of CNNs — local connectivity, weight sharing, and pooling — encode prior knowledge about images (nearby pixels are related; features appear at multiple locations) directly into the network structure. This is why CNNs need far less data and compute to learn good image representations than FC networks. It also explains why CNNs fail on non-image structured data where spatial locality is not the right inductive bias.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "A Conv2D layer with 64 filters, kernel size 5×5, is applied to a 32×32×3 input with same padding and stride 1. What is the output shape?",
+      options: [
+        "32×32×64 — same padding preserves spatial dimensions, 64 filters create 64 channels",
+        "28×28×64 — valid padding reduces by (K−1)=4 per spatial dimension",
+        "32×32×3 — same padding and stride 1 preserve the original shape including channels",
+      ],
+      correctIndex: 0,
+      explanation: "Same padding adds zeros around the input so H_out = H_in and W_out = W_in (for stride 1). The number of output channels always equals the number of filters. So output: 32×32×64. With valid padding instead, it would be 28×28×64 (32−5+1=28).",
+    },
+    {
+      question: "A Conv2D layer with 128 filters, kernel size 3×3, processes 64-channel input. How many trainable parameters does this layer have (with bias)?",
+      options: [
+        "73,856 — (3×3×64 + 1) × 128",
+        "9,216 — 3×3×128×... (ignoring input channels)",
+        "147,456 — 3×3×64×128 (forgetting bias terms)",
+      ],
+      correctIndex: 0,
+      explanation: "Formula: (K×K×C_in + 1) × C_out = (9×64 + 1) × 128 = (576+1) × 128 = 577 × 128 = 73,856. The +1 is the bias per filter. The key insight: this is independent of input spatial dimensions (H, W) because of weight sharing — the same filter slides across all positions.",
+    },
+    {
+      question: "In the early layers of an image classifier, max pooling is preferred over average pooling primarily because:",
+      options: [
+        "Max pooling preserves the strongest feature activations and is robust to small spatial translations of detected features",
+        "Max pooling reduces the channel count, while average pooling only reduces spatial dimensions",
+        "Max pooling has trainable parameters that can be optimized, unlike average pooling",
+      ],
+      correctIndex: 0,
+      explanation: "Max pooling answers 'was this feature strongly present anywhere in this region?' — it preserves the peak activation even if the feature is slightly shifted within the pooling window. Average pooling dilutes strong activations with weaker surroundings. Neither operation changes channel count, and neither has trainable parameters. Average pooling is used as Global Average Pooling (GAP) at the network's end to aggregate spatial features before the classifier.",
+    },
+  ],
+},
+
+"dl-a2": {
+  durationLabel: "22 min",
+  outcomes: [
+    "Explain why vanilla RNNs fail on long sequences due to the **vanishing gradient problem** — not as a buzzword, but mechanically.",
+    "Describe the LSTM **cell state** and three gates and why they solve the gradient highway problem.",
+    "Choose between RNN, LSTM, GRU, and Transformer for a given sequence modeling task based on length, latency, and compute constraints.",
+    "Identify the architectural limit that makes vanilla RNNs unsuitable for sequences longer than ~50–100 steps.",
+  ],
+  learnMarkdown: `## Why sequences are different
+
+Most ML models assume inputs are independent and identically distributed. Sequences break that assumption: the meaning of token t depends on tokens 1 through t-1. Language, time series, audio, DNA — all require **memory of context**.
+
+The simplest solution is an RNN. At each time step t, it maintains a hidden state:
+
+\`\`\`
+h_t = tanh(W_h · h_{t-1} + W_x · x_t + b)
+\`\`\`
+
+The hidden state is the model's "working memory" — it's supposed to carry relevant history forward. The problem is what happens during training.
+
+## The vanishing gradient problem
+
+Backpropagation through time (BPTT) unrolls the RNN and computes gradients like any deep network. But the gradient for the loss at step T with respect to the hidden state at step 1 involves a product of T Jacobians:
+
+\`\`\`
+∂L/∂h_1 = ∂L/∂h_T · ∏(t=2..T) ∂h_t/∂h_{t-1}
+\`\`\`
+
+Each factor involves the derivative of tanh, which is bounded by 1. Repeated multiplication over 100 steps drives gradients toward zero exponentially fast. **The model simply cannot learn long-range dependencies** because the gradient signal from distant time steps disappears before it reaches the early parameters.
+
+Exploding gradients are the opposite failure — when the product grows unboundedly. Gradient clipping (clip the norm to a threshold) handles this, but clipping cannot resurrect a vanished gradient.
+
+## LSTMs: the cell state highway
+
+The Long Short-Term Memory (LSTM) adds a **cell state** C_t — a separate memory channel that flows through the network with only minor, multiplicative interactions (unlike the hidden state which is repeatedly squashed by tanh).
+
+Three gates control the cell state:
+
+- **Forget gate** f_t: how much of C_{t-1} to keep. f_t ≈ 0 → clear memory; f_t ≈ 1 → preserve it.
+- **Input gate** i_t: how much of the new candidate cell value to write.
+- **Output gate** o_t: how much of the cell state to expose as the hidden state h_t.
+
+\`\`\`
+f_t = σ(W_f · [h_{t-1}, x_t] + b_f)
+i_t = σ(W_i · [h_{t-1}, x_t] + b_i)
+C̃_t = tanh(W_C · [h_{t-1}, x_t] + b_C)
+C_t = f_t ⊙ C_{t-1} + i_t ⊙ C̃_t
+h_t = o_t ⊙ tanh(C_t)
+\`\`\`
+
+The cell state update is additive (not multiplicative through a squashing function), so gradients can flow back hundreds of steps without vanishing. This is the fundamental architectural insight.
+
+## GRU: LSTMs with fewer parameters
+
+The Gated Recurrent Unit (GRU) merges the cell and hidden state and uses only two gates (reset, update). Empirically it performs similarly to LSTM on most tasks with fewer parameters — preferred when compute is constrained.
+
+## RNN/LSTM vs Transformer
+
+| | RNN / LSTM | Transformer |
+|---|---|---|
+| Sequence length | Good up to ~200 tokens | Good for 1k–100k+ tokens |
+| Parallelism | Sequential — cannot parallelize | Fully parallel (O(n²) attention) |
+| Training speed | Slow on long sequences | Fast with GPUs |
+| Inference latency | Low (incremental) | Higher (full attention) |
+| Typical use | On-device, short sequences | NLP, long context, SOTA |
+
+For real-time streaming tasks on edge devices or short sequences (sensor data, short text), LSTMs remain competitive. For any task where Transformers are feasible, they win on accuracy.
+
+## Interview hook (answer like a senior)
+
+"Vanilla RNNs fail on long sequences because backprop through time multiplies Jacobians at each step — the gradient vanishes exponentially. LSTMs solve this with a cell state highway that uses additive updates and gated writes, preserving gradients over hundreds of steps. For most modern NLP the Transformer has superseded both due to full parallelism, but LSTMs remain relevant for low-latency streaming tasks on constrained hardware."`,
+
+  video: null,
+  videoFallbackMarkdown: `## Deep dive: build the LSTM intuition
+
+### The gradient highway mental model
+
+Think of the cell state as a conveyor belt running along the top of the network. The gates are arms that can add to or remove items from the belt. Unlike the hidden state (which gets squashed by tanh at every step), the conveyor belt can carry items unchanged from step 1 to step T.
+
+This is why forget gate values near 1.0 during a long document mean "keep this context" — the gradient signal travels back through those 1.0 multiplications essentially intact.
+
+### Practical LSTM gotchas
+
+- **Stateful vs stateless**: By default, Keras resets hidden state between batches. For time series, use stateful=True and manually reset between sequences.
+- **Bidirectional LSTM**: Runs one LSTM forward, one backward, concatenates hidden states. Useful when the full sequence is available (classification) but impossible for autoregressive generation.
+- **Return sequences vs return state**: return_sequences=True returns h_t at every step (for stacked LSTMs or seq-to-seq). return_state=True also returns the final cell state (for encoder-decoder architectures).`,
+
+  tryGuidance: "Use the viz to step through how the hidden state updates at each time step in a vanilla RNN, then switch to the LSTM tab to see how the forget/input/output gates control the cell state. Notice how the gradient magnitude (shown as color intensity) fades in the RNN but stays strong in the LSTM.",
+
+  interviewGraph: {
+    initialStageId: "a2_rnn_click",
+    artifactDimensions: [
+      { label: "Vanishing Gradient Mechanics", recoveryStageId: "a2_rec_vanish" },
+      { label: "LSTM Gate Functions", recoveryStageId: "a2_rec_gates" },
+      { label: "Sequence Model Selection", recoveryStageId: "a2_rec_selection", passLabel: "Sequence Architecture Mastery" },
+    ],
+    stages: {
+      a2_rnn_click: {
+        id: "a2_rnn_click",
+        type: "click_target",
+        badge: "Stage 1 target",
+        title: "Stage 1 · Wrong cell type for long-range dependencies",
+        prompt: "The model processes product reviews (avg 300 tokens) to predict sentiment. Click the line that will fail to capture long-range context.",
+        code_snippet: `tokenizer = Tokenizer(num_words=10000)
+sequences = tokenizer.texts_to_sequences(reviews)  # avg length 300
+X = pad_sequences(sequences, maxlen=300)
+model.add(SimpleRNN(128))  # ds-target:wrong_cell
+model.add(Dense(1, activation='sigmoid'))`,
+        validationCopy: {
+          wrong_cell: "Correct. SimpleRNN fails on sequences of length 300 due to vanishing gradients — it cannot capture dependencies between the beginning and end of a review. LSTM or a Transformer is needed.",
+        },
+        branches: { wrong_cell: "a2_vanish_choice" },
+      },
+      a2_vanish_choice: {
+        id: "a2_vanish_choice",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Why vanilla RNNs fail on long sequences",
+        prompt: "A vanilla RNN on 100 time steps has near-zero gradients in the first 20 layers during training. What is the root cause?",
+        code_snippet: `# During BPTT, the gradient at step 1 involves:
+# ∂L/∂h_1 ≈ ∏(t=2..100) ∂h_t/∂h_{t-1}
+# Each factor involves tanh derivative, max value = ?`,
+        choices: [
+          { id: "a", label: "Repeated multiplication of tanh derivatives (≤1) over 100 steps → exponential decay", description: "Each step's Jacobian has spectral radius < 1; multiplied 100 times → gradient vanishes." },
+          { id: "b", label: "The learning rate is too high for long sequences", description: "Learning rate affects step size, not whether gradients exist at all positions." },
+          { id: "c", label: "Weight initialization causes the gradients to start near zero", description: "Initialization affects magnitude at step 0; the vanishing problem compounds over time regardless of initialization." },
+          { id: "d", label: "Batch size is too small for long sequences", description: "Batch size affects gradient noise but not the fundamental vanishing gradient problem." },
+        ],
+        branches: { a: "a2_lstm_gate_choice", b: "a2_rec_vanish", c: "a2_rec_vanish", d: "a2_rec_vanish" },
+        rationale: "The vanishing gradient is a product of T Jacobians. Each ∂h_t/∂h_{t-1} involves the derivative of tanh (bounded by 1). Over 100 steps, values like 0.9^100 ≈ 2.6×10^{-5} — effectively zero.",
+      },
+      a2_rec_vanish: {
+        id: "a2_rec_vanish",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Vanishing gradient mechanics",
+        prompt: "Which architectural change in LSTM directly prevents the vanishing gradient (not just slows it)?",
+        code_snippet: `# LSTM cell state update:
+# C_t = f_t ⊙ C_{t-1} + i_t ⊙ C̃_t
+# Compare to RNN: h_t = tanh(W · h_{t-1} + ...)`,
+        choices: [
+          { id: "a", label: "Additive cell state update — gradient flows back through additions, not multiplications through tanh", description: "The cell state update is additive: gradient ∂C_t/∂C_{t-1} = f_t (a value, not squashed through tanh). With f_t ≈ 1, gradient passes through unchanged." },
+          { id: "b", label: "LSTM uses ReLU activations instead of tanh", description: "LSTM gates still use sigmoid and the cell update uses tanh. The key difference is the cell state highway, not the activation." },
+          { id: "c", label: "LSTM has more parameters so gradients are larger", description: "More parameters doesn't prevent vanishing gradients — the issue is the multiplicative path through squashing functions." },
+        ],
+        branches: { a: "a2_lstm_gate_choice", b: "a2_rec_vanish", c: "a2_rec_vanish" },
+        rationale: "The cell state update C_t = f_t ⊙ C_{t-1} + i_t ⊙ C̃_t means ∂C_t/∂C_{t-1} = f_t, which can be close to 1. Gradients travel back through this additive path without repeated tanh squashing.",
+      },
+      a2_lstm_gate_choice: {
+        id: "a2_lstm_gate_choice",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · LSTM gate behavior",
+        prompt: "Mid-sequence in a text classification task, the forget gate outputs 0.02 for all positions. What is the model doing?",
+        code_snippet: `# Forget gate: f_t = σ(W_f · [h_{t-1}, x_t] + b_f)
+# Cell state: C_t = f_t ⊙ C_{t-1} + ...
+# f_t ≈ 0.02 → C_t ≈ ?`,
+        choices: [
+          { id: "a", label: "Erasing almost all prior cell state — treating the current position as a fresh start", description: "C_t = 0.02 × C_{t-1} + new content ≈ entirely new content. This is appropriate when context resets (e.g., new sentence, topic shift)." },
+          { id: "b", label: "Preserving nearly all prior cell state unchanged", description: "Forget gate near 0 erases, near 1 preserves. 0.02 means almost everything is forgotten." },
+          { id: "c", label: "Blocking all new information from being written to cell state", description: "That's the input gate, not the forget gate. The forget gate only controls how much of C_{t-1} survives." },
+          { id: "d", label: "Forcing the hidden state output to zero", description: "The output gate controls h_t. The forget gate only affects C_{t-1} retention." },
+        ],
+        branches: { a: "a2_seq_selection_choice", b: "a2_rec_gates", c: "a2_rec_gates", d: "a2_rec_gates" },
+        rationale: "Forget gate = 0.02 means C_t ≈ 0.02 × C_{t-1} + new_content — the model effectively resets its memory. This is learned behavior at positions where history is irrelevant.",
+      },
+      a2_rec_gates: {
+        id: "a2_rec_gates",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · LSTM gates",
+        prompt: "Which gate controls how much new information is written to the cell state (not how much old information is kept)?",
+        code_snippet: `# The 3 gates:
+# f_t = σ(...)  → controls retention of C_{t-1}
+# i_t = σ(...)  → controls writing of C̃_t
+# o_t = σ(...)  → controls reading from C_t to h_t`,
+        choices: [
+          { id: "a", label: "Input gate i_t — scales how much of the candidate cell value C̃_t is written", description: "C_t = f_t ⊙ C_{t-1} + i_t ⊙ C̃_t. The input gate scales the new candidate." },
+          { id: "b", label: "Forget gate f_t", description: "Forget gate controls how much of C_{t-1} survives — it's about retention, not new writes." },
+          { id: "c", label: "Output gate o_t", description: "Output gate controls what gets exposed as the hidden state h_t — it reads from the cell, doesn't write to it." },
+        ],
+        branches: { a: "a2_seq_selection_choice", b: "a2_rec_gates", c: "a2_rec_gates" },
+        rationale: "The input gate i_t (multiplied by the candidate C̃_t) controls how much new information enters the cell state. Forget gate = what old info to keep; input gate = what new info to add.",
+      },
+      a2_seq_selection_choice: {
+        id: "a2_seq_selection_choice",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Sequence model selection",
+        prompt: "Real-time anomaly detection on IoT sensor streams: 50-value sequences, must run on a microcontroller at <10ms latency. Which architecture?",
+        code_snippet: `# Constraints:
+# - Sequence length: 50 time steps
+# - Device: ARM Cortex-M4 (no GPU)
+# - Latency requirement: <10ms per inference
+# - Training data: 500k labeled sequences`,
+        choices: [
+          { id: "a", label: "LSTM — short sequences, low-latency incremental inference, deployable on-device", description: "Sequence length 50 is well within LSTM's capability. LSTM runs incrementally (update state per new value), has tiny memory footprint, and can be quantized to run on microcontrollers." },
+          { id: "b", label: "Transformer — best accuracy on sequence tasks", description: "Transformers need full sequence present at once (O(n²) attention), need GPU for reasonable latency, and are too large for microcontrollers." },
+          { id: "c", label: "GRU — same as LSTM but fewer parameters is always better", description: "GRU would also work here, but 'fewer parameters is always better' is wrong — LSTM may learn better with the extra capacity. Both are valid; the key argument is against Transformer." },
+          { id: "d", label: "Vanilla RNN — simplest model, best for microcontrollers", description: "Vanilla RNN would work at length 50 (vanishing gradient is less severe), but LSTM is the standard choice since it handles variable-length dependencies better without much overhead." },
+        ],
+        branches: { a: "a2_terminal", b: "a2_rec_selection", c: "a2_terminal", d: "a2_rec_selection" },
+        rationale: "LSTM (or GRU) is the right call: short sequence avoids the vanishing gradient limit, incremental inference fits real-time requirements, and the model is small enough for edge deployment. Transformer is overkill and impractical here.",
+      },
+      a2_rec_selection: {
+        id: "a2_rec_selection",
+        type: "scenario_choice",
+        badge: "Recovery 3",
+        title: "Recovery · Sequence model trade-offs",
+        prompt: "Transformers replaced RNNs for most NLP tasks. Which limitation of RNNs does the Transformer most directly address?",
+        code_snippet: `# RNN: h_t depends on h_{t-1} → sequential, cannot parallelize
+# Transformer: all positions attend to all positions simultaneously`,
+        choices: [
+          { id: "a", label: "Sequential dependency — RNNs can't be parallelized during training; Transformers process all positions simultaneously", description: "This is the primary win: full GPU parallelism during training. Self-attention is O(n²) in memory but O(1) in sequential steps." },
+          { id: "b", label: "RNNs can't handle variable-length sequences", description: "RNNs handle variable-length sequences naturally — they process step by step. Padding is needed but that's not the architectural limitation." },
+          { id: "c", label: "RNNs are always slower at inference than Transformers", description: "At inference time, RNNs are actually faster for streaming (one step at a time). Transformers need full context for each prediction." },
+        ],
+        branches: { a: "a2_terminal", b: "a2_rec_selection", c: "a2_rec_selection" },
+        rationale: "The killer feature of Transformers is full parallelism: all tokens are processed simultaneously during training, enabling orders-of-magnitude faster training on long sequences with modern GPU hardware.",
+      },
+      a2_terminal: {
+        id: "a2_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Revision complete · Sequence modeling mastered",
+        terminal: true,
+        prompt: "An LSTM model is trained on financial news (avg 400 tokens) for market sentiment. Training loss drops but validation performance plateaus after epoch 3. The forget gates are near 0.9 throughout. What does the forget gate value tell you, and what would you try next?",
+        code_snippet: `# Forget gates ≈ 0.9 throughout training
+# Train loss: 0.45 → 0.18 (epoch 1-10)
+# Val loss: 0.48 → 0.41 → 0.40 (plateau)`,
+        choices: [
+          { id: "a", label: "Forget gates near 0.9 = model is retaining most context across the 400-token sequence. Plateau = overfitting. Try dropout, L2 regularization, or switch to a Transformer for better long-range modeling.", description: "Forget gate 0.9 means the cell state carries information far back — the model is trying to use long-range context. Plateau with dropping train loss = overfitting. Regularization or a more expressive architecture are the right next steps." },
+          { id: "b", label: "Forget gates near 0.9 = bad — the model is not forgetting enough irrelevant context. Lower the learning rate.", description: "High forget gate values are often correct behavior for long documents — the model needs distant context. The plateau is an overfitting issue, not a forget gate issue." },
+          { id: "c", label: "The model needs more LSTM units — increase hidden size from 128 to 512.", description: "More units increases capacity but won't address overfitting (plateaued val loss). Adding parameters to an overfitting model makes it worse." },
+        ],
+        branches: { a: "a2_terminal", b: "a2_terminal", c: "a2_terminal" },
+        rationale: "Forget gate ≈ 0.9 is informative: the model is preserving cell state over long distances, which is appropriate for 400-token news articles. The train/val gap indicates overfitting — add dropout (Keras LSTM has a recurrent_dropout parameter), reduce model size, or upgrade to a Transformer which handles long sequences more efficiently.",
+      },
+    },
+  },
+
+  knowledgeCheck: [
+    {
+      question: "Why does a vanilla RNN fail to learn dependencies between tokens 1 and 300 in a 300-token sequence?",
+      options: [
+        "Gradients vanish exponentially when backpropagated through 300 tanh-squashed time steps",
+        "RNNs can only process sequences up to 100 tokens by design",
+        "The hidden state dimension is too small to store 300 tokens of context",
+      ],
+      correctIndex: 0,
+      explanation: "BPTT multiplies Jacobians at each step. Each involves the tanh derivative (max 0.25), so gradients decay exponentially over 300 steps — effectively zero long before they reach step 1.",
+    },
+    {
+      question: "An LSTM forget gate outputs 0.01 for a specific time step. What does this mean for the cell state?",
+      options: [
+        "The cell state is almost entirely erased at this step — the model treats it as a fresh start",
+        "The cell state is preserved unchanged — the model is in 'remember everything' mode",
+        "The output gate is preventing the cell state from influencing the hidden state",
+      ],
+      correctIndex: 0,
+      explanation: "C_t = 0.01 × C_{t-1} + i_t × C̃_t ≈ i_t × C̃_t. Nearly all prior cell state is discarded — appropriate at topic boundaries or sentence breaks.",
+    },
+    {
+      question: "You need to classify documents up to 2,000 tokens. LSTM or Transformer?",
+      options: [
+        "Transformer — self-attention directly connects any two positions in O(1) steps regardless of distance",
+        "LSTM — it has been proven to handle longer sequences than Transformers",
+        "Either works identically at 2,000 tokens",
+      ],
+      correctIndex: 0,
+      explanation: "At 2,000 tokens, LSTM's vanishing gradient and sequential processing are real limitations. Transformers attend to all positions simultaneously and are the standard choice for long-document tasks when compute is available.",
+    },
+  ],
+},
+
+"dl-a3": {
+  durationLabel: "30 min",
+  outcomes: [
+    "Explain the **query-key-value attention mechanism** and why it enables direct long-range dependency modeling.",
+    "Distinguish encoder-only (BERT), decoder-only (GPT), and encoder-decoder (T5) Transformer architectures and their appropriate use cases.",
+    "Identify the **O(n²) attention complexity** bottleneck and name two approaches that address it for long contexts.",
+    "Explain why positional encoding is required and how learned vs. sinusoidal encodings differ.",
+  ],
+  learnMarkdown: `## The problem Transformers were designed to solve
+
+RNNs process sequences one token at a time — they cannot be parallelized and struggle with dependencies spanning hundreds of tokens. The 2017 paper "Attention Is All You Need" proposed replacing recurrence entirely with **self-attention**: every position attends to every other position simultaneously.
+
+This one change unlocked three things:
+1. **Full parallelism** — all positions computed simultaneously on GPU
+2. **Direct long-range connections** — no vanishing gradient over distance
+3. **Scalability** — just add more layers, heads, and parameters
+
+## The attention mechanism
+
+Attention takes three inputs for each token: a **Query** (what am I looking for?), a **Key** (what do I contain?), and a **Value** (what do I contribute?). For a sequence of n tokens:
+
+\`\`\`
+Attention(Q, K, V) = softmax(QK^T / √d_k) · V
+\`\`\`
+
+The dot product QK^T produces an n×n matrix of attention scores — how much each token should attend to every other token. Dividing by √d_k prevents softmax saturation. The softmax produces weights that sum to 1 per row, which are used to aggregate Values.
+
+**Key insight**: The cost is O(n²) in both compute and memory — a 10,000-token sequence requires 100 million attention pairs. This is why long-context Transformers require sparse attention or other approximations.
+
+## Multi-head attention
+
+Rather than a single attention operation, Transformers use H parallel attention heads, each projecting into a smaller subspace:
+
+\`\`\`
+MultiHead(Q,K,V) = Concat(head_1, ..., head_H) · W_O
+\`\`\`
+
+Different heads learn different relationship types: one might specialize in syntactic structure, another in semantic similarity, another in positional proximity. The multi-head output is a richer representation than any single attention could provide.
+
+## Positional encoding
+
+Self-attention is **permutation-invariant** — shuffle the tokens and get the same attention weights (just reordered). This means the model has no sense of order without an explicit signal. Positional encodings add position information to each token's embedding:
+
+- **Sinusoidal** (original paper): deterministic, generalizes to lengths longer than training
+- **Learned**: trainable embeddings per position — simpler, but hard to generalize beyond max training length
+- **RoPE / ALiBi** (modern): rotary or bias-based, better length generalization — used in LLaMA, GPT-NeoX
+
+## Three Transformer variants
+
+| Architecture | Training objective | Use case |
+|---|---|---|
+| Encoder-only (BERT) | Masked Language Modeling | Classification, NER, sentence embeddings |
+| Decoder-only (GPT) | Next-token prediction | Text generation, chat, completion |
+| Encoder-decoder (T5, BART) | Seq-to-seq | Translation, summarization, Q&A |
+
+BERT is bidirectional — it sees both left and right context for each token. This makes it excellent for understanding tasks but impossible to use for autoregressive generation. GPT is unidirectional (causal mask) — each token only attends to previous tokens, enabling step-by-step generation.
+
+## Interview hook (answer like a senior)
+
+"Transformers replaced RNNs because self-attention connects any two positions in a single layer — there's no path length proportional to sequence distance, so gradients flow freely and the architecture trains orders of magnitude faster on GPUs. The cost is O(n²) attention, which is why long-context models require sparse or linear attention approximations. BERT uses masked LM to build bidirectional representations; GPT uses causal language modeling for generation — the choice of objective creates fundamentally different models from the same architecture."`,
+
+  video: null,
+  videoFallbackMarkdown: `## Deep dive: build the attention intuition
+
+### The bank analogy for Q/K/V
+
+Think of a library. You walk in with a **query** ("books about gradient descent"). Each book has a **key** on its spine (title/topic tags). You compute relevance scores (dot products), pick the highest-scoring books, and combine their **values** (actual content) weighted by relevance. That's attention.
+
+In the model, Q, K, V are linear projections of the same input — the model learns what to look for (Q), how to label itself (K), and what to contribute when attended to (V).
+
+### Why scaled dot product?
+
+Without the √d_k scaling, large d_k causes dot products to grow large, pushing softmax into saturation regions where gradients become tiny. The scale keeps variance stable regardless of embedding dimension.
+
+### The causal mask in GPT
+
+GPT uses a lower-triangular mask: position t can only attend to positions 1..t. This enforces autoregressive generation — the model cannot "cheat" by looking at future tokens during training. At inference, tokens are generated one at a time, each conditioning on all previous.`,
+
+  tryGuidance: "Use the Attention visualization to trace how a query token attends to key tokens. Try sentences with coreference (pronouns) — notice how the model learns to attend across long distances. Toggle multi-head mode to see different heads specializing in different relationship types.",
+
+  interviewGraph: {
+    initialStageId: "a3_pos_enc_click",
+    artifactDimensions: [
+      { label: "Attention Mechanics", recoveryStageId: "a3_rec_attention" },
+      { label: "Architecture Variants", recoveryStageId: "a3_rec_variants" },
+      { label: "Complexity & Scale", recoveryStageId: "a3_rec_complexity", passLabel: "Transformer Architecture Mastery" },
+    ],
+    stages: {
+      a3_pos_enc_click: {
+        id: "a3_pos_enc_click",
+        type: "click_target",
+        badge: "Stage 1 target",
+        title: "Stage 1 · Missing positional encoding",
+        prompt: "A Transformer built for sentence classification. Click the line whose absence makes all token positions indistinguishable.",
+        code_snippet: `embedding = Embedding(vocab_size, d_model)(tokens)
+# positional encoding omitted here  # ds-target:missing_pos_enc
+x = MultiHeadAttention(num_heads=8, key_dim=64)(embedding, embedding)
+x = LayerNormalization()(x + embedding)
+output = Dense(num_classes, activation='softmax')(x[:, 0, :])`,
+        validationCopy: {
+          missing_pos_enc: "Correct. Without positional encoding, self-attention is permutation-invariant — 'The cat sat on the mat' and 'mat the on sat cat The' produce identical attention outputs. Position information must be explicitly injected.",
+        },
+        branches: { missing_pos_enc: "a3_attn_complexity_choice" },
+      },
+      a3_attn_complexity_choice: {
+        id: "a3_attn_complexity_choice",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Attention complexity bottleneck",
+        prompt: "A Transformer with standard self-attention processes a 4,096-token legal document. What's the primary bottleneck compared to processing a 512-token document?",
+        code_snippet: `# Attention matrix: n × n for sequence length n
+# n=512:  512² =   262,144 pairs
+# n=4096: 4096² = 16,777,216 pairs`,
+        choices: [
+          { id: "a", label: "O(n²) memory and compute — 64× more attention pairs, GPU memory explodes", description: "4096² / 512² = 64×. Both memory (storing the full attention matrix) and compute scale quadratically. This is why models like Longformer use sparse attention for long documents." },
+          { id: "b", label: "More tokens means more gradient updates — training is slower", description: "Training speed is affected by many factors, but the fundamental bottleneck is the O(n²) attention matrix size, not gradient count." },
+          { id: "c", label: "The vocabulary size must increase for longer documents", description: "Vocabulary size is independent of sequence length." },
+          { id: "d", label: "Position embeddings run out past 512 tokens", description: "Standard sinusoidal encodings generalize beyond training length; learned embeddings do have this issue, but it's separate from the core complexity bottleneck." },
+        ],
+        branches: { a: "a3_bert_gpt_choice", b: "a3_rec_attention", c: "a3_rec_attention", d: "a3_rec_attention" },
+        rationale: "Self-attention computes n² dot products and stores an n×n matrix. At n=4096, that's 64× the memory vs n=512. This is why long-context models use sliding window attention (Longformer), linear attention approximations, or chunking strategies.",
+      },
+      a3_rec_attention: {
+        id: "a3_rec_attention",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Attention mechanics",
+        prompt: "In scaled dot-product attention, what is the purpose of dividing QK^T by √d_k?",
+        code_snippet: `# Attention(Q, K, V) = softmax(QK^T / √d_k) · V
+# d_k = key dimension (e.g. 64)`,
+        choices: [
+          { id: "a", label: "Prevent softmax saturation — large dot products push softmax into near-zero gradient regions", description: "As d_k grows, dot products grow in magnitude. Dividing by √d_k keeps variance ≈ 1, preventing softmax from producing near-uniform or near-one-hot distributions prematurely." },
+          { id: "b", label: "Normalize attention weights to sum to 1 per row", description: "That's done by softmax itself. The √d_k scaling happens before softmax, for a different reason." },
+          { id: "c", label: "Reduce the number of attention parameters", description: "√d_k is a scalar constant — it doesn't change the parameter count." },
+        ],
+        branches: { a: "a3_bert_gpt_choice", b: "a3_rec_attention", c: "a3_rec_attention" },
+        rationale: "Without √d_k scaling, high-dimensional embeddings produce large dot products, pushing softmax into saturation. Dividing by √d_k (standard deviation of a random dot product) keeps values in the soft-attention region where gradients are informative.",
+      },
+      a3_bert_gpt_choice: {
+        id: "a3_bert_gpt_choice",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · BERT vs GPT architecture choice",
+        prompt: "You need to build a named entity recognition (NER) system — labeling each token as person/org/location/other. BERT or GPT?",
+        code_snippet: `# NER: label each token with a class
+# Input: "Apple Inc. was founded by Steve Jobs"
+# Output: [ORG, ORG, O, O, O, O, PER, PER]`,
+        choices: [
+          { id: "a", label: "BERT — encoder-only, bidirectional context, ideal for per-token classification tasks", description: "BERT processes each token with full left and right context (bidirectional). NER benefits from seeing what comes after a token ('Jobs' is a person because 'Steve' precedes it and nothing follows suggesting otherwise). Fine-tune a token classification head on top." },
+          { id: "b", label: "GPT — larger models generally perform better on all tasks", description: "GPT's causal mask means each token only sees left context. For NER this misses right-context signals. Model size matters, but architecture fit matters more." },
+          { id: "c", label: "Encoder-decoder (T5) — always the most flexible choice", description: "T5 can do NER framed as seq-to-seq, but it's overkill and slower than a BERT-style token classifier for this task." },
+          { id: "d", label: "GPT — its next-token prediction pre-training teaches it to understand entity boundaries", description: "GPT learns language structure, but its unidirectional attention is a structural disadvantage for token-level tasks that need full context." },
+        ],
+        branches: { a: "a3_multihead_choice", b: "a3_rec_variants", c: "a3_rec_variants", d: "a3_rec_variants" },
+        rationale: "BERT is the natural choice for token classification: bidirectional attention means each token's representation encodes full sentence context. GPT's causal mask limits it to left context only, which is a disadvantage for tasks where right context is informative.",
+      },
+      a3_rec_variants: {
+        id: "a3_rec_variants",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · Transformer architecture variants",
+        prompt: "You need to build a system that takes a long English paragraph and outputs a 2-sentence summary. Which Transformer variant?",
+        code_snippet: `# Input: long paragraph (variable length)
+# Output: short summary (different length)
+# Task type: sequence → sequence (different output length)`,
+        choices: [
+          { id: "a", label: "Encoder-decoder (T5, BART) — designed for input-output sequences of different lengths", description: "Seq-to-seq tasks with different input/output lengths are the natural home for encoder-decoder models. The encoder builds a compressed representation; the decoder generates the summary autoregressively." },
+          { id: "b", label: "Encoder-only (BERT) — encode the paragraph, truncate to 2 sentences", description: "BERT produces token-level representations, not generated text. You can't generate summaries by truncating BERT output." },
+          { id: "c", label: "Decoder-only (GPT) — frame it as completion: 'paragraph → summary:'", description: "GPT can do summarization via prompting, but it's less efficient than an encoder-decoder which explicitly compresses the input into a representation the decoder can cross-attend to." },
+        ],
+        branches: { a: "a3_multihead_choice", b: "a3_rec_variants", c: "a3_rec_variants" },
+        rationale: "Summarization is a canonical seq-to-seq task. Encoder-decoder models (T5, BART, PEGASUS) were specifically designed and pre-trained for this pattern — they compress the full input in the encoder, then generate variable-length output in the decoder.",
+      },
+      a3_multihead_choice: {
+        id: "a3_multihead_choice",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Multi-head attention purpose",
+        prompt: "A Transformer uses 12 attention heads. At inference, you visualize head 3 and head 7. Head 3 mostly attends to the previous token; head 7 attends to the subject of the sentence regardless of distance. What does this indicate?",
+        code_snippet: `# 12 heads, each with d_k = 64 (d_model = 768)
+# head_3: strong attention to position t-1 (local)
+# head_7: strong attention to sentence subject (long-range)`,
+        choices: [
+          { id: "a", label: "Different heads specialize in different relationship types — multi-head attention learns a richer, multi-aspect representation", description: "This is the intended behavior: each head projects to a different subspace and learns to capture a different linguistic or structural relationship. The outputs are concatenated to give a joint representation." },
+          { id: "b", label: "This is a training instability — all heads should attend to the same positions", description: "Head specialization is a feature, not a bug. Diversity of attention patterns is what makes multi-head attention more expressive than a single large head." },
+          { id: "c", label: "Head 3 is underfitting because it only looks one position back", description: "Local attention heads (focusing on nearby tokens) are valuable for capturing syntactic patterns like subject-verb agreement across short spans." },
+          { id: "d", label: "12 heads is too many — reduce to 1 to eliminate redundant computation", description: "Fewer heads means less representational diversity. 12 heads (as in BERT-base) is a standard architecture choice backed by empirical performance." },
+        ],
+        branches: { a: "a3_terminal", b: "a3_rec_complexity", c: "a3_rec_complexity", d: "a3_rec_complexity" },
+        rationale: "Multi-head attention is specifically designed to allow different heads to learn different relationship types in parallel. Head specialization (local vs. long-range, syntactic vs. semantic) is a key empirical finding — it's why multi-head consistently outperforms single-head with equivalent parameter count.",
+      },
+      a3_rec_complexity: {
+        id: "a3_rec_complexity",
+        type: "scenario_choice",
+        badge: "Recovery 3",
+        title: "Recovery · Attention complexity",
+        prompt: "A startup wants to run a Transformer on 100,000-token legal contracts in real time. Standard self-attention fails. What's the architectural approach?",
+        code_snippet: `# Standard attention: O(n²) memory
+# n=100,000 → 10^10 attention pairs
+# At fp16: ~20TB memory just for attention matrix`,
+        choices: [
+          { id: "a", label: "Sparse / sliding window attention — only attend to local windows + selected global tokens", description: "Longformer, BigBird: each token attends to a fixed local window (e.g., 512 tokens) plus a few global tokens. O(n) instead of O(n²). FlashAttention also reduces memory via tiling." },
+          { id: "b", label: "Just use a larger GPU", description: "At 100k tokens, even an 80GB A100 cannot fit the standard attention matrix. Hardware cannot solve an algorithmic scaling problem of this magnitude." },
+          { id: "c", label: "Reduce vocabulary size to shrink the model", description: "Vocabulary size is unrelated to the attention complexity over sequence length." },
+        ],
+        branches: { a: "a3_terminal", b: "a3_rec_complexity", c: "a3_rec_complexity" },
+        rationale: "For very long sequences, O(n²) attention is infeasible. Sparse attention (Longformer, BigBird) restricts each token to attend only to a local window and designated global tokens, reducing complexity to O(n). FlashAttention achieves the same outputs as standard attention but with O(n) memory via careful tiling.",
+      },
+      a3_terminal: {
+        id: "a3_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Revision complete · Transformer architecture mastered",
+        terminal: true,
+        prompt: "Explain the key architectural difference between BERT and GPT, and give one task each is better suited for — in 3 sentences or fewer.",
+        code_snippet: `# BERT: bidirectional encoder, masked LM pre-training
+# GPT: causal decoder, next-token prediction pre-training`,
+        choices: [
+          { id: "a", label: "BERT is bidirectional (sees full context per token) → best for classification/NER/QA. GPT is causal (left context only) → best for generation. Both are Transformers but trained with different objectives creating fundamentally different representations.", description: "Complete and accurate — captures the architectural difference (attention mask), the training objective difference, and the task implication." },
+          { id: "b", label: "BERT is bigger so it's better for classification; GPT is smaller so it's better for generation", description: "Model size is not the defining difference — the attention mask and pre-training objective are." },
+          { id: "c", label: "They are the same architecture with different fine-tuning data", description: "The causal mask in GPT vs. bidirectional attention in BERT creates fundamentally different token representations, not just different fine-tuning behavior." },
+        ],
+        branches: { a: "a3_terminal", b: "a3_terminal", c: "a3_terminal" },
+        rationale: "BERT uses a bidirectional (unmasked) encoder — every token attends to every other token, giving context-rich representations ideal for understanding tasks (classification, NER, QA). GPT uses a causal decoder — each token only attends to previous tokens, which naturally supports autoregressive text generation. The pre-training objectives (masked LM vs. next-token prediction) reinforce these different capabilities.",
+      },
+    },
+  },
+
+  knowledgeCheck: [
+    {
+      question: "Why is positional encoding required in a Transformer but not in an RNN?",
+      options: [
+        "Self-attention is permutation-invariant — without position encoding, 'cat sat mat' and 'mat cat sat' produce identical outputs",
+        "Transformers use larger vocabularies that require position-aware embeddings",
+        "RNNs also require positional encoding but it is implicit in the recurrent weights",
+      ],
+      correctIndex: 0,
+      explanation: "Self-attention computes dot products between all pairs of tokens regardless of order. Without an explicit position signal, the model has no way to distinguish token order. RNNs inherently encode position through the sequential hidden state update.",
+    },
+    {
+      question: "What does the O(n²) complexity of self-attention refer to?",
+      options: [
+        "The number of attention score computations grows quadratically with sequence length",
+        "The model needs n² training examples to learn n attention patterns",
+        "The number of parameters in the Transformer grows quadratically with vocabulary size",
+      ],
+      correctIndex: 0,
+      explanation: "For a sequence of n tokens, each token computes a dot product with every other token — n² operations total. Memory required to store the attention matrix is also O(n²), which becomes prohibitive for n > a few thousand tokens.",
+    },
+    {
+      question: "You need to generate product descriptions from structured feature data (price, category, specs). Which Transformer variant?",
+      options: [
+        "Encoder-decoder — encodes the structured input, decodes to natural language output",
+        "Encoder-only (BERT) — best for text generation tasks",
+        "A decoder-only model trained only on descriptions with no input conditioning",
+      ],
+      correctIndex: 0,
+      explanation: "Generating text from a structured input of a different format is a seq-to-seq task. Encoder-decoder models (T5, BART) are designed for exactly this: the encoder compresses the structured input, and the decoder generates the output text via cross-attention to the encoder's representation.",
+    },
+  ],
+},
+
+"dl-a4": {
+  durationLabel: "18 min",
+  outcomes: [
+    "Choose between **feature extraction** and **fine-tuning** based on dataset size and domain similarity.",
+    "Explain why fine-tuning at a high learning rate causes **catastrophic forgetting** of pretrained weights.",
+    "Apply **discriminative learning rates** — lower LR for early layers, higher for later layers.",
+    "Describe parameter-efficient fine-tuning (LoRA) and when it is preferred over full fine-tuning.",
+  ],
+  learnMarkdown: `## Why transfer learning works
+
+Training a deep network from scratch requires vast data and compute. But the lower layers of any network trained on a large, diverse dataset learn surprisingly general features: edges and textures in vision models; token co-occurrence patterns in language models. These features are reusable.
+
+Transfer learning copies a **pretrained model** and adapts it to a new task, letting you benefit from millions of training examples you never had to collect.
+
+## The three strategies
+
+### Feature extraction (freeze everything)
+
+Freeze all pretrained weights. Add a new classification head (or MLP) on top. Only train the head.
+
+**When**: small target dataset (< a few thousand examples), or when target domain is very similar to pretraining domain (e.g., fine-tuning an ImageNet model for a different object category).
+
+**Risk**: if your task is sufficiently different, frozen features may not be expressive enough.
+
+### Partial fine-tuning (unfreeze top N layers)
+
+Freeze early layers (generic features); unfreeze and retrain later layers (task-specific features). Use a small learning rate (1e-5 to 1e-4) to avoid destroying pretrained representations.
+
+**When**: moderate-size dataset, domain shift exists but isn't extreme.
+
+### Full fine-tuning (unfreeze all layers)
+
+Train all weights, with a very low learning rate. Early layers change slowly (they're good already); later layers adapt more aggressively.
+
+**When**: large target dataset, domain shift is significant (e.g., adapting a general LLM to medical records).
+
+**Risk**: catastrophic forgetting — if LR is too high, gradient updates overwrite pretrained knowledge, often performing worse than feature extraction on small data.
+
+## Discriminative learning rates
+
+Different layers need different learning rates:
+
+\`\`\`
+layer_1_lr = base_lr / 100    # almost frozen
+layer_2_lr = base_lr / 10     # gentle updates
+layer_3_lr = base_lr          # full updates (task-specific head)
+\`\`\`
+
+Early layers encode low-level, general features (edges, syntax) — a small LR preserves them. Later layers encode high-level, task-specific features — a larger LR lets them adapt quickly.
+
+## LoRA: parameter-efficient fine-tuning
+
+Full fine-tuning of a 7B-parameter LLM requires updating all 7B parameters — expensive in compute and memory. LoRA (Low-Rank Adaptation) instead adds small trainable rank-decomposition matrices alongside the frozen original weights:
+
+\`\`\`
+W' = W_frozen + ΔW
+ΔW = A · B   where A is (d × r), B is (r × k), r << min(d, k)
+\`\`\`
+
+With rank r=8 and d=k=4096, ΔW has 8×2×4096 = 65,536 parameters instead of 4096² = 16.7M. LoRA reduces trainable parameters by 100–10,000× while matching full fine-tuning on most benchmarks. It's the standard approach for fine-tuning large language models.
+
+## Interview hook (answer like a senior)
+
+"Transfer learning reuses pretrained feature hierarchies rather than learning from scratch. The key decision is how much to unfreeze: frozen (feature extraction) for small data or similar domains; partially or fully fine-tuned for larger data or domain shift. The critical constraint is learning rate — fine-tuning at a high LR causes catastrophic forgetting of pretrained representations. For large language models, LoRA reduces this to training <1% of parameters with comparable task performance."`,
+
+  video: null,
+  videoFallbackMarkdown: `## Deep dive: the domain shift spectrum
+
+### How to think about domain similarity
+
+Pretrained model → target task combinations fall on a 2D grid:
+
+| | Similar domain | Different domain |
+|---|---|---|
+| Large dataset | Fine-tune all layers | Fine-tune all layers carefully |
+| Small dataset | Feature extraction | Try feature extraction; augment aggressively |
+
+When target domain is very different and you have little data, you're in trouble — feature extraction may not work (wrong features) and fine-tuning will overfit. Collect more data or find a more similar pretrained model.
+
+### Why catastrophic forgetting happens
+
+A pretrained model's weights encode a complex, high-dimensional representation of its training distribution. A high learning rate on a new task's gradient descent takes large steps in weight space — large enough to walk far from the pretrained solution. The new task doesn't have enough signal to rebuild the general representation from scratch, so you end up with a model that partially learns the new task while forgetting the pretrained features entirely.
+
+The fix: small LR keeps you close to the pretrained solution while nudging the weights toward the new task — you're in the "fine-tuning" regime, not the "retraining" regime.`,
+
+  tryGuidance: "Use the Transfer Learning viz to adjust how many layers are frozen. Observe the parameter count change and the learning rate strategy for each configuration. Switch between the three strategies and read the trade-off cards — try to predict the right strategy before reading the recommendation.",
+
+  interviewGraph: {
+    initialStageId: "a4_lr_click",
+    artifactDimensions: [
+      { label: "Fine-Tuning Strategy Selection", recoveryStageId: "a4_rec_strategy" },
+      { label: "Catastrophic Forgetting", recoveryStageId: "a4_rec_forgetting" },
+      { label: "Parameter-Efficient Methods", recoveryStageId: "a4_rec_lora", passLabel: "Transfer Learning Mastery" },
+    ],
+    stages: {
+      a4_lr_click: {
+        id: "a4_lr_click",
+        type: "click_target",
+        badge: "Stage 1 target",
+        title: "Stage 1 · Fine-tuning with a destructively high learning rate",
+        prompt: "A pretrained ResNet-50 is being fine-tuned on 500 medical X-ray images. Click the line that will cause catastrophic forgetting of pretrained ImageNet features.",
+        code_snippet: `base_model = ResNet50(weights='imagenet', include_top=False)
+base_model.trainable = True
+optimizer = Adam(learning_rate=0.01)  # ds-target:high_lr
+model.compile(optimizer=optimizer, loss='binary_crossentropy')
+model.fit(x_train, y_train, epochs=20)`,
+        validationCopy: {
+          high_lr: "Correct. lr=0.01 is 100–1000× too high for fine-tuning a pretrained model. Large gradient steps overwrite the ImageNet features the network spent millions of images learning. Use lr=1e-4 to 1e-5 for fine-tuning, with even lower rates for early layers.",
+        },
+        branches: { high_lr: "a4_strategy_choice" },
+      },
+      a4_strategy_choice: {
+        id: "a4_strategy_choice",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Feature extraction vs fine-tuning decision",
+        prompt: "You have a pretrained ResNet-50 (ImageNet) and 400 labeled medical images (chest X-rays). Which strategy?",
+        code_snippet: `# Pretrained on: ImageNet (1.2M images, 1000 classes)
+# Target task: pneumonia detection (binary)
+# Available labeled data: 400 images
+# Domain similarity: low (photos ≠ X-rays)`,
+        choices: [
+          { id: "a", label: "Feature extraction — freeze all ResNet layers, train only a new binary classification head", description: "With only 400 images and domain shift, full fine-tuning will overfit badly. Frozen ImageNet features (edges, textures) still provide useful signal even for X-rays — start here, then try unfreezing last block if needed." },
+          { id: "b", label: "Full fine-tuning with lr=1e-3 — more parameters = better performance on medical images", description: "400 images is far too few for full fine-tuning. You'll overfit to the training set and the high LR will destroy pretrained features without learning medical-specific ones." },
+          { id: "c", label: "Train from scratch — ImageNet features are too different from X-rays to be useful", description: "Even with domain shift, low-level features (edges, textures) from ImageNet are transferable. Training from scratch with 400 images will underfit severely." },
+          { id: "d", label: "Use a pretrained radiology model — ImageNet is irrelevant for medical imaging", description: "A radiology-pretrained model would be better, but if unavailable, ImageNet transfer still outperforms training from scratch for small medical datasets." },
+        ],
+        branches: { a: "a4_discrim_lr_choice", b: "a4_rec_strategy", c: "a4_rec_strategy", d: "a4_discrim_lr_choice" },
+        rationale: "With 400 images and domain shift, feature extraction is the safe starting point. Freeze all ImageNet layers, add a small classification head, train the head only. If performance is insufficient, gradually unfreeze later blocks with a very low LR.",
+      },
+      a4_rec_strategy: {
+        id: "a4_rec_strategy",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Fine-tuning strategy selection",
+        prompt: "You have 100,000 labeled customer support emails and a pretrained BERT. Domain: similar (English text). Which strategy?",
+        code_snippet: `# Pretrained: BERT-base (English Wikipedia + BooksCorpus)
+# Target: customer support intent classification
+# Data: 100,000 labeled examples
+# Domain similarity: high`,
+        choices: [
+          { id: "a", label: "Full fine-tuning with a low LR (1e-5 to 5e-5) — enough data, similar domain", description: "100k examples is more than sufficient to fine-tune all BERT layers without overfitting. Similar domain means pretrained features are highly relevant. Standard BERT fine-tuning recipe." },
+          { id: "b", label: "Feature extraction — freeze BERT, train only a linear classifier head", description: "Feature extraction wastes available training data. With 100k examples and domain match, you can safely update all parameters." },
+          { id: "c", label: "Train BERT from scratch on customer support data", description: "Discards millions of training examples worth of pretrained knowledge. Always prefer starting from a pretrained checkpoint if available." },
+        ],
+        branches: { a: "a4_discrim_lr_choice", b: "a4_rec_strategy", c: "a4_rec_strategy" },
+        rationale: "Large dataset + domain similarity = full fine-tuning. Use the standard BERT fine-tuning recipe: unfreeze all layers, lr=2e-5 to 5e-5, 3-5 epochs, linear warmup + decay.",
+      },
+      a4_discrim_lr_choice: {
+        id: "a4_discrim_lr_choice",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Discriminative learning rates",
+        prompt: "You're fine-tuning a 12-layer BERT for text classification. Why should layer 1 use a smaller LR than layer 12?",
+        code_snippet: `# Layer 1 (close to input): learns low-level syntax, subword patterns
+# Layer 12 (close to output): learns task-specific representations
+# layer_1_lr << layer_12_lr`,
+        choices: [
+          { id: "a", label: "Early layers encode general language features that transfer well — large updates destroy this; later layers need more task-specific adaptation", description: "Layer 1 of BERT encodes syntax and morphology — useful for almost any NLP task and already well-trained. Layer 12 encodes high-level semantics that should shift toward the target task. Discriminative LRs preserve the former while adapting the latter." },
+          { id: "b", label: "Early layers have more parameters so a lower LR prevents gradient explosion", description: "All layers in BERT-base have the same number of parameters per layer. The LR choice is about preserving general vs. adapting task-specific features, not parameter count." },
+          { id: "c", label: "Early layers train faster, so a lower LR makes training more uniform", description: "Layer training speed is not the reason. The argument is about what each layer has learned and how much it should change for the new task." },
+          { id: "d", label: "Lower LR everywhere is always better to prevent catastrophic forgetting", description: "A uniformly low LR is conservative but misses the insight that later layers should adapt more aggressively than earlier ones to the new task." },
+        ],
+        branches: { a: "a4_lora_choice", b: "a4_rec_forgetting", c: "a4_rec_forgetting", d: "a4_rec_forgetting" },
+        rationale: "Discriminative learning rates (Howard & Ruder, ULMFiT) reflect the feature hierarchy: early layers learn transferable, general features; later layers learn task-specific representations. Smaller LR for early layers preserves general knowledge while later layers adapt.",
+      },
+      a4_rec_forgetting: {
+        id: "a4_rec_forgetting",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · Catastrophic forgetting",
+        prompt: "After fine-tuning a pretrained model with lr=0.01, your model performs worse than feature extraction alone. What most likely happened?",
+        code_snippet: `# Before fine-tuning: feature extraction val_acc = 0.82
+# After full fine-tuning (lr=0.01, 20 epochs): val_acc = 0.71`,
+        choices: [
+          { id: "a", label: "Catastrophic forgetting — high LR overwrote pretrained feature representations before the new task could be learned from limited data", description: "lr=0.01 takes large parameter update steps. On a small dataset, the gradient signal from the new task is insufficient to rebuild the destroyed pretrained representations. You end up worse than frozen features." },
+          { id: "b", label: "The pretrained model is too large for the new task and overfits", description: "Model size contributes to overfitting, but the immediate cause of worse-than-frozen performance is catastrophic forgetting from the high LR." },
+          { id: "c", label: "The optimizer (Adam) is incompatible with fine-tuning pretrained models", description: "Adam is standard for fine-tuning. The LR is the problem, not the optimizer choice." },
+        ],
+        branches: { a: "a4_lora_choice", b: "a4_rec_forgetting", c: "a4_rec_forgetting" },
+        rationale: "Catastrophic forgetting is the defining failure mode of fine-tuning with too-high LR. The fix: use lr=1e-4 to 1e-5, apply discriminative LRs, and use gradual unfreezing (unfreeze one block at a time).",
+      },
+      a4_lora_choice: {
+        id: "a4_lora_choice",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · LoRA vs full fine-tuning for LLMs",
+        prompt: "You need to fine-tune a 7B-parameter LLM for a domain-specific task. You have one 24GB GPU. Full fine-tuning requires ~56GB just for the model in fp16 + optimizer states. What's the practical approach?",
+        code_snippet: `# 7B params × 2 bytes (fp16) = 14 GB model
+# + optimizer states (Adam: 2× params) = 28 GB
+# + gradients = 14 GB
+# Total: ~56 GB → exceeds single GPU
+# LoRA rank=8: adds ~0.1% trainable params`,
+        choices: [
+          { id: "a", label: "LoRA — freeze original weights, add small trainable rank-decomposition matrices; fits on 24GB GPU", description: "LoRA (rank=8) adds ~50M trainable parameters to a 7B model. Original weights stay frozen (loaded in 4-bit or 8-bit quantization). Total memory budget: ~12GB quantized model + small LoRA gradients — fits easily on 24GB." },
+          { id: "b", label: "Use gradient checkpointing and it will fit on one GPU", description: "Gradient checkpointing trades compute for memory (recomputes activations instead of storing), saving ~50% activation memory. It doesn't solve the fundamental issue of optimizer states for 7B parameters." },
+          { id: "c", label: "Train from scratch on domain data — full fine-tuning is not possible so LoRA is not worth trying", description: "Training from scratch is orders of magnitude harder and almost always worse than LoRA fine-tuning. LoRA is specifically designed for this exact scenario." },
+          { id: "d", label: "Feature extraction — freeze the entire 7B model, add a task-specific head", description: "For generative tasks or when you need the model's generation behavior to change, a frozen head is insufficient. LoRA adapts the model's generation capability while keeping memory manageable." },
+        ],
+        branches: { a: "a4_terminal", b: "a4_rec_lora", c: "a4_rec_lora", d: "a4_rec_lora" },
+        rationale: "LoRA is the standard approach for fine-tuning large language models on consumer hardware. Combined with quantization (QLoRA), a 7B model fine-tuning fits on a 12–24GB GPU. The trainable parameter count drops from 7B to ~50M (rank=8), while performance matches full fine-tuning on most tasks.",
+      },
+      a4_rec_lora: {
+        id: "a4_rec_lora",
+        type: "scenario_choice",
+        badge: "Recovery 3",
+        title: "Recovery · Parameter-efficient fine-tuning",
+        prompt: "In LoRA, the weight update is ΔW = A·B where A is (d×r) and B is (r×k). What is r and why is it set to a small value like 4 or 8?",
+        code_snippet: `# Original weight matrix W: shape (d, k) = (4096, 4096)
+# W_frozen: not updated during training
+# A: (4096, 8), B: (8, 4096)  [rank r=8]
+# Trainable params: 2 × 4096 × 8 = 65,536 vs 4096² = 16.7M`,
+        choices: [
+          { id: "a", label: "r is the rank of the decomposition — small r means ΔW is a low-rank matrix, which is the hypothesis that task-specific adaptations live in a low-dimensional subspace", description: "The key insight: the weight changes needed for fine-tuning are often low-rank (they lie in a small-dimensional subspace). r=8 captures most of this with 256× fewer parameters than the full matrix." },
+          { id: "b", label: "r controls the learning rate — smaller r means slower, more stable training", description: "r is the rank of the decomposition, not a learning rate schedule. The learning rate is set separately." },
+          { id: "c", label: "r is the number of attention heads to adapt — other heads are frozen", description: "LoRA can be applied to attention weights, but r is the matrix rank, not the head count." },
+        ],
+        branches: { a: "a4_terminal", b: "a4_rec_lora", c: "a4_rec_lora" },
+        rationale: "LoRA's hypothesis: fine-tuning weight changes have low intrinsic rank — most of the useful adaptation can be expressed as a product of two small matrices. This lets you train <1% of parameters while achieving comparable performance to full fine-tuning.",
+      },
+      a4_terminal: {
+        id: "a4_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Revision complete · Transfer Learning mastered",
+        terminal: true,
+        prompt: "A PM asks: 'We have 200 customer support tickets and want to classify them into 5 intent categories using a pretrained language model. What's your plan?' Give the 3 most important decisions.",
+        code_snippet: `# Available: BERT-base pretrained model
+# Data: 200 labeled tickets, 5 categories
+# Constraint: production latency < 100ms`,
+        choices: [
+          { id: "a", label: "1) Feature extraction (freeze BERT, train head only — 200 examples is too few for fine-tuning). 2) Evaluate if frozen features are expressive enough; if not, unfreeze last 2 layers with lr=1e-5. 3) Monitor for overfitting with validation split.", description: "The three critical decisions: strategy (feature extraction given small data), progressive unfreezing fallback, and overfitting monitoring. Latency is handled by BERT-base being a standard size." },
+          { id: "b", label: "1) Full fine-tuning with high LR. 2) Use all 200 examples for training (no validation). 3) Run for 50 epochs to maximize accuracy.", description: "All three choices are wrong: full fine-tuning with 200 examples causes overfitting/forgetting; no validation means you can't detect overfitting; 50 epochs with small data will massively overfit." },
+          { id: "c", label: "1) Train from scratch to avoid domain mismatch. 2) Use 100 examples for training and 100 for test. 3) Increase model size for better accuracy.", description: "Training from scratch with 200 examples is the worst possible choice. Pretrained features are almost always better than random initialization for small datasets." },
+        ],
+        branches: { a: "a4_terminal", b: "a4_terminal", c: "a4_terminal" },
+        rationale: "With 200 examples: (1) Start with feature extraction — frozen BERT + new classification head, trained for 10-20 epochs. (2) If accuracy is insufficient, unfreeze the last 1-2 transformer blocks with lr=1e-5. (3) Use 80/20 train/val split to catch overfitting. This is the industry-standard small-data BERT fine-tuning recipe.",
+      },
+    },
+  },
+
+  knowledgeCheck: [
+    {
+      question: "You have 300 images and a pretrained ResNet. Training from scratch gives 65% accuracy; feature extraction gives 79%; full fine-tuning gives 61%. Why does full fine-tuning underperform feature extraction?",
+      options: [
+        "Catastrophic forgetting — high LR with limited data overwrote pretrained ImageNet features before the new task could be learned",
+        "Full fine-tuning has too many parameters for 300 images and always overfits",
+        "ResNet is not compatible with fine-tuning and must be used as a fixed feature extractor",
+      ],
+      correctIndex: 0,
+      explanation: "With 300 images and insufficient LR tuning, full fine-tuning destroys the pretrained representations faster than the small dataset can rebuild task-specific ones. Use lr=1e-4 or lower, or gradual unfreezing.",
+    },
+    {
+      question: "Why use a lower learning rate for early layers than late layers when fine-tuning a deep network?",
+      options: [
+        "Early layers encode general, transferable features — large updates destroy them; later layers need more task-specific adaptation",
+        "Early layers have more parameters so they need smaller updates to remain numerically stable",
+        "Early layers converge faster, so a smaller LR slows them down to match later layers",
+      ],
+      correctIndex: 0,
+      explanation: "Discriminative learning rates reflect the feature hierarchy. Early layers learn transferable, general features (edges, syntax) that should change very little. Later layers encode task-specific features that need aggressive adaptation to the new task.",
+    },
+    {
+      question: "What is the key advantage of LoRA over full fine-tuning for a 7B-parameter LLM?",
+      options: [
+        "Reduces trainable parameters by 100-1000× by adding low-rank matrices alongside frozen weights, making fine-tuning feasible on consumer hardware",
+        "LoRA always achieves higher accuracy than full fine-tuning because it prevents overfitting",
+        "LoRA eliminates the need for a learning rate schedule during fine-tuning",
+      ],
+      correctIndex: 0,
+      explanation: "LoRA (rank=8) adds ~50M trainable parameters to a 7B model instead of updating all 7B. Combined with quantization, this makes fine-tuning feasible on 16-24GB GPUs. Performance typically matches full fine-tuning at a fraction of the compute cost.",
+    },
+  ],
+},
+
 };
 
 
