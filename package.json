@@ -9,7 +9,9 @@
     "build:verbose": "vite build --debug",
     "preview": "vite preview",
     "lint": "eslint .",
-    "lint:verbose": "eslint . --debug"
+    "lint:verbose": "eslint . --debug",
+    "validate:interview-graphs": "node scripts/validate-interview-graphs.mjs",
+    "lint:engine": "eslint src/components/platform/LessonModule.jsx src/lib/simple-markdown.jsx"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",

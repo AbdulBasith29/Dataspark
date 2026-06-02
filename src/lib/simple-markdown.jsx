@@ -1,34 +1,7 @@
 import { DS } from "./ds-platform-tokens.js";
+import { renderInlineMarkdown } from "./inline-markdown.jsx";
 
 /** Minimal markdown: ## / ### headings, paragraphs, - lists, **bold**, `code`. No deps. */
-function renderInline(text) {
-  if (!text) return null;
-  const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith("`") && part.endsWith("`")) {
-      return (
-        <code
-          key={i}
-          style={{
-            fontFamily: "var(--ds-mono), monospace",
-            fontSize: "0.9em",
-            background: "rgba(255,255,255,0.06)",
-            padding: "2px 6px",
-            borderRadius: 6,
-            border: `1px solid ${DS.border}`,
-            color: DS.t1,
-          }}
-        >
-          {part.slice(1, -1)}
-        </code>
-      );
-    }
-    if (part.startsWith("**") && part.endsWith("**")) {
-      return <strong key={i} style={{ color: DS.t1, fontWeight: 700 }}>{part.slice(2, -2)}</strong>;
-    }
-    return <span key={i}>{part}</span>;
-  });
-}
 
 export function SimpleMarkdown({ text, accent }) {
   if (!text?.trim()) return null;
@@ -78,6 +51,36 @@ export function SimpleMarkdown({ text, accent }) {
       i += 1;
       continue;
     }
+    if (line.startsWith("```")) {
+      const language = line.slice(3).trim();
+      i += 1;
+      const codeLines = [];
+      while (i < lines.length && !lines[i].startsWith("```")) {
+        codeLines.push(lines[i]);
+        i += 1;
+      }
+      if (i < lines.length && lines[i].startsWith("```")) i += 1;
+      out.push(
+        <pre
+          key={key++}
+          style={{
+            margin: "0 0 18px",
+            padding: "14px 16px",
+            overflowX: "auto",
+            borderRadius: 12,
+            border: `1px solid ${DS.border}`,
+            background: "rgba(2,6,23,0.72)",
+            color: DS.t1,
+            fontSize: 13,
+            lineHeight: 1.65,
+            fontFamily: "var(--ds-mono), monospace",
+          }}
+        >
+          <code data-language={language || undefined}>{codeLines.join("\n")}</code>
+        </pre>,
+      );
+      continue;
+    }
     if (line.startsWith("- ")) {
       const items = [];
       while (i < lines.length && lines[i].startsWith("- ")) {
@@ -96,7 +99,7 @@ export function SimpleMarkdown({ text, accent }) {
           }}
         >
           {items.map((item, j) => (
-            <li key={j} style={{ marginBottom: 6 }}>{renderInline(item)}</li>
+            <li key={j} style={{ marginBottom: 6 }}>{renderInlineMarkdown(item)}</li>
           ))}
         </ul>,
       );
@@ -128,7 +131,7 @@ export function SimpleMarkdown({ text, accent }) {
           fontWeight: 400,
         }}
       >
-        {renderInline(para.join(" "))}
+        {renderInlineMarkdown(para.join(" "))}
       </p>,
     );
   }

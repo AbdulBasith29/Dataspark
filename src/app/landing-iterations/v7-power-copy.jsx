@@ -360,9 +360,9 @@ export default function DS7() {
       <footer style={{ borderTop: `1px solid ${P.border}`, maxWidth: 1200, margin: "0 auto", padding: "20px 48px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative", zIndex: 1 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 7 }}><Logo /><span style={{ fontSize: 10, color: "#1E293B", fontFamily: "var(--mono)" }}>© 2026 DataSpark</span></div>
         <div style={{ display: "flex", gap: 22 }}>
-          {["TikTok", "LinkedIn", "Twitter"].map(s => (
-            <a key={s} href="#" style={{ fontSize: 10, color: "#334155", textDecoration: "none", fontFamily: "var(--mono)", transition: "color .2s" }}
-              onMouseEnter={e => e.target.style.color = "#E2E8F0"} onMouseLeave={e => e.target.style.color = "#334155"}>{s}</a>
+          {[{ label: "Privacy Policy", href: "/privacy" }, { label: "Terms of Service", href: "/terms" }, { label: "Contact", href: "/contact" }].map(link => (
+            <a key={link.label} href={link.href} style={{ fontSize: 10, color: "#334155", textDecoration: "none", fontFamily: "var(--mono)", transition: "color .2s" }}
+              onMouseEnter={e => e.target.style.color = "#E2E8F0"} onMouseLeave={e => e.target.style.color = "#334155"}>{link.label}</a>
           ))}
         </div>
       </footer>

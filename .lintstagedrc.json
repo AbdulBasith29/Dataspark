@@ -1,0 +1,4 @@
+{
+  "src/components/platform/LessonModule.jsx": ["npx eslint --fix"],
+  "src/lib/simple-markdown.jsx": ["npx eslint --fix"]
+}

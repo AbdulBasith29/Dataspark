@@ -42,7 +42,7 @@ ${topics}
 ${formattingAndScope}`;
 };
 
-const AIChatbot = ({ course, onClose }) => {
+const AIChatbot = ({ course, onClose, seedInput }) => {
   const [messages, setMessages] = useState(() => {
     const cfg = CHATBOT_CONFIG[course.id] || {};
     const tutorName = cfg.tutorName || SYSTEM_PROMPTS[course.id]?.name || "Tutor";
@@ -53,7 +53,9 @@ const AIChatbot = ({ course, onClose }) => {
       },
     ];
   });
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(
+    typeof seedInput === "string" ? seedInput : ""
+  );
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
 

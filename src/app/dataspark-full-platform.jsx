@@ -4,6 +4,7 @@ import AIChatbot from "../chatbot/AIChatbot.jsx";
 import SQLJoins from "../visualizations/SQLJoins.jsx";
 import TrainValTestSplit from "../visualizations/TrainValTestSplit.jsx";
 import PythonMutabilityViz from "../visualizations/PythonMutabilityViz.jsx";
+import VariableBindingLab from "../visualizations/VariableBindingLab.jsx";
 import StringFormatAtelier from "../visualizations/StringFormatAtelier.jsx";
 import HashLab from "../visualizations/HashLab.jsx";
 import ComprehensionForge from "../visualizations/ComprehensionForge.jsx";
@@ -49,12 +50,51 @@ import SVMMargins from "../visualizations/SVMMargins.jsx";
 import DBSCANClustering from "../visualizations/DBSCANClustering.jsx";
 import TSNEvsUMAP from "../visualizations/TSNEvsUMAP.jsx";
 import ImbalancedClasses from "../visualizations/ImbalancedClasses.jsx";
+import ClassObjectLab from "../visualizations/ClassObjectLab.jsx";
+import InheritanceExplorer from "../visualizations/InheritanceExplorer.jsx";
+import DecoratorForge from "../visualizations/DecoratorForge.jsx";
+import PandasDataLab from "../visualizations/PandasDataLab.jsx";
+import VectorizationRace from "../visualizations/VectorizationRace.jsx";
+import GroupByMergeForge from "../visualizations/GroupByMergeForge.jsx";
+import SQLOrderOfExecution from "../visualizations/SQLOrderOfExecution.jsx";
+import SQLNullLogic from "../visualizations/SQLNullLogic.jsx";
+import SQLGroupByViz from "../visualizations/SQLGroupByViz.jsx";
+import SQLSubqueryVsJoin from "../visualizations/SQLSubqueryVsJoin.jsx";
+import SQLWindowFunctionsViz from "../visualizations/SQLWindowFunctionsViz.jsx";
+import SQLLagLeadViz from "../visualizations/SQLLagLeadViz.jsx";
+import SQLCteExplorer from "../visualizations/SQLCteExplorer.jsx";
+import SQLPivotViz from "../visualizations/SQLPivotViz.jsx";
+import SQLExplainPlanViz from "../visualizations/SQLExplainPlanViz.jsx";
+import SQLNormalizationViz from "../visualizations/SQLNormalizationViz.jsx";
+import SQLIndexingViz from "../visualizations/SQLIndexingViz.jsx";
+import SQLStarSnowflakeViz from "../visualizations/SQLStarSnowflakeViz.jsx";
+import SQLOltpOlapViz from "../visualizations/SQLOltpOlapViz.jsx";
+import StatMeanMedianModeViz from "../visualizations/StatMeanMedianModeViz.jsx";
+import StatPercentileIQRViz from "../visualizations/StatPercentileIQRViz.jsx";
+import StatCorrelationViz from "../visualizations/StatCorrelationViz.jsx";
+import StatBinomialPoissonViz from "../visualizations/StatBinomialPoissonViz.jsx";
+import StatCLTViz from "../visualizations/StatCLTViz.jsx";
+import StatPValueViz from "../visualizations/StatPValueViz.jsx";
+import StatTestsViz from "../visualizations/StatTestsViz.jsx";
+import StatConfidenceIntervalViz from "../visualizations/StatConfidenceIntervalViz.jsx";
+import StatTypeErrorsViz from "../visualizations/StatTypeErrorsViz.jsx";
+import StatPowerAnalysisViz from "../visualizations/StatPowerAnalysisViz.jsx";
+import StatMultipleTestingViz from "../visualizations/StatMultipleTestingViz.jsx";
+import StatBootstrapViz from "../visualizations/StatBootstrapViz.jsx";
+import StatBayesFrequentistViz from "../visualizations/StatBayesFrequentistViz.jsx";
+import DLRNNLSTMViz from "../visualizations/DLRNNLSTMViz.jsx";
+import DLTransferLearningViz from "../visualizations/DLTransferLearningViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import LessonModule from "../components/platform/LessonModule.jsx";
-import { getResolvedLessonModule } from "../data/lesson-modules.js";
+import { getResolvedLessonModule, auditPythonLessonIntegrity, PYTHON_CLUSTER_MILESTONES } from "../data/lesson-modules.js";
 import { PYTHON_QUESTIONS } from "../data/questions-python.js";
 import { STATISTICS_QUESTIONS } from "../data/questions-statistics.js";
 import { DS, dsGlassCard } from "../lib/ds-platform-tokens.js";
+import { trackLvsEvent, buildLvsMetadata, LVS_EVENT_NAMES, buildPythonProgressArtifacts } from "../lib/analytics.js";
+import useLearnerIntent from "../lib/use-learner-intent.js";
+import IntentSelector from "../components/platform/IntentSelector.jsx";
+import ProgressArtifactCard from "../components/platform/ProgressArtifactCard.jsx";
+import LiveRegion from "../components/platform/LiveRegion.jsx";
 
 const PlatformLogo = () => (
   <svg width="26" height="26" viewBox="0 0 40 40" fill="none" style={{ display: "block", flexShrink: 0 }}>
@@ -170,14 +210,13 @@ const CURRICULUM = [
     description: "The language of data. From basic queries to advanced window functions, CTEs, and query optimization.",
     topics: [
       {
-        id: "sql-basics",
-        title: "SQL Fundamentals",
+        id: "sql-revision",
+        title: "Rapid Revision & Foundations",
         lessons: [
-          { id: "sq-b1", title: "SELECT, WHERE, ORDER BY", duration: "12 min", hasViz: false },
-          { id: "sq-b2", title: "JOINs Visualized: INNER, LEFT, RIGHT, FULL", duration: "20 min", hasViz: true },
-          { id: "sq-b3", title: "GROUP BY & Aggregation Functions", duration: "15 min", hasViz: true },
-          { id: "sq-b4", title: "HAVING vs WHERE: When to Filter", duration: "10 min", hasViz: true },
-          { id: "sq-b5", title: "Subqueries & Correlated Subqueries", duration: "18 min", hasViz: true },
+          { id: "sql-found-01", title: "SQL Order of Execution", duration: "12 min", hasViz: true },
+          { id: "sql-found-02", title: "Three-Valued Logic of NULL", duration: "12 min", hasViz: true },
+          { id: "sql-found-03", title: "GROUP BY & Aggregations", duration: "12 min", hasViz: true },
+          { id: "sql-found-04", title: "Subqueries vs Basic Joins", duration: "12 min", hasViz: true },
         ]
       },
       {
@@ -187,7 +226,7 @@ const CURRICULUM = [
           { id: "sq-a1", title: "Window Functions: ROW_NUMBER, RANK, DENSE_RANK", duration: "22 min", hasViz: true },
           { id: "sq-a2", title: "LAG, LEAD & Running Calculations", duration: "18 min", hasViz: true },
           { id: "sq-a3", title: "CTEs & Recursive Queries", duration: "20 min", hasViz: true },
-          { id: "sq-a4", title: "PIVOT, UNPIVOT & Conditional Aggregation", duration: "15 min", hasViz: false },
+          { id: "sq-a4", title: "PIVOT, UNPIVOT & Conditional Aggregation", duration: "15 min", hasViz: true },
           { id: "sq-a5", title: "Query Optimization & EXPLAIN Plans", duration: "25 min", hasViz: true },
         ]
       },
@@ -195,7 +234,7 @@ const CURRICULUM = [
         id: "sql-design",
         title: "Database Design",
         lessons: [
-          { id: "sq-d1", title: "Normalization: 1NF â†’ 3NF â†’ BCNF", duration: "20 min", hasViz: true },
+          { id: "sq-d1", title: "Normalization: 1NF → 3NF → BCNF", duration: "20 min", hasViz: true },
           { id: "sq-d2", title: "Indexing Strategies", duration: "18 min", hasViz: true },
           { id: "sq-d3", title: "Star Schema vs Snowflake Schema", duration: "15 min", hasViz: true },
           { id: "sq-d4", title: "OLTP vs OLAP: Choosing the Right DB", duration: "12 min", hasViz: true },
@@ -258,7 +297,7 @@ const CURRICULUM = [
           { id: "st-a1", title: "A/B Testing: Design to Decision", duration: "25 min", hasViz: true },
           { id: "st-a2", title: "Multiple Testing & Bonferroni Correction", duration: "12 min", hasViz: true },
           { id: "st-a3", title: "Bootstrap Methods", duration: "15 min", hasViz: true },
-          { id: "st-a4", title: "Bayesian vs Frequentist: The Debate", duration: "18 min", hasViz: false },
+          { id: "st-a4", title: "Bayesian vs Frequentist: The Debate", duration: "18 min", hasViz: true },
         ]
       }
     ],
@@ -915,6 +954,8 @@ const VISUALIZATIONS = {
   "dl-f3": ActivationFunctions,
   "dl-f4": GradientDescentViz,
   "dl-a1": ConvolutionFilter,
+  "dl-a2": DLRNNLSTMViz,
+  "dl-a4": DLTransferLearningViz,
   "dl-f5": RegularizationEffect,
   "ml-f1": LearningParadigms,
   "ml-f2": BiasVarianceViz,
@@ -945,6 +986,7 @@ const VISUALIZATIONS = {
   "sp-t1": TimeSeriesDecomposition,
   "sp-r1": RecSysCollaborativeFiltering,
   "sp-n2": WordEmbeddings,
+  "py-b1": VariableBindingLab,
   "py-b2": StringFormatAtelier,
   "py-b3": PythonMutabilityViz,
   "py-b4": HashLab,
@@ -954,6 +996,13 @@ const VISUALIZATIONS = {
   "py-c3": ArgumentBinder,
   "py-c4": FoldMachine,
   "py-c5": TracebackTheater,
+  "py-o1": ClassObjectLab,
+  "py-o2": InheritanceExplorer,
+  "py-o4": DecoratorForge,
+  "py-d1": FeatureScaling,
+  "py-d2": PandasDataLab,
+  "py-d3": GroupByMergeForge,
+  "py-d5": VectorizationRace,
   "sd-p1": BatchVsStreaming,
   "sd-p2": ETLPipeline,
   "sd-p3": StreamingEnginesTrinity,
@@ -962,6 +1011,32 @@ const VISUALIZATIONS = {
   "sd-m2": FeatureStoreViz,
   "sd-m3": BatchVsStreaming,
   "sd-m4": RecSysCollaborativeFiltering,
+  "sql-found-01": SQLOrderOfExecution,
+  "sql-found-02": SQLNullLogic,
+  "sql-found-03": SQLGroupByViz,
+  "sql-found-04": SQLSubqueryVsJoin,
+  "sq-a1": SQLWindowFunctionsViz,
+  "sq-a2": SQLLagLeadViz,
+  "sq-a3": SQLCteExplorer,
+  "sq-a4": SQLPivotViz,
+  "sq-a5": SQLExplainPlanViz,
+  "sq-d1": SQLNormalizationViz,
+  "sq-d2": SQLIndexingViz,
+  "sq-d3": SQLStarSnowflakeViz,
+  "sq-d4": SQLOltpOlapViz,
+  "st-f1": StatMeanMedianModeViz,
+  "st-f3": StatPercentileIQRViz,
+  "st-f4": StatCorrelationViz,
+  "st-p3": StatBinomialPoissonViz,
+  "st-p4": StatCLTViz,
+  "st-i2": StatPValueViz,
+  "st-i3": StatTestsViz,
+  "st-i4": StatConfidenceIntervalViz,
+  "st-i5": StatTypeErrorsViz,
+  "st-i6": StatPowerAnalysisViz,
+  "st-a2": StatMultipleTestingViz,
+  "st-a3": StatBootstrapViz,
+  "st-a4": StatBayesFrequentistViz,
 };
 
 const ML_VIZ_FALLBACK = [
@@ -1037,6 +1112,7 @@ export default function DataSparkPlatform() {
   const [activeLesson, setActiveLesson] = useState(null);
   const [activeQuestion, setActiveQuestion] = useState(null);
   const [chatbotCourse, setChatbotCourse] = useState(null);
+  const [chatbotSeed, setChatbotSeed] = useState("");
   const [userAnswer, setUserAnswer] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [showModel, setShowModel] = useState(false);
@@ -1046,10 +1122,61 @@ export default function DataSparkPlatform() {
   const [evalLoading, setEvalLoading] = useState(false);
   const [evalError, setEvalError] = useState(null);
   const [evalResult, setEvalResult] = useState(null);
+  const { intent, setIntent } = useLearnerIntent();
+
+  // Screen-reader announcement for the current view (DS-101 accessibility).
+  const liveMessage =
+    view === "lesson" && activeLesson ? `Lesson opened: ${activeLesson.title}`
+    : view === "course" && activeCourse ? `Course opened: ${activeCourse.title}`
+    : view === "question" && activeQuestion ? `Practice question opened: ${activeQuestion.title}`
+    : view === "home" ? "Home"
+    : "";
 
   const totalLessons = CURRICULUM.reduce((a, c) => a + c.topics.reduce((b, t) => b + t.lessons.length, 0), 0);
   const totalQuestions = CURRICULUM.reduce((a, c) => a + c.questions.length, 0);
+  useEffect(() => {
+    window.history.pushState({ dsView: view }, "");
+  }, [view]);
+
+  useEffect(() => {
+    try {
+      const issues = auditPythonLessonIntegrity(CURRICULUM, VISUALIZATIONS);
+      if (issues.length > 0) {
+        console.warn("[DataSpark] Python lesson integrity issues:", issues);
+      }
+    } catch {
+      // Audit is non-blocking — never let it crash the platform.
+    }
+  }, []);
+
+  useEffect(() => {
+    const onPop = (event) => {
+      const nextView = event?.state?.dsView;
+      if (nextView && ["home", "course", "lesson", "question"].includes(nextView)) {
+        setView(nextView);
+      } else if (view !== "home") {
+        setView("home");
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [view]);
+
   const completedLessons = Object.keys(progress).filter(k => progress[k] === "done").length;
+
+  useEffect(() => {
+    if (view === "lesson" && activeLesson && activeCourse) {
+      try {
+        trackLvsEvent({
+          eventName: LVS_EVENT_NAMES.lessonStart,
+          page: "/platform",
+          metadata: buildLvsMetadata({ courseId: activeCourse.id, lessonId: activeLesson.id }),
+        });
+      } catch {
+        // Never block UX on analytics failures.
+      }
+    }
+  }, [view, activeLesson, activeCourse]);
 
   const submitPracticeAnswer = useCallback(async () => {
     if (!activeQuestion || !userAnswer.trim()) return;
@@ -1136,6 +1263,88 @@ export default function DataSparkPlatform() {
           ))}
         </div>
       </div>
+
+      <div style={{ ...dsGlassCard({ padding: "14px 18px", marginBottom: 20 }), display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <div style={{ fontSize: 12, color: DS.t3, fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>
+          What brings you here?
+        </div>
+        <IntentSelector intent={intent} onSelect={setIntent} compact />
+      </div>
+
+      {(() => {
+        const pythonCourse = CURRICULUM.find((c) => c.id === "python");
+        const pythonLessonCount = pythonCourse
+          ? pythonCourse.topics.reduce((a, t) => a + t.lessons.length, 0)
+          : 0;
+        const completedPythonIds = pythonCourse
+          ? pythonCourse.topics.flatMap((t) => t.lessons.map((l) => l.id)).filter((id) => progress[id] === "done")
+          : [];
+        const artifacts = buildPythonProgressArtifacts({
+          completedLessonIds: completedPythonIds,
+          totalPythonLessons: pythonLessonCount,
+        });
+        if (artifacts.unlockedSkills.length === 0 && artifacts.readinessMilestones.length === 0) return null;
+        const donePy = new Set(completedPythonIds);
+        const CLUSTER_LESSONS = {
+          "py-basics": ["py-b1", "py-b2", "py-b3", "py-b4", "py-b5"],
+          "py-control": ["py-c1", "py-c2", "py-c3", "py-c4", "py-c5"],
+          "py-oop": ["py-o1", "py-o2", "py-o3", "py-o4"],
+          "py-data": ["py-d1", "py-d2", "py-d3", "py-d4", "py-d5"],
+        };
+        const clusterNarratives = Object.entries(CLUSTER_LESSONS)
+          .filter(([, ids]) => ids.every((id) => donePy.has(id)))
+          .map(([cid]) => PYTHON_CLUSTER_MILESTONES?.[cid])
+          .filter(Boolean);
+        return (
+          <div style={{ ...dsGlassCard({ padding: "16px 20px", marginBottom: 20, border: `1px solid rgba(59,130,246,0.25)` }) }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#60A5FA", fontFamily: "var(--ds-mono), monospace", letterSpacing: "0.12em", marginBottom: 10, textTransform: "uppercase" }}>
+              Python Progress &mdash; {artifacts.completionRate}% complete
+            </div>
+            {artifacts.unlockedSkills.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Unlocked skills</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {artifacts.unlockedSkills.map((skill) => (
+                    <span key={skill} style={{ fontSize: 10, padding: "4px 10px", borderRadius: 999, background: "rgba(59,130,246,0.12)", color: "#60A5FA", fontFamily: "var(--ds-mono), monospace", fontWeight: 600, border: "1px solid rgba(59,130,246,0.3)" }}>
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {artifacts.readinessMilestones.length > 0 && (
+              <div>
+                <div style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Milestones reached</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {artifacts.readinessMilestones.map((m) => (
+                    <span key={m} style={{ fontSize: 10, padding: "4px 10px", borderRadius: 999, background: "rgba(52,211,153,0.12)", color: DS.grn, fontFamily: "var(--ds-mono), monospace", fontWeight: 600, border: "1px solid rgba(52,211,153,0.3)" }}>
+                      {m}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {clusterNarratives.length > 0 && (
+              <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${DS.border}`, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace" }}>You can now</div>
+                {clusterNarratives.map((c) => (
+                  <div key={c.title} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                    <span aria-hidden="true" style={{ color: DS.grn, fontWeight: 700, lineHeight: 1.5 }}>✓</span>
+                    <span style={{ fontSize: 13, color: DS.t2, lineHeight: 1.5, fontFamily: "var(--ds-sans), sans-serif" }}>{c.completionStatement}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ marginTop: 16 }}>
+              <ProgressArtifactCard
+                completionRate={artifacts.completionRate}
+                unlockedSkills={artifacts.unlockedSkills}
+                readinessMilestones={artifacts.readinessMilestones}
+              />
+            </div>
+          </div>
+        );
+      })()}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16, paddingBottom: 72 }}>
         {CURRICULUM.map((course) => {
@@ -1337,10 +1546,22 @@ export default function DataSparkPlatform() {
         onBack={() => setView("course")}
         backLabel={`â† Back to ${activeCourse.title}`}
         onMarkComplete={() => {
+          try {
+            trackLvsEvent({
+              eventName: LVS_EVENT_NAMES.lessonComplete,
+              page: "/platform",
+              metadata: buildLvsMetadata({ courseId: activeCourse.id, lessonId: activeLesson.id, passed: true }),
+            });
+          } catch {
+            // Never block UX on analytics failures.
+          }
           setProgress((p) => ({ ...p, [activeLesson.id]: "done" }));
           setView("course");
         }}
-        onAskTutor={() => setChatbotCourse(activeCourse)}
+        onAskTutor={() => { setChatbotSeed(""); setChatbotCourse(activeCourse); }}
+        onOpenPractice={() => { setCourseTab("practice"); setView("course"); }}
+        intent={intent}
+        onAskTutorWithPrompt={(prompt) => { setChatbotSeed(prompt || ""); setChatbotCourse(activeCourse); }}
       />
     );
   };
@@ -1510,6 +1731,7 @@ export default function DataSparkPlatform() {
 
   return (
     <div style={{ minHeight: "100vh", background: DS.bg, color: DS.t1, fontFamily: "var(--ds-sans), system-ui, sans-serif", position: "relative" }}>
+      <LiveRegion message={liveMessage} />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
         :root { --ds-sans: 'Manrope', system-ui, sans-serif; --ds-mono: 'JetBrains Mono', monospace; }
@@ -1568,6 +1790,22 @@ export default function DataSparkPlatform() {
           >
             Landing
           </Link>
+          <Link
+            to="/platform/insights"
+            style={{
+              fontSize: 11,
+              color: DS.t3,
+              textDecoration: "none",
+              fontFamily: "var(--ds-mono), monospace",
+              fontWeight: 600,
+              padding: "6px 10px",
+              borderRadius: 8,
+              border: `1px solid ${DS.border}`,
+              flexShrink: 0,
+            }}
+          >
+            Insights
+          </Link>
         </div>
 
         <div style={{ display: "flex", gap: 4, overflowX: "auto", maxWidth: "min(68vw, 520px)", paddingBottom: 2 }}>
@@ -1607,7 +1845,7 @@ export default function DataSparkPlatform() {
         {view === "question" && renderQuestion()}
       </main>
 
-      {chatbotCourse && <AIChatbot course={chatbotCourse} onClose={() => setChatbotCourse(null)} />}
+      {chatbotCourse && <AIChatbot course={chatbotCourse} seedInput={chatbotSeed} onClose={() => { setChatbotCourse(null); setChatbotSeed(""); }} />}
     </div>
   );
 }
