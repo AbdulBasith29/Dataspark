@@ -129,9 +129,31 @@ All 18 lessons (st-f1→st-f4, st-p1→st-p4, st-i1→st-i6, st-a1→st-a4) full
 5. **Build**: `npm run build` — fix any syntax errors (common: missing closing quote in JSX string props)
 6. **Commit + push** to `codex/audit-dataspark-module-for-interview-preparation`
 
+### Deep Learning curriculum
+All 9 lessons (dl-f1→dl-f5, dl-a1→dl-a4) fully built with:
+- Full `learnMarkdown` + `interviewGraph` + `knowledgeCheck`
+- 2 new bespoke viz components (see below)
+- Existing viz retained: `NeuralNetwork` (dl-f1), `BackpropAnimation` (dl-f2), `ActivationFunctions` (dl-f3), `GradientDescentViz` (dl-f4), `RegularizationEffect` (dl-f5), `ConvolutionFilter` (dl-a1)
+
+### Deep Learning Visualizations created
+| Lesson | Component |
+|--------|-----------|
+| dl-a2 RNNs & LSTMs | `DLRNNLSTMViz` |
+| dl-a4 Transfer Learning | `DLTransferLearningViz` |
+
 ## Common gotchas
 - **TDZ crash**: declaring a `const` after it's referenced in module-level code (e.g. inside a top-level array). Always declare color constants at the top of viz files.
 - **Double-comma**: when injecting lesson modules, check for `},,` with `grep -n '},,' lesson-modules.js`
 - **Missing quote in JSX**: `color: "#FB923C }` (missing closing `"`) — shows as "unterminated string" in build
 - **Duplicate VISUALIZATIONS key warning**: `sq-a1` appears twice in the map — harmless warning, last one wins
-- **st-a4 hasViz**: was `false`, now `true` — already fixed
+- **Unescaped inline backticks in learnMarkdown**: inline code like `` `model.eval()` `` inside a JS template literal must be escaped as `\`` or the template literal ends prematurely. Use Python to find unescaped single backticks in the DL section (exclude triple-fence sequences).
+
+## Workflow for adding a new lesson batch
+
+1. **Concurrent agents** (one per topic): each agent writes viz `.jsx` files to `src/visualizations/` and dumps lesson module JS to `/tmp/<topic>_lessons.js`
+2. **Copy viz files** from worktrees to main repo
+3. **Inject lesson modules** into `lesson-modules.js` using Python: find last `\n};`, insert before it
+4. **Escape inline backticks**: scan DL/new content for unescaped single backticks inside template literals — escape them with `\``
+5. **Update platform file**: add `import` lines + VISUALIZATIONS map entries + fix any `hasViz: false` flags
+6. **Build**: `npm run build` — fix any syntax errors
+7. **Commit + push** to `codex/audit-dataspark-module-for-interview-preparation`
