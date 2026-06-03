@@ -955,6 +955,7 @@ const VISUALIZATIONS = {
   "dl-f4": GradientDescentViz,
   "dl-a1": ConvolutionFilter,
   "dl-a2": DLRNNLSTMViz,
+  "dl-a3": Attention,
   "dl-a4": DLTransferLearningViz,
   "dl-f5": RegularizationEffect,
   "ml-f1": LearningParadigms,
