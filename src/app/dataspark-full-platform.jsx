@@ -42,6 +42,14 @@ import StreamingEnginesTrinity from "../visualizations/StreamingEnginesTrinity.j
 import WarehouseStarSchema from "../visualizations/WarehouseStarSchema.jsx";
 import MLSystemPipeline from "../visualizations/MLSystemPipeline.jsx";
 import FeatureStoreViz from "../visualizations/FeatureStoreViz.jsx";
+import LearningParadigms from "../visualizations/LearningParadigms.jsx";
+import FeatureEngineeringLab from "../visualizations/FeatureEngineeringLab.jsx";
+import RandomForestBagging from "../visualizations/RandomForestBagging.jsx";
+import GradientBoosting from "../visualizations/GradientBoosting.jsx";
+import SVMMargins from "../visualizations/SVMMargins.jsx";
+import DBSCANClustering from "../visualizations/DBSCANClustering.jsx";
+import TSNEvsUMAP from "../visualizations/TSNEvsUMAP.jsx";
+import ImbalancedClasses from "../visualizations/ImbalancedClasses.jsx";
 import ClassObjectLab from "../visualizations/ClassObjectLab.jsx";
 import InheritanceExplorer from "../visualizations/InheritanceExplorer.jsx";
 import DecoratorForge from "../visualizations/DecoratorForge.jsx";
@@ -74,6 +82,8 @@ import StatPowerAnalysisViz from "../visualizations/StatPowerAnalysisViz.jsx";
 import StatMultipleTestingViz from "../visualizations/StatMultipleTestingViz.jsx";
 import StatBootstrapViz from "../visualizations/StatBootstrapViz.jsx";
 import StatBayesFrequentistViz from "../visualizations/StatBayesFrequentistViz.jsx";
+import DLRNNLSTMViz from "../visualizations/DLRNNLSTMViz.jsx";
+import DLTransferLearningViz from "../visualizations/DLTransferLearningViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import LessonModule from "../components/platform/LessonModule.jsx";
 import { getResolvedLessonModule, auditPythonLessonIntegrity, PYTHON_CLUSTER_MILESTONES } from "../data/lesson-modules.js";
@@ -944,18 +954,29 @@ const VISUALIZATIONS = {
   "dl-f3": ActivationFunctions,
   "dl-f4": GradientDescentViz,
   "dl-a1": ConvolutionFilter,
+  "dl-a2": DLRNNLSTMViz,
+  "dl-a3": Attention,
+  "dl-a4": DLTransferLearningViz,
   "dl-f5": RegularizationEffect,
+  "ml-f1": LearningParadigms,
   "ml-f2": BiasVarianceViz,
   "ml-f3": TrainValTestSplit,
+  "ml-f4": FeatureEngineeringLab,
   "ml-f5": FeatureScaling,
   "ml-s1": LinearRegression,
   "ml-s2": LogisticRegression,
   "ml-s3": DecisionTree,
+  "ml-s4": RandomForestBagging,
+  "ml-s5": GradientBoosting,
+  "ml-s6": SVMMargins,
   "ml-u1": KMeansClustering,
+  "ml-u2": DBSCANClustering,
   "ml-u3": PCA,
+  "ml-u4": TSNEvsUMAP,
   "ml-e1": ConfusionMatrix,
   "ml-e2": ROCCurve,
   "ml-e3": CrossValidation,
+  "ml-e4": ImbalancedClasses,
   "st-f2": NormalDistViz,
   "sq-b2": SQLJoins,
   "sq-a1": WindowFunctions,

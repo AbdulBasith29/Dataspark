@@ -1,7 +1,12 @@
-/**
- * Full lesson modules: Learn (long-form) → Watch / deep dive → Try → Knowledge check.
- * Aligns with docs/CURRICULUM-SCOPE.md §2. Lessons without an entry use buildFallbackModule().
+﻿/**
+ * Full lesson modules: Learn (long-form) â†’ Watch / deep dive â†’ Try â†’ Knowledge check.
+ * Aligns with docs/CURRICULUM-SCOPE.md Â§2. Lessons without an entry use buildFallbackModule().
  */
+
+import { ML_FOUNDATIONS } from "./ml/foundations.js";
+import { ML_SUPERVISED } from "./ml/supervised.js";
+import { ML_UNSUPERVISED } from "./ml/unsupervised.js";
+import { ML_EVALUATION } from "./ml/evaluation.js";
 
 export const MODULE_TIME_LABEL = "18–20 min";
 const MD_CODE_TICK = "`";
@@ -36,7 +41,7 @@ const FALLBACK_CHECKS = [
       "Because video alone is always sufficient",
     ],
     correctIndex: 0,
-    explanation: "Intuition first (predict), then verify (drag/slide/query) — the same loop strong interviewers probe.",
+    explanation: "Intuition first (predict), then verify (drag/slide/query) â€” the same loop strong interviewers probe.",
   },
 ];
 
@@ -61,13 +66,13 @@ Write, on paper or in a notes app:
 
 ## Pitfalls (generic but real)
 
-- **Treating the interactive as the whole lesson** — it is the *check* on your mental model, not the syllabus.
-- **Skipping the knowledge check** — it is low-stakes practice for the “explain tradeoffs” part of interviews.
-- **Memorizing syntax without a story** — interviewers pivot to *why* and *when*.
+- **Treating the interactive as the whole lesson** â€” it is the *check* on your mental model, not the syllabus.
+- **Skipping the knowledge check** â€” it is low-stakes practice for the â€œexplain tradeoffsâ€ part of interviews.
+- **Memorizing syntax without a story** â€” interviewers pivot to *why* and *when*.
 
 ## Interview hook
 
-Expect variations of: “Tell me about a time this went wrong in production” or “How would you validate that result?” Tie your answer to **business impact** (revenue, trust, latency), not only correctness.`;
+Expect variations of: â€œTell me about a time this went wrong in productionâ€ or â€œHow would you validate that result?â€ Tie your answer to **business impact** (revenue, trust, latency), not only correctness.`;
 }
 
 
@@ -85,7 +90,7 @@ Turn this into an active exercise:
 
 1. Open the **Practice** tab and pick **one** question tagged near this topic.
 2. Before you write a solution, **predict** the shape of the output (rows/columns or model behavior).
-3. Solve, then **diff** your prediction vs reality — that gap is what to rehearse aloud.
+3. Solve, then **diff** your prediction vs reality â€” that gap is what to rehearse aloud.
 
 If there is no exact tag match, ask the **AI tutor**: "Give me a 5-minute drill on ${lesson.title} with a rubric."`;
 }
@@ -954,21 +959,21 @@ export const LESSON_MODULES = {
   "py-b1": {
     durationLabel: MODULE_TIME_LABEL,
     outcomes: [
-      "Explain the **name → object** binding model (variables are labels, not boxes).",
+      "Explain the **name â†’ object** binding model (variables are labels, not boxes).",
       "Predict when code **mutates** an object vs **rebinds** a name (and why that matters in pipelines).",
       "Use `id()`, `type()`, `is`, and `==` correctly to debug identity, aliasing, and None checks.",
       "Write boundary-safe code: **parse early, validate once**, and make contracts explicit with type hints.",
     ],
     learnMarkdown: `## The mental model (the one that prevents ghost bugs)
 
-In Python, a “variable” is not a box that holds a value. It is a **name** bound to an **object**.
+In Python, a â€œvariableâ€ is not a box that holds a value. It is a **name** bound to an **object**.
 
 That single model explains:
 
 - Why \`b = a\` creates **aliasing** (two names, one object)
-- Why mutability creates “ghost changes”
+- Why mutability creates â€œghost changesâ€
 - Why \`is\` is not the same as \`==\`
-- Why “copying” is not always copying
+- Why â€œcopyingâ€ is not always copying
 
 ### Objects have three important properties
 
@@ -1010,14 +1015,14 @@ b = a
 b.append(1)
 \`\`\`
 
-Both \`a\` and \`b\` refer to the same list — a frequent cause of “it changed somewhere else” bugs.
+Both \`a\` and \`b\` refer to the same list â€” a frequent cause of â€œit changed somewhere elseâ€ bugs.
 
 ---
 
 ## Equality vs identity: \`==\` vs \`is\`
 
-- **\`==\`**: “Do these have the same value?”
-- **\`is\`**: “Are these the same object?”
+- **\`==\`**: â€œDo these have the same value?â€
+- **\`is\`**: â€œAre these the same object?â€
 
 \`\`\`
 a = [1, 2]
@@ -1033,7 +1038,7 @@ if x is None:
     ...
 \`\`\`
 
-Use \`is None\` for sentinel checks. Avoid \`x is 1000\` style comparisons (interning can make them “work” until they don’t).
+Use \`is None\` for sentinel checks. Avoid \`x is 1000\` style comparisons (interning can make them â€œworkâ€ until they donâ€™t).
 
 ---
 
@@ -1055,11 +1060,11 @@ This speeds iteration, but production systems demand discipline at boundaries:
 
 ---
 
-## Type hints: not enforcement — leverage
+## Type hints: not enforcement â€” leverage
 
 Type hints do **not** enforce runtime behavior. Their job is to make code:
 
-- easier to review (“what shape is this?”)
+- easier to review (â€œwhat shape is this?â€)
 - safer to refactor
 - easier to test
 - easier to use correctly (autocomplete + tooling)
@@ -1081,13 +1086,13 @@ Take untrusted input (env/JSON/config) and convert it into a clean, explicit int
 
 ## Interview hook (answer like a senior)
 
-“In Python, variables are bindings to objects. Most subtle bugs come from aliasing and unintended mutation. I use \`is None\` for sentinel checks, \`==\` for value equality, and I validate/normalize inputs at boundaries so core logic stays predictable.”`,
+â€œIn Python, variables are bindings to objects. Most subtle bugs come from aliasing and unintended mutation. I use \`is None\` for sentinel checks, \`==\` for value equality, and I validate/normalize inputs at boundaries so core logic stays predictable.â€`,
 
     // No curated clip yet; ship the deep dive as written content.
     video: null,
-    videoFallbackMarkdown: `## Deep dive: build a debugger’s intuition
+    videoFallbackMarkdown: `## Deep dive: build a debuggerâ€™s intuition
 
-### 1) The “binding graph” you should picture
+### 1) The â€œbinding graphâ€ you should picture
 
 When you see:
 
@@ -1096,7 +1101,7 @@ raw = {"batch_size": "1000"}
 cfg = raw
 \`\`\`
 
-You should instantly think: “Two names, one object.” If \`cfg\` is mutated, \`raw\` changes too.
+You should instantly think: â€œTwo names, one object.â€ If \`cfg\` is mutated, \`raw\` changes too.
 
 ### 2) Predict first, then verify (how you learn this for real)
 
@@ -1110,9 +1115,9 @@ Run this loop mentally before you execute code:
 
 In ETL code, subtle shared-state bugs show up as:
 
-- “Why did this record’s fields change after a helper ran?”
-- “Why does my config grow every time the job retries?”
-- “Why does a list keep accumulating values across calls?”
+- â€œWhy did this recordâ€™s fields change after a helper ran?â€
+- â€œWhy does my config grow every time the job retries?â€
+- â€œWhy does a list keep accumulating values across calls?â€
 
 These are name-binding + mutability bugs, not pandas bugs.
 
@@ -1139,9 +1144,9 @@ def append_to(element, to=None):
 ### 5) Type hints: practical guidance
 
 - Use type hints to state intent and enable tooling.
-- Still validate at boundaries: hints don’t stop \`"100"\` from sneaking in as an int.
+- Still validate at boundaries: hints donâ€™t stop \`"100"\` from sneaking in as an int.
 
-If you can explain these tradeoffs clearly, you’ll outperform most candidates.`,
+If you can explain these tradeoffs clearly, youâ€™ll outperform most candidates.`,
 
     tryGuidance: "Use the binding lab below as a prediction game: choose a scenario, decide whether the code will **mutate** an existing object, **rebind** a name, or compare **value vs identity**, then verify the name → object diagram and debugger cue.",
 
@@ -1171,7 +1176,7 @@ If you can explain these tradeoffs clearly, you’ll outperform most candidates.
         options: [
           "[1] because a and b refer to the same list",
           "[] because append only affects b",
-          "It raises an exception because lists can’t be shared",
+          "It raises an exception because lists canâ€™t be shared",
         ],
         correctIndex: 0,
         explanation: "This is aliasing: two names refer to one list, and append mutates in place.",
@@ -1215,23 +1220,23 @@ If you can explain these tradeoffs clearly, you’ll outperform most candidates.
       "Treat a Python `str` as an **immutable sequence of Unicode code points**, not a bag of bytes.",
       "Compose f-strings fluently: **conversion flags** (`!r`/`!s`/`!a`) + the **format mini-language** (fill, align, sign, width, grouping, precision, type).",
       "Pick the right **string method** for the job (strip/split/join/replace/casefold) and avoid `+=` in loops.",
-      "Know **when not to use f-strings**: logging, SQL, shell, i18n — each has a safer idiom.",
+      "Know **when not to use f-strings**: logging, SQL, shell, i18n â€” each has a safer idiom.",
     ],
     learnMarkdown: `## The mental model (say this out loud)
 
 A Python \`str\` is an **immutable sequence of Unicode code points**. Two words do all the work:
 
-- **Immutable** — every “modification” (\`s.lower()\`, \`s.replace(...)\`, \`s + "!"\`) returns a **new** string. The old object is untouched. This is why \`s += x\` inside a tight loop is an O(n²) footgun — each iteration allocates a brand-new string.
-- **Unicode** — indexing walks **code points**, not bytes. \`len("résumé") == 6\`, but when you \`encode("utf-8")\` the byte count can jump. \`str\` is characters, \`bytes\` is octets, and the line between them is where most production bugs live.
+- **Immutable** â€” every â€œmodificationâ€ (\`s.lower()\`, \`s.replace(...)\`, \`s + "!"\`) returns a **new** string. The old object is untouched. This is why \`s += x\` inside a tight loop is an O(nÂ²) footgun â€” each iteration allocates a brand-new string.
+- **Unicode** â€” indexing walks **code points**, not bytes. \`len("rÃ©sumÃ©") == 6\`, but when you \`encode("utf-8")\` the byte count can jump. \`str\` is characters, \`bytes\` is octets, and the line between them is where most production bugs live.
 
 ## String literals: the four you actually use
 
-- \`'ada'\` and \`"ada"\` — interchangeable. Pick one per file and be consistent.
-- \`"""triple"""\` — spans lines, keeps newlines literal. Docstrings and SQL.
-- \`r"C:\\\\Users\\\\ada"\` — raw string. Backslashes are **literal**. Non-negotiable for regex and Windows paths.
-- \`b"bytes"\` — a **different type**, not a string. \`str.encode("utf-8")\` converts str → bytes; \`bytes.decode("utf-8")\` converts back.
+- \`'ada'\` and \`"ada"\` â€” interchangeable. Pick one per file and be consistent.
+- \`"""triple"""\` â€” spans lines, keeps newlines literal. Docstrings and SQL.
+- \`r"C:\\\\Users\\\\ada"\` â€” raw string. Backslashes are **literal**. Non-negotiable for regex and Windows paths.
+- \`b"bytes"\` â€” a **different type**, not a string. \`str.encode("utf-8")\` converts str â†’ bytes; \`bytes.decode("utf-8")\` converts back.
 
-Adjacent string literals are **implicitly concatenated**: \`"hello " "world"\` → \`"hello world"\`. Handy for long SQL; dangerous inside function calls where a missing comma silently glues two args into one.
+Adjacent string literals are **implicitly concatenated**: \`"hello " "world"\` â†’ \`"hello world"\`. Handy for long SQL; dangerous inside function calls where a missing comma silently glues two args into one.
 
 ---
 
@@ -1247,26 +1252,26 @@ f"prefix {expression!conversion:format_spec} suffix"
 
 Three slots inside the braces, each optional except \`expression\`:
 
-### 1 · The expression
+### 1 Â· The expression
 
-Any Python expression: a variable, a call, a dict lookup, arithmetic, even a list comprehension. Python 3.8+ adds \`{x=}\` — it prints the **source** \`x=\` plus the value. Logging gold.
+Any Python expression: a variable, a call, a dict lookup, arithmetic, even a list comprehension. Python 3.8+ adds \`{x=}\` â€” it prints the **source** \`x=\` plus the value. Logging gold.
 
 \`\`\`
 unit_price, qty = 4.20, 3
 print(f"{unit_price * qty = }")   # unit_price * qty = 12.6
 \`\`\`
 
-### 2 · The conversion flag: \`!r\` \`!s\` \`!a\`
+### 2 Â· The conversion flag: \`!r\` \`!s\` \`!a\`
 
 Runs **before** the format spec.
 
-- \`!s\` — default, calls \`str()\`.
-- \`!r\` — calls \`repr()\`. For strings this wraps them in quotes and escapes invisibles — it is your debugging best friend. \`f"got {value!r}"\` surfaces trailing whitespace, \`\\n\`, and mixed unicode.
-- \`!a\` — \`ascii()\`. Same as \`!r\` but non-ASCII characters are escaped as \`\\uXXXX\`.
+- \`!s\` â€” default, calls \`str()\`.
+- \`!r\` â€” calls \`repr()\`. For strings this wraps them in quotes and escapes invisibles â€” it is your debugging best friend. \`f"got {value!r}"\` surfaces trailing whitespace, \`\\n\`, and mixed unicode.
+- \`!a\` â€” \`ascii()\`. Same as \`!r\` but non-ASCII characters are escaped as \`\\uXXXX\`.
 
-Interview heuristic: if a bug involves “invisible” characters, reach for \`!r\`.
+Interview heuristic: if a bug involves â€œinvisibleâ€ characters, reach for \`!r\`.
 
-### 3 · The format mini-language
+### 3 Â· The format mini-language
 
 After a colon, Python parses this tiny grammar:
 
@@ -1276,16 +1281,16 @@ After a colon, Python parses this tiny grammar:
 
 Read it left to right:
 
-- **fill** + **align** — a single fill char plus one of \`<\` (left), \`>\` (right), \`^\` (center), \`=\` (pad between sign and digits). Fill is only read when align is present.
-- **sign** — \`-\` (default, show sign only on negatives), \`+\` (always), \` \` (leading space for positives, so columns line up).
-- **#** — alt form. Adds \`0b\`/\`0o\`/\`0x\` prefixes for bin/oct/hex; forces a decimal point on \`g\`/\`f\`.
-- **0** — zero-pad. Shorthand for fill=\`0\` with align=\`=\` (zeros slide **after** the sign).
-- **width** — minimum field width. The value **never** gets truncated by width — only by precision.
-- **, or _** — thousands separator: \`f"{1234567:,}"\` → \`1,234,567\`.
-- **.precision** — floats: digits after the point. Strings: **truncate** to N chars. Integers: error.
-- **type** — \`s\` string · \`d\` int · \`f\` fixed · \`e\` scientific · \`g\` general · \`%\` percent · \`b\`/\`o\`/\`x\`/\`X\` bin/oct/hex · \`c\` codepoint.
+- **fill** + **align** â€” a single fill char plus one of \`<\` (left), \`>\` (right), \`^\` (center), \`=\` (pad between sign and digits). Fill is only read when align is present.
+- **sign** â€” \`-\` (default, show sign only on negatives), \`+\` (always), \` \` (leading space for positives, so columns line up).
+- **#** â€” alt form. Adds \`0b\`/\`0o\`/\`0x\` prefixes for bin/oct/hex; forces a decimal point on \`g\`/\`f\`.
+- **0** â€” zero-pad. Shorthand for fill=\`0\` with align=\`=\` (zeros slide **after** the sign).
+- **width** â€” minimum field width. The value **never** gets truncated by width â€” only by precision.
+- **, or _** â€” thousands separator: \`f"{1234567:,}"\` â†’ \`1,234,567\`.
+- **.precision** â€” floats: digits after the point. Strings: **truncate** to N chars. Integers: error.
+- **type** â€” \`s\` string Â· \`d\` int Â· \`f\` fixed Â· \`e\` scientific Â· \`g\` general Â· \`%\` percent Â· \`b\`/\`o\`/\`x\`/\`X\` bin/oct/hex Â· \`c\` codepoint.
 
-The spec is **context-sensitive**: \`.3\` on a \`str\` truncates, on a \`float\` it means 3 decimals. Same two characters, different semantics — interviewers love this.
+The spec is **context-sensitive**: \`.3\` on a \`str\` truncates, on a \`float\` it means 3 decimals. Same two characters, different semantics â€” interviewers love this.
 
 ### Nested / dynamic specs
 
@@ -1304,14 +1309,14 @@ This is how you build column layouts without reaching for \`tabulate\`.
 
 Think in **pipelines**, not ad-hoc calls:
 
-- \`s.strip()\` / \`.lstrip()\` / \`.rstrip()\` — trim whitespace. Pass a string to remove **any of those characters**, not a suffix: \`"abc.com".rstrip(".com")\` returns \`"ab"\`, not \`"abc"\`. For suffix stripping use \`str.removesuffix\` (3.9+).
-- \`.split(sep=None, maxsplit=-1)\` — \`None\` splits on any whitespace and collapses runs. \`","\` splits on the literal.
-- \`sep.join(iterable)\` — the only way to concatenate N strings performantly: \`", ".join(names)\` is O(n) with a single allocation. Never \`s += x\` in a loop.
-- \`.replace(old, new, count=-1)\` — returns a new string; does not mutate.
-- \`.startswith(prefix)\` / \`.endswith(suffix)\` — accepts a **tuple** of options: \`url.startswith(("http://", "https://"))\`. Prefer over slicing.
-- \`in\` — membership: \`"error" in line\` is idiomatic. \`.find\` returns \`-1\` if missing; \`.index\` raises.
-- \`.lower()\` vs \`.casefold()\` — **use \`casefold\` for case-insensitive compares**. Lower() doesn’t handle German ß, Turkish i, etc.
-- \`.format(...)\` / \`%\` — legacy siblings of f-strings. Learn them only because old codebases still use them.
+- \`s.strip()\` / \`.lstrip()\` / \`.rstrip()\` â€” trim whitespace. Pass a string to remove **any of those characters**, not a suffix: \`"abc.com".rstrip(".com")\` returns \`"ab"\`, not \`"abc"\`. For suffix stripping use \`str.removesuffix\` (3.9+).
+- \`.split(sep=None, maxsplit=-1)\` â€” \`None\` splits on any whitespace and collapses runs. \`","\` splits on the literal.
+- \`sep.join(iterable)\` â€” the only way to concatenate N strings performantly: \`", ".join(names)\` is O(n) with a single allocation. Never \`s += x\` in a loop.
+- \`.replace(old, new, count=-1)\` â€” returns a new string; does not mutate.
+- \`.startswith(prefix)\` / \`.endswith(suffix)\` â€” accepts a **tuple** of options: \`url.startswith(("http://", "https://"))\`. Prefer over slicing.
+- \`in\` â€” membership: \`"error" in line\` is idiomatic. \`.find\` returns \`-1\` if missing; \`.index\` raises.
+- \`.lower()\` vs \`.casefold()\` â€” **use \`casefold\` for case-insensitive compares**. Lower() doesnâ€™t handle German ÃŸ, Turkish i, etc.
+- \`.format(...)\` / \`%\` â€” legacy siblings of f-strings. Learn them only because old codebases still use them.
 
 ---
 
@@ -1319,7 +1324,7 @@ Think in **pipelines**, not ad-hoc calls:
 
 This section separates juniors from seniors.
 
-### Logging → use \`%\`-style with lazy interpolation
+### Logging â†’ use \`%\`-style with lazy interpolation
 
 \`\`\`
 logger.info("user %s action %s", user_id, action)  # right
@@ -1328,7 +1333,7 @@ logger.info(f"user {user_id} action {action}")     # wrong: formats even when le
 
 Lazy logging skips formatting when the log is filtered, and plays nicely with structured-logging collectors.
 
-### SQL → parameterized queries, **always**
+### SQL â†’ parameterized queries, **always**
 
 \`\`\`
 cur.execute(f"SELECT * FROM users WHERE id = {user_id}")   # SQL injection
@@ -1337,7 +1342,7 @@ cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))  # safe
 
 The same rule holds for shell (\`subprocess\` with a list argv) and any other eval-adjacent API.
 
-### i18n / translation → \`.format\` with named args
+### i18n / translation â†’ \`.format\` with named args
 
 Named-placeholder templates survive translator re-ordering; f-strings hard-bake the order into code.
 
@@ -1345,41 +1350,41 @@ Named-placeholder templates survive translator re-ordering; f-strings hard-bake 
 
 ## Pitfalls that cost production hours
 
-- **\`s += x\` inside a loop** — O(n²). Build a \`list\` and \`join\` at the end.
-- **Implicit literal concatenation** — \`["alpha" "beta", "gamma"]\` is a 2-element list, not 3. A missing comma is an invisible bug.
-- **\`rstrip\` treats arg as a charset** — \`"data.csv".rstrip(".csv")\` is \`"dat"\`. Use \`removesuffix\`.
-- **\`lower()\` for case-insensitive compare** — pass a Turkish user through it and watch your auth flake out. Use \`casefold\`.
-- **Counting characters vs bytes** — \`len(s)\` is code points, not UTF-8 bytes. Database \`VARCHAR(n)\` usually counts bytes.
-- **Forgetting \`r""\` for regex** — \`"\\\\d+"\` works, \`r"\\\\d+"\` is obviously correct and survives review.
+- **\`s += x\` inside a loop** â€” O(nÂ²). Build a \`list\` and \`join\` at the end.
+- **Implicit literal concatenation** â€” \`["alpha" "beta", "gamma"]\` is a 2-element list, not 3. A missing comma is an invisible bug.
+- **\`rstrip\` treats arg as a charset** â€” \`"data.csv".rstrip(".csv")\` is \`"dat"\`. Use \`removesuffix\`.
+- **\`lower()\` for case-insensitive compare** â€” pass a Turkish user through it and watch your auth flake out. Use \`casefold\`.
+- **Counting characters vs bytes** â€” \`len(s)\` is code points, not UTF-8 bytes. Database \`VARCHAR(n)\` usually counts bytes.
+- **Forgetting \`r""\` for regex** â€” \`"\\\\d+"\` works, \`r"\\\\d+"\` is obviously correct and survives review.
 
 ---
 
 ## Interview hook (answer like a senior)
 
-“A Python str is an immutable sequence of code points. I use f-strings for runtime display, but I reach for parameterized queries in SQL and lazy \`%\`-format in logging. The format mini-language is \`[[fill]align][sign][#][0][width][,][.precision][type]\` — most bugs come from using precision on a string (truncates) when you meant width (pad).”`,
+â€œA Python str is an immutable sequence of code points. I use f-strings for runtime display, but I reach for parameterized queries in SQL and lazy \`%\`-format in logging. The format mini-language is \`[[fill]align][sign][#][0][width][,][.precision][type]\` â€” most bugs come from using precision on a string (truncates) when you meant width (pad).â€`,
 
     video: null,
     videoFallbackMarkdown: `## Deep dive: build the format spec from muscle memory
 
-### 1) The “read the spec left to right” drill
+### 1) The â€œread the spec left to rightâ€ drill
 
 Given \`{price:+,.2f}\`, say it aloud before you run code:
 
-1. No fill/align → default right-align for numbers.
-2. \`+\` → always show sign (useful for deltas, +3.2% / -1.1%).
-3. \`,\` → thousands separator.
-4. \`.2\` → two decimals.
-5. \`f\` → fixed-point type.
+1. No fill/align â†’ default right-align for numbers.
+2. \`+\` â†’ always show sign (useful for deltas, +3.2% / -1.1%).
+3. \`,\` â†’ thousands separator.
+4. \`.2\` â†’ two decimals.
+5. \`f\` â†’ fixed-point type.
 
-Now try \`{name:<20.10}\`: left-align in a **20-char** field, but **truncate** the name to **10** characters first. Width and precision do different jobs — this is the exam trap.
+Now try \`{name:<20.10}\`: left-align in a **20-char** field, but **truncate** the name to **10** characters first. Width and precision do different jobs â€” this is the exam trap.
 
 ### 2) The one diagram you must be able to draw
 
-A table with three columns — input, \`{x:>10}\`, \`{x:0>10}\`, \`{x:_>10}\` — for values \`"42"\`, \`"1.5"\`, and \`"-7"\`. If you can fill it in without running Python, you own the mini-language.
+A table with three columns â€” input, \`{x:>10}\`, \`{x:0>10}\`, \`{x:_>10}\` â€” for values \`"42"\`, \`"1.5"\`, and \`"-7"\`. If you can fill it in without running Python, you own the mini-language.
 
 ### 3) A concrete data-engineering story
 
-A stakeholder asks for “nice numbers” in a dashboard export. Without the mini-language you end up with ten bespoke helper functions. With it, you write one tiny row formatter:
+A stakeholder asks for â€œnice numbersâ€ in a dashboard export. Without the mini-language you end up with ten bespoke helper functions. With it, you write one tiny row formatter:
 
 \`\`\`
 def fmt(row):
@@ -1402,7 +1407,7 @@ record["city"] = (
     raw["city"]
     .strip()          # trim surrounding whitespace
     .casefold()       # locale-aware lower
-    .removeprefix("the ")   # 3.9+ — safer than rstrip(chars)
+    .removeprefix("the ")   # 3.9+ â€” safer than rstrip(chars)
     .replace("  ", " ")     # collapse double-spaces
 )
 \`\`\`
@@ -1411,22 +1416,22 @@ Every step returns a new string. There is **no hidden mutation**. Debugging thes
 
 ### 5) Bytes vs strings, once and for all
 
-- Read/write files as text → you get \`str\`. Encoding happens at the boundary (\`open(path, encoding="utf-8")\`).
-- Network / file bytes → you get \`bytes\`. Decode **once**, at the boundary.
+- Read/write files as text â†’ you get \`str\`. Encoding happens at the boundary (\`open(path, encoding="utf-8")\`).
+- Network / file bytes â†’ you get \`bytes\`. Decode **once**, at the boundary.
 - Mixing the two silently is where \`UnicodeDecodeError\` comes from at 2am. Keep str and bytes **obviously distinct** in type hints.
 
 If you can narrate all five of these, you are ahead of most Python screens.`,
 
     tryGuidance:
-      "Open the atelier below and play the anatomy game: **start from a recipe** (try *USD currency* or *Zero-padded ID*), then change **one control at a time** and predict before you see the output. Watch the green span in the ruler — that is the formatted value inside the padded field. The *source the interpreter sees* panel is your ground truth.",
+      "Open the atelier below and play the anatomy game: **start from a recipe** (try *USD currency* or *Zero-padded ID*), then change **one control at a time** and predict before you see the output. Watch the green span in the ruler â€” that is the formatted value inside the padded field. The *source the interpreter sees* panel is your ground truth.",
 
     knowledgeCheck: [
       {
         question: "What prints?\n\n`f\"{'hello':>8}\"`",
         options: [
-          "'   hello' — right-aligned in an 8-char field (default for strings is left, but `>` overrides).",
-          "'hello   ' — strings always left-align, the `>` is ignored.",
-          "'hello' — width is only valid on numbers.",
+          "'   hello' â€” right-aligned in an 8-char field (default for strings is left, but `>` overrides).",
+          "'hello   ' â€” strings always left-align, the `>` is ignored.",
+          "'hello' â€” width is only valid on numbers.",
         ],
         correctIndex: 0,
         explanation: "`>` forces right-alignment; width 8 pads to the left. Default align differs for types (strings left, numbers right), but explicit align wins.",
@@ -1434,15 +1439,15 @@ If you can narrate all five of these, you are ahead of most Python screens.`,
       {
         question: "What does `f\"{name:.3}\"` do when `name = 'ada lovelace'`?",
         options: [
-          "Truncates to 'ada' — precision on a string means 'max N chars'.",
-          "Formats 3 decimal places — ValueError: you can’t use precision on a str.",
+          "Truncates to 'ada' â€” precision on a string means 'max N chars'.",
+          "Formats 3 decimal places â€” ValueError: you canâ€™t use precision on a str.",
           "Pads the string out to 3 characters.",
         ],
         correctIndex: 0,
         explanation: "Precision is context-sensitive: on floats it means decimals; on strings it truncates to N code points. Classic interview trap.",
       },
       {
-        question: "Which line logs correctly — i.e., skips formatting work when the log level filters the message out?",
+        question: "Which line logs correctly â€” i.e., skips formatting work when the log level filters the message out?",
         options: [
           "logger.info('user %s action %s', user_id, action)",
           "logger.info(f'user {user_id} action {action}')",
@@ -1454,9 +1459,9 @@ If you can narrate all five of these, you are ahead of most Python screens.`,
       {
         question: "`\"data.csv\".rstrip(\".csv\")` returns what, and why?",
         options: [
-          "'dat' — rstrip removes any trailing character that appears in the argument (a charset, not a suffix).",
-          "'data' — it strips the literal '.csv' suffix.",
-          "'data.csv' — rstrip only trims whitespace.",
+          "'dat' â€” rstrip removes any trailing character that appears in the argument (a charset, not a suffix).",
+          "'data' â€” it strips the literal '.csv' suffix.",
+          "'data.csv' â€” rstrip only trims whitespace.",
         ],
         correctIndex: 0,
         explanation: "rstrip treats the argument as a set of characters. For a real suffix strip use `str.removesuffix('.csv')` (3.9+).",
@@ -1469,17 +1474,17 @@ If you can narrate all five of these, you are ahead of most Python screens.`,
           "f\"{n:0>11,d}\"",
         ],
         correctIndex: 0,
-        explanation: "Zero-pad (`0`), width (`11`), grouping (`,`), type (`d`). Order matters: `0` before width, `,` before type. The third option also works numerically but pads zeros *including* the comma positions and can misalign signs — `0` is the idiomatic zero-pad.",
+        explanation: "Zero-pad (`0`), width (`11`), grouping (`,`), type (`d`). Order matters: `0` before width, `,` before type. The third option also works numerically but pads zeros *including* the comma positions and can misalign signs â€” `0` is the idiomatic zero-pad.",
       },
       {
         question: "Why is `result += s` inside a loop of 1M strings a performance bug?",
         options: [
-          "Strings are immutable — each `+=` allocates a new string. Cost is O(n²). Use `''.join(parts)` instead.",
+          "Strings are immutable â€” each `+=` allocates a new string. Cost is O(nÂ²). Use `''.join(parts)` instead.",
           "Python caches all strings, so memory leaks accumulate.",
           "It works, but only on CPython; PyPy rejects it.",
         ],
         correctIndex: 0,
-        explanation: "Immutability forces reallocation. `str.join` walks the iterable once and allocates once — O(n) with a single buffer.",
+        explanation: "Immutability forces reallocation. `str.join` walks the iterable once and allocates once â€” O(n) with a single buffer.",
       },
       {
         question: "For a case-insensitive comparison of user-provided text, what is the senior choice?",
@@ -1489,12 +1494,12 @@ If you can narrate all five of these, you are ahead of most Python screens.`,
           "a.upper() == b.upper()",
         ],
         correctIndex: 0,
-        explanation: "`casefold` is the aggressive Unicode lower-case designed for compares: it handles ß → ss, Greek sigma, Turkish dotless i. `lower` preserves locale quirks.",
+        explanation: "`casefold` is the aggressive Unicode lower-case designed for compares: it handles ÃŸ â†’ ss, Greek sigma, Turkish dotless i. `lower` preserves locale quirks.",
       },
       {
-        question: "A junior writes `cur.execute(f\"SELECT * FROM users WHERE id = {uid}\")`. What’s the right review comment?",
+        question: "A junior writes `cur.execute(f\"SELECT * FROM users WHERE id = {uid}\")`. Whatâ€™s the right review comment?",
         options: [
-          "Don’t format SQL with f-strings — use parameterized queries (`%s` placeholders + a params tuple) to prevent SQL injection.",
+          "Donâ€™t format SQL with f-strings â€” use parameterized queries (`%s` placeholders + a params tuple) to prevent SQL injection.",
           "Use `.format()` instead of f-string for SQL.",
           "Rename `uid` to `user_id` and ship it.",
         ],
@@ -1515,62 +1520,62 @@ If you can narrate all five of these, you are ahead of most Python screens.`,
     ],
     learnMarkdown: `## The mental model (say this first)
 
-A \`dict\` is a **hash table**. So is a \`set\` — it is just a hash table that throws away the value and only keeps keys. Everything else follows from two facts:
+A \`dict\` is a **hash table**. So is a \`set\` â€” it is just a hash table that throws away the value and only keeps keys. Everything else follows from two facts:
 
 - You must be able to **hash** a key into a number (fast, deterministic within a run).
 - You must be able to **compare** two keys with \`==\` (to resolve collisions and detect duplicates).
 
 That is the entire ${MD_CODE_TICK}__hash__${MD_CODE_TICK} / ${MD_CODE_TICK}__eq__${MD_CODE_TICK} contract. Violate it and the table silently loses data.
 
-Why does this buy you **O(1) average** lookup? Because the hash is an index into an array — no scanning. The *average* matters: if many keys hash to the same slot (a **collision**), CPython probes forward until it finds an empty slot or a match. In the worst case — pathological hashing, adversarial input, or a small table — you degrade to **O(n)**. Every interviewer quizzing "why is a set faster than a list for membership?" wants this story.
+Why does this buy you **O(1) average** lookup? Because the hash is an index into an array â€” no scanning. The *average* matters: if many keys hash to the same slot (a **collision**), CPython probes forward until it finds an empty slot or a match. In the worst case â€” pathological hashing, adversarial input, or a small table â€” you degrade to **O(n)**. Every interviewer quizzing "why is a set faster than a list for membership?" wants this story.
 
 ---
 
-## \`dict\` — the everyday hash table
+## \`dict\` â€” the everyday hash table
 
 ### Four ways to build one
 
 \`\`\`
 d1 = {"a": 1, "b": 2}                # literal
-d2 = dict(a=1, b=2)                  # kwargs — keys must be valid identifiers
+d2 = dict(a=1, b=2)                  # kwargs â€” keys must be valid identifiers
 d3 = dict([("a", 1), ("b", 2)])      # from pairs
-d4 = {k: v for k, v in pairs}        # dict comprehension — the Pythonic one
+d4 = {k: v for k, v in pairs}        # dict comprehension â€” the Pythonic one
 \`\`\`
 
 ### Three idioms you will use every day
 
-- \`d[k]\` — raises \`KeyError\` on miss. Use when absence is a **bug**.
-- \`d.get(k, default)\` — returns default on miss. Use when absence is **expected**.
-- \`d.setdefault(k, default)\` — returns existing OR inserts + returns default. One line, two operations.
+- \`d[k]\` â€” raises \`KeyError\` on miss. Use when absence is a **bug**.
+- \`d.get(k, default)\` â€” returns default on miss. Use when absence is **expected**.
+- \`d.setdefault(k, default)\` â€” returns existing OR inserts + returns default. One line, two operations.
 
 ### Insertion order is preserved (3.7+)
 
 Iteration walks keys in **insertion order**, guaranteed by the language spec since Python 3.7. That is why \`OrderedDict\` is mostly legacy. Equality still ignores order: \`{"a": 1, "b": 2} == {"b": 2, "a": 1}\` is \`True\`.
 
-### Merging — know all three
+### Merging â€” know all three
 
-- \`{**a, **b}\` — new dict, **b wins** on conflicts. (3.5+)
-- \`a | b\` — same semantics, more readable. (3.9+)
-- \`a.update(b)\` — mutates \`a\` in place, b wins. Use inside a function; avoid on shared state.
+- \`{**a, **b}\` â€” new dict, **b wins** on conflicts. (3.5+)
+- \`a | b\` â€” same semantics, more readable. (3.9+)
+- \`a.update(b)\` â€” mutates \`a\` in place, b wins. Use inside a function; avoid on shared state.
 
 ---
 
 ## The stdlib cousins you should actually use
 
-- \`collections.defaultdict(list)\` — missing key auto-inits to \`[]\`. Bucket-by-key without \`if k not in d\`.
-- \`collections.Counter(iterable)\` — frequency map with \`.most_common(k)\`, arithmetic (\`c1 + c2\`), and subtraction. Interview staple.
-- \`collections.ChainMap(*dicts)\` — layered lookup (scope chains, config overlays).
-- \`types.MappingProxyType(d)\` — read-only view of a dict. Surfaces as \`cls.__dict__\`.
+- \`collections.defaultdict(list)\` â€” missing key auto-inits to \`[]\`. Bucket-by-key without \`if k not in d\`.
+- \`collections.Counter(iterable)\` â€” frequency map with \`.most_common(k)\`, arithmetic (\`c1 + c2\`), and subtraction. Interview staple.
+- \`collections.ChainMap(*dicts)\` â€” layered lookup (scope chains, config overlays).
+- \`types.MappingProxyType(d)\` â€” read-only view of a dict. Surfaces as \`cls.__dict__\`.
 
 If you reach for \`if k not in d: d[k] = []\` twice in a file, switch to \`defaultdict\`. If you are counting anything, it is \`Counter\`.
 
 ---
 
-## \`set\` and \`frozenset\` — dedupe + membership + algebra
+## \`set\` and \`frozenset\` â€” dedupe + membership + algebra
 
 A set is a dict without values. You get:
 
-- \`x in s\` → **O(1) average** (versus **O(n)** on a list).
+- \`x in s\` â†’ **O(1) average** (versus **O(n)** on a list).
 - Uniqueness: adding a duplicate is a no-op.
 - **Set algebra** as operators:
 
@@ -1582,7 +1587,7 @@ A set is a dict without values. You get:
 | \`A ^ B\` | \`A.symmetric_difference(B)\` | in exactly one |
 | \`A <= B\` | \`A.issubset(B)\` | every A in B |
 
-\`frozenset\` is the immutable, **hashable** cousin — use it when you need a set to itself be a dict key or another set's element.
+\`frozenset\` is the immutable, **hashable** cousin â€” use it when you need a set to itself be a dict key or another set's element.
 
 **A real data-engineering pattern:**
 
@@ -1605,7 +1610,7 @@ A value can be a dict key / set element only if it is **hashable**: it has a sta
 - **Unhashable**: \`list\`, \`dict\`, \`set\`, \`bytearray\`. Anything that can **mutate** in place.
 
 \`\`\`
-key = (user_id, date)      # ok — tuple of hashables
+key = (user_id, date)      # ok â€” tuple of hashables
 key = (user_id, [1, 2])    # TypeError when you try to use it
 \`\`\`
 
@@ -1615,12 +1620,12 @@ key = (user_id, [1, 2])    # TypeError when you try to use it
 
 ---
 
-## Iteration — and the one fatal bug
+## Iteration â€” and the one fatal bug
 
-- \`for k in d\` — iterate keys (insertion order).
-- \`for v in d.values()\` — values.
-- \`for k, v in d.items()\` — the default you reach for.
-- \`d.keys() | other\` — dict views support set algebra directly.
+- \`for k in d\` â€” iterate keys (insertion order).
+- \`for v in d.values()\` â€” values.
+- \`for k, v in d.items()\` â€” the default you reach for.
+- \`d.keys() | other\` â€” dict views support set algebra directly.
 
 **Never mutate a dict while iterating it:**
 
@@ -1642,21 +1647,21 @@ The comprehension version is usually cleaner and more obviously correct.
 
 ## Pitfalls that burn real teams
 
-- **Hash order across runs** — for strings, CPython randomizes hashes per process (PYTHONHASHSEED). Never persist something that depends on hash order. This is why iteration order is guaranteed, but **collision layout** is not.
-- **Shared-reference values** — \`d = dict.fromkeys(users, [])\` gives every user the **same** list. Mutating one mutates all. Use \`{u: [] for u in users}\`.
-- **Float / NaN keys** — \`NaN != NaN\`, so \`d[float("nan")] = 1; d[float("nan")]\` raises. Don't use floats with fractional noise as keys.
-- **"Nested dict" as a contract** — great for prototypes, painful at scale. Once the shape matters, reach for \`@dataclass\` or a typed schema.
+- **Hash order across runs** â€” for strings, CPython randomizes hashes per process (PYTHONHASHSEED). Never persist something that depends on hash order. This is why iteration order is guaranteed, but **collision layout** is not.
+- **Shared-reference values** â€” \`d = dict.fromkeys(users, [])\` gives every user the **same** list. Mutating one mutates all. Use \`{u: [] for u in users}\`.
+- **Float / NaN keys** â€” \`NaN != NaN\`, so \`d[float("nan")] = 1; d[float("nan")]\` raises. Don't use floats with fractional noise as keys.
+- **"Nested dict" as a contract** â€” great for prototypes, painful at scale. Once the shape matters, reach for \`@dataclass\` or a typed schema.
 
 ---
 
 ## Interview hook (answer like a senior)
 
-"A dict is a hash table. Lookup, insert, delete are O(1) *on average* because the hash is the index into a contiguous slot array; collisions probe forward. Worst case is O(n), which is what makes the hashability contract matter: equal objects must hash to the same value, and only immutable objects are safe to hash because their hash has to stay stable for the lifetime of the dict. Sets are the same machinery with no values. For the everyday ETL problems — bucketing, deduping, counting, joining by key — I reach for \`defaultdict\`, \`set\`, and \`Counter\` before writing any explicit loop."`,
+"A dict is a hash table. Lookup, insert, delete are O(1) *on average* because the hash is the index into a contiguous slot array; collisions probe forward. Worst case is O(n), which is what makes the hashability contract matter: equal objects must hash to the same value, and only immutable objects are safe to hash because their hash has to stay stable for the lifetime of the dict. Sets are the same machinery with no values. For the everyday ETL problems â€” bucketing, deduping, counting, joining by key â€” I reach for \`defaultdict\`, \`set\`, and \`Counter\` before writing any explicit loop."`,
 
     video: null,
     videoFallbackMarkdown: `## Deep dive: think in dict/set patterns, not loops
 
-### 1) The "bucket-by-key" pattern — \`defaultdict(list)\`
+### 1) The "bucket-by-key" pattern â€” \`defaultdict(list)\`
 
 Almost every ETL cleanup looks like: "group records by some key."
 
@@ -1679,7 +1684,7 @@ for event in events:
 
 Same behavior, twice the code, three times the chances of a bug.
 
-### 2) The \`Counter\` pattern — read-once frequency maps
+### 2) The \`Counter\` pattern â€” read-once frequency maps
 
 \`\`\`
 from collections import Counter
@@ -1688,7 +1693,7 @@ top_countries = Counter(r["country"] for r in visits).most_common(5)
 
 You just solved the classic "top-K by count" interview question in one line. Reach for it in every frequency, histogram, or anomaly-detection warm-up.
 
-### 3) The set-join pattern — when a JOIN isn't available
+### 3) The set-join pattern â€” when a JOIN isn't available
 
 Before pandas, before SQL, these are the primitives:
 
@@ -1713,16 +1718,16 @@ unique_preserve_order = list(dict.fromkeys(items))
 
 ### 5) Why you should fear "nested dict as a contract"
 
-Nested dicts read like JSON and feel free. The trap: there is **no type checking**, and a typo in a key just silently returns \`None\`/\`KeyError\` far from where you meant. Promote stable shapes to \`@dataclass(frozen=True)\` or \`TypedDict\` early. Keep dict/set for the *dynamic* places — grouping, dedup, counting.
+Nested dicts read like JSON and feel free. The trap: there is **no type checking**, and a typo in a key just silently returns \`None\`/\`KeyError\` far from where you meant. Promote stable shapes to \`@dataclass(frozen=True)\` or \`TypedDict\` early. Keep dict/set for the *dynamic* places â€” grouping, dedup, counting.
 
 ### 6) One diagram you must be able to draw
 
-Draw a row of 8 slots. Write "cat" → compute \`hash % 8\` → slot X. Then write "tac" → same slot X (toy collision). Then "act" → same slot again. Walk through linear probing. Then lookup "cat": show that the probe terminates on either a match or the first empty slot.
+Draw a row of 8 slots. Write "cat" â†’ compute \`hash % 8\` â†’ slot X. Then write "tac" â†’ same slot X (toy collision). Then "act" â†’ same slot again. Walk through linear probing. Then lookup "cat": show that the probe terminates on either a match or the first empty slot.
 
 If you can explain this diagram in 60 seconds, the rest of the lesson comes for free.`,
 
     tryGuidance:
-      "Play **Buckets** first: type a key, click insert, and read the log — the message narrates what CPython does (hash → slot → probe). Then click **Seed collisions** to watch anagram keys share a home and probe onward. Now flip to **Algebra** and rearrange sets A and B; watch which elements survive each of the five operations. Before each click, predict which elements end up in the result.",
+      "Play **Buckets** first: type a key, click insert, and read the log â€” the message narrates what CPython does (hash â†’ slot â†’ probe). Then click **Seed collisions** to watch anagram keys share a home and probe onward. Now flip to **Algebra** and rearrange sets A and B; watch which elements survive each of the five operations. Before each click, predict which elements end up in the result.",
 
     knowledgeCheck: [
       {
@@ -1733,22 +1738,22 @@ If you can explain this diagram in 60 seconds, the rest of the lesson comes for 
           "Lists force a linear sort at the start of each membership test.",
         ],
         correctIndex: 0,
-        explanation: "Hash tables index by a computed hash → the slot is found in constant time on average. Lists are sequences; membership is a linear walk.",
+        explanation: "Hash tables index by a computed hash â†’ the slot is found in constant time on average. Lists are sequences; membership is a linear walk.",
       },
       {
         question: "Which value **cannot** be used as a dict key?",
         options: [
-          "[1, 2] — lists are mutable and therefore unhashable",
-          "(1, 2) — tuple of ints",
-          "'alice' — strings are immutable and hashable",
+          "[1, 2] â€” lists are mutable and therefore unhashable",
+          "(1, 2) â€” tuple of ints",
+          "'alice' â€” strings are immutable and hashable",
         ],
         correctIndex: 0,
-        explanation: "Mutable containers (list, dict, set, bytearray) are unhashable — using them as keys raises TypeError. Tuples of hashables and strings are fine.",
+        explanation: "Mutable containers (list, dict, set, bytearray) are unhashable â€” using them as keys raises TypeError. Tuples of hashables and strings are fine.",
       },
       {
         question: "What does `d.get('missing_key', 0)` do when the key is absent?",
         options: [
-          "Returns 0 — the supplied default — without modifying the dict.",
+          "Returns 0 â€” the supplied default â€” without modifying the dict.",
           "Inserts 0 under 'missing_key' and returns it.",
           "Raises KeyError.",
         ],
@@ -1763,13 +1768,13 @@ If you can explain this diagram in 60 seconds, the rest of the lesson comes for 
           "The single most common key repeated three times.",
         ],
         correctIndex: 0,
-        explanation: "`.most_common(k)` returns a list of (element, count) tuples — that is why it is the go-to for top-K frequency questions.",
+        explanation: "`.most_common(k)` returns a list of (element, count) tuples â€” that is why it is the go-to for top-K frequency questions.",
       },
       {
         question: "Given `a = {'x': 1, 'y': 2}` and `b = {'y': 99, 'z': 3}`, what does `{**a, **b}` produce?",
         options: [
-          "{'x': 1, 'y': 99, 'z': 3} — b wins on the conflicting key 'y'.",
-          "{'x': 1, 'y': 2, 'z': 3} — a wins because it comes first.",
+          "{'x': 1, 'y': 99, 'z': 3} â€” b wins on the conflicting key 'y'.",
+          "{'x': 1, 'y': 2, 'z': 3} â€” a wins because it comes first.",
           "A TypeError because the keys overlap.",
         ],
         correctIndex: 0,
@@ -1778,9 +1783,9 @@ If you can explain this diagram in 60 seconds, the rest of the lesson comes for 
       {
         question: "Why does this loop raise at runtime?\n\n`for k in d:\n    if stale(k):\n        del d[k]`",
         options: [
-          "RuntimeError: dict changed size during iteration — mutate a snapshot or build a new dict with a comprehension.",
-          "KeyError — del can only remove keys that were added with d.setdefault.",
-          "IndexError — dicts can't be indexed by k inside a for loop.",
+          "RuntimeError: dict changed size during iteration â€” mutate a snapshot or build a new dict with a comprehension.",
+          "KeyError â€” del can only remove keys that were added with d.setdefault.",
+          "IndexError â€” dicts can't be indexed by k inside a for loop.",
         ],
         correctIndex: 0,
         explanation: "The iterator tracks the dict's structural version. Mutating keys invalidates it. Iterate `list(d)` or rebuild: `d = {k: v for k, v in d.items() if not stale(k)}`.",
@@ -1798,8 +1803,8 @@ If you can explain this diagram in 60 seconds, the rest of the lesson comes for 
       {
         question: "Two dicts have the same keys and values but were inserted in different orders. Are they `==`?",
         options: [
-          "Yes — dict equality ignores insertion order.",
-          "No — iteration order matters for equality.",
+          "Yes â€” dict equality ignores insertion order.",
+          "No â€” iteration order matters for equality.",
           "Yes only on Python 3.7+; earlier they would be unequal.",
         ],
         correctIndex: 0,
@@ -1811,7 +1816,7 @@ If you can explain this diagram in 60 seconds, the rest of the lesson comes for 
   "py-b5": {
     durationLabel: MODULE_TIME_LABEL,
     outcomes: [
-      "Read and write comprehensions in **all four flavors** — list, set, dict, generator — fluently.",
+      "Read and write comprehensions in **all four flavors** â€” list, set, dict, generator â€” fluently.",
       "Translate between a comprehension and the equivalent for-loop **in either direction**, under interview time pressure.",
       "Pick **generator expressions** over list comprehensions when memory or laziness matter.",
       "Know the readability ceiling: **when a comprehension should become a loop or a helper function**.",
@@ -1826,13 +1831,13 @@ Every comprehension has the same shape, read **expression-first, filter-last**:
     (what)            (source)                 (optional gate)
 \`\`\`
 
-But Python **executes** it in iteration order: pull an item → test the filter → if it passes, evaluate the expression → collect. That mismatch between reading order and execution order is the **single biggest source of bugs** in beginner code. The forge below draws the execution order left-to-right so you stop fighting it.
+But Python **executes** it in iteration order: pull an item â†’ test the filter â†’ if it passes, evaluate the expression â†’ collect. That mismatch between reading order and execution order is the **single biggest source of bugs** in beginner code. The forge below draws the execution order left-to-right so you stop fighting it.
 
 ---
 
 ## The four flavors (same grammar, different brackets)
 
-### 1 · List comprehension — \`[ ]\`
+### 1 Â· List comprehension â€” \`[ ]\`
 
 \`\`\`
 squares = [x ** 2 for x in nums if x % 2 == 0]
@@ -1840,7 +1845,7 @@ squares = [x ** 2 for x in nums if x % 2 == 0]
 
 Eager. Allocates a list. Use when you need a concrete, indexable, reusable collection.
 
-### 2 · Set comprehension — \`{ }\`
+### 2 Â· Set comprehension â€” \`{ }\`
 
 \`\`\`
 unique_lower = {name.casefold() for name in names}
@@ -1848,16 +1853,16 @@ unique_lower = {name.casefold() for name in names}
 
 Eager, unique. Collision: if two items transform to the same value, the second wins and the first is silently dropped. Great for dedup; dangerous when you wanted to keep both.
 
-### 3 · Dict comprehension — \`{ : }\`
+### 3 Â· Dict comprehension â€” \`{ : }\`
 
 \`\`\`
 lookup = {user["id"]: user for user in users}
 by_active = {u["id"]: u for u in users if u["active"]}
 \`\`\`
 
-Also eager. Same late-key-wins rule as regular dict construction — if two items share a key, the **later** pair overwrites the earlier one without a warning.
+Also eager. Same late-key-wins rule as regular dict construction â€” if two items share a key, the **later** pair overwrites the earlier one without a warning.
 
-### 4 · Generator expression — \`( )\`
+### 4 Â· Generator expression â€” \`( )\`
 
 \`\`\`
 total = sum(x ** 2 for x in nums)
@@ -1877,13 +1882,13 @@ When a generator expression is the **only** argument to a function, you can drop
 
 There are **two** positions for \`if\` / \`else\` in a comprehension, and they mean different things:
 
-**Filter (tail of the comprehension) — single \`if\`, decides whether to *keep* the item:**
+**Filter (tail of the comprehension) â€” single \`if\`, decides whether to *keep* the item:**
 
 \`\`\`
 [x for x in nums if x > 0]   # drops non-positive items
 \`\`\`
 
-**Conditional expression (head of the comprehension) — \`if / else\`, decides what to *emit*:**
+**Conditional expression (head of the comprehension) â€” \`if / else\`, decides what to *emit*:**
 
 \`\`\`
 [x if x > 0 else 0 for x in nums]   # always emits, replaces negatives with 0
@@ -1895,7 +1900,7 @@ Swapping them is a classic interview trap. Memorize: *"if at the end filters, if
 
 ## Nested for-loops (and when to stop)
 
-Comprehensions can stack \`for\` clauses — they read **outer-to-inner**, same as the equivalent for-loop:
+Comprehensions can stack \`for\` clauses â€” they read **outer-to-inner**, same as the equivalent for-loop:
 
 \`\`\`
 flat = [x for row in matrix for x in row]
@@ -1925,7 +1930,7 @@ list(map(str.strip, lines))        # clear
 [line.strip() for line in lines]   # also clear, slightly shorter
 \`\`\`
 
-When you need a **lambda**, prefer the comprehension — lambdas cost a call frame per item; a comprehension expression is inlined. And nested \`map(filter(...))\` becomes unreadable fast; the comprehension reads left-to-right.
+When you need a **lambda**, prefer the comprehension â€” lambdas cost a call frame per item; a comprehension expression is inlined. And nested \`map(filter(...))\` becomes unreadable fast; the comprehension reads left-to-right.
 
 ---
 
@@ -1933,10 +1938,10 @@ When you need a **lambda**, prefer the comprehension — lambdas cost a call fra
 
 This is senior-level judgment.
 
-- **Side effects** — if the purpose is \`logger.info(x)\` or \`db.write(x)\` for each item, write a **for-loop**. Comprehensions are expressions that *produce a collection*; when you use them only for the effect and throw away the list, you confuse every reviewer.
-- **Debugging step-by-step** — a plain loop lets you drop a breakpoint inside; a comprehension hides the iteration.
-- **Complex transforms** — the moment your expression crosses two lines or has a ternary inside a dict lookup inside a function call, stop. Name the transform: \`result = [clean(row) for row in rows if is_valid(row)]\`.
-- **You need the index** — reach for \`enumerate\`: \`[(i, row) for i, row in enumerate(rows)]\`.
+- **Side effects** â€” if the purpose is \`logger.info(x)\` or \`db.write(x)\` for each item, write a **for-loop**. Comprehensions are expressions that *produce a collection*; when you use them only for the effect and throw away the list, you confuse every reviewer.
+- **Debugging step-by-step** â€” a plain loop lets you drop a breakpoint inside; a comprehension hides the iteration.
+- **Complex transforms** â€” the moment your expression crosses two lines or has a ternary inside a dict lookup inside a function call, stop. Name the transform: \`result = [clean(row) for row in rows if is_valid(row)]\`.
+- **You need the index** â€” reach for \`enumerate\`: \`[(i, row) for i, row in enumerate(rows)]\`.
 
 ---
 
@@ -1950,9 +1955,9 @@ When the filter and the expression compute the **same expensive value**, bind it
 cleaned = [result for raw in batch if (result := heavy_parse(raw)) is not None]
 \`\`\`
 
-Without the walrus you would call \`heavy_parse\` twice — once in the filter, once in the expression. Use sparingly; it reads fine to Python-fluent eyes and confuses everyone else.
+Without the walrus you would call \`heavy_parse\` twice â€” once in the filter, once in the expression. Use sparingly; it reads fine to Python-fluent eyes and confuses everyone else.
 
-### \`zip\` + dict comprehension — idiomatic row builder
+### \`zip\` + dict comprehension â€” idiomatic row builder
 
 \`\`\`
 cols = ["id", "name", "age"]
@@ -1968,15 +1973,15 @@ This is how idiomatic Python turns CSV rows into dicts without pandas.
 
 ## Performance, honestly
 
-- A list comprehension is typically **~1.5–2× faster** than the equivalent \`for / append\` loop. Not because of magic — the bytecode uses a specialized \`LIST_APPEND\` op and avoids attribute lookup for \`.append\`.
+- A list comprehension is typically **~1.5â€“2Ã— faster** than the equivalent \`for / append\` loop. Not because of magic â€” the bytecode uses a specialized \`LIST_APPEND\` op and avoids attribute lookup for \`.append\`.
 - A generator expression allocates essentially no memory for the output; use it inside \`sum\`, \`max\`, \`any\`, \`all\`, etc.
-- The win evaporates the moment your expression calls a Python function — the per-call overhead dominates. Don't "optimize" by shoving a loop into a comprehension if it ends up calling \`some_helper(x)\` anyway.
+- The win evaporates the moment your expression calls a Python function â€” the per-call overhead dominates. Don't "optimize" by shoving a loop into a comprehension if it ends up calling \`some_helper(x)\` anyway.
 
 ---
 
 ## Interview hook (answer like a senior)
 
-"A comprehension is syntactic sugar over a for-loop that produces a collection. Four flavors: list, set, dict, and generator — the generator form is the one I reach for when I only need an aggregate, because it keeps memory flat. Readability is the hard limit: one \`for\`, one \`if\`, simple expression. Beyond that I promote to a generator function. And I never use a comprehension for side effects — that signals to the reviewer that I misunderstood what the syntax is for."`,
+"A comprehension is syntactic sugar over a for-loop that produces a collection. Four flavors: list, set, dict, and generator â€” the generator form is the one I reach for when I only need an aggregate, because it keeps memory flat. Readability is the hard limit: one \`for\`, one \`if\`, simple expression. Beyond that I promote to a generator function. And I never use a comprehension for side effects â€” that signals to the reviewer that I misunderstood what the syntax is for."`,
 
     video: null,
     videoFallbackMarkdown: `## Deep dive: rewriting loops as comprehensions
@@ -1985,7 +1990,7 @@ This is how idiomatic Python turns CSV rows into dicts without pandas.
 
 Take these three loops, rewrite each as a comprehension, then rewrite back. Do it on paper, not in a shell.
 
-**A — filter + transform into a list:**
+**A â€” filter + transform into a list:**
 
 \`\`\`
 out = []
@@ -1994,7 +1999,7 @@ for x in nums:
         out.append(x ** 2)
 \`\`\`
 
-**B — filter + build a dict keyed by id:**
+**B â€” filter + build a dict keyed by id:**
 
 \`\`\`
 out = {}
@@ -2003,7 +2008,7 @@ for row in rows:
         out[row["id"]] = row["name"].upper()
 \`\`\`
 
-**C — filter + aggregate into a sum:**
+**C â€” filter + aggregate into a sum:**
 
 \`\`\`
 out = 0
@@ -2014,9 +2019,9 @@ for x in nums:
 
 Expected rewrites:
 
-- **A** → \`[x ** 2 for x in nums if x >= 0]\`
-- **B** → \`{row["id"]: row["name"].upper() for row in rows if row["active"]}\`
-- **C** → \`sum(x for x in nums if x > 0)\` — a **generator expression**, no list built.
+- **A** â†’ \`[x ** 2 for x in nums if x >= 0]\`
+- **B** â†’ \`{row["id"]: row["name"].upper() for row in rows if row["active"]}\`
+- **C** â†’ \`sum(x for x in nums if x > 0)\` â€” a **generator expression**, no list built.
 
 If **C** tripped you, that is exactly the habit the lesson wants. You almost never want to build a temporary list only to feed it to \`sum\`, \`max\`, or \`any\`.
 
@@ -2029,21 +2034,21 @@ sum(x ** 2 for x in range(10_000_000))     # builds nothing; streams
 
 On a laptop the first can use 300+ MB of RAM. The second stays near zero. This is why interviewers who ask about pipelines care whether you reach for the parens or the brackets.
 
-### 3) \`any\` / \`all\` — short-circuit for free
+### 3) \`any\` / \`all\` â€” short-circuit for free
 
 \`\`\`
 has_negative = any(x < 0 for x in nums)
 all_positive = all(x > 0 for x in nums)
 \`\`\`
 
-Both return as soon as they know the answer. Paired with a generator expression you get **early exit + no intermediate storage** — the Python idiom for "does at least one row match?" / "do all rows match?".
+Both return as soon as they know the answer. Paired with a generator expression you get **early exit + no intermediate storage** â€” the Python idiom for "does at least one row match?" / "do all rows match?".
 
 ### 4) Read-vs-run mismatch, visualized
 
 In \`[expr for x in data if pred]\`:
 
-- Your **eye** goes \`expr → for x → if pred\`.
-- Python goes \`for x → if pred → expr\`.
+- Your **eye** goes \`expr â†’ for x â†’ if pred\`.
+- Python goes \`for x â†’ if pred â†’ expr\`.
 
 When debugging a comprehension that misbehaves, rewrite it as a loop **in execution order**, print the state after the \`if\`, and then collapse it back. That is the safest way to fix tricky ones.
 
@@ -2053,33 +2058,33 @@ When debugging a comprehension that misbehaves, rewrite it as a loop **in execut
 - **Dedup-and-transform**: \`{s.casefold() for s in names}\`
 - **Keyed index**: \`{u["id"]: u for u in users}\`
 - **Enumerate + comprehension**: \`[(i, row) for i, row in enumerate(rows)]\`
-- **Pair up**: \`dict(zip(keys, values))\` — not strictly a comprehension, but the same idiom.
+- **Pair up**: \`dict(zip(keys, values))\` â€” not strictly a comprehension, but the same idiom.
 
 If those five are automatic, you can solve ~half of all Python screens without thinking about syntax at all.`,
 
     tryGuidance:
-      "Open the forge and run this loop in your head before clicking: pick a dataset, then a filter, then a transform, then the container. The pipeline shows execution order (filter before transform), while the **comprehension** and **equivalent for-loop** panels mirror each other line-by-line. Try flipping container to **generator** and notice the result is *not materialized* — that is the laziness story. Then try a dict container and watch what happens when two items transform to the same key (later wins).",
+      "Open the forge and run this loop in your head before clicking: pick a dataset, then a filter, then a transform, then the container. The pipeline shows execution order (filter before transform), while the **comprehension** and **equivalent for-loop** panels mirror each other line-by-line. Try flipping container to **generator** and notice the result is *not materialized* â€” that is the laziness story. Then try a dict container and watch what happens when two items transform to the same key (later wins).",
 
     knowledgeCheck: [
       {
         question: "In `[x ** 2 for x in nums if x > 0]`, what order does Python execute the pieces?",
         options: [
-          "For each x, test `x > 0` first; if it passes, evaluate `x ** 2` and collect — filter runs *before* the expression.",
+          "For each x, test `x > 0` first; if it passes, evaluate `x ** 2` and collect â€” filter runs *before* the expression.",
           "The expression `x ** 2` runs first for every x, and the filter drops invalid results afterward.",
-          "Python evaluates all three simultaneously — order is undefined.",
+          "Python evaluates all three simultaneously â€” order is undefined.",
         ],
         correctIndex: 0,
-        explanation: "Reading order is expression-first, but execution order is iteration → filter → expression → collect. Getting this backward is the #1 beginner bug.",
+        explanation: "Reading order is expression-first, but execution order is iteration â†’ filter â†’ expression â†’ collect. Getting this backward is the #1 beginner bug.",
       },
       {
-        question: "What’s the difference between `{x for x in items}` and `{x: 1 for x in items}`?",
+        question: "Whatâ€™s the difference between `{x for x in items}` and `{x: 1 for x in items}`?",
         options: [
           "The first is a set comprehension; the second is a dict comprehension. The colon makes it a dict.",
-          "Both build dicts — the first just uses implicit `None` values.",
+          "Both build dicts â€” the first just uses implicit `None` values.",
           "The first is a set; the second is a syntax error because dicts need explicit parentheses.",
         ],
         correctIndex: 0,
-        explanation: "The colon between key and value is how Python disambiguates set vs dict comprehensions. No colon → set. With colon → dict.",
+        explanation: "The colon between key and value is how Python disambiguates set vs dict comprehensions. No colon â†’ set. With colon â†’ dict.",
       },
       {
         question: "You want to replace negatives with 0 but keep every row. Which comprehension is correct?",
@@ -2094,9 +2099,9 @@ If those five are automatic, you can solve ~half of all Python screens without t
       {
         question: "`sum(x ** 2 for x in range(10_000_000))` vs `sum([x ** 2 for x in range(10_000_000)])`. The important difference is:",
         options: [
-          "The generator expression streams values one at a time — no intermediate list is built, so memory stays flat.",
+          "The generator expression streams values one at a time â€” no intermediate list is built, so memory stays flat.",
           "The list comprehension is always slower because brackets are parsed twice.",
-          "They are identical — the outer parens are just a style choice.",
+          "They are identical â€” the outer parens are just a style choice.",
         ],
         correctIndex: 0,
         explanation: "Generators are lazy: each value is produced, consumed, and discarded. The list version allocates 10M elements before summing. Both return the same number; the memory bill is very different.",
@@ -2104,17 +2109,17 @@ If those five are automatic, you can solve ~half of all Python screens without t
       {
         question: "Why is this an anti-pattern?\n\n`[logger.info(row) for row in rows]`",
         options: [
-          "It uses a comprehension for its side effect and discards the returned list — write a for-loop instead. Comprehensions are for *producing* collections.",
-          "Comprehensions can’t contain function calls.",
+          "It uses a comprehension for its side effect and discards the returned list â€” write a for-loop instead. Comprehensions are for *producing* collections.",
+          "Comprehensions canâ€™t contain function calls.",
           "`logger.info` must be wrapped in a lambda inside a comprehension.",
         ],
         correctIndex: 0,
-        explanation: "The throwaway list costs memory, and reviewers can’t tell at a glance whether the expression’s value matters. A plain `for row in rows: logger.info(row)` is both correct and obvious.",
+        explanation: "The throwaway list costs memory, and reviewers canâ€™t tell at a glance whether the expressionâ€™s value matters. A plain `for row in rows: logger.info(row)` is both correct and obvious.",
       },
       {
         question: "What does `{k: v for k, v in zip(cols, row)}` do for `cols = ['id', 'name']` and `row = [1, 'ada']`?",
         options: [
-          "Builds `{'id': 1, 'name': 'ada'}` — the idiomatic way to turn parallel lists into a dict.",
+          "Builds `{'id': 1, 'name': 'ada'}` â€” the idiomatic way to turn parallel lists into a dict.",
           "Zips the two lists into a single list of tuples.",
           "Raises a TypeError because `zip` is already a dict.",
         ],
@@ -2124,18 +2129,18 @@ If those five are automatic, you can solve ~half of all Python screens without t
       {
         question: "Two users share the same `'id'`. What happens in `{u['id']: u for u in users}`?",
         options: [
-          "The later entry overwrites the earlier one — the final dict contains only one record per id, the last one seen.",
+          "The later entry overwrites the earlier one â€” the final dict contains only one record per id, the last one seen.",
           "Python raises `ValueError: duplicate key`.",
           "Both entries are preserved in a list under the shared key.",
         ],
         correctIndex: 0,
-        explanation: "Dict construction — whether literal, `dict()`, or comprehension — always lets the later key win. If you need to preserve all, use `defaultdict(list)` and append.",
+        explanation: "Dict construction â€” whether literal, `dict()`, or comprehension â€” always lets the later key win. If you need to preserve all, use `defaultdict(list)` and append.",
       },
       {
         question: "`[x for row in matrix for x in row]` is equivalent to which nested for-loop?",
         options: [
-          "`for row in matrix:\\n    for x in row:\\n        result.append(x)` — outer-to-inner, same order as written.",
-          "`for x in row:\\n    for row in matrix:\\n        result.append(x)` — inner loops come first.",
+          "`for row in matrix:\\n    for x in row:\\n        result.append(x)` â€” outer-to-inner, same order as written.",
+          "`for x in row:\\n    for row in matrix:\\n        result.append(x)` â€” inner loops come first.",
           "It can't be nested; Python requires a separate comprehension per loop.",
         ],
         correctIndex: 0,
@@ -2147,10 +2152,10 @@ If those five are automatic, you can solve ~half of all Python screens without t
   "py-c1": {
     durationLabel: MODULE_TIME_LABEL,
     outcomes: [
-      "Use Python's truthiness rules deliberately — and override them with `is None` or `len(x) == 0` when zero, empty string, or empty list are valid values.",
+      "Use Python's truthiness rules deliberately â€” and override them with `is None` or `len(x) == 0` when zero, empty string, or empty list are valid values.",
       "Choose between **if/elif chains**, **conditional expressions**, and **`match` / `case`** based on what you are actually branching on.",
       "Read and write the full **structural pattern matching** vocabulary: literal, capture, wildcard, OR, sequence, mapping, class, and guard.",
-      "Avoid the **capture-pattern footgun** — knowing why `case ok:` silently swallows every value while `case Status.OK:` is a real comparison.",
+      "Avoid the **capture-pattern footgun** â€” knowing why `case ok:` silently swallows every value while `case Status.OK:` is a real comparison.",
       "Refactor a long if-elif chain into a **strategy dict** or a **match block** when the branching is dispatching on shape rather than on a boolean.",
     ],
     learnMarkdown: `## The branch primitives
@@ -2158,23 +2163,23 @@ If those five are automatic, you can solve ~half of all Python screens without t
 Three pieces of syntax cover **every** decision in Python. Anything fancier is sugar.
 
 \`\`\`
-if predicate:        # statement form — only one branch runs
+if predicate:        # statement form â€” only one branch runs
     ...
 elif other:
     ...
 else:
     ...
 
-value = a if predicate else b      # conditional expression — produces a value
+value = a if predicate else b      # conditional expression â€” produces a value
 
-0 <= x < 10           # comparison chaining — evaluates x once, then ANDs the comparisons
+0 <= x < 10           # comparison chaining â€” evaluates x once, then ANDs the comparisons
 \`\`\`
 
-**Comparison chaining** is the one most people miss. \`a < b < c\` is **not** \`(a < b) < c\` — it is \`(a < b) and (b < c)\`, and \`b\` is evaluated **once**. That matters when \`b\` is an expensive call: \`0 < expensive() < 100\` calls it once, but \`0 < expensive() and expensive() < 100\` calls it twice.
+**Comparison chaining** is the one most people miss. \`a < b < c\` is **not** \`(a < b) < c\` â€” it is \`(a < b) and (b < c)\`, and \`b\` is evaluated **once**. That matters when \`b\` is an expensive call: \`0 < expensive() < 100\` calls it once, but \`0 < expensive() and expensive() < 100\` calls it twice.
 
 ---
 
-## Truthiness — the rule and its trap
+## Truthiness â€” the rule and its trap
 
 When you write \`if x:\`, Python calls \`bool(x)\`. The **falsy** values are exactly:
 
@@ -2182,7 +2187,7 @@ When you write \`if x:\`, Python calls \`bool(x)\`. The **falsy** values are exa
 None    False    0    0.0    0j    ""    b""    []    ()    {}    set()    range(0)
 \`\`\`
 
-Everything else — including \`"False"\` (a non-empty string), \`-1\`, and a custom object that doesn't override \`__bool__\` — is **truthy**.
+Everything else â€” including \`"False"\` (a non-empty string), \`-1\`, and a custom object that doesn't override \`__bool__\` â€” is **truthy**.
 
 The trap: \`if x:\` collapses **all** falsy values into one branch. That is fine when you genuinely mean "is this value present and non-empty." It is wrong whenever \`0\`, \`""\`, or \`[]\` is a **valid** value distinct from \`None\`:
 
@@ -2192,15 +2197,15 @@ def render(label):
         label = "[no label]"
 
 def render(label):
-    if label is None:              # explicit — only the missing case rewrites
+    if label is None:              # explicit â€” only the missing case rewrites
         label = "[no label]"
 \`\`\`
 
 **Heuristics**
 
-- \`x is None\` — sentinel check. Always use \`is\`, not \`==\`.
-- \`if not x\` — accept any falsy value. Use only when zero / empty really mean "absent".
-- \`if len(x) == 0\` — explicitly check emptiness on a known collection.
+- \`x is None\` â€” sentinel check. Always use \`is\`, not \`==\`.
+- \`if not x\` â€” accept any falsy value. Use only when zero / empty really mean "absent".
+- \`if len(x) == 0\` â€” explicitly check emptiness on a known collection.
 
 ---
 
@@ -2220,7 +2225,7 @@ The same trap as above: if \`override = {}\` is a *valid* override (an explicit 
 
 ---
 
-## \`match\` / \`case\` — structural pattern matching (3.10+)
+## \`match\` / \`case\` â€” structural pattern matching (3.10+)
 
 \`match\` is **not** a faster switch. It compares the **shape** of a value against patterns and **binds names** along the way. The four moving parts:
 
@@ -2235,31 +2240,31 @@ The subject is evaluated **once**, then each \`case\` is tried **top-down**. The
 ### The pattern vocabulary
 
 \`\`\`
-case 200 | 201 | 204:        # OR pattern — any literal can match
-case None:                   # literal pattern — equality with None
+case 200 | 201 | 204:        # OR pattern â€” any literal can match
+case None:                   # literal pattern â€” equality with None
 case "ok":                   # literal string
 
-case [a, b]:                 # sequence — exactly two elements; binds a, b
-case [head, *rest]:          # sequence with rest — binds head and rest as list
+case [a, b]:                 # sequence â€” exactly two elements; binds a, b
+case [head, *rest]:          # sequence with rest â€” binds head and rest as list
 case []:                     # empty sequence
 
-case {"type": "user", "id": uid}:   # mapping — keys must exist; extras allowed; binds uid
+case {"type": "user", "id": uid}:   # mapping â€” keys must exist; extras allowed; binds uid
 case {}:                            # empty mapping (matches any dict, even with keys! see below)
 
-case Point(x, y):            # class pattern — uses Point.__match_args__ for positional
-case Point(x=0, y=0):        # class pattern with kwargs — exact origin
+case Point(x, y):            # class pattern â€” uses Point.__match_args__ for positional
+case Point(x=0, y=0):        # class pattern with kwargs â€” exact origin
 
-case Point(x, y) if x == y:  # guard — runs after the pattern matches; rejects on False
+case Point(x, y) if x == y:  # guard â€” runs after the pattern matches; rejects on False
 
-case _:                      # wildcard — matches anything, binds nothing. Always last.
+case _:                      # wildcard â€” matches anything, binds nothing. Always last.
 \`\`\`
 
 A few subtleties worth burning in:
 
-- A **mapping pattern** \`{}\` matches **any** dict, not only empty ones — extras are permitted by design.
+- A **mapping pattern** \`{}\` matches **any** dict, not only empty ones â€” extras are permitted by design.
 - A **sequence pattern** does **not** match strings or bytes (Python explicitly excluded those, otherwise \`case [c]\` against \`"a"\` would always succeed).
 - The **OR pattern** \`A | B\` requires both alternatives to bind the **same** names (or no names).
-- A **guard** is part of the case — if it fails, the next case is tried; the subject is **not** rebound to a fresh search.
+- A **guard** is part of the case â€” if it fails, the next case is tried; the subject is **not** rebound to a fresh search.
 
 ---
 
@@ -2274,15 +2279,15 @@ class Status:
 match resp.code:
     case Status.OK:           # match against the dotted constant 200
         ...
-    case OK:                  # NOT a comparison — this **binds** OK = resp.code, ALWAYS matches
+    case OK:                  # NOT a comparison â€” this **binds** OK = resp.code, ALWAYS matches
         ...
 \`\`\`
 
 The rule:
 
-- A name with **a dot** in it (\`Status.OK\`, \`module.CONSTANT\`) is a **value pattern** → equality check.
-- A **bare name** (\`OK\`, \`x\`, \`foo\`) is a **capture pattern** → it binds, and **always matches**.
-- The single underscore \`_\` is the **wildcard** — matches anything, binds nothing.
+- A name with **a dot** in it (\`Status.OK\`, \`module.CONSTANT\`) is a **value pattern** â†’ equality check.
+- A **bare name** (\`OK\`, \`x\`, \`foo\`) is a **capture pattern** â†’ it binds, and **always matches**.
+- The single underscore \`_\` is the **wildcard** â€” matches anything, binds nothing.
 
 Practical consequence: any \`case x:\` that looks like a "default" branch will silently swallow every input above your real cases if you put it too early. Either move it to the bottom or use \`case _:\`.
 
@@ -2299,7 +2304,7 @@ elif user.is_active:
     nudge(user)
 \`\`\`
 
-Use \`match\` when you are branching on the **shape** of a value — types, structure, presence of keys:
+Use \`match\` when you are branching on the **shape** of a value â€” types, structure, presence of keys:
 
 \`\`\`
 match event:
@@ -2309,7 +2314,7 @@ match event:
     case _:                            ignore(event)
 \`\`\`
 
-If your chain is genuinely **dispatching on a key** to a function, the most senior move is often **neither** — it is a **dict of callables**:
+If your chain is genuinely **dispatching on a key** to a function, the most senior move is often **neither** â€” it is a **dict of callables**:
 
 \`\`\`
 DISPATCH = {
@@ -2337,14 +2342,14 @@ That is constant-time, pluggable at runtime, and trivially testable. \`match\` w
 
 ## Interview hook (answer like a senior)
 
-"Conditionals come in three flavours: \`if/elif\` for predicates, conditional expressions for value-pickers, and \`match\` for shape-based dispatch. The rule I follow: if the branches differ in **what is true**, use \`if\`; if they differ in **what the value looks like**, use \`match\`; if they differ only in **which function to call**, use a dispatch dict. The capture-pattern footgun is the one I always check for in code review — \`case foo:\` is *not* a comparison; it binds \`foo\` to the subject and always matches. Use a dotted name or wrap it in parentheses with \`Const.FOO\` to mean equality."`,
+"Conditionals come in three flavours: \`if/elif\` for predicates, conditional expressions for value-pickers, and \`match\` for shape-based dispatch. The rule I follow: if the branches differ in **what is true**, use \`if\`; if they differ in **what the value looks like**, use \`match\`; if they differ only in **which function to call**, use a dispatch dict. The capture-pattern footgun is the one I always check for in code review â€” \`case foo:\` is *not* a comparison; it binds \`foo\` to the subject and always matches. Use a dotted name or wrap it in parentheses with \`Const.FOO\` to mean equality."`,
 
     video: null,
     videoFallbackMarkdown: `## Deep dive: branching like a senior
 
 ### 1) The truthiness gotcha trio
 
-Three checks, three meanings — interview-grade trap:
+Three checks, three meanings â€” interview-grade trap:
 
 \`\`\`
 if x:                # any truthy value: not None, not 0, not "", not [], not {}
@@ -2362,7 +2367,7 @@ def add_tag(tags=None):
     return tags
 \`\`\`
 
-What is wrong? \`add_tag([])\` reaches the \`if not tags:\` branch (an empty list is falsy), reassigns \`tags\` to a **new** \`[]\`, and the caller's list is left untouched. The fix is \`if tags is None\` — it preserves the caller's empty list while still defaulting when nothing was passed.
+What is wrong? \`add_tag([])\` reaches the \`if not tags:\` branch (an empty list is falsy), reassigns \`tags\` to a **new** \`[]\`, and the caller's list is left untouched. The fix is \`if tags is None\` â€” it preserves the caller's empty list while still defaulting when nothing was passed.
 
 ### 2) Pattern matching real-world examples
 
@@ -2412,7 +2417,7 @@ match event:
         log_unknown(kind, rest)
 \`\`\`
 
-The last case captures the type and **the remaining keys** as a dict — useful for forward-compatible logging.
+The last case captures the type and **the remaining keys** as a dict â€” useful for forward-compatible logging.
 
 ### 3) The strategy-dict alternative
 
@@ -2444,7 +2449,7 @@ def classify(code):
     OK = 200
     FAIL = 500
     match code:
-        case OK:           # BUG — binds OK = code, always matches
+        case OK:           # BUG â€” binds OK = code, always matches
             return "ok"
         case FAIL:
             return "fail"
@@ -2452,9 +2457,9 @@ def classify(code):
 
 \`classify(500)\` returns \`"ok"\`. The fix is one of:
 
-- \`case 200:\` — literal pattern.
-- \`case Codes.OK:\` — dotted-name value pattern (any name with a dot).
-- \`case (OK):\` — **does not** help. Parentheses don't change pattern semantics.
+- \`case 200:\` â€” literal pattern.
+- \`case Codes.OK:\` â€” dotted-name value pattern (any name with a dot).
+- \`case (OK):\` â€” **does not** help. Parentheses don't change pattern semantics.
 
 This is the single most common Python 3.10 review comment.
 
@@ -2490,31 +2495,31 @@ def describe(value):
         case _:                    return "other"
 \`\`\`
 
-Half the lines, same behaviour, clearer intent. Note how \`case 0:\` quietly handles **only** integer 0 (and \`False\`, since \`False == 0\`) — if that asymmetry matters, add \`case 0 if value is not False:\` as a guard.`,
+Half the lines, same behaviour, clearer intent. Note how \`case 0:\` quietly handles **only** integer 0 (and \`False\`, since \`False == 0\`) â€” if that asymmetry matters, add \`case 0 if value is not False:\` as a guard.`,
 
     tryGuidance:
-      "Open the **branch router** and run two experiments. **Mode 1 (if-chain)**: pick the empty string \`\"\"\` and notice it falls all the way to the \`isinstance(x, str)\` branch — the truthiness branch never fires. Then pick \`None\` and watch the very first branch catch it. **Mode 2 (match/case)**: send \`Point(0, 0)\` and watch the \`Point(x=0, y=0)\` branch fire instead of \`Point(x, y) if x == y\` — first-match-wins. Then send \`Point(3, 3)\` and watch how the *order* of cases changes the answer. Finally, scroll to the wildcard \`case _:\` and ask yourself: which branches above it are reachable for which subjects?",
+      "Open the **branch router** and run two experiments. **Mode 1 (if-chain)**: pick the empty string \`\"\"\` and notice it falls all the way to the \`isinstance(x, str)\` branch â€” the truthiness branch never fires. Then pick \`None\` and watch the very first branch catch it. **Mode 2 (match/case)**: send \`Point(0, 0)\` and watch the \`Point(x=0, y=0)\` branch fire instead of \`Point(x, y) if x == y\` â€” first-match-wins. Then send \`Point(3, 3)\` and watch how the *order* of cases changes the answer. Finally, scroll to the wildcard \`case _:\` and ask yourself: which branches above it are reachable for which subjects?",
 
     knowledgeCheck: [
       {
         question: "Which list contains exactly Python's built-in falsy values?",
         options: [
-          "`None`, `False`, `0`, `0.0`, `\"\"`, `[]`, `{}`, `set()`, `range(0)` — and any custom object whose `__bool__` returns False or whose `__len__` returns 0.",
-          "Only `None` and `False` — everything else (including `0` and empty containers) is truthy.",
+          "`None`, `False`, `0`, `0.0`, `\"\"`, `[]`, `{}`, `set()`, `range(0)` â€” and any custom object whose `__bool__` returns False or whose `__len__` returns 0.",
+          "Only `None` and `False` â€” everything else (including `0` and empty containers) is truthy.",
           "`None`, `False`, and any string spelled `\"false\"` regardless of case.",
         ],
         correctIndex: 0,
-        explanation: "`bool(x)` calls `__bool__`, then falls back to `__len__`. Empty built-in containers and zero numerics are all falsy. The string `\"False\"` is non-empty, so it is **truthy** — a classic interview trap.",
+        explanation: "`bool(x)` calls `__bool__`, then falls back to `__len__`. Empty built-in containers and zero numerics are all falsy. The string `\"False\"` is non-empty, so it is **truthy** â€” a classic interview trap.",
       },
       {
         question: "What does this evaluate to and why?\n\n`0 or \"default\"`",
         options: [
-          "`\"default\"` — `or` returns the first truthy operand, or the last operand if none are truthy. `0` is falsy, so the right side is returned.",
-          "`True` — `or` always returns a boolean.",
-          "`0` — `or` returns the left operand whenever it is defined.",
+          "`\"default\"` â€” `or` returns the first truthy operand, or the last operand if none are truthy. `0` is falsy, so the right side is returned.",
+          "`True` â€” `or` always returns a boolean.",
+          "`0` â€” `or` returns the left operand whenever it is defined.",
         ],
         correctIndex: 0,
-        explanation: "`a or b` returns `a` if truthy, else `b`. The result is the **operand**, not a coerced bool. This is why `name = user.name or \"anonymous\"` is the idiomatic default-when-missing pattern — but be careful when an empty string is a *valid* value distinct from missing.",
+        explanation: "`a or b` returns `a` if truthy, else `b`. The result is the **operand**, not a coerced bool. This is why `name = user.name or \"anonymous\"` is the idiomatic default-when-missing pattern â€” but be careful when an empty string is a *valid* value distinct from missing.",
       },
       {
         question: "Inside a `match` block, what does `case foo:` actually do?",
@@ -2524,13 +2529,13 @@ Half the lines, same behaviour, clearer intent. Note how \`case 0:\` quietly han
           "Raises `SyntaxError` because `match` cases require a literal or dotted name.",
         ],
         correctIndex: 0,
-        explanation: "Bare names in `case` patterns are **captures** — they bind, never compare. To compare against a constant, use a dotted name (`case Status.OK:`) or a literal (`case 200:`). This is the single most common bug in Python 3.10+ code review.",
+        explanation: "Bare names in `case` patterns are **captures** â€” they bind, never compare. To compare against a constant, use a dotted name (`case Status.OK:`) or a literal (`case 200:`). This is the single most common bug in Python 3.10+ code review.",
       },
       {
         question: "Given the chain `0 <= x < 10`, which is true?",
         options: [
           "`x` is evaluated once, and the chain is equivalent to `(0 <= x) and (x < 10)` with short-circuit.",
-          "`x` is evaluated twice — once per comparison — so an expensive `x = compute()` runs twice.",
+          "`x` is evaluated twice â€” once per comparison â€” so an expensive `x = compute()` runs twice.",
           "The expression is parsed as `(0 <= x) < 10`, comparing a bool to 10.",
         ],
         correctIndex: 0,
@@ -2539,15 +2544,15 @@ Half the lines, same behaviour, clearer intent. Note how \`case 0:\` quietly han
       {
         question: "You match `[1, 2, 3]` against `case [head, *tail]:`. What gets bound?",
         options: [
-          "`head = 1`, `tail = [2, 3]` — the spread captures the remainder as a list.",
-          "`head = [1, 2, 3]`, `tail = []` — the spread always grabs everything.",
-          "`head = 1`, `tail = 2` — the spread captures only the next element.",
+          "`head = 1`, `tail = [2, 3]` â€” the spread captures the remainder as a list.",
+          "`head = [1, 2, 3]`, `tail = []` â€” the spread always grabs everything.",
+          "`head = 1`, `tail = 2` â€” the spread captures only the next element.",
         ],
         correctIndex: 0,
         explanation: "Sequence patterns with `*name` work like extended iterable unpacking: `head` takes one element from the start, `tail` takes the rest as a fresh list. Empty tail (`[1]` against `[head, *tail]`) gives `head=1, tail=[]`.",
       },
       {
-        question: "`match` evaluation order — which is correct?",
+        question: "`match` evaluation order â€” which is correct?",
         options: [
           "The subject is evaluated **once**; cases are tried **top-down**; the **first** match wins; later cases are skipped even if they would also match.",
           "All cases are tried in parallel and Python picks the most specific one.",
@@ -2560,7 +2565,7 @@ Half the lines, same behaviour, clearer intent. Note how \`case 0:\` quietly han
         question: "What is the cleanest way to default a config when the caller passes `None`, but **not** when they pass an explicit empty dict `{}`?",
         options: [
           "`config = override if override is not None else DEFAULT_CONFIG`",
-          "`config = override or DEFAULT_CONFIG` — Python treats `{}` and `None` the same here, which is what we want.",
+          "`config = override or DEFAULT_CONFIG` â€” Python treats `{}` and `None` the same here, which is what we want.",
           "`config = bool(override) and override or DEFAULT_CONFIG`",
         ],
         correctIndex: 0,
@@ -2570,11 +2575,11 @@ Half the lines, same behaviour, clearer intent. Note how \`case 0:\` quietly han
         question: "When does a `case Point(x, y) if x == y:` branch fire?",
         options: [
           "Only when the subject is a `Point` (matches the class pattern), `x` and `y` are bound, and the guard `x == y` evaluates True. If the guard fails, Python tries the next case.",
-          "Whenever the subject is any object with `x` and `y` attributes — the guard runs first to filter out non-Points.",
+          "Whenever the subject is any object with `x` and `y` attributes â€” the guard runs first to filter out non-Points.",
           "Only when the subject is exactly `Point(0, 0)`; the guard is decorative.",
         ],
         correctIndex: 0,
-        explanation: "Guards run **after** the pattern matches and bindings are made. If the guard fails, the case is rejected and the next one is tried — the bindings made during the failed match are discarded.",
+        explanation: "Guards run **after** the pattern matches and bindings are made. If the guard fails, the case is rejected and the next one is tried â€” the bindings made during the failed match are discarded.",
       },
     ],
   },
@@ -2583,9 +2588,9 @@ Half the lines, same behaviour, clearer intent. Note how \`case 0:\` quietly han
     durationLabel: MODULE_TIME_LABEL,
     outcomes: [
       "Distinguish an **iterable** (something you can ask for an iterator) from an **iterator** (the one-shot cursor itself), and know which one a given object is.",
-      "Implement the **iterator protocol** by hand — `__iter__` returns the cursor, `__next__` returns the next value or raises `StopIteration` — and read what `for` does **under the hood**.",
+      "Implement the **iterator protocol** by hand â€” `__iter__` returns the cursor, `__next__` returns the next value or raises `StopIteration` â€” and read what `for` does **under the hood**.",
       "Reach for **generators** (`yield` / `yield from`) to express lazy pipelines that stay flat in memory, even over multi-GB inputs.",
-      "Use the right **`itertools`** primitive — `islice`, `chain`, `takewhile`, `groupby`, `tee` — instead of rebuilding them.",
+      "Use the right **`itertools`** primitive â€” `islice`, `chain`, `takewhile`, `groupby`, `tee` â€” instead of rebuilding them.",
       "Avoid the four canonical footguns: **one-shot exhaustion**, **iterating while mutating**, **late-binding closures in generators**, and **eager `list(...)` of an infinite stream**.",
     ],
     learnMarkdown: `## The mental model: a cursor, not a collection
@@ -2595,7 +2600,7 @@ A \`for\` loop in Python is sugar over **two** ideas you should be able to draw 
 1. An **iterable** is anything that knows how to *hand out a cursor*. \`__iter__()\` returns one.
 2. An **iterator** is the cursor itself. \`__next__()\` returns the next value or raises \`StopIteration\` when there are no more.
 
-That is the whole protocol. Lists, tuples, strings, dicts, sets, files, ranges, generators — every "thing you can loop over" is just a polite implementation of those two methods. When you write:
+That is the whole protocol. Lists, tuples, strings, dicts, sets, files, ranges, generators â€” every "thing you can loop over" is just a polite implementation of those two methods. When you write:
 
 \`\`\`
 for x in xs:
@@ -2628,17 +2633,17 @@ a = iter(xs); b = iter(xs)   # two independent cursors over the same list
 next(a), next(a), next(b)    # 1, 2, 1
 \`\`\`
 
-A **generator** *is* an iterator — and \`iter(gen)\` returns *the generator itself*. There is no "rewind". This is why:
+A **generator** *is* an iterator â€” and \`iter(gen)\` returns *the generator itself*. There is no "rewind". This is why:
 
 \`\`\`
 g = (x * x for x in range(3))
 list(g)         # [0, 1, 4]
-list(g)         # [] — exhausted, the cursor is at the end
+list(g)         # [] â€” exhausted, the cursor is at the end
 \`\`\`
 
 The contract for an iterator: **\`__iter__\` returns \`self\`**, and \`__next__\` advances. That is why \`for x in g:\` works once and then silently does nothing the second time.
 
-> **The check you should always run mentally:** "Is this thing fresh-each-time, or one-shot?" Lists/tuples/dicts/sets/strings/ranges → fresh. Files, generators, \`zip\`, \`map\`, \`filter\`, \`enumerate\`, \`reversed\`, \`itertools.*\` → one-shot.
+> **The check you should always run mentally:** "Is this thing fresh-each-time, or one-shot?" Lists/tuples/dicts/sets/strings/ranges â†’ fresh. Files, generators, \`zip\`, \`map\`, \`filter\`, \`enumerate\`, \`reversed\`, \`itertools.*\` â†’ one-shot.
 
 ---
 
@@ -2686,7 +2691,7 @@ This is exactly how \`list\` is built: \`list.__iter__()\` returns a *new* \`lis
 
 ## Generators: the same protocol, written backwards
 
-A generator function is a **factory for iterators**. Every \`yield\` pauses the function and hands a value to whoever called \`next()\`. The local variables — \`n\`, the loop counter, the open file handle — *survive* across yields. That is how a generator can stream a 50 GB log without holding it in memory.
+A generator function is a **factory for iterators**. Every \`yield\` pauses the function and hands a value to whoever called \`next()\`. The local variables â€” \`n\`, the loop counter, the open file handle â€” *survive* across yields. That is how a generator can stream a 50 GB log without holding it in memory.
 
 \`\`\`
 def countdown(n):
@@ -2699,22 +2704,22 @@ That replaces the entire \`Countdown\` class above. Same protocol; one-quarter t
 
 ### \`yield\` vs \`return\` inside a generator
 
-- \`yield x\` — produce a value, pause. The next \`next()\` resumes right after the yield.
-- \`return\` (bare) — end the iteration. Raises \`StopIteration\` automatically.
-- \`return x\` — also ends iteration; the value goes into \`StopIteration.value\` (rarely used outside \`yield from\`).
+- \`yield x\` â€” produce a value, pause. The next \`next()\` resumes right after the yield.
+- \`return\` (bare) â€” end the iteration. Raises \`StopIteration\` automatically.
+- \`return x\` â€” also ends iteration; the value goes into \`StopIteration.value\` (rarely used outside \`yield from\`).
 
-A function with **any** \`yield\` in its body is a generator function — calling it does **not** run the body, it returns a generator. This trips up beginners who write:
+A function with **any** \`yield\` in its body is a generator function â€” calling it does **not** run the body, it returns a generator. This trips up beginners who write:
 
 \`\`\`
 def warmup():
     print("starting")
     yield from range(3)
 
-warmup()           # nothing printed — the body has not started
+warmup()           # nothing printed â€” the body has not started
 list(warmup())     # *now* "starting" prints, then 0 1 2
 \`\`\`
 
-### \`yield from\` — delegation in one keyword
+### \`yield from\` â€” delegation in one keyword
 
 \`yield from sub\` does what a junior writes as:
 
@@ -2723,7 +2728,7 @@ for v in sub:
     yield v
 \`\`\`
 
-…but it also forwards \`send()\`, \`throw()\`, and the final return value. In day-to-day code you use it for one reason: **flatten a stream of streams**.
+â€¦but it also forwards \`send()\`, \`throw()\`, and the final return value. In day-to-day code you use it for one reason: **flatten a stream of streams**.
 
 \`\`\`
 def walk(node):
@@ -2741,17 +2746,17 @@ That is a tree traversal in four lines. No accumulator, no recursion-with-list, 
 Same grammar, different brackets:
 
 \`\`\`
-total = sum(x * x for x in range(10_000_000))   # generator — flat memory
-total = sum([x * x for x in range(10_000_000)]) # list — ~300 MB on a laptop first
+total = sum(x * x for x in range(10_000_000))   # generator â€” flat memory
+total = sum([x * x for x in range(10_000_000)]) # list â€” ~300 MB on a laptop first
 \`\`\`
 
-Heuristic: **if the only thing you do with the comprehension is feed it to \`sum\` / \`max\` / \`min\` / \`any\` / \`all\` / a constructor — drop the brackets.** When a generator expression is the **sole** argument to a function, you can omit the outer parens, hence the idiomatic \`sum(x*x for x in nums)\`.
+Heuristic: **if the only thing you do with the comprehension is feed it to \`sum\` / \`max\` / \`min\` / \`any\` / \`all\` / a constructor â€” drop the brackets.** When a generator expression is the **sole** argument to a function, you can omit the outer parens, hence the idiomatic \`sum(x*x for x in nums)\`.
 
-When you need to iterate it **twice**, *do* materialize. Generators do not rewind — and \`list(g)\` after \`max(g)\` is the canonical "why is my second loop empty?" bug.
+When you need to iterate it **twice**, *do* materialize. Generators do not rewind â€” and \`list(g)\` after \`max(g)\` is the canonical "why is my second loop empty?" bug.
 
 ---
 
-## \`for / else\` — the keyword Python reuses for "loop completed without break"
+## \`for / else\` â€” the keyword Python reuses for "loop completed without break"
 
 \`\`\`
 for item in haystack:
@@ -2761,7 +2766,7 @@ else:
     print("not found")     # runs only if the loop finished without hitting break
 \`\`\`
 
-The \`else\` is wired to the **\`break\`**, not to the iteration count. It exists because before \`any\`/\`all\` were idiomatic, this was the cleanest "search for X" pattern. Today most senior code just uses \`if any(...): ...\` instead — but the construct still appears in the standard library and in interview questions.
+The \`else\` is wired to the **\`break\`**, not to the iteration count. It exists because before \`any\`/\`all\` were idiomatic, this was the cleanest "search for X" pattern. Today most senior code just uses \`if any(...): ...\` instead â€” but the construct still appears in the standard library and in interview questions.
 
 ---
 
@@ -2772,7 +2777,7 @@ Two rules that prevent 80% of loop bugs:
 1. **Never mutate a collection while iterating it.** \`for x in xs: if cond(x): xs.remove(x)\` skips elements (because the cursor stays put while the list shifts). Iterate \`xs[:]\` (a copy) or build a new list with a comprehension.
 2. **Files are iterators, not iterables.** \`for line in f:\` consumes the file. A second \`for line in f:\` reads zero lines until you \`f.seek(0)\`.
 
-Same pattern, two different failure modes — both rooted in "iterators are stateful one-shot cursors".
+Same pattern, two different failure modes â€” both rooted in "iterators are stateful one-shot cursors".
 
 ---
 
@@ -2780,12 +2785,12 @@ Same pattern, two different failure modes — both rooted in "iterators are stat
 
 The standard library already wrote the loop you are about to write. The high-leverage primitives:
 
-- **\`islice(it, start, stop, step)\`** — \`it[start:stop:step]\` for iterators that don't support slicing. \`islice(stream, 100)\` to take the first 100 items.
-- **\`chain(a, b, c)\`** — concatenate iterables lazily. \`chain.from_iterable(rows)\` flattens one level.
-- **\`takewhile(pred, it)\`** / **\`dropwhile(pred, it)\`** — stop / skip while a predicate is true. *Order-sensitive*: behavior depends on input order.
-- **\`groupby(it, key=...)\`** — group **consecutive** equal-key runs. Sort first if you wanted SQL-style GROUP BY.
-- **\`tee(it, n)\`** — fork an iterator into N independent cursors. Cheap if consumers stay in lockstep; otherwise it buffers.
-- **\`zip(a, b, strict=True)\`** — pair items, raise on length mismatch (3.10+). Without \`strict=True\` it silently truncates to the shorter input — the cause of countless off-by-one bugs.
+- **\`islice(it, start, stop, step)\`** â€” \`it[start:stop:step]\` for iterators that don't support slicing. \`islice(stream, 100)\` to take the first 100 items.
+- **\`chain(a, b, c)\`** â€” concatenate iterables lazily. \`chain.from_iterable(rows)\` flattens one level.
+- **\`takewhile(pred, it)\`** / **\`dropwhile(pred, it)\`** â€” stop / skip while a predicate is true. *Order-sensitive*: behavior depends on input order.
+- **\`groupby(it, key=...)\`** â€” group **consecutive** equal-key runs. Sort first if you wanted SQL-style GROUP BY.
+- **\`tee(it, n)\`** â€” fork an iterator into N independent cursors. Cheap if consumers stay in lockstep; otherwise it buffers.
+- **\`zip(a, b, strict=True)\`** â€” pair items, raise on length mismatch (3.10+). Without \`strict=True\` it silently truncates to the shorter input â€” the cause of countless off-by-one bugs.
 
 You will reach for \`enumerate(it, start=1)\` and \`reversed(seq)\` daily; both are iterators in their own right.
 
@@ -2798,7 +2803,7 @@ This is the line between mid-level and senior judgment:
 - **You need random access**, e.g. \`xs[10]\` or \`len(xs)\`. Generators support neither.
 - **You need to iterate the data more than once.** Materialize as a list or use a fresh-each-time iterable.
 - **The producer is faster than the consumer and you are I/O-bound on the *consumer*.** A queue + worker is usually the right structure, not a hand-rolled generator.
-- **Side-effect-only loops.** \`def emit(): for row in rows: db.write(row)\` should be a plain function, not a generator that the caller forgets to consume — a generator function whose result is discarded **does nothing at all** because the body never starts.
+- **Side-effect-only loops.** \`def emit(): for row in rows: db.write(row)\` should be a plain function, not a generator that the caller forgets to consume â€” a generator function whose result is discarded **does nothing at all** because the body never starts.
 
 ---
 
@@ -2806,7 +2811,7 @@ This is the line between mid-level and senior judgment:
 
 - **The "empty the second time" bug.** \`g = (...); print(max(g)); print(min(g))\` returns the right max and an empty min.
 - **\`zip\` truncation.** Mismatched lengths silently drop the tail. Use \`zip(..., strict=True)\` in 3.10+.
-- **Late binding in a generator.** \`fns = [(lambda: i) for i in range(3)]\` — every lambda closes over the *same* \`i\`. The fix is \`lambda i=i: i\`. The same trap occurs with generator expressions that close over a loop variable.
+- **Late binding in a generator.** \`fns = [(lambda: i) for i in range(3)]\` â€” every lambda closes over the *same* \`i\`. The fix is \`lambda i=i: i\`. The same trap occurs with generator expressions that close over a loop variable.
 - **\`itertools.tee\` with one slow consumer.** \`tee\` buffers everything between the fastest and slowest cursor. With one cursor stuck at element 0, \`tee\` ends up holding the *entire* stream.
 - **Calling a generator function and ignoring the return value.** No body runs. Symptom: "my logging function does nothing." Cause: there is a \`yield\` in it somewhere.
 
@@ -2814,7 +2819,7 @@ This is the line between mid-level and senior judgment:
 
 ## Interview hook (answer like a senior)
 
-"A \`for\` loop is desugared into \`iter()\` then repeated \`next()\` until \`StopIteration\`. An *iterable* hands out cursors; an *iterator* is the cursor. Generators are the cleanest way to write an iterator — \`yield\` pauses the function, locals survive across yields, and \`yield from\` delegates. I reach for generator expressions whenever I only need an aggregate, because memory stays flat. The bugs to watch for are one-shot exhaustion, iterating-while-mutating, and \`zip\` silently truncating; \`itertools.islice\`, \`chain\`, and \`groupby\` cover almost everything else without rolling my own."`,
+"A \`for\` loop is desugared into \`iter()\` then repeated \`next()\` until \`StopIteration\`. An *iterable* hands out cursors; an *iterator* is the cursor. Generators are the cleanest way to write an iterator â€” \`yield\` pauses the function, locals survive across yields, and \`yield from\` delegates. I reach for generator expressions whenever I only need an aggregate, because memory stays flat. The bugs to watch for are one-shot exhaustion, iterating-while-mutating, and \`zip\` silently truncating; \`itertools.islice\`, \`chain\`, and \`groupby\` cover almost everything else without rolling my own."`,
 
     video: null,
     videoFallbackMarkdown: `## Deep dive: build the iterator intuition
@@ -2825,9 +2830,9 @@ Before you loop over anything twice, ask yourself: **iterable or iterator?** The
 
 \`\`\`
 xs = [1, 2, 3]
-iter(xs) is xs           # False — list is an iterable
+iter(xs) is xs           # False â€” list is an iterable
 g = (x for x in xs)
-iter(g) is g             # True — generator is an iterator
+iter(g) is g             # True â€” generator is an iterator
 \`\`\`
 
 If you take only one mental tool from this lesson, take that one.
@@ -2845,7 +2850,7 @@ def evens(xs):
 it = evens([1, 2, 3, 4])
 \`\`\`
 
-What happens *before* you call \`next(it)\`? Nothing. The body of \`evens\` has not executed yet. Calling \`next(it)\` resumes it from the top, runs until the first \`yield 2\`, and pauses. The next \`next(it)\` resumes after the yield, finds the next even (4), yields. The third \`next(it)\` runs the loop to completion and falls off the end → \`StopIteration\`.
+What happens *before* you call \`next(it)\`? Nothing. The body of \`evens\` has not executed yet. Calling \`next(it)\` resumes it from the top, runs until the first \`yield 2\`, and pauses. The next \`next(it)\` resumes after the yield, finds the next even (4), yields. The third \`next(it)\` runs the loop to completion and falls off the end â†’ \`StopIteration\`.
 
 The thing to internalize: **the local frame of a paused generator is preserved on the heap**. \`x\` is still 4 between yields. That is what lets a generator stream a file without buffering it.
 
@@ -2905,80 +2910,80 @@ Every stage is a generator. Memory holds one record at a time. Each stage is ind
 
 Match each natural-language request to the right primitive (do this on paper):
 
-- "Take the first 1000 lines of a stream." → \`islice(stream, 1000)\`
-- "Combine three sorted feeds into one (any order)." → \`chain(a, b, c)\`
-- "Stop reading the moment a row's timestamp exceeds 23:59:59." → \`takewhile(lambda r: r.ts <= cutoff, rows)\`
-- "Group consecutive rows with the same user_id." → \`groupby(rows, key=lambda r: r.user_id)\` *(after sorting!)*
-- "Run the same stream through two pipelines." → \`tee(stream, 2)\`
-- "Pair user IDs with their scores; raise if lengths differ." → \`zip(user_ids, scores, strict=True)\`
+- "Take the first 1000 lines of a stream." â†’ \`islice(stream, 1000)\`
+- "Combine three sorted feeds into one (any order)." â†’ \`chain(a, b, c)\`
+- "Stop reading the moment a row's timestamp exceeds 23:59:59." â†’ \`takewhile(lambda r: r.ts <= cutoff, rows)\`
+- "Group consecutive rows with the same user_id." â†’ \`groupby(rows, key=lambda r: r.user_id)\` *(after sorting!)*
+- "Run the same stream through two pipelines." â†’ \`tee(stream, 2)\`
+- "Pair user IDs with their scores; raise if lengths differ." â†’ \`zip(user_ids, scores, strict=True)\`
 
 Knowing these six replaces about half of the loops a junior would write.
 
 ### 6) The four exhaustion-and-mutation bugs, isolated
 
 \`\`\`
-# A — generator exhaustion
+# A â€” generator exhaustion
 g = (x for x in range(5))
 print(list(g))     # [0, 1, 2, 3, 4]
-print(list(g))     # [] — silently!
+print(list(g))     # [] â€” silently!
 
-# B — mutating while iterating
+# B â€” mutating while iterating
 xs = [1, 2, 3, 4]
 for x in xs:
     if x % 2 == 0:
         xs.remove(x)
-# xs is now [1, 3, 4], not [1, 3] — index moved while items shifted
+# xs is now [1, 3, 4], not [1, 3] â€” index moved while items shifted
 
-# C — late binding in a generator-of-closures
+# C â€” late binding in a generator-of-closures
 fns = [lambda: i for i in range(3)]
-[fn() for fn in fns]        # [2, 2, 2] — every lambda saw the *final* i
+[fn() for fn in fns]        # [2, 2, 2] â€” every lambda saw the *final* i
 
-# D — zip silently truncates
-list(zip([1, 2, 3], ['a', 'b']))             # [(1,'a'), (2,'b')] — 3 lost
+# D â€” zip silently truncates
+list(zip([1, 2, 3], ['a', 'b']))             # [(1,'a'), (2,'b')] â€” 3 lost
 list(zip([1, 2, 3], ['a', 'b'], strict=True))   # ValueError, as it should
 \`\`\`
 
 If you can spot all four in code review without running it, you are calibrated.`,
 
     tryGuidance:
-      "Open the **iterator engine** below and run it in two passes. **Mode 1 (Iterator Protocol)**: pick a small source, then click *next()* repeatedly. Watch the cursor index advance, the consumed items move into the *yielded* tray, and the eventual \`StopIteration\`. Try clicking *next()* one more time after exhaustion — it stays raised, the cursor doesn't reset. **Mode 2 (Lazy Pipeline)**: pick a source and chain a *filter → map → take*. Click *pull* one step at a time and watch *only one item at a time* flow through every stage — that is laziness made visible. Compare with the *eager* toggle to see how the equivalent list-comprehension version would inflate intermediate lists. The bottom \"memory in flight\" counter tells the whole story: lazy stays at 1, eager grows linearly with N.",
+      "Open the **iterator engine** below and run it in two passes. **Mode 1 (Iterator Protocol)**: pick a small source, then click *next()* repeatedly. Watch the cursor index advance, the consumed items move into the *yielded* tray, and the eventual \`StopIteration\`. Try clicking *next()* one more time after exhaustion â€” it stays raised, the cursor doesn't reset. **Mode 2 (Lazy Pipeline)**: pick a source and chain a *filter â†’ map â†’ take*. Click *pull* one step at a time and watch *only one item at a time* flow through every stage â€” that is laziness made visible. Compare with the *eager* toggle to see how the equivalent list-comprehension version would inflate intermediate lists. The bottom \"memory in flight\" counter tells the whole story: lazy stays at 1, eager grows linearly with N.",
 
     knowledgeCheck: [
       {
         question: "Which best describes how Python desugars `for x in xs: body`?",
         options: [
-          "`it = iter(xs); while True: try: x = next(it); except StopIteration: break; body` — call `__iter__` once, then `__next__` repeatedly until it raises.",
+          "`it = iter(xs); while True: try: x = next(it); except StopIteration: break; body` â€” call `__iter__` once, then `__next__` repeatedly until it raises.",
           "Python builds the full list `list(xs)` first, then loops by integer index from 0 to `len - 1`.",
-          "Python repeatedly calls `xs[0]`, `xs[1]`, … and stops on `IndexError` — only sequences can be iterated.",
+          "Python repeatedly calls `xs[0]`, `xs[1]`, â€¦ and stops on `IndexError` â€” only sequences can be iterated.",
         ],
         correctIndex: 0,
-        explanation: "The protocol is `__iter__` (get a cursor) + `__next__` (advance, raise `StopIteration` at end). That is why **anything** that implements those two methods can be the right-hand side of `for x in …`, not just sequences.",
+        explanation: "The protocol is `__iter__` (get a cursor) + `__next__` (advance, raise `StopIteration` at end). That is why **anything** that implements those two methods can be the right-hand side of `for x in â€¦`, not just sequences.",
       },
       {
         question: "What is the difference between an **iterable** and an **iterator** in Python?",
         options: [
-          "An iterable can produce a fresh cursor each time you call `iter()` on it; an iterator **is** the cursor and is one-shot — `iter(it) is it` returns True.",
-          "They are the same thing — Python uses the names interchangeably.",
+          "An iterable can produce a fresh cursor each time you call `iter()` on it; an iterator **is** the cursor and is one-shot â€” `iter(it) is it` returns True.",
+          "They are the same thing â€” Python uses the names interchangeably.",
           "An iterator supports random access (`it[3]`) while an iterable only supports `for` loops.",
         ],
         correctIndex: 0,
-        explanation: "Lists, dicts, strings, ranges, sets are *iterables* — `iter(xs)` returns a brand-new cursor. Generators, files, `map`/`filter`/`zip`, `itertools.*` are *iterators* — they're their own cursor and exhaust after one full pass.",
+        explanation: "Lists, dicts, strings, ranges, sets are *iterables* â€” `iter(xs)` returns a brand-new cursor. Generators, files, `map`/`filter`/`zip`, `itertools.*` are *iterators* â€” they're their own cursor and exhaust after one full pass.",
       },
       {
         question: "What does this print?\n\n```\ng = (x * x for x in range(3))\nprint(sum(g))\nprint(sum(g))\n```",
         options: [
-          "`5` then `0` — the first `sum` exhausts the generator; the second sees no values left.",
-          "`5` then `5` — generator expressions are reusable like list comprehensions.",
+          "`5` then `0` â€” the first `sum` exhausts the generator; the second sees no values left.",
+          "`5` then `5` â€” generator expressions are reusable like list comprehensions.",
           "`StopIteration` on the second `sum` because the generator hasn't been re-created.",
         ],
         correctIndex: 0,
-        explanation: "Generator expressions are **iterators**, not iterables — once consumed, they're exhausted. `sum(empty_iterator)` is `0`, not an error. The fix is either materialize once (`xs = list(g)`) or rebuild the generator before each pass.",
+        explanation: "Generator expressions are **iterators**, not iterables â€” once consumed, they're exhausted. `sum(empty_iterator)` is `0`, not an error. The fix is either materialize once (`xs = list(g)`) or rebuild the generator before each pass.",
       },
       {
         question: "Inside a function, what does writing `yield` anywhere in the body change?",
         options: [
           "Calling the function returns a **generator** without executing any of the body. The body only runs (in slices) when something calls `next()` on that generator.",
-          "It's a synonym for `return` — the function still runs eagerly and returns a single value.",
+          "It's a synonym for `return` â€” the function still runs eagerly and returns a single value.",
           "It marks the function as `async`; you must call it with `await`.",
         ],
         correctIndex: 0,
@@ -2992,14 +2997,14 @@ If you can spot all four in code review without running it, you are calibrated.`
           "```\ndef walk(n):\n    return [n.value] + [walk(c) for c in n.children]\n```",
         ],
         correctIndex: 0,
-        explanation: "`yield from` delegates iteration to a sub-generator — it forwards values, `StopIteration`, and even `send`/`throw`. The list-building alternatives materialize the entire tree in memory, defeating the point of streaming.",
+        explanation: "`yield from` delegates iteration to a sub-generator â€” it forwards values, `StopIteration`, and even `send`/`throw`. The list-building alternatives materialize the entire tree in memory, defeating the point of streaming.",
       },
       {
         question: "Which of these is **NOT** safe for the same reason as the others?\n\n(a) `for line in file:` then later `for line in file:`  \n(b) `g = (x for x in xs); list(g); list(g)`  \n(c) `for x in [1,2,3]: print(x)` followed by another `for x in [1,2,3]:`",
         options: [
-          "(c) — lists are iterables, so they hand out a fresh cursor each `for`. (a) and (b) share the bug: files and generator expressions are one-shot iterators.",
-          "(a) — files are special-cased and cannot be re-iterated even after `seek(0)`.",
-          "(b) — generator expressions actually buffer their results invisibly, so the second `list(g)` works fine.",
+          "(c) â€” lists are iterables, so they hand out a fresh cursor each `for`. (a) and (b) share the bug: files and generator expressions are one-shot iterators.",
+          "(a) â€” files are special-cased and cannot be re-iterated even after `seek(0)`.",
+          "(b) â€” generator expressions actually buffer their results invisibly, so the second `list(g)` works fine.",
         ],
         correctIndex: 0,
         explanation: "Files and generator expressions are iterators (their `__iter__` returns `self`); lists are iterables (their `__iter__` returns a *new* `list_iterator` each call). The first two silently appear empty on the second pass; the list works because it minted a fresh cursor.",
@@ -3007,9 +3012,9 @@ If you can spot all four in code review without running it, you are calibrated.`
       {
         question: "What does `list(zip([1, 2, 3], ['a', 'b']))` produce, and what's the senior fix when lengths *should* match?",
         options: [
-          "`[(1, 'a'), (2, 'b')]` — `zip` truncates to the shortest input silently. Use `zip(..., strict=True)` (3.10+) to raise `ValueError` on length mismatch.",
+          "`[(1, 'a'), (2, 'b')]` â€” `zip` truncates to the shortest input silently. Use `zip(..., strict=True)` (3.10+) to raise `ValueError` on length mismatch.",
           "Raises `ValueError` because the lengths differ.",
-          "`[(1, 'a'), (2, 'b'), (3, None)]` — `zip` pads with `None`. Use `itertools.zip_longest(..., fillvalue=0)` for explicit zeroes.",
+          "`[(1, 'a'), (2, 'b'), (3, None)]` â€” `zip` pads with `None`. Use `itertools.zip_longest(..., fillvalue=0)` for explicit zeroes.",
         ],
         correctIndex: 0,
         explanation: "Default `zip` truncation is the cause of countless off-by-one bugs in joining parallel arrays. `strict=True` makes the assumption explicit; `zip_longest` is the alternative when you genuinely want padding.",
@@ -3017,12 +3022,12 @@ If you can spot all four in code review without running it, you are calibrated.`
       {
         question: "`itertools.groupby(rows, key=lambda r: r['user_id'])` returns a single group when you expected three. What's the most likely cause?",
         options: [
-          "`groupby` only collapses **consecutive** equal-key runs — it does not sort. The input must be sorted by the same key first, otherwise the same user_id appears in multiple non-adjacent groups.",
+          "`groupby` only collapses **consecutive** equal-key runs â€” it does not sort. The input must be sorted by the same key first, otherwise the same user_id appears in multiple non-adjacent groups.",
           "`groupby` requires hashable keys; integer `user_id`s are unhashable.",
           "`groupby` returns a single group whenever the iterable is a generator; you must call `list()` first.",
         ],
         correctIndex: 0,
-        explanation: "This is the single most-asked `itertools` interview trap. `groupby` is a streaming primitive — it walks once and breaks the stream wherever the key value changes. To get SQL-`GROUP BY` semantics, sort first: `groupby(sorted(rows, key=k), key=k)`.",
+        explanation: "This is the single most-asked `itertools` interview trap. `groupby` is a streaming primitive â€” it walks once and breaks the stream wherever the key value changes. To get SQL-`GROUP BY` semantics, sort first: `groupby(sorted(rows, key=k), key=k)`.",
       },
     ],
   },
@@ -3031,8 +3036,8 @@ If you can spot all four in code review without running it, you are calibrated.`
     durationLabel: MODULE_TIME_LABEL,
     outcomes: [
       "Read any Python signature and **classify every parameter** into one of five slots: positional-only, positional-or-keyword, `*args`, keyword-only, `**kwargs`.",
-      "Use the **`/`** and **`*`** markers deliberately to lock down API contracts (PEP 570) — and know what each one forbids the caller from doing.",
-      "Bind arguments at the call site fluently: positional, keyword, `*iterable` unpack, `**mapping` unpack — and predict every `TypeError` before running the code.",
+      "Use the **`/`** and **`*`** markers deliberately to lock down API contracts (PEP 570) â€” and know what each one forbids the caller from doing.",
+      "Bind arguments at the call site fluently: positional, keyword, `*iterable` unpack, `**mapping` unpack â€” and predict every `TypeError` before running the code.",
       "Avoid the four **default-value footguns**: mutable defaults shared across calls, `None`-sentinel patterns, defaults evaluated at definition time, and accidental capture of loop variables.",
       "Choose between **`*args` / `**kwargs` passthrough**, an explicit signature, and a TypedDict / dataclass when designing wrapper functions and decorators.",
     ],
@@ -3042,16 +3047,16 @@ Every Python function signature is a contract written in **five slots**, in fixe
 
 \`\`\`
 def f(POS_ONLY,  /,  POS_OR_KW,  *ARGS,  KW_ONLY,  **KWARGS):
-                    └── default      └── default       └── absorbs
+                    â””â”€â”€ default      â””â”€â”€ default       â””â”€â”€ absorbs
 \`\`\`
 
 Read left to right:
 
-1. **Positional-only** — before the \`/\`. Must be passed by position. Caller cannot use the name. (PEP 570, 3.8+.)
-2. **Positional-or-keyword** — between \`/\` and \`*\`. The default. Can be passed either way.
-3. **\`*args\`** — soaks up *extra* positional arguments into a tuple. Optional. Acts as a **divider**: anything after it is keyword-only.
-4. **Keyword-only** — after \`*args\` (or after a bare \`*\`). Must be passed by name.
-5. **\`**kwargs\`** — soaks up *extra* keyword arguments into a dict. Always last.
+1. **Positional-only** â€” before the \`/\`. Must be passed by position. Caller cannot use the name. (PEP 570, 3.8+.)
+2. **Positional-or-keyword** â€” between \`/\` and \`*\`. The default. Can be passed either way.
+3. **\`*args\`** â€” soaks up *extra* positional arguments into a tuple. Optional. Acts as a **divider**: anything after it is keyword-only.
+4. **Keyword-only** â€” after \`*args\` (or after a bare \`*\`). Must be passed by name.
+5. **\`**kwargs\`** â€” soaks up *extra* keyword arguments into a dict. Always last.
 
 If you can name those five slots and place a parameter in the right one, you can read 100% of Python signatures and write APIs that hold up under review.
 
@@ -3062,15 +3067,15 @@ def render(template, /, data, *layers, theme="dark", **opts):
     ...
 \`\`\`
 
-- \`template\` — positional-only. \`render(template="...")\` is a \`TypeError\`.
-- \`data\` — positional-or-keyword. \`render(t, data={...})\` is fine.
-- \`layers\` — \`*args\`. \`render(t, d, "header", "footer")\` makes \`layers == ("header", "footer")\`.
-- \`theme\` — keyword-only (it's after \`*layers\`). \`render(t, d, "header", "dark")\` does **not** set theme; \`"dark"\` joins \`layers\`.
-- \`opts\` — \`**kwargs\`. Anything else \`render(..., debug=True)\` lands in \`opts\`.
+- \`template\` â€” positional-only. \`render(template="...")\` is a \`TypeError\`.
+- \`data\` â€” positional-or-keyword. \`render(t, data={...})\` is fine.
+- \`layers\` â€” \`*args\`. \`render(t, d, "header", "footer")\` makes \`layers == ("header", "footer")\`.
+- \`theme\` â€” keyword-only (it's after \`*layers\`). \`render(t, d, "header", "dark")\` does **not** set theme; \`"dark"\` joins \`layers\`.
+- \`opts\` â€” \`**kwargs\`. Anything else \`render(..., debug=True)\` lands in \`opts\`.
 
 ---
 
-## The bare \`*\` — keyword-only without absorbing positionals
+## The bare \`*\` â€” keyword-only without absorbing positionals
 
 If you don't want a variadic but you *do* want the rest of the parameters to be keyword-only, use a **bare** \`*\`:
 
@@ -3079,7 +3084,7 @@ def connect(host, port, *, timeout=10, retries=3):
     ...
 \`\`\`
 
-\`connect("db", 5432, 30)\` is a \`TypeError\` — the third positional has no slot, because the \`*\` ate the positional cursor without absorbing anything. The caller is *forced* to write \`timeout=30\`. That is how you make boolean and numeric flags self-documenting at the call site.
+\`connect("db", 5432, 30)\` is a \`TypeError\` â€” the third positional has no slot, because the \`*\` ate the positional cursor without absorbing anything. The caller is *forced* to write \`timeout=30\`. That is how you make boolean and numeric flags self-documenting at the call site.
 
 ---
 
@@ -3093,7 +3098,7 @@ def append_to(item, target=[]):
     return target
 
 append_to(1)   # [1]
-append_to(2)   # [1, 2] — surprise! same list reused across calls
+append_to(2)   # [1, 2] â€” surprise! same list reused across calls
 append_to(3)   # [1, 2, 3]
 \`\`\`
 
@@ -3114,16 +3119,16 @@ The default value is now \`None\` (an immutable singleton, no shared state), and
 ### When immutable defaults are fine
 
 \`\`\`
-def greet(name, greeting="hello"):  # str is immutable — perfectly safe
-def page(rows, page_size=50):       # int is immutable — perfectly safe
-def split(line, sep=","):           # str again — safe
+def greet(name, greeting="hello"):  # str is immutable â€” perfectly safe
+def page(rows, page_size=50):       # int is immutable â€” perfectly safe
+def split(line, sep=","):           # str again â€” safe
 \`\`\`
 
 Strings, numbers, tuples, frozensets, \`None\`: all immutable. Defaults are the same object every call, but no one can mutate them.
 
 ---
 
-## \`*args\` — variadic positional
+## \`*args\` â€” variadic positional
 
 \`*args\` packs *zero or more* extra positional arguments into a tuple.
 
@@ -3131,14 +3136,14 @@ Strings, numbers, tuples, frozensets, \`None\`: all immutable. Defaults are the 
 def total(*nums):
     return sum(nums)
 
-total()           # 0   — empty tuple is fine
+total()           # 0   â€” empty tuple is fine
 total(1)          # 1
 total(1, 2, 3)    # 6
 \`\`\`
 
 Two senior-level usage rules:
 
-- The name \`args\` is convention, not a rule — \`*nums\` is fine and clearer when you have a domain word.
+- The name \`args\` is convention, not a rule â€” \`*nums\` is fine and clearer when you have a domain word.
 - \`*args\` produces a **tuple**, not a list. It is *not* shared across calls (each call gets a fresh tuple). The mutable-default trap does not apply.
 
 ### Forwarding through wrappers
@@ -3159,7 +3164,7 @@ def timed(fn):
 
 ---
 
-## \`**kwargs\` — variadic keyword
+## \`**kwargs\` â€” variadic keyword
 
 \`**kwargs\` packs *zero or more* extra keyword arguments into a **dict**.
 
@@ -3174,7 +3179,7 @@ configure()                       # {}
 The dict is *fresh per call*. Senior idioms:
 
 - **Filter and forward**: \`fn(**{k: v for k, v in opts.items() if k in ALLOWED})\` to strip unknown options before passing through.
-- **Merge with defaults**: \`final = {**DEFAULTS, **opts}\` — later keys win, so caller-provided values override defaults. Same as \`DEFAULTS | opts\` in 3.9+.
+- **Merge with defaults**: \`final = {**DEFAULTS, **opts}\` â€” later keys win, so caller-provided values override defaults. Same as \`DEFAULTS | opts\` in 3.9+.
 - **Avoid as the public API**: a function that takes only \`**kwargs\` is undocumented by construction. Reach for it for *forwarding*, not for primary arguments.
 
 ---
@@ -3184,10 +3189,10 @@ The dict is *fresh per call*. Senior idioms:
 At the call site, every argument is one of three things:
 
 \`\`\`
-f(value)        # positional — fills the next pos slot
-f(name=value)   # keyword     — binds to that named slot
-f(*iterable)    # positional unpack — each element fills the next pos slot
-f(**mapping)    # keyword unpack    — each key=value binds by name
+f(value)        # positional â€” fills the next pos slot
+f(name=value)   # keyword     â€” binds to that named slot
+f(*iterable)    # positional unpack â€” each element fills the next pos slot
+f(**mapping)    # keyword unpack    â€” each key=value binds by name
 \`\`\`
 
 You can mix and match:
@@ -3204,25 +3209,25 @@ fmt("{}/{}/{}", *args, **opts)
 Two rules to memorize:
 
 - **Positionals (and \`*\`-unpacks) come before keywords (and \`**\`-unpacks)** at the call site.
-- A name cannot be bound twice — \`f(1, x=1)\` where \`1\` already filled \`x\` is a \`TypeError: got multiple values for argument 'x'\`.
+- A name cannot be bound twice â€” \`f(1, x=1)\` where \`1\` already filled \`x\` is a \`TypeError: got multiple values for argument 'x'\`.
 
 ---
 
-## The order of things — the mental rule that prevents 90% of TypeErrors
+## The order of things â€” the mental rule that prevents 90% of TypeErrors
 
 When Python binds a call to a signature, it walks **positionals first, then keywords**:
 
 1. Pull positional args from left to right, fill positional-only slots, then positional-or-keyword slots, **then** dump the rest into \`*args\` if present.
 2. Pull keyword args, bind by name into positional-or-keyword *or* keyword-only slots.
 3. Anything left after step 2 lands in \`**kwargs\` if present, else \`TypeError: unexpected keyword argument\`.
-4. Any required slot still empty → \`TypeError: missing required argument\`.
-5. Any positional-or-keyword slot already filled by a positional that *also* gets a keyword → \`TypeError: got multiple values\`.
+4. Any required slot still empty â†’ \`TypeError: missing required argument\`.
+5. Any positional-or-keyword slot already filled by a positional that *also* gets a keyword â†’ \`TypeError: got multiple values\`.
 
 Almost every \`TypeError\` you will ever see from a Python call comes from one of these five rules.
 
 ---
 
-## Positional-only \`/\` — a contract, not a quirk
+## Positional-only \`/\` â€” a contract, not a quirk
 
 \`\`\`
 def at(seq, idx, /):
@@ -3231,9 +3236,9 @@ def at(seq, idx, /):
 
 \`at("ada", 1)\` works. \`at(seq="ada", idx=1)\` is a \`TypeError\`. Why bother forbidding the keyword form?
 
-- **API stability** — once you publish \`def get(key)\`, every caller starts writing \`get(key="x")\`, and you can never rename \`key\` without breaking them. Lock it down with \`/\` and the parameter name is private.
-- **Override flexibility** — internal subclasses can rename the parameter without breaking callers.
-- **Built-ins do this** — \`len(obj=...)\` does not work; \`obj\` is positional-only. PEP 570 just gave us the syntax.
+- **API stability** â€” once you publish \`def get(key)\`, every caller starts writing \`get(key="x")\`, and you can never rename \`key\` without breaking them. Lock it down with \`/\` and the parameter name is private.
+- **Override flexibility** â€” internal subclasses can rename the parameter without breaking callers.
+- **Built-ins do this** â€” \`len(obj=...)\` does not work; \`obj\` is positional-only. PEP 570 just gave us the syntax.
 
 ---
 
@@ -3256,7 +3261,7 @@ def cache(fn):
 Two non-obvious bits:
 
 - The cache key joins \`args\` (already a tuple, hashable) with \`sorted(kwargs.items())\` because \`{"a":1,"b":2}\` and \`{"b":2,"a":1}\` should hit the same cache entry.
-- \`@wraps(fn)\` copies the wrapped function's name and docstring onto the wrapper so introspection (\`help(wrapper)\`, \`wrapper.__name__\`) still shows the original — without it, every cached function looks like \`<function wrapper at ...>\`.
+- \`@wraps(fn)\` copies the wrapped function's name and docstring onto the wrapper so introspection (\`help(wrapper)\`, \`wrapper.__name__\`) still shows the original â€” without it, every cached function looks like \`<function wrapper at ...>\`.
 
 ---
 
@@ -3266,8 +3271,8 @@ Two non-obvious bits:
 - **\`*args\` greedy capture.** \`def f(*args, x=1)\`: \`f(1, 2, 3)\` puts everything in \`args\` and \`x\` stays \`1\`. The caller must write \`f(1, 2, 3, x=99)\`.
 - **\`f(1, x=1)\` when \`x\` is the first parameter.** "TypeError: f() got multiple values for argument 'x'." Common when a positional argument was added later and a caller used the keyword form for the original parameter.
 - **\`f(a=1, b=2)\` to a positional-only.** "TypeError: f() got some positional-only arguments passed as keyword arguments."
-- **Late binding inside a closure.** \`fns = [lambda: i for i in range(3)]\` — every lambda closes over the *same* \`i\`. Fix: \`lambda i=i: i\` (default args are evaluated at function definition, capturing the current value).
-- **\`return\` with no value.** Returns \`None\`. Forgetting \`return\` is the #1 cause of "my function did the work but the result is None" bugs — happens twice as often inside \`if\` chains where one branch forgets it.
+- **Late binding inside a closure.** \`fns = [lambda: i for i in range(3)]\` â€” every lambda closes over the *same* \`i\`. Fix: \`lambda i=i: i\` (default args are evaluated at function definition, capturing the current value).
+- **\`return\` with no value.** Returns \`None\`. Forgetting \`return\` is the #1 cause of "my function did the work but the result is None" bugs â€” happens twice as often inside \`if\` chains where one branch forgets it.
 
 ---
 
@@ -3287,13 +3292,13 @@ def f(a, b, /, c, d=1, *e, g, h=2, **i):
 #     P  P     B  B     A  K  K     W
 \`\`\`
 
-- \`a, b\` — positional-only, must be passed by position
-- \`c\` — positional-or-keyword, required
-- \`d\` — positional-or-keyword, default 1
-- \`e\` — variadic positional → tuple
-- \`g\` — keyword-only, required
-- \`h\` — keyword-only, default 2
-- \`i\` — variadic keyword → dict
+- \`a, b\` â€” positional-only, must be passed by position
+- \`c\` â€” positional-or-keyword, required
+- \`d\` â€” positional-or-keyword, default 1
+- \`e\` â€” variadic positional â†’ tuple
+- \`g\` â€” keyword-only, required
+- \`h\` â€” keyword-only, default 2
+- \`i\` â€” variadic keyword â†’ dict
 
 Mark every signature you read with that ring for a week and reading Python APIs becomes a glance, not a puzzle.
 
@@ -3303,24 +3308,24 @@ When a call fails to bind, the error message tells you *exactly* which rule was 
 
 \`\`\`
 TypeError: f() missing 1 required positional argument: 'x'
-    → required slot left empty after positionals + keywords were placed.
+    â†’ required slot left empty after positionals + keywords were placed.
 
 TypeError: f() got an unexpected keyword argument 'y'
-    → keyword name has no matching slot, and there is no **kwargs to absorb it.
+    â†’ keyword name has no matching slot, and there is no **kwargs to absorb it.
 
 TypeError: f() got multiple values for argument 'x'
-    → the same slot was filled by both a positional and a keyword.
+    â†’ the same slot was filled by both a positional and a keyword.
 
 TypeError: f() takes 2 positional arguments but 3 were given
-    → too many positionals, and there is no *args.
+    â†’ too many positionals, and there is no *args.
 
 TypeError: f() got some positional-only arguments passed as keyword arguments: 'a'
-    → caller used name=value for a parameter behind the / divider.
+    â†’ caller used name=value for a parameter behind the / divider.
 \`\`\`
 
 If you can recite this taxonomy, you will diagnose 90% of "why does this call fail?" issues from the message alone.
 
-### 3) Mutable defaults — the long version
+### 3) Mutable defaults â€” the long version
 
 \`\`\`
 def add_user(name, tags=[]):
@@ -3331,13 +3336,13 @@ def add_user(name, tags=[]):
 What goes wrong, traced step by step:
 
 1. \`def\` runs. Python evaluates \`[]\` once, binds it as the default for \`tags\`.
-2. \`add_user("ada")\` — \`tags\` is the shared default list. Append \`"ada_default"\`. Return reference to that list. List is now \`["ada_default"]\`.
-3. \`add_user("brad")\` — \`tags\` is the **same** shared list (still \`["ada_default"]\`). Append \`"brad_default"\`. Return same list. Now \`["ada_default", "brad_default"]\`.
+2. \`add_user("ada")\` â€” \`tags\` is the shared default list. Append \`"ada_default"\`. Return reference to that list. List is now \`["ada_default"]\`.
+3. \`add_user("brad")\` â€” \`tags\` is the **same** shared list (still \`["ada_default"]\`). Append \`"brad_default"\`. Return same list. Now \`["ada_default", "brad_default"]\`.
 4. The caller has the same list reference both times. Any code that retained the first return value sees the second value sneak into its data structure.
 
-The bug is silent — no exception, just slowly corrupted state. Always use \`None\` as the sentinel and build inside.
+The bug is silent â€” no exception, just slowly corrupted state. Always use \`None\` as the sentinel and build inside.
 
-### 4) Designing wrappers — the \`(*args, **kwargs)\` discipline
+### 4) Designing wrappers â€” the \`(*args, **kwargs)\` discipline
 
 The forwarding pattern only works if you commit to it fully:
 
@@ -3364,16 +3369,16 @@ def fetch(url, *, timeout=10):
 Notice:
 
 - \`wrapper\` accepts **any** call shape, forwards it unchanged. The wrapped \`fetch\` keeps its real signature for tools that introspect it (\`@wraps\` preserves \`__wrapped__\`).
-- The \`retry(times=5)\` outer factory takes its *own* arguments — that is why decorators with arguments need an extra level of nesting.
+- The \`retry(times=5)\` outer factory takes its *own* arguments â€” that is why decorators with arguments need an extra level of nesting.
 
 The discipline: **do not rename or reorder \`*args\` / \`**kwargs\` inside a wrapper**. Forward them exactly as received.
 
-### 5) When to escape \`**kwargs\` — TypedDict / dataclass
+### 5) When to escape \`**kwargs\` â€” TypedDict / dataclass
 
 \`**kwargs\` is a hammer. Most APIs are screws.
 
 \`\`\`
-# WRONG — every caller has to read the source to know what's accepted
+# WRONG â€” every caller has to read the source to know what's accepted
 def render(template, **opts):
     theme = opts.get("theme", "dark")
     layout = opts.get("layout", "wide")
@@ -3381,7 +3386,7 @@ def render(template, **opts):
 \`\`\`
 
 \`\`\`
-# RIGHT — the type checker, IDE, and every reader can see the shape
+# RIGHT â€” the type checker, IDE, and every reader can see the shape
 @dataclass
 class RenderOpts:
     theme: str = "dark"
@@ -3420,20 +3425,20 @@ f(a=1, b=2, c=3, e=5)                 # ?
 f(1, 2, 3, e=5, c=99)                 # ?
 \`\`\`
 
-Answers: ① fails — \`e\` is required keyword-only, missing. ② passes — \`a=1, b=2, c=3, e=5\`, \`d=()\`, \`g={}\`. ③ passes — \`a=1, b=2, c=3, d=(4,5), e=6, g={"x":7}\`. ④ fails — \`a\` and \`b\` are positional-only, can't be passed as keywords. ⑤ fails — \`c\` is filled by the positional \`3\` and again by the keyword \`c=99\` → multiple values.
+Answers: â‘  fails â€” \`e\` is required keyword-only, missing. â‘¡ passes â€” \`a=1, b=2, c=3, e=5\`, \`d=()\`, \`g={}\`. â‘¢ passes â€” \`a=1, b=2, c=3, d=(4,5), e=6, g={"x":7}\`. â‘£ fails â€” \`a\` and \`b\` are positional-only, can't be passed as keywords. â‘¤ fails â€” \`c\` is filled by the positional \`3\` and again by the keyword \`c=99\` â†’ multiple values.
 
 If you can do that in five seconds per call, you have internalized the binding rules.`,
 
     tryGuidance:
-      "Open the **argument binder** below and run two experiments. **Mode 1 (signature)**: pick a signature with all five slot kinds (the *render* example) and watch the divider lines for \`/\` and \`*\` — every parameter to the left of \`/\` is positional-only, every parameter to the right of \`*\` is keyword-only. **Mode 2 (call site)**: add positional, keyword, \`*list\`, and \`**dict\` arguments and watch them route into the slots in real time. The arrows turn red the moment a binding rule breaks — *missing required*, *multiple values*, *unexpected keyword*. Toggle the *mutable default* example to see the same default-list object grow across three call frames — that is the bug, made literal.",
+      "Open the **argument binder** below and run two experiments. **Mode 1 (signature)**: pick a signature with all five slot kinds (the *render* example) and watch the divider lines for \`/\` and \`*\` â€” every parameter to the left of \`/\` is positional-only, every parameter to the right of \`*\` is keyword-only. **Mode 2 (call site)**: add positional, keyword, \`*list\`, and \`**dict\` arguments and watch them route into the slots in real time. The arrows turn red the moment a binding rule breaks â€” *missing required*, *multiple values*, *unexpected keyword*. Toggle the *mutable default* example to see the same default-list object grow across three call frames â€” that is the bug, made literal.",
 
     knowledgeCheck: [
       {
         question: "Name the five parameter slots a Python signature can contain, **in the order they must appear**.",
         options: [
-          "positional-only (before `/`), positional-or-keyword, `*args`, keyword-only (after `*` or `*args`), `**kwargs` — and `**kwargs` is always last.",
-          "`*args`, `**kwargs`, positional-only, keyword-only, positional-or-keyword — the order is flexible as long as `**kwargs` is last.",
-          "Required, optional, default, variadic, named — Python normalizes the syntax internally.",
+          "positional-only (before `/`), positional-or-keyword, `*args`, keyword-only (after `*` or `*args`), `**kwargs` â€” and `**kwargs` is always last.",
+          "`*args`, `**kwargs`, positional-only, keyword-only, positional-or-keyword â€” the order is flexible as long as `**kwargs` is last.",
+          "Required, optional, default, variadic, named â€” Python normalizes the syntax internally.",
         ],
         correctIndex: 0,
         explanation: "PEP 570 + PEP 3102 give the canonical order. The `/` and `*` are *dividers* between slot kinds, and `**kwargs` is always the rightmost slot. Memorize the ordering and most signature-related TypeErrors become obvious.",
@@ -3441,18 +3446,18 @@ If you can do that in five seconds per call, you have internalized the binding r
       {
         question: "What does this print, and why?\n\n```\ndef add(item, target=[]):\n    target.append(item)\n    return target\n\nprint(add(1))\nprint(add(2))\n```",
         options: [
-          "`[1]` then `[1, 2]` — the default `[]` is created **once** at definition time and reused across every call that omits the argument.",
-          "`[1]` then `[2]` — Python builds a fresh empty list per call.",
-          "`[1]` then `[1]` — the second call's append silently fails because the default is locked.",
+          "`[1]` then `[1, 2]` â€” the default `[]` is created **once** at definition time and reused across every call that omits the argument.",
+          "`[1]` then `[2]` â€” Python builds a fresh empty list per call.",
+          "`[1]` then `[1]` â€” the second call's append silently fails because the default is locked.",
         ],
         correctIndex: 0,
-        explanation: "Default values are evaluated once when `def` runs. Mutable defaults persist across calls. The fix is `target=None` plus `if target is None: target = []` inside the body — a fresh list per call, no shared state.",
+        explanation: "Default values are evaluated once when `def` runs. Mutable defaults persist across calls. The fix is `target=None` plus `if target is None: target = []` inside the body â€” a fresh list per call, no shared state.",
       },
       {
         question: "Inside `def connect(host, port, *, timeout=10):`, what does the bare `*` do?",
         options: [
-          "Makes every parameter to its right **keyword-only** without absorbing any extra positionals — `connect('db', 5432, 30)` raises TypeError because the third positional has no slot.",
-          "Marks `timeout` as variadic — it can absorb multiple positional arguments.",
+          "Makes every parameter to its right **keyword-only** without absorbing any extra positionals â€” `connect('db', 5432, 30)` raises TypeError because the third positional has no slot.",
+          "Marks `timeout` as variadic â€” it can absorb multiple positional arguments.",
           "Is a syntax error in modern Python; you must write `**timeout=10`.",
         ],
         correctIndex: 0,
@@ -3466,14 +3471,14 @@ If you can do that in five seconds per call, you have internalized the binding r
           "Python tries every permutation and picks whichever produces no TypeError.",
         ],
         correctIndex: 0,
-        explanation: "Positionals first (left-to-right), keywords second (by name), then leftovers into `**kwargs` or error. Every signature TypeError — *missing required*, *multiple values*, *unexpected keyword* — comes from a slot left empty or a slot filled twice in this two-pass walk.",
+        explanation: "Positionals first (left-to-right), keywords second (by name), then leftovers into `**kwargs` or error. Every signature TypeError â€” *missing required*, *multiple values*, *unexpected keyword* â€” comes from a slot left empty or a slot filled twice in this two-pass walk.",
       },
       {
         question: "Why does `def get(key, /):` exist as a pattern? What does the `/` buy you?",
         options: [
-          "It makes `key` **positional-only** — callers must write `get(\"x\")`, never `get(key=\"x\")` — which lets you rename the parameter later without breaking any caller.",
+          "It makes `key` **positional-only** â€” callers must write `get(\"x\")`, never `get(key=\"x\")` â€” which lets you rename the parameter later without breaking any caller.",
           "It enables fast-path lookup; positional-only parameters bypass the keyword-binding step internally.",
-          "It is purely cosmetic — `/` has no effect at runtime, only in type checkers.",
+          "It is purely cosmetic â€” `/` has no effect at runtime, only in type checkers.",
         ],
         correctIndex: 0,
         explanation: "PEP 570 introduced `/` so library authors can hide parameter names from the public API. Built-ins like `len(obj, /)` and `dict.pop(key, /, default)` use it precisely so the names are not part of the contract.",
@@ -3481,8 +3486,8 @@ If you can do that in five seconds per call, you have internalized the binding r
       {
         question: "You write `f(1, 2, x=99)` and `f` is `def f(x, y, z): ...`. What goes wrong?",
         options: [
-          "TypeError: got multiple values for argument 'x' — the positional `1` filled `x`, and then `x=99` tried to fill it again.",
-          "TypeError: missing required argument 'z' — only `x`, `y`, and `x` were provided; `z` is empty.",
+          "TypeError: got multiple values for argument 'x' â€” the positional `1` filled `x`, and then `x=99` tried to fill it again.",
+          "TypeError: missing required argument 'z' â€” only `x`, `y`, and `x` were provided; `z` is empty.",
           "It silently overwrites: `x=99`, `y=2`, `z=1`.",
         ],
         correctIndex: 0,
@@ -3502,7 +3507,7 @@ If you can do that in five seconds per call, you have internalized the binding r
         question: "What does `f(*[1, 2], **{\"x\": 3})` mean at the call site?",
         options: [
           "Positional unpack: each element of `[1, 2]` becomes a positional argument. Keyword unpack: each `key=value` from the dict becomes a keyword argument. Equivalent to `f(1, 2, x=3)`.",
-          "Builds a list and a dict, then calls `f` with exactly two arguments — a list and a dict.",
+          "Builds a list and a dict, then calls `f` with exactly two arguments â€” a list and a dict.",
           "Raises SyntaxError; you cannot mix `*` and `**` in the same call.",
         ],
         correctIndex: 0,
@@ -3514,10 +3519,10 @@ If you can do that in five seconds per call, you have internalized the binding r
   "py-c4": {
     durationLabel: MODULE_TIME_LABEL,
     outcomes: [
-      "Read and write a **lambda** fluently — and know its three hard restrictions (single expression, no statements, anonymous in tracebacks).",
-      "Use **`map`**, **`filter`**, and **`functools.reduce`** with a clear mental model: *transform / keep / fold* — and remember they all return **iterators** in Python 3.",
-      "Default to a **comprehension** over `map` / `filter` when readability is the tiebreaker, and pick the right escape hatch — \`operator.*\`, \`functools.partial\`, named \`def\` — when a lambda becomes a smell.",
-      "Pick the right **reducer**: `sum` / `min` / `max` / `any` / `all` / `Counter` / \`statistics.fmean\` — and only fall back to **`reduce`** for genuinely custom folds.",
+      "Read and write a **lambda** fluently â€” and know its three hard restrictions (single expression, no statements, anonymous in tracebacks).",
+      "Use **`map`**, **`filter`**, and **`functools.reduce`** with a clear mental model: *transform / keep / fold* â€” and remember they all return **iterators** in Python 3.",
+      "Default to a **comprehension** over `map` / `filter` when readability is the tiebreaker, and pick the right escape hatch â€” \`operator.*\`, \`functools.partial\`, named \`def\` â€” when a lambda becomes a smell.",
+      "Pick the right **reducer**: `sum` / `min` / `max` / `any` / `all` / `Counter` / \`statistics.fmean\` â€” and only fall back to **`reduce`** for genuinely custom folds.",
       "Avoid the four canonical **lambda traps**: late-binding closures in loops, multi-statement temptation, lambdas as dict keys, and reaching for `lambda` where `operator.itemgetter` / `attrgetter` is shorter and faster.",
     ],
     learnMarkdown: `## The mental model: three primitives, one shape
@@ -3525,14 +3530,14 @@ If you can do that in five seconds per call, you have internalized the binding r
 \`map\`, \`filter\`, and \`reduce\` are the three things you can do to a stream of values:
 
 \`\`\`
-map(fn, xs)        # transform each → 1:1
-filter(pred, xs)   # keep matches  → 1:0-or-1
-reduce(fn, xs)     # fold to one   → N:1
+map(fn, xs)        # transform each â†’ 1:1
+filter(pred, xs)   # keep matches  â†’ 1:0-or-1
+reduce(fn, xs)     # fold to one   â†’ N:1
 \`\`\`
 
 If you can name those three operations and pick the right one for a problem, you have ~80% of "functional Python" covered. Lambdas are the **inline syntax** for the function each one needs. Together they form the core of every "transform a list" interview question.
 
-> Heuristic: **same shape out → \`map\`. Subset out → \`filter\`. Single value out → \`reduce\` (or one of its specialized siblings: \`sum\`, \`max\`, \`min\`, \`any\`, \`all\`).**
+> Heuristic: **same shape out â†’ \`map\`. Subset out â†’ \`filter\`. Single value out â†’ \`reduce\` (or one of its specialized siblings: \`sum\`, \`max\`, \`min\`, \`any\`, \`all\`).**
 
 ---
 
@@ -3553,11 +3558,11 @@ Three constraints that separate juniors from seniors:
 
 1. **Body is one expression**, not a statement. No \`if/elif/else\` blocks, no \`for\`, no \`return\`. You can use a *conditional expression* (\`x if cond else y\`) which is a single expression.
 2. **No annotations.** \`lambda x: int\` is a body of \`int\`, not a return-type hint.
-3. **No name.** \`(lambda x: x).__name__\` is the literal string \`"<lambda>"\`. Tracebacks read \`<lambda>\` instead of a useful name — which is why production code prefers \`def\` for anything more than 1 line of logic.
+3. **No name.** \`(lambda x: x).__name__\` is the literal string \`"<lambda>"\`. Tracebacks read \`<lambda>\` instead of a useful name â€” which is why production code prefers \`def\` for anything more than 1 line of logic.
 
-The signature follows all the rules from the previous lesson: positional-only with \`/\`, keyword-only with \`*\`, defaults, \`*args\`, \`**kwargs\`. \`lambda *xs, **kw: …\` is valid Python.
+The signature follows all the rules from the previous lesson: positional-only with \`/\`, keyword-only with \`*\`, defaults, \`*args\`, \`**kwargs\`. \`lambda *xs, **kw: â€¦\` is valid Python.
 
-### Conditional expression inside a lambda — the only "branch" available
+### Conditional expression inside a lambda â€” the only "branch" available
 
 \`\`\`
 sign = lambda x: 1 if x > 0 else -1 if x < 0 else 0
@@ -3567,7 +3572,7 @@ Three-way branch in one expression. Past two levels of nested ternary, stop and 
 
 ---
 
-## \`map(fn, xs)\` — transform each item
+## \`map(fn, xs)\` â€” transform each item
 
 \`\`\`
 list(map(str.upper, ["ada", "linus"]))    # ['ADA', 'LINUS']
@@ -3576,52 +3581,52 @@ list(map(len, ["a", "abc", "abcd"]))      # [1, 3, 4]
 
 Two non-obvious bits:
 
-- In Python 3, \`map\` returns an **iterator**, not a list. \`list(map(...))\` materializes; \`for x in map(...)\` streams. Same memory story as the previous lesson — be aware which one you wrote.
-- \`map\` accepts **multiple iterables** and zips them: \`map(operator.add, [1,2,3], [10,20,30])\` → \`[11, 22, 33]\`. It stops at the shortest input, silently. Use \`itertools.zip_longest\` if you need padding.
+- In Python 3, \`map\` returns an **iterator**, not a list. \`list(map(...))\` materializes; \`for x in map(...)\` streams. Same memory story as the previous lesson â€” be aware which one you wrote.
+- \`map\` accepts **multiple iterables** and zips them: \`map(operator.add, [1,2,3], [10,20,30])\` â†’ \`[11, 22, 33]\`. It stops at the shortest input, silently. Use \`itertools.zip_longest\` if you need padding.
 
-### \`map\` vs comprehension — the readable choice
+### \`map\` vs comprehension â€” the readable choice
 
 \`\`\`
-[s.upper() for s in names]            # comprehension — Pythonic
-list(map(str.upper, names))           # map — also fine when fn already exists
+[s.upper() for s in names]            # comprehension â€” Pythonic
+list(map(str.upper, names))           # map â€” also fine when fn already exists
 [ (lambda s: s.upper())(s) for s in names ]   # never write this
-list(map(lambda s: s.upper(), names))         # avoid — comprehension reads better
+list(map(lambda s: s.upper(), names))         # avoid â€” comprehension reads better
 \`\`\`
 
-**Rule of thumb**: if you're typing \`lambda\`, prefer the comprehension. If you have a *named* function to apply, \`map\` is a tie — pick whichever reads better.
+**Rule of thumb**: if you're typing \`lambda\`, prefer the comprehension. If you have a *named* function to apply, \`map\` is a tie â€” pick whichever reads better.
 
 ---
 
-## \`filter(pred, xs)\` — keep matches
+## \`filter(pred, xs)\` â€” keep matches
 
 \`\`\`
 list(filter(lambda x: x > 0, [-1, 0, 3, -2, 5]))   # [3, 5]
-list(filter(None, [0, 1, "", "a", None, 0.0, "b"]))  # [1, 'a', 'b']  — None means "is truthy"
+list(filter(None, [0, 1, "", "a", None, 0.0, "b"]))  # [1, 'a', 'b']  â€” None means "is truthy"
 \`\`\`
 
-The \`None\`-as-predicate trick is worth knowing — \`filter(None, xs)\` keeps every truthy value. Same as \`[x for x in xs if x]\`.
+The \`None\`-as-predicate trick is worth knowing â€” \`filter(None, xs)\` keeps every truthy value. Same as \`[x for x in xs if x]\`.
 
 Same readability tiebreaker:
 
 \`\`\`
-[x for x in xs if x > 0]              # comprehension — usually wins
-list(filter(lambda x: x > 0, xs))     # filter + lambda — comprehension is shorter
-list(filter(is_valid, xs))            # filter + named — fine, both work
+[x for x in xs if x > 0]              # comprehension â€” usually wins
+list(filter(lambda x: x > 0, xs))     # filter + lambda â€” comprehension is shorter
+list(filter(is_valid, xs))            # filter + named â€” fine, both work
 \`\`\`
 
 ---
 
-## \`reduce(fn, xs[, initial])\` — fold to one
+## \`reduce(fn, xs[, initial])\` â€” fold to one
 
-Lives in \`functools\` as of Python 3 — Guido moved it out of the built-ins to push you toward \`sum\` / \`min\` / \`max\` / \`any\` / \`all\` first.
+Lives in \`functools\` as of Python 3 â€” Guido moved it out of the built-ins to push you toward \`sum\` / \`min\` / \`max\` / \`any\` / \`all\` first.
 
 \`\`\`
 from functools import reduce
 
-reduce(lambda a, b: a + b, [1, 2, 3, 4])         # 10  → ((1+2)+3)+4
-reduce(lambda a, b: a + b, [1, 2, 3, 4], 100)    # 110 → (((100+1)+2)+3)+4
-reduce(lambda a, b: a + b, [], 100)              # 100 — initial returned
-reduce(lambda a, b: a + b, [])                   # TypeError — empty + no initial
+reduce(lambda a, b: a + b, [1, 2, 3, 4])         # 10  â†’ ((1+2)+3)+4
+reduce(lambda a, b: a + b, [1, 2, 3, 4], 100)    # 110 â†’ (((100+1)+2)+3)+4
+reduce(lambda a, b: a + b, [], 100)              # 100 â€” initial returned
+reduce(lambda a, b: a + b, [])                   # TypeError â€” empty + no initial
 \`\`\`
 
 The mental model:
@@ -3662,20 +3667,20 @@ After Python 3.8, \`math.prod\` covers the multiplication case. The dict merge c
 
 Two standard-library tools that **make most lambdas unnecessary**.
 
-### \`operator\` — named functions for arithmetic and indexing
+### \`operator\` â€” named functions for arithmetic and indexing
 
 \`\`\`
 import operator
 
-list(map(operator.add, [1,2,3], [10,20,30]))     # [11, 22, 33]   → no lambda
-sorted(rows, key=operator.itemgetter("revenue")) # → no lambda
-sorted(users, key=operator.attrgetter("name"))   # → no lambda
-sorted(rows, key=operator.itemgetter(2, 0))      # → tuple key by columns 2, 0
+list(map(operator.add, [1,2,3], [10,20,30]))     # [11, 22, 33]   â†’ no lambda
+sorted(rows, key=operator.itemgetter("revenue")) # â†’ no lambda
+sorted(users, key=operator.attrgetter("name"))   # â†’ no lambda
+sorted(rows, key=operator.itemgetter(2, 0))      # â†’ tuple key by columns 2, 0
 \`\`\`
 
-\`itemgetter\` and \`attrgetter\` are not just shorter than \`lambda r: r["revenue"]\` — they are also implemented in C and **measurably faster** in tight inner loops.
+\`itemgetter\` and \`attrgetter\` are not just shorter than \`lambda r: r["revenue"]\` â€” they are also implemented in C and **measurably faster** in tight inner loops.
 
-### \`functools.partial\` — fix some args, return a smaller function
+### \`functools.partial\` â€” fix some args, return a smaller function
 
 \`\`\`
 from functools import partial
@@ -3708,10 +3713,10 @@ If your lambda has more than ~30 characters of body, promote it to a \`def\` for
 
 \`\`\`
 fns = [lambda: i for i in range(3)]
-[f() for f in fns]      # [2, 2, 2] — every lambda closed over the SAME i
+[f() for f in fns]      # [2, 2, 2] â€” every lambda closed over the SAME i
 \`\`\`
 
-Every lambda captures the *name* \`i\`, not its current value. By the time you call \`fns[0]()\`, the loop has finished and \`i\` is \`2\`. The fix is the **default-argument trick** — defaults are evaluated at function definition time, snapshotting the value:
+Every lambda captures the *name* \`i\`, not its current value. By the time you call \`fns[0]()\`, the loop has finished and \`i\` is \`2\`. The fix is the **default-argument trick** â€” defaults are evaluated at function definition time, snapshotting the value:
 
 \`\`\`
 fns = [lambda i=i: i for i in range(3)]
@@ -3723,7 +3728,7 @@ The same bug appears in any closure created inside a loop, not only lambdas. \`d
 ### 2. Trying to write multiple statements
 
 \`\`\`
-# illegal — lambda body is a single expression
+# illegal â€” lambda body is a single expression
 weird = lambda x: print(x); return x          # SyntaxError
 \`\`\`
 
@@ -3732,7 +3737,7 @@ The moment you want \`print + return\` or \`if/else\` blocks, write a \`def\`. D
 ### 3. Lambdas as dict keys / set members
 
 \`\`\`
-{lambda: 1: "x"}        # legal — lambdas are hashable by *identity*
+{lambda: 1: "x"}        # legal â€” lambdas are hashable by *identity*
 \`\`\`
 
 But they hash by identity, not by source code. Two lambdas with the same body are different keys. If you ever find yourself doing this, switch to a named \`def\` or a \`callable\` class with ${MD_CODE_TICK}__hash__${MD_CODE_TICK}.
@@ -3741,7 +3746,7 @@ But they hash by identity, not by source code. Two lambdas with the same body ar
 
 \`\`\`
 sorted(rows, key=lambda r: r["revenue"])             # ok
-sorted(rows, key=operator.itemgetter("revenue"))     # better — shorter, faster, no lambda
+sorted(rows, key=operator.itemgetter("revenue"))     # better â€” shorter, faster, no lambda
 
 sorted(users, key=lambda u: (u.last_name, u.first_name))     # ok
 sorted(users, key=operator.attrgetter("last_name", "first_name"))   # better
@@ -3754,15 +3759,15 @@ Both work; in code review the second pair is what gets the +1.
 ## Pitfalls in data work specifically
 
 - **\`pandas.DataFrame.apply(lambda row: ...)\` is slow.** Vectorize first (\`df["a"] + df["b"]\` instead of \`df.apply(lambda r: r["a"] + r["b"], axis=1)\`). Lambdas force a Python-call per row; vectorized ops stay in NumPy.
-- **\`reduce\` with a list-append builder is O(n²).** \`reduce(lambda a, x: a + [x], items, [])\` reallocates a new list each step. Use a comprehension or a generator.
-- **\`map\` over an iterator is exhausted after one pass.** Same one-shot rule from the iterator lesson — the result is itself an iterator.
+- **\`reduce\` with a list-append builder is O(nÂ²).** \`reduce(lambda a, x: a + [x], items, [])\` reallocates a new list each step. Use a comprehension or a generator.
+- **\`map\` over an iterator is exhausted after one pass.** Same one-shot rule from the iterator lesson â€” the result is itself an iterator.
 - **Lambdas are not picklable in some workers** (e.g., \`multiprocessing\` on Windows). Define a top-level \`def\` if the function needs to cross a process boundary.
 
 ---
 
 ## Interview hook (answer like a senior)
 
-"Map / filter / reduce are *transform / keep / fold*. In Python 3 all three are lazy iterators, and the standard-library defaults — \`sum\`, \`min\`, \`max\`, \`any\`, \`all\` — already cover most reductions, so I only reach for \`functools.reduce\` for genuine custom folds. Lambdas are the inline syntax for the function each primitive needs, but a comprehension is usually shorter and reads top-to-bottom — I save \`lambda\` for sort keys and tiny callbacks, and I prefer \`operator.itemgetter\` or \`functools.partial\` whenever they fit. The classic bug is late binding in a loop — every closure shares the same loop variable; the fix is the default-argument trick \`lambda i=i: i\`."`,
+"Map / filter / reduce are *transform / keep / fold*. In Python 3 all three are lazy iterators, and the standard-library defaults â€” \`sum\`, \`min\`, \`max\`, \`any\`, \`all\` â€” already cover most reductions, so I only reach for \`functools.reduce\` for genuine custom folds. Lambdas are the inline syntax for the function each primitive needs, but a comprehension is usually shorter and reads top-to-bottom â€” I save \`lambda\` for sort keys and tiny callbacks, and I prefer \`operator.itemgetter\` or \`functools.partial\` whenever they fit. The classic bug is late binding in a loop â€” every closure shares the same loop variable; the fix is the default-argument trick \`lambda i=i: i\`."`,
 
     video: null,
     videoFallbackMarkdown: `## Deep dive: pick the right primitive every time
@@ -3771,17 +3776,17 @@ Both work; in code review the second pair is what gets the +1.
 
 Before you reach for any of the three, ask the shape question:
 
-- **Same shape, item-by-item transform?** → \`map\` or a comprehension. Tie-broken by which reads better.
-- **Subset of the input?** → \`filter\` or a comprehension with \`if\`. Comprehension wins on tie.
-- **Single value out of N items?** → reach for the *specialized* aggregator first:
+- **Same shape, item-by-item transform?** â†’ \`map\` or a comprehension. Tie-broken by which reads better.
+- **Subset of the input?** â†’ \`filter\` or a comprehension with \`if\`. Comprehension wins on tie.
+- **Single value out of N items?** â†’ reach for the *specialized* aggregator first:
   - sum: \`sum(xs)\` (or \`math.fsum\` for floats)
   - product: \`math.prod(xs)\` (3.8+)
   - max/min: \`max(xs, key=...)\` / \`min(xs, key=...)\`
-  - any/all: \`any(p(x) for x in xs)\` — short-circuits
+  - any/all: \`any(p(x) for x in xs)\` â€” short-circuits
   - count-by-key: \`collections.Counter(xs)\`
   - mean/stdev: \`statistics.fmean\` / \`statistics.stdev\`
 
-If none of those fit, *then* \`functools.reduce\` is the right tool — and pass an \`initial\` value so the empty case doesn't crash.
+If none of those fit, *then* \`functools.reduce\` is the right tool â€” and pass an \`initial\` value so the empty case doesn't crash.
 
 ### 2) The \`reduce\` desugaring drill
 
@@ -3817,7 +3822,7 @@ return 14
 
 This is the most common interview "implement reduce" follow-up, and it is also the line every \`reduce\` user should be able to draw without thinking.
 
-### 3) Pythonic translations — memorize five
+### 3) Pythonic translations â€” memorize five
 
 \`\`\`
 # 1. uppercase a list of strings
@@ -3829,20 +3834,20 @@ list(filter(None, lines))                 # OR
 [l for l in lines if l]
 
 # 3. sum of squares
-sum(x * x for x in xs)                    # generator → flat memory
+sum(x * x for x in xs)                    # generator â†’ flat memory
 
-# 4. running max so far (NOT reduce — itertools)
+# 4. running max so far (NOT reduce â€” itertools)
 import itertools
 list(itertools.accumulate(xs, max))       # [3, 3, 4, 4, 5]
 
-# 5. group dicts by a key (NOT reduce — defaultdict + loop)
+# 5. group dicts by a key (NOT reduce â€” defaultdict + loop)
 from collections import defaultdict
 out = defaultdict(list)
 for r in rows:
     out[r["dept"]].append(r)
 \`\`\`
 
-Note pattern 4 — \`itertools.accumulate\` is the *streaming* sibling of \`reduce\`. \`reduce\` returns one final value; \`accumulate\` yields every intermediate accumulator. It is the right tool for running totals, running max, and "value at each step of a fold".
+Note pattern 4 â€” \`itertools.accumulate\` is the *streaming* sibling of \`reduce\`. \`reduce\` returns one final value; \`accumulate\` yields every intermediate accumulator. It is the right tool for running totals, running max, and "value at each step of a fold".
 
 ### 4) The late-binding trap, isolated
 
@@ -3869,7 +3874,7 @@ from operator import add, sub, mul, truediv, mod, pow,
                      itemgetter, attrgetter, methodcaller,
                      and_, or_, xor, not_, eq, ne, lt, le, gt, ge
 
-# arithmetic — drops the lambda
+# arithmetic â€” drops the lambda
 list(map(add, [1, 2, 3], [10, 20, 30]))     # [11, 22, 33]
 
 # sort by nested attribute
@@ -3882,30 +3887,30 @@ list(map(methodcaller("strip"), lines))     # equivalent to [l.strip() for l in 
 reduce(or_, [{1,2}, {2,3}], set())          # set union
 \`\`\`
 
-If you're writing a one-line lambda that just unwraps an attribute, indexes a key, or applies a binary operator — there is an \`operator\` callable for that.
+If you're writing a one-line lambda that just unwraps an attribute, indexes a key, or applies a binary operator â€” there is an \`operator\` callable for that.
 
 ### 6) Real-world pandas pattern (data work specifically)
 
 \`\`\`
-# slow — Python lambda per row
+# slow â€” Python lambda per row
 df["full_name"] = df.apply(lambda r: r["first"] + " " + r["last"], axis=1)
 
-# fast — vectorized, no lambda crossed
+# fast â€” vectorized, no lambda crossed
 df["full_name"] = df["first"] + " " + df["last"]
 \`\`\`
 
-A 10× speedup is normal. The senior heuristic in pandas: **if you reach for \`lambda\` inside \`apply\`, ask whether you can vectorize first**. \`apply\` is for genuinely row-shaped logic that can't be expressed as column-wise ops.`,
+A 10Ã— speedup is normal. The senior heuristic in pandas: **if you reach for \`lambda\` inside \`apply\`, ask whether you can vectorize first**. \`apply\` is for genuinely row-shaped logic that can't be expressed as column-wise ops.`,
 
     tryGuidance:
-      "Open the **fold machine** below and run three experiments. **Mode 1 (lambda decoder)**: pick a recipe like \`lambda r: r[\"revenue\"]\` and watch four equivalents render side-by-side — \`def\`, comprehension, \`operator.itemgetter\`, \`functools.partial\`. The verdict pill tells you which one a senior reviewer would prefer. **Mode 2 (pipeline lab)**: configure a filter and a map; watch the source flow through both stages with rejected items struck out and transformed values lit up. **Mode 3 (fold animation)**: pick a binary reducer (sum / max / product / set-union / dict-merge), step one item at a time, and watch the accumulator update — \`acc = fn(acc, x)\` — frame by frame. The empty-iterable + no-initial case is one of the buttons; click it to see the actual TypeError Python raises.",
+      "Open the **fold machine** below and run three experiments. **Mode 1 (lambda decoder)**: pick a recipe like \`lambda r: r[\"revenue\"]\` and watch four equivalents render side-by-side â€” \`def\`, comprehension, \`operator.itemgetter\`, \`functools.partial\`. The verdict pill tells you which one a senior reviewer would prefer. **Mode 2 (pipeline lab)**: configure a filter and a map; watch the source flow through both stages with rejected items struck out and transformed values lit up. **Mode 3 (fold animation)**: pick a binary reducer (sum / max / product / set-union / dict-merge), step one item at a time, and watch the accumulator update â€” \`acc = fn(acc, x)\` â€” frame by frame. The empty-iterable + no-initial case is one of the buttons; click it to see the actual TypeError Python raises.",
 
     knowledgeCheck: [
       {
         question: "Which is the **only** legal lambda body?",
         options: [
-          "A single expression — including conditional expressions like `1 if x > 0 else -1` — but no statements (no `if/elif`, no `for`, no `return`).",
+          "A single expression â€” including conditional expressions like `1 if x > 0 else -1` â€” but no statements (no `if/elif`, no `for`, no `return`).",
           "Any sequence of statements separated by semicolons; lambda is just an unnamed `def`.",
-          "Statements only — expressions are forbidden because lambdas have no return slot.",
+          "Statements only â€” expressions are forbidden because lambdas have no return slot.",
         ],
         correctIndex: 0,
         explanation: "`lambda PARAMETERS: EXPRESSION` is the entire grammar. The body is one expression whose value is implicitly returned. The moment you need branches with bodies, an explicit return, or assignments, promote to `def`.",
@@ -3913,9 +3918,9 @@ A 10× speedup is normal. The senior heuristic in pandas: **if you reach for \`l
       {
         question: "What does `list(filter(None, [0, 1, '', 'a', None, 0.0, 'b']))` produce, and why?",
         options: [
-          "`[1, 'a', 'b']` — passing `None` as the predicate is shorthand for *keep truthy values*, identical to `[x for x in xs if x]`.",
-          "`[0, 1, '', 'a', None, 0.0, 'b']` — `filter(None, …)` is a no-op that returns the input unchanged.",
-          "TypeError — `filter`'s first argument must be a callable.",
+          "`[1, 'a', 'b']` â€” passing `None` as the predicate is shorthand for *keep truthy values*, identical to `[x for x in xs if x]`.",
+          "`[0, 1, '', 'a', None, 0.0, 'b']` â€” `filter(None, â€¦)` is a no-op that returns the input unchanged.",
+          "TypeError â€” `filter`'s first argument must be a callable.",
         ],
         correctIndex: 0,
         explanation: "When the predicate is `None`, `filter` treats it as 'identity' and keeps every truthy element. The falsy ones (`0`, `''`, `None`, `0.0`) are dropped. It's the cleanest way to drop blanks from a list.",
@@ -3923,8 +3928,8 @@ A 10× speedup is normal. The senior heuristic in pandas: **if you reach for \`l
       {
         question: "What does `reduce(lambda a, b: a + b, [], 100)` return?",
         options: [
-          "`100` — when the iterable is empty, the `initial` value is returned unchanged. Without an initial, `reduce` would raise `TypeError`.",
-          "`0` — `reduce` ignores `initial` and uses the additive identity.",
+          "`100` â€” when the iterable is empty, the `initial` value is returned unchanged. Without an initial, `reduce` would raise `TypeError`.",
+          "`0` â€” `reduce` ignores `initial` and uses the additive identity.",
           "Raises `TypeError` because the lambda was never called.",
         ],
         correctIndex: 0,
@@ -3933,29 +3938,29 @@ A 10× speedup is normal. The senior heuristic in pandas: **if you reach for \`l
       {
         question: "Which is the **most Pythonic** rewrite of `list(map(lambda x: x.upper(), names))`?",
         options: [
-          "`[name.upper() for name in names]` — a list comprehension, the readability default for transforms.",
-          "`list(map(str.upper, names))` — same logic, no lambda needed because `str.upper` is already a callable.",
+          "`[name.upper() for name in names]` â€” a list comprehension, the readability default for transforms.",
+          "`list(map(str.upper, names))` â€” same logic, no lambda needed because `str.upper` is already a callable.",
           "Both A and B are clearly more Pythonic than the lambda version, and choosing between them is a style call.",
         ],
         correctIndex: 2,
-        explanation: "The lambda is the smell — Python's idiom is *avoid `lambda` whenever a comprehension or a named callable expresses the same logic*. Both rewrites are clearly better than `map(lambda …)`; senior reviewers accept either as long as the lambda is gone.",
+        explanation: "The lambda is the smell â€” Python's idiom is *avoid `lambda` whenever a comprehension or a named callable expresses the same logic*. Both rewrites are clearly better than `map(lambda â€¦)`; senior reviewers accept either as long as the lambda is gone.",
       },
       {
         question: "What does this print, and what is the fix?\n\n```\nfns = [lambda x: x * i for i in range(1, 4)]\nprint([f(10) for f in fns])\n```",
         options: [
-          "`[30, 30, 30]` — every lambda closed over the same name `i`, which is `3` after the comprehension finishes. Fix with the default-argument trick: `lambda x, i=i: x * i`.",
-          "`[10, 20, 30]` — Python snapshots loop variables when defining lambdas inside a comprehension.",
-          "Raises `NameError` — the `i` inside the lambda is out of scope after the comprehension exits.",
+          "`[30, 30, 30]` â€” every lambda closed over the same name `i`, which is `3` after the comprehension finishes. Fix with the default-argument trick: `lambda x, i=i: x * i`.",
+          "`[10, 20, 30]` â€” Python snapshots loop variables when defining lambdas inside a comprehension.",
+          "Raises `NameError` â€” the `i` inside the lambda is out of scope after the comprehension exits.",
         ],
         correctIndex: 0,
-        explanation: "Late binding: closures capture *names*, not values. Defaults, however, are evaluated when the function is defined — so `lambda i=i: ...` snapshots `i` at definition time. This is the single most-tested closure trap in Python interviews.",
+        explanation: "Late binding: closures capture *names*, not values. Defaults, however, are evaluated when the function is defined â€” so `lambda i=i: ...` snapshots `i` at definition time. This is the single most-tested closure trap in Python interviews.",
       },
       {
-        question: "Senior code review: which is the right replacement for `key=lambda r: r['revenue']` in `sorted(rows, key=…)`?",
+        question: "Senior code review: which is the right replacement for `key=lambda r: r['revenue']` in `sorted(rows, key=â€¦)`?",
         options: [
-          "`key=operator.itemgetter('revenue')` — shorter, implemented in C, faster in tight inner loops, and explicitly named in tracebacks.",
-          "Leave the lambda — `operator.itemgetter` is just stylistic preference with no real difference.",
-          "`key=functools.partial(dict.get, key='revenue')` — partials always beat lambdas for indexing.",
+          "`key=operator.itemgetter('revenue')` â€” shorter, implemented in C, faster in tight inner loops, and explicitly named in tracebacks.",
+          "Leave the lambda â€” `operator.itemgetter` is just stylistic preference with no real difference.",
+          "`key=functools.partial(dict.get, key='revenue')` â€” partials always beat lambdas for indexing.",
         ],
         correctIndex: 0,
         explanation: "`itemgetter`/`attrgetter` are the standard-library escape hatches for the most common lambda use case (key extraction). They're *measurably* faster (C implementation), shorter, and produce a useful repr. `functools.partial` is the right tool when you want to *fix arguments* to a function, not extract a key.",
@@ -3963,22 +3968,22 @@ A 10× speedup is normal. The senior heuristic in pandas: **if you reach for \`l
       {
         question: "Why is `reduce(lambda acc, x: acc + [x], items, [])` an anti-pattern?",
         options: [
-          "Each step builds a brand-new list (`acc + [x]` allocates), making the whole fold O(n²) in time. The Pythonic alternative is `list(items)` or a comprehension — and if you need the running list, use `itertools.accumulate(items, lambda a, x: a + [x])` only for very small inputs.",
+          "Each step builds a brand-new list (`acc + [x]` allocates), making the whole fold O(nÂ²) in time. The Pythonic alternative is `list(items)` or a comprehension â€” and if you need the running list, use `itertools.accumulate(items, lambda a, x: a + [x])` only for very small inputs.",
           "It's perfectly fine; `reduce` is internally optimized to mutate the accumulator.",
           "It raises `TypeError` because `acc` is initialized to a mutable `[]`.",
         ],
         correctIndex: 0,
-        explanation: "`+` on lists creates a new list every iteration. For N items the total work is 1 + 2 + … + N = O(N²) allocations and copies. If your reduce body is `acc + [x]`, you almost certainly wanted a list comprehension, `list()`, or `extend` in a loop.",
+        explanation: "`+` on lists creates a new list every iteration. For N items the total work is 1 + 2 + â€¦ + N = O(NÂ²) allocations and copies. If your reduce body is `acc + [x]`, you almost certainly wanted a list comprehension, `list()`, or `extend` in a loop.",
       },
       {
         question: "Which of these is the correct mental model for `map`, `filter`, and `reduce` in Python 3?",
         options: [
-          "All three return **iterators**, not lists. They're lazy: nothing computes until you consume them with `list(…)`, a `for` loop, `sum(…)`, or any other consumer. This means a `map(…)` you've already iterated through is exhausted on the next pass.",
+          "All three return **iterators**, not lists. They're lazy: nothing computes until you consume them with `list(â€¦)`, a `for` loop, `sum(â€¦)`, or any other consumer. This means a `map(â€¦)` you've already iterated through is exhausted on the next pass.",
           "`map` and `filter` return lists eagerly; `reduce` returns a single value immediately.",
           "`map` and `filter` return generators; `reduce` returns a coroutine you must `await`.",
         ],
         correctIndex: 0,
-        explanation: "Python 3 made `map` and `filter` lazy iterators (they were lists in Python 2). `functools.reduce` is *not* lazy — it consumes the entire input and returns a value. The 'iterator exhaustion' rules from the Loops/Iterators lesson apply directly: `m = map(...); list(m); list(m)` returns the data once, then `[]`.",
+        explanation: "Python 3 made `map` and `filter` lazy iterators (they were lists in Python 2). `functools.reduce` is *not* lazy â€” it consumes the entire input and returns a value. The 'iterator exhaustion' rules from the Loops/Iterators lesson apply directly: `m = map(...); list(m); list(m)` returns the data once, then `[]`.",
       },
     ],
   },
@@ -3986,11 +3991,11 @@ A 10× speedup is normal. The senior heuristic in pandas: **if you reach for \`l
   "py-c5": {
     durationLabel: MODULE_TIME_LABEL,
     outcomes: [
-      "Read and write the four-clause **`try / except / else / finally`** block fluently — and predict exactly which clauses run for each of the five outcomes (success · caught · uncaught · return · raise inside except).",
-      "Catch the **narrowest exception that means what you mean** — never bare \`except:\` (which swallows \`KeyboardInterrupt\` / \`SystemExit\`), rarely \`except Exception:\` — and use multi-type \`except (A, B):\` and the \`as e\` binding correctly.",
-      "Re-raise without losing the traceback (`raise`), chain causes (`raise NewError() from e`), and silence chains (`raise NewError() from None`) — and explain the difference between **`__cause__`** (explicit) and **`__context__`** (implicit during handling).",
-      "Read a Python traceback **bottom-up**: the actual error is the **last** line; the frames above are the call stack from outermost to innermost. Distinguish the two boilerplate lines — *direct cause of* vs *during handling of*.",
-      "Debug like a senior: \`breakpoint()\` over \`print\`, \`logger.exception()\` over \`print(e)\`, **pdb post-mortem** (`python -m pdb -c continue script.py`), \`traceback.format_exc()\` for capture, and \`assert\` for invariants — with the \`-O\` caveat.",
+      "Read and write the four-clause **`try / except / else / finally`** block fluently â€” and predict exactly which clauses run for each of the five outcomes (success Â· caught Â· uncaught Â· return Â· raise inside except).",
+      "Catch the **narrowest exception that means what you mean** â€” never bare \`except:\` (which swallows \`KeyboardInterrupt\` / \`SystemExit\`), rarely \`except Exception:\` â€” and use multi-type \`except (A, B):\` and the \`as e\` binding correctly.",
+      "Re-raise without losing the traceback (`raise`), chain causes (`raise NewError() from e`), and silence chains (`raise NewError() from None`) â€” and explain the difference between **`__cause__`** (explicit) and **`__context__`** (implicit during handling).",
+      "Read a Python traceback **bottom-up**: the actual error is the **last** line; the frames above are the call stack from outermost to innermost. Distinguish the two boilerplate lines â€” *direct cause of* vs *during handling of*.",
+      "Debug like a senior: \`breakpoint()\` over \`print\`, \`logger.exception()\` over \`print(e)\`, **pdb post-mortem** (`python -m pdb -c continue script.py`), \`traceback.format_exc()\` for capture, and \`assert\` for invariants â€” with the \`-O\` caveat.",
     ],
     learnMarkdown: `## The mental model: errors are values that travel up the stack
 
@@ -4009,7 +4014,7 @@ except KeyError:
     handle_missing_field()
 \`\`\`
 
-The key insight: **catching is a stack operation**. Whichever \`try\` block is closest to the \`raise\` and has a matching \`except\` clause wins. If your handler is three frames up, every frame in between unwinds — \`finally\` blocks run on the way out, generators get \`GeneratorExit\`, context managers get \`__exit__\`.
+The key insight: **catching is a stack operation**. Whichever \`try\` block is closest to the \`raise\` and has a matching \`except\` clause wins. If your handler is three frames up, every frame in between unwinds â€” \`finally\` blocks run on the way out, generators get \`GeneratorExit\`, context managers get \`__exit__\`.
 
 > Heuristic: **let exceptions travel** until they reach a layer that *can do something useful*. A library function should rarely catch \`Exception\`; an HTTP handler at the edge usually should.
 
@@ -4027,18 +4032,18 @@ except (KeyError, IndexError):
 else:
     success_path()           # runs only if try block raised NOTHING
 finally:
-    cleanup()                # ALWAYS runs — return, raise, no matter what
+    cleanup()                # ALWAYS runs â€” return, raise, no matter what
 \`\`\`
 
 **Memorize the truth table** (this is the #1 test case in interviews):
 
 | try outcome              | which clauses run                       |
 |--------------------------|-----------------------------------------|
-| no exception             | \`try\` → \`else\` → \`finally\`              |
-| caught exception         | \`try\` (partial) → matching \`except\` → \`finally\` |
-| uncaught exception       | \`try\` (partial) → \`finally\` → re-raised |
-| \`return\` inside \`try\`    | expression evaluated → \`finally\` → return |
-| \`raise\` inside \`except\`  | new exception → \`finally\` → propagates |
+| no exception             | \`try\` â†’ \`else\` â†’ \`finally\`              |
+| caught exception         | \`try\` (partial) â†’ matching \`except\` â†’ \`finally\` |
+| uncaught exception       | \`try\` (partial) â†’ \`finally\` â†’ re-raised |
+| \`return\` inside \`try\`    | expression evaluated â†’ \`finally\` â†’ return |
+| \`raise\` inside \`except\`  | new exception â†’ \`finally\` â†’ propagates |
 
 Two clauses people forget about:
 
@@ -4061,18 +4066,18 @@ def read_csv(path):
 
 ---
 
-## EAFP vs LBYL — the Pythonic stance
+## EAFP vs LBYL â€” the Pythonic stance
 
 Two ways to handle "the file might not exist":
 
 \`\`\`
-# LBYL — Look Before You Leap (C / Java style)
+# LBYL â€” Look Before You Leap (C / Java style)
 if os.path.exists(path):
     f = open(path)
 else:
     return None
 
-# EAFP — Easier to Ask Forgiveness than Permission (Pythonic)
+# EAFP â€” Easier to Ask Forgiveness than Permission (Pythonic)
 try:
     f = open(path)
 except FileNotFoundError:
@@ -4084,7 +4089,7 @@ The Pythonic preference is **EAFP** for two reasons:
 1. **Race conditions**: between \`os.path.exists\` and \`open\`, the file could be deleted by another process. The exception version is *atomic*.
 2. **Performance in the happy path**: in CPython, raising and catching an exception is more expensive than a successful operation, but \`if\` is cheaper than \`try\` in the rare/error case. If errors are rare, EAFP wins on average.
 
-There are exceptions (pun intended): for **dict access**, \`d.get(key, default)\` is shorter than \`try: d[key] except KeyError\`. Use the right tool — but reach for \`try\` more often than you would in Java.
+There are exceptions (pun intended): for **dict access**, \`d.get(key, default)\` is shorter than \`try: d[key] except KeyError\`. Use the right tool â€” but reach for \`try\` more often than you would in Java.
 
 ---
 
@@ -4094,44 +4099,44 @@ The exception hierarchy looks like this (top of the tree):
 
 \`\`\`
 BaseException
- ├── SystemExit              ← raised by sys.exit()
- ├── KeyboardInterrupt       ← Ctrl+C
- ├── GeneratorExit           ← used by generator close()
- └── Exception               ← *everything you should normally catch* descends from here
-      ├── ArithmeticError
-      │    └── ZeroDivisionError
-      ├── LookupError
-      │    ├── KeyError
-      │    └── IndexError
-      ├── OSError
-      │    ├── FileNotFoundError
-      │    ├── PermissionError
-      │    └── ...
-      ├── ValueError
-      ├── TypeError
-      └── ... ~50 more
+ â”œâ”€â”€ SystemExit              â† raised by sys.exit()
+ â”œâ”€â”€ KeyboardInterrupt       â† Ctrl+C
+ â”œâ”€â”€ GeneratorExit           â† used by generator close()
+ â””â”€â”€ Exception               â† *everything you should normally catch* descends from here
+      â”œâ”€â”€ ArithmeticError
+      â”‚    â””â”€â”€ ZeroDivisionError
+      â”œâ”€â”€ LookupError
+      â”‚    â”œâ”€â”€ KeyError
+      â”‚    â””â”€â”€ IndexError
+      â”œâ”€â”€ OSError
+      â”‚    â”œâ”€â”€ FileNotFoundError
+      â”‚    â”œâ”€â”€ PermissionError
+      â”‚    â””â”€â”€ ...
+      â”œâ”€â”€ ValueError
+      â”œâ”€â”€ TypeError
+      â””â”€â”€ ... ~50 more
 \`\`\`
 
 Three rules every senior follows:
 
-1. **Never bare \`except:\`** — it catches \`BaseException\`, which means \`Ctrl+C\` and \`sys.exit()\` are silently swallowed. The user can't kill your script.
-2. **Rarely \`except Exception:\`** — only at the absolute outermost edge of a long-running service, where the contract is "log everything and keep serving". Inside a function, this is a bug magnet.
+1. **Never bare \`except:\`** â€” it catches \`BaseException\`, which means \`Ctrl+C\` and \`sys.exit()\` are silently swallowed. The user can't kill your script.
+2. **Rarely \`except Exception:\`** â€” only at the absolute outermost edge of a long-running service, where the contract is "log everything and keep serving". Inside a function, this is a bug magnet.
 3. **Catch the narrowest exception that means what you mean.** If you're parsing a number, catch \`ValueError\`. If you're indexing a dict, catch \`KeyError\`. If you genuinely handle both, write \`except (KeyError, ValueError):\`.
 
 \`\`\`
-# bad — swallows Ctrl+C, swallows AttributeError, swallows everything
+# bad â€” swallows Ctrl+C, swallows AttributeError, swallows everything
 try:
     do_thing()
 except:
     pass
 
-# bad — almost as broad
+# bad â€” almost as broad
 try:
     do_thing()
 except Exception:
     pass
 
-# good — narrow, intentional, names the variable
+# good â€” narrow, intentional, names the variable
 try:
     parse(line)
 except ValueError as e:
@@ -4148,7 +4153,7 @@ try:
     open("missing")
 except OSError:               # this catches everything OSError-shaped
     handle_io_error()
-except FileNotFoundError:     # never reachable — FileNotFoundError ⊂ OSError
+except FileNotFoundError:     # never reachable â€” FileNotFoundError âŠ‚ OSError
     handle_missing()
 \`\`\`
 
@@ -4162,10 +4167,10 @@ try:
 except ValueError as e:
     log.warning("bad: %s", e)
 
-print(e)                      # NameError — \`e\` was deleted at end of except
+print(e)                      # NameError â€” \`e\` was deleted at end of except
 \`\`\`
 
-CPython explicitly **deletes** the bound name when the \`except\` block exits, to break a reference cycle (\`e\` → traceback → frame → \`e\`). If you need the value later, copy it: \`err = e\`.
+CPython explicitly **deletes** the bound name when the \`except\` block exits, to break a reference cycle (\`e\` â†’ traceback â†’ frame â†’ \`e\`). If you need the value later, copy it: \`err = e\`.
 
 ---
 
@@ -4173,7 +4178,7 @@ CPython explicitly **deletes** the bound name when the \`except\` block exits, t
 
 Three forms, three different traceback shapes.
 
-### Bare \`raise\` — the right way to re-raise
+### Bare \`raise\` â€” the right way to re-raise
 
 \`\`\`
 try:
@@ -4185,7 +4190,7 @@ except SomeError:
 
 The traceback **is preserved** (same \`__traceback__\`). \`raise e\` *also* works but is verbose; bare \`raise\` is the idiom.
 
-### \`raise NewError() from e\` — explicit cause chain
+### \`raise NewError() from e\` â€” explicit cause chain
 
 \`\`\`
 try:
@@ -4206,7 +4211,7 @@ InvalidConfig: bad age: 'old'
 
 The \`from e\` sets \`__cause__\`. This is what you want when you're **wrapping** a low-level error in a domain-level one.
 
-### Implicit chain — exception during handling
+### Implicit chain â€” exception during handling
 
 If a new exception is raised inside an \`except\` block **without** \`from\`, Python automatically chains via \`__context__\`:
 
@@ -4229,10 +4234,10 @@ DatabaseError: connection lost
 
 Two boilerplate strings, two semantics:
 
-- **"direct cause of"** → \`__cause__\` set by \`raise X from Y\` → you wrapped on purpose.
-- **"during handling of"** → \`__context__\` set automatically → you accidentally raised while cleaning up.
+- **"direct cause of"** â†’ \`__cause__\` set by \`raise X from Y\` â†’ you wrapped on purpose.
+- **"during handling of"** â†’ \`__context__\` set automatically â†’ you accidentally raised while cleaning up.
 
-### Suppress the chain — \`from None\`
+### Suppress the chain â€” \`from None\`
 
 \`\`\`
 raise InvalidConfig("bad age") from None    # don't show __context__/__cause__
@@ -4242,7 +4247,7 @@ Useful when the underlying error is implementation noise and the new error fully
 
 ---
 
-## Custom exceptions — keep them shallow and named
+## Custom exceptions â€” keep them shallow and named
 
 \`\`\`
 class ConfigError(Exception): pass
@@ -4258,63 +4263,63 @@ Three guidelines:
 
 1. **Inherit from \`Exception\`**, not \`BaseException\`. Always.
 2. **One project-level base** (\`ConfigError\`, \`AppError\`, etc.) so callers can write \`except AppError:\` and not have to enumerate.
-3. **Add structured fields** (the \`field\` / \`value\` above) — strings are searchable, attributes are *queryable* in handlers.
+3. **Add structured fields** (the \`field\` / \`value\` above) â€” strings are searchable, attributes are *queryable* in handlers.
 
 ---
 
 ## Pitfalls senior interviewers love
 
-- **\`except Exception: pass\`** ("Pokémon exception handling" — gotta catch 'em all). The function silently keeps going with a half-broken state. If you must silence, log: \`except Exception:  log.exception("…"); return default\`.
-- **Catching exceptions for normal control flow** — using \`KeyError\` to test "did this dict have the key?" is *acceptable* for one access; using exceptions to drive a 3-deep loop is a smell. Use \`dict.get\`, \`getattr(..., default)\`, \`contextlib.suppress\`.
+- **\`except Exception: pass\`** ("PokÃ©mon exception handling" â€” gotta catch 'em all). The function silently keeps going with a half-broken state. If you must silence, log: \`except Exception:  log.exception("â€¦"); return default\`.
+- **Catching exceptions for normal control flow** â€” using \`KeyError\` to test "did this dict have the key?" is *acceptable* for one access; using exceptions to drive a 3-deep loop is a smell. Use \`dict.get\`, \`getattr(..., default)\`, \`contextlib.suppress\`.
 - **Resource leaks**: every \`open()\` / \`acquire()\` outside a \`with\` block needs a \`finally: close()\`. The senior pattern is *always use a context manager*.
 - **\`return\` inside \`finally\`** suppresses any pending exception or pending return. Never do this unintentionally.
 - **Mutable state half-modified inside \`try\`**: if the \`try\` mutates a list and then raises, the list is left half-mutated. Either rollback in \`except\` or copy-then-replace.
-- **\`assert\` is stripped under \`-O\`**: assertions are for *invariants* and *test code*. Don't use \`assert\` for argument validation in production library code — \`python -O\` removes them.
+- **\`assert\` is stripped under \`-O\`**: assertions are for *invariants* and *test code*. Don't use \`assert\` for argument validation in production library code â€” \`python -O\` removes them.
 
 ---
 
-## Debugging — beyond \`print\`
+## Debugging â€” beyond \`print\`
 
 The senior toolkit, in order:
 
-1. **\`breakpoint()\`** (3.7+) — drops into \`pdb\` at that line. Set \`PYTHONBREAKPOINT=ipdb.set_trace\` to swap implementations. \`PYTHONBREAKPOINT=0\` disables them — useful in CI.
-2. **\`pdb\` essential commands** — \`n\` (next line), \`s\` (step into), \`c\` (continue), \`l\` (list source), \`p expr\` (print), \`pp expr\` (pretty), \`w\` (where = stack), \`u\`/\`d\` (up/down frames), \`b file:line\` (breakpoint), \`q\` (quit).
-3. **Post-mortem debugging** — when a script crashes:
+1. **\`breakpoint()\`** (3.7+) â€” drops into \`pdb\` at that line. Set \`PYTHONBREAKPOINT=ipdb.set_trace\` to swap implementations. \`PYTHONBREAKPOINT=0\` disables them â€” useful in CI.
+2. **\`pdb\` essential commands** â€” \`n\` (next line), \`s\` (step into), \`c\` (continue), \`l\` (list source), \`p expr\` (print), \`pp expr\` (pretty), \`w\` (where = stack), \`u\`/\`d\` (up/down frames), \`b file:line\` (breakpoint), \`q\` (quit).
+3. **Post-mortem debugging** â€” when a script crashes:
    \`\`\`
    python -m pdb script.py            # interactive from the start
    python -m pdb -c continue script.py # run; drop into pdb at the crash
    \`\`\`
    Inside an interactive REPL after a crash: \`import pdb; pdb.pm()\`.
-4. **\`logging\` over \`print\`** — \`logger.exception("oh no")\` inside an \`except\` block automatically attaches the **current traceback** to the log record. Use levels (\`debug\` / \`info\` / \`warning\` / \`error\` / \`critical\`); use \`%s\` formatting (\`log.info("user %s", user)\`) so disabled levels skip the format work.
-5. **\`traceback\` module** — \`traceback.print_exc()\` from inside an \`except\` block prints the same thing Python would. \`traceback.format_exc()\` returns it as a string — useful for sending to Sentry, writing to a file, or returning in a JSON error response.
-6. **\`faulthandler\`** — \`python -X faulthandler script.py\` prints a Python traceback on segfault / fatal error. Worth knowing for native-extension debugging.
-7. **\`warnings\`** — \`warnings.warn("deprecated", DeprecationWarning)\` is the right channel for "this still works but won't soon" — *not* exceptions.
+4. **\`logging\` over \`print\`** â€” \`logger.exception("oh no")\` inside an \`except\` block automatically attaches the **current traceback** to the log record. Use levels (\`debug\` / \`info\` / \`warning\` / \`error\` / \`critical\`); use \`%s\` formatting (\`log.info("user %s", user)\`) so disabled levels skip the format work.
+5. **\`traceback\` module** â€” \`traceback.print_exc()\` from inside an \`except\` block prints the same thing Python would. \`traceback.format_exc()\` returns it as a string â€” useful for sending to Sentry, writing to a file, or returning in a JSON error response.
+6. **\`faulthandler\`** â€” \`python -X faulthandler script.py\` prints a Python traceback on segfault / fatal error. Worth knowing for native-extension debugging.
+7. **\`warnings\`** â€” \`warnings.warn("deprecated", DeprecationWarning)\` is the right channel for "this still works but won't soon" â€” *not* exceptions.
 
 ---
 
 ## Interview hook (answer like a senior)
 
-"\`try/except/else/finally\`: \`else\` runs only on success — it keeps the success path *outside* the \`try\` so I don't accidentally catch unrelated errors; \`finally\` always runs, even on \`return\` or \`raise\`. I catch the narrowest exception that names what I mean — never bare \`except:\` because it eats \`KeyboardInterrupt\`, and \`except Exception:\` only at the outermost edge of a service. To re-raise without losing the traceback I use bare \`raise\`. To wrap a low-level error in a domain one I use \`raise NewError(...) from e\` — that prints *direct cause of* and sets \`__cause__\`; if a new exception leaks out of an \`except\` block on its own, Python sets \`__context__\` and prints *during handling of*, which is usually a bug. For debugging I reach for \`breakpoint()\` and \`pdb.pm()\` for post-mortem before I reach for \`print\`, and \`logger.exception\` is what attaches the traceback to a log record."`,
+"\`try/except/else/finally\`: \`else\` runs only on success â€” it keeps the success path *outside* the \`try\` so I don't accidentally catch unrelated errors; \`finally\` always runs, even on \`return\` or \`raise\`. I catch the narrowest exception that names what I mean â€” never bare \`except:\` because it eats \`KeyboardInterrupt\`, and \`except Exception:\` only at the outermost edge of a service. To re-raise without losing the traceback I use bare \`raise\`. To wrap a low-level error in a domain one I use \`raise NewError(...) from e\` â€” that prints *direct cause of* and sets \`__cause__\`; if a new exception leaks out of an \`except\` block on its own, Python sets \`__context__\` and prints *during handling of*, which is usually a bug. For debugging I reach for \`breakpoint()\` and \`pdb.pm()\` for post-mortem before I reach for \`print\`, and \`logger.exception\` is what attaches the traceback to a log record."`,
 
     video: null,
     videoFallbackMarkdown: `## Deep dive: read every traceback like an SRE
 
 ### 1) Read tracebacks **bottom-up**
 
-Most engineers read the traceback top-down. That is wrong. The interpreter prints frames in *call order* — the **last** line is the actual exception; the line **just above it** is where it was raised; the lines further up are the callers. Train the eye:
+Most engineers read the traceback top-down. That is wrong. The interpreter prints frames in *call order* â€” the **last** line is the actual exception; the line **just above it** is where it was raised; the lines further up are the callers. Train the eye:
 
 \`\`\`
-Traceback (most recent call last):     ← Python's hint: the most recent call is at the bottom
+Traceback (most recent call last):     â† Python's hint: the most recent call is at the bottom
   File "main.py", line 42, in <module>
     run()
   File "main.py", line 30, in run
     load_user(uid)
   File "users.py", line 14, in load_user
     return int(row["age"])
-ValueError: invalid literal for int() with base 10: 'old'   ← THE error, read first
+ValueError: invalid literal for int() with base 10: 'old'   â† THE error, read first
 \`\`\`
 
-Senior reading order: **last line → file:line of the raise → walk up only as far as needed**.
+Senior reading order: **last line â†’ file:line of the raise â†’ walk up only as far as needed**.
 
 ### 2) The two boilerplate lines, decoded
 
@@ -4322,10 +4327,10 @@ These two strings have *different meanings*:
 
 | string                                                                                  | what it says                                                                  |
 |-----------------------------------------------------------------------------------------|-------------------------------------------------------------------------------|
-| \`The above exception was the direct cause of the following exception:\`                  | someone wrote \`raise NewError() from e\` — explicit chain via \`__cause__\`.    |
-| \`During handling of the above exception, another exception occurred:\`                   | a bare \`raise NewError()\` happened *inside* an \`except\` block — implicit \`__context__\`. |
+| \`The above exception was the direct cause of the following exception:\`                  | someone wrote \`raise NewError() from e\` â€” explicit chain via \`__cause__\`.    |
+| \`During handling of the above exception, another exception occurred:\`                   | a bare \`raise NewError()\` happened *inside* an \`except\` block â€” implicit \`__context__\`. |
 
-The **first** is intentional. The **second** is almost always a bug — it means cleanup code in your handler raised on top of the real error, so the *original* error is two screens up the traceback and the user only sees the cleanup error.
+The **first** is intentional. The **second** is almost always a bug â€” it means cleanup code in your handler raised on top of the real error, so the *original* error is two screens up the traceback and the user only sees the cleanup error.
 
 ### 3) Idiom: wrap-and-rethrow at API boundaries
 
@@ -4340,16 +4345,16 @@ def get_user(uid):
         raise UserError(f"could not load user {uid!r}") from e
 \`\`\`
 
-Callers handle one named exception type — \`UserError\` — but the underlying \`__cause__\` is preserved for the on-call SRE who reads the log. Best of both worlds.
+Callers handle one named exception type â€” \`UserError\` â€” but the underlying \`__cause__\` is preserved for the on-call SRE who reads the log. Best of both worlds.
 
 ### 4) The \`contextlib\` shortcuts every senior uses
 
-- \`contextlib.suppress(KeyError)\` — replaces \`try: ... except KeyError: pass\` for a single statement.
+- \`contextlib.suppress(KeyError)\` â€” replaces \`try: ... except KeyError: pass\` for a single statement.
   \`\`\`
   with contextlib.suppress(FileNotFoundError):
       os.remove(tmp_path)
   \`\`\`
-- \`contextlib.contextmanager\` — turn a generator into a \`with\` block; \`yield\` separates *setup* from *teardown*. The teardown runs in a \`finally\`, so it survives exceptions:
+- \`contextlib.contextmanager\` â€” turn a generator into a \`with\` block; \`yield\` separates *setup* from *teardown*. The teardown runs in a \`finally\`, so it survives exceptions:
   \`\`\`
   @contextmanager
   def tx(conn):
@@ -4361,7 +4366,7 @@ Callers handle one named exception type — \`UserError\` — but the underlying
           conn.rollback()
           raise
   \`\`\`
-- \`contextlib.ExitStack\` — manage a *dynamic* number of context managers without nested \`with\` pyramids.
+- \`contextlib.ExitStack\` â€” manage a *dynamic* number of context managers without nested \`with\` pyramids.
 
 ### 5) The pdb cheat sheet (15 commands you actually use)
 
@@ -4369,7 +4374,7 @@ Callers handle one named exception type — \`UserError\` — but the underlying
 n         next line in same frame
 s         step into a function call
 c         continue until next breakpoint or end
-r         return — run until current frame returns
+r         return â€” run until current frame returns
 l / ll    list source / list whole function
 p expr    print expression
 pp expr   pretty-print
@@ -4383,7 +4388,7 @@ interact  drop into a normal Python REPL with the current locals
 q         quit
 \`\`\`
 
-\`pdb.pm()\` after an unhandled exception in the REPL drops you at the *site* of the crash with all locals intact — closer to the error than re-running.
+\`pdb.pm()\` after an unhandled exception in the REPL drops you at the *site* of the crash with all locals intact â€” closer to the error than re-running.
 
 ### 6) The \`logging\` recipe for production exception handling
 
@@ -4396,40 +4401,40 @@ try:
 except Exception:                       # outermost edge of a worker
     log.exception("processing failed for %r", record)   # attaches traceback
     metrics.increment("processor.errors")
-    # don't re-raise — keep the worker alive
+    # don't re-raise â€” keep the worker alive
 \`\`\`
 
 Two things to notice:
 
-- \`log.exception(...)\` is shorthand for \`log.error(..., exc_info=True)\` — it attaches the **current traceback** to the log record automatically.
-- The \`except Exception:\` here is one of the few places it is *correct* — at a worker's outer loop where the contract is "log and keep going". Inside a small function, this would be a bug.
+- \`log.exception(...)\` is shorthand for \`log.error(..., exc_info=True)\` â€” it attaches the **current traceback** to the log record automatically.
+- The \`except Exception:\` here is one of the few places it is *correct* â€” at a worker's outer loop where the contract is "log and keep going". Inside a small function, this would be a bug.
 
 ### 7) The \`assert\` rule
 
 \`\`\`
 def transfer(amount):
-    assert amount >= 0, "negative transfer"   # invariant — strip in production
+    assert amount >= 0, "negative transfer"   # invariant â€” strip in production
     if not user.can_afford(amount):
-        raise InsufficientFunds(user, amount) # validation — DO raise
+        raise InsufficientFunds(user, amount) # validation â€” DO raise
 \`\`\`
 
 Two different things:
 
-- **\`assert\`** is for *invariants* — things you believe are *always* true. \`python -O\` strips them. Never put I/O or argument validation behind \`assert\`.
+- **\`assert\`** is for *invariants* â€” things you believe are *always* true. \`python -O\` strips them. Never put I/O or argument validation behind \`assert\`.
 - **\`raise\`** is for *runtime conditions* the user might cause. Always present.
 
-A stripped \`assert\` is one of the most embarrassing production bugs in Python — your validation just disappears.`,
+A stripped \`assert\` is one of the most embarrassing production bugs in Python â€” your validation just disappears.`,
 
     tryGuidance:
-      "Open the **traceback theater** below and run three experiments. **Mode 1 (try/except router)**: pick what happens inside the \`try\` (raise ValueError, raise KeyError, return early, no error) and an except chain — watch the green/red highlights show *exactly* which clauses run, in order, and check that \`finally\` is always lit. **Mode 2 (hierarchy match)**: pick a raised exception class and a chain of \`except\` clauses; the visualization walks the chain top-down using \`isinstance\` and shows the first match winning — try ordering \`OSError\` *before* \`FileNotFoundError\` to see the dead-code case. **Mode 3 (traceback reader)**: toggle \`raise\` vs \`raise from e\` vs \`raise from None\` and read how the boilerplate lines change between *direct cause of* and *during handling of* — and which line is the actual error.",
+      "Open the **traceback theater** below and run three experiments. **Mode 1 (try/except router)**: pick what happens inside the \`try\` (raise ValueError, raise KeyError, return early, no error) and an except chain â€” watch the green/red highlights show *exactly* which clauses run, in order, and check that \`finally\` is always lit. **Mode 2 (hierarchy match)**: pick a raised exception class and a chain of \`except\` clauses; the visualization walks the chain top-down using \`isinstance\` and shows the first match winning â€” try ordering \`OSError\` *before* \`FileNotFoundError\` to see the dead-code case. **Mode 3 (traceback reader)**: toggle \`raise\` vs \`raise from e\` vs \`raise from None\` and read how the boilerplate lines change between *direct cause of* and *during handling of* â€” and which line is the actual error.",
 
     knowledgeCheck: [
       {
         question: "In `try / except / else / finally`, when does the `else` clause run?",
         options: [
-          "Only when the `try` block completes **without** raising any exception — and `else` runs *before* `finally`.",
+          "Only when the `try` block completes **without** raising any exception â€” and `else` runs *before* `finally`.",
           "Only when the `try` block raises an exception that is **not** caught by any `except` clause.",
-          "Always — `else` is just a synonym for `finally` in older Python versions.",
+          "Always â€” `else` is just a synonym for `finally` in older Python versions.",
         ],
         correctIndex: 0,
         explanation: "`else` is the *success* clause: it runs after a successful `try`, before `finally`. Its purpose is to keep success-path code *outside* the `try` so an unrelated exception isn't accidentally caught. Many engineers go years without learning `else` exists; seniors use it whenever the success path has more than one line.",
@@ -4437,17 +4442,17 @@ A stripped \`assert\` is one of the most embarrassing production bugs in Python 
       {
         question: "Why is `except:` (bare) different from `except Exception:` and almost always wrong?",
         options: [
-          "Bare `except:` catches **`BaseException`**, which includes `KeyboardInterrupt` (Ctrl+C) and `SystemExit` — meaning your script silently swallows the user's request to terminate. `except Exception:` catches normal errors but lets the interpreter still die on Ctrl+C / sys.exit, which is what you want.",
+          "Bare `except:` catches **`BaseException`**, which includes `KeyboardInterrupt` (Ctrl+C) and `SystemExit` â€” meaning your script silently swallows the user's request to terminate. `except Exception:` catches normal errors but lets the interpreter still die on Ctrl+C / sys.exit, which is what you want.",
           "They are identical; bare `except:` is just a shorter alias for `except Exception:`.",
           "Bare `except:` is faster because it skips the `isinstance` check; otherwise the behavior matches `except Exception:` exactly.",
         ],
         correctIndex: 0,
-        explanation: "The hierarchy distinction matters: `BaseException` → `SystemExit` / `KeyboardInterrupt` / `GeneratorExit` / `Exception`. Bare `except` catches the parent and so eats things you should *never* catch. Linters (ruff `E722`, pylint `W0702`) flag bare `except:` for this exact reason.",
+        explanation: "The hierarchy distinction matters: `BaseException` â†’ `SystemExit` / `KeyboardInterrupt` / `GeneratorExit` / `Exception`. Bare `except` catches the parent and so eats things you should *never* catch. Linters (ruff `E722`, pylint `W0702`) flag bare `except:` for this exact reason.",
       },
       {
         question: "What is the difference between `raise NewError() from e` and a bare `raise NewError()` written inside an `except` block?",
         options: [
-          "`from e` sets `__cause__` and prints **'The above exception was the direct cause of the following exception'** — explicit wrapping. A bare `raise NewError()` inside `except` automatically sets `__context__` and prints **'During handling of the above exception, another exception occurred'** — implicit, usually unintentional.",
+          "`from e` sets `__cause__` and prints **'The above exception was the direct cause of the following exception'** â€” explicit wrapping. A bare `raise NewError()` inside `except` automatically sets `__context__` and prints **'During handling of the above exception, another exception occurred'** â€” implicit, usually unintentional.",
           "Both forms are exactly equivalent; `from e` is just more explicit syntax for the same `__context__` mechanism.",
           "`from e` discards the original traceback entirely; the bare form preserves it.",
         ],
@@ -4457,39 +4462,39 @@ A stripped \`assert\` is one of the most embarrassing production bugs in Python 
       {
         question: "What does this print?\n\n```\ndef f():\n    try:\n        return 1\n    finally:\n        return 2\n```",
         options: [
-          "`2` — `finally` runs after the `return 1` expression is evaluated, and a `return` inside `finally` overrides the pending return value (and would also suppress a pending exception). This is why `return` in `finally` is considered a code smell.",
-          "`1` — `finally` runs but cannot affect the already-pending return value.",
-          "Raises `SyntaxError` — `return` is illegal inside a `finally` clause.",
+          "`2` â€” `finally` runs after the `return 1` expression is evaluated, and a `return` inside `finally` overrides the pending return value (and would also suppress a pending exception). This is why `return` in `finally` is considered a code smell.",
+          "`1` â€” `finally` runs but cannot affect the already-pending return value.",
+          "Raises `SyntaxError` â€” `return` is illegal inside a `finally` clause.",
         ],
         correctIndex: 0,
-        explanation: "`finally` is genuinely *final* — its `return` (or `raise`) wins over anything pending from `try`. The same rule means `return` in `finally` will silently swallow an exception that was about to propagate. Never write it unless you really mean it.",
+        explanation: "`finally` is genuinely *final* â€” its `return` (or `raise`) wins over anything pending from `try`. The same rule means `return` in `finally` will silently swallow an exception that was about to propagate. Never write it unless you really mean it.",
       },
       {
         question: "Which `except` ordering is correct, and why?",
         options: [
           "```\nexcept FileNotFoundError: ...\nexcept OSError: ...\n```\nbecause `except` clauses are tried top-down and the **first** clause whose class is an ancestor of (or equal to) the raised exception wins. Since `FileNotFoundError` is a subclass of `OSError`, a more specific subclass must come *before* the base or it becomes dead code.",
           "```\nexcept OSError: ...\nexcept FileNotFoundError: ...\n```\nbecause base classes should always be listed first to act as a 'default' handler.",
-          "Order doesn't matter — Python finds the most specific match regardless of clause position.",
+          "Order doesn't matter â€” Python finds the most specific match regardless of clause position.",
         ],
         correctIndex: 0,
-        explanation: "Python doesn't search for the *most specific* match — it picks the *first* match top-down using `isinstance`. So subclasses must come before parents. Linters flag the opposite ordering as 'unreachable except clause'.",
+        explanation: "Python doesn't search for the *most specific* match â€” it picks the *first* match top-down using `isinstance`. So subclasses must come before parents. Linters flag the opposite ordering as 'unreachable except clause'.",
       },
       {
         question: "After `try: ... except ValueError as e: ...`, can you reference `e` after the `except` block?\n\n```\ntry:\n    int('x')\nexcept ValueError as e:\n    pass\nprint(e)\n```",
         options: [
-          "No — `e` is **explicitly deleted** by Python at the end of the `except` block (to break a reference cycle through the traceback). Accessing it raises `NameError`. If you need the value later, copy it inside the block: `err = e`.",
-          "Yes — `e` is a normal local variable and remains in scope until the function returns.",
+          "No â€” `e` is **explicitly deleted** by Python at the end of the `except` block (to break a reference cycle through the traceback). Accessing it raises `NameError`. If you need the value later, copy it inside the block: `err = e`.",
+          "Yes â€” `e` is a normal local variable and remains in scope until the function returns.",
           "Only in CPython 3.10+; earlier versions raise `UnboundLocalError`.",
         ],
         correctIndex: 0,
-        explanation: "The `as` binding in `except` has special scope rules: the name is unbound when the block ends, breaking the cycle `e → traceback → frame → e`. This is one of the few places Python deletes a local for you. Senior pattern when the value is needed later: `except E as e: err = e; ...; use(err)`.",
+        explanation: "The `as` binding in `except` has special scope rules: the name is unbound when the block ends, breaking the cycle `e â†’ traceback â†’ frame â†’ e`. This is one of the few places Python deletes a local for you. Senior pattern when the value is needed later: `except E as e: err = e; ...; use(err)`.",
       },
       {
         question: "Which line is the *actual* error in this traceback?\n\n```\nTraceback (most recent call last):\n  File \"main.py\", line 42, in <module>\n    run()\n  File \"main.py\", line 30, in run\n    load_user(uid)\n  File \"users.py\", line 14, in load_user\n    return int(row['age'])\nValueError: invalid literal for int() with base 10: 'old'\n```",
         options: [
-          "The **last** line — `ValueError: invalid literal...` — is the actual error. The lines above are the call chain in call order; the *site* of the raise is the line just above it (`return int(row['age'])`). Read tracebacks bottom-up: error first, then the raise site, then frames as far up as needed.",
-          "The first line `Traceback (most recent call last):` — that's the error message; the rest is debugging noise.",
-          "`File \"main.py\", line 42, in <module>` — the entry point is always where the error originated.",
+          "The **last** line â€” `ValueError: invalid literal...` â€” is the actual error. The lines above are the call chain in call order; the *site* of the raise is the line just above it (`return int(row['age'])`). Read tracebacks bottom-up: error first, then the raise site, then frames as far up as needed.",
+          "The first line `Traceback (most recent call last):` â€” that's the error message; the rest is debugging noise.",
+          "`File \"main.py\", line 42, in <module>` â€” the entry point is always where the error originated.",
         ],
         correctIndex: 0,
         explanation: "Python's hint *most recent call last* is literally telling you to read bottom-up. The exception type and message are always the last line; the file:line just above is where `raise` was issued; everything above that is the call stack. Senior debuggers learn to scan the bottom 3 lines first and only walk up when the message alone isn't enough.",
@@ -4497,12 +4502,12 @@ A stripped \`assert\` is one of the most embarrassing production bugs in Python 
       {
         question: "Why is `assert validate_amount(amt)` a dangerous way to validate user input in production code?",
         options: [
-          "Because `python -O` (optimize mode) **strips all `assert` statements at compile time**, so in production your validation silently disappears. `assert` is for invariants you believe are always true (and want to catch in dev/test); user-input validation should use `if not …: raise ValueError(...)` instead.",
+          "Because `python -O` (optimize mode) **strips all `assert` statements at compile time**, so in production your validation silently disappears. `assert` is for invariants you believe are always true (and want to catch in dev/test); user-input validation should use `if not â€¦: raise ValueError(...)` instead.",
           "Because `assert` raises `AssertionError`, and `AssertionError` is not catchable by `except Exception`.",
           "Because `assert` only works inside `try` blocks; outside one it's a no-op.",
         ],
         correctIndex: 0,
-        explanation: "`assert` exists for testing invariants — when it fires, you have a *bug*, not a *user error*. The `-O` flag (and `PYTHONOPTIMIZE=1`) removes them entirely. Use `assert` for sanity checks in tests and for documenting invariants; use `raise` for any condition that depends on runtime input.",
+        explanation: "`assert` exists for testing invariants â€” when it fires, you have a *bug*, not a *user error*. The `-O` flag (and `PYTHONOPTIMIZE=1`) removes them entirely. Use `assert` for sanity checks in tests and for documenting invariants; use `raise` for any condition that depends on runtime input.",
       },
     ],
   },
@@ -4512,7 +4517,7 @@ A stripped \`assert\` is one of the most embarrassing production bugs in Python 
     outcomes: [
       "Predict join cardinality (1:1, 1:N, N:M) before you run a query.",
       "Choose INNER vs LEFT vs FULL with NULL semantics in mind.",
-      "Explain to a PM why a report row count “exploded” after a join.",
+      "Explain to a PM why a report row count â€œexplodedâ€ after a join.",
     ],
     learnMarkdown: `## Outcomes
 
@@ -4520,61 +4525,61 @@ You will read **row-by-row** how SQL joins combine tables, when duplicates appea
 
 ## Motivation (Shopify-flavored)
 
-You are building a **merchant revenue** report. You have \`orders\` (one row per order) and \`merchants\` (one row per shop). The PM wants “revenue by merchant name.” The moment you join, three things bite you:
+You are building a **merchant revenue** report. You have \`orders\` (one row per order) and \`merchants\` (one row per shop). The PM wants â€œrevenue by merchant name.â€ The moment you join, three things bite you:
 
-- **Missing merchants** (orphan \`merchant_id\`) → rows disappear with INNER.
-- **Duplicate keys** on the dimension side → revenue **double-counts**.
-- **Timezone / status filters** applied in the wrong clause → correct SQL, wrong story.
+- **Missing merchants** (orphan \`merchant_id\`) â†’ rows disappear with INNER.
+- **Duplicate keys** on the dimension side â†’ revenue **double-counts**.
+- **Timezone / status filters** applied in the wrong clause â†’ correct SQL, wrong story.
 
 ## Concepts: what a join really does
 
 A join is **not** magic; it is a nested loop with rules you chose.
 
-- **INNER JOIN**: keep only pairs where the predicate matches. No match on either side → row dropped.
+- **INNER JOIN**: keep only pairs where the predicate matches. No match on either side â†’ row dropped.
 - **LEFT JOIN**: keep **every** row from the **left** table. If no partner on the right, right-side columns are **NULL**.
 - **RIGHT JOIN**: mirror of LEFT; most teams rewrite as LEFT for consistency.
-- **FULL OUTER JOIN**: keep unmatched rows from **both** sides; rare in dashboards, useful for reconciliation (“what is only in A / only in B?”).
+- **FULL OUTER JOIN**: keep unmatched rows from **both** sides; rare in dashboards, useful for reconciliation (â€œwhat is only in A / only in B?â€).
 
-## Slow path — trace by hand
+## Slow path â€” trace by hand
 
 **Tables (tiny):**
 
-\`merchants\`: (id, name) → (1, Ada), (2, Bob)
+\`merchants\`: (id, name) â†’ (1, Ada), (2, Bob)
 
-\`orders\`: (id, merchant_id, amount) → (101, 1, 50), (102, 1, 50), (103, 99, 20)  ← 99 is bogus FK
+\`orders\`: (id, merchant_id, amount) â†’ (101, 1, 50), (102, 1, 50), (103, 99, 20)  â† 99 is bogus FK
 
 **INNER JOIN** \`orders\` to \`merchants\` on \`merchant_id = merchants.id\`:
 
-- Row 101 matches Ada → keep.
-- Row 102 matches Ada → keep.
-- Row 103 has **no** merchant 99 → **dropped**.
+- Row 101 matches Ada â†’ keep.
+- Row 102 matches Ada â†’ keep.
+- Row 103 has **no** merchant 99 â†’ **dropped**.
 
 So INNER silently **hides bad data**. That is sometimes what you want in a **trusted** pipeline; often it is **not** what you want when auditing.
 
 **LEFT JOIN** the same:
 
-- Rows 101, 102 → Ada, amounts 50, 50.
-- Row 103 → **NULL** merchant name, amount 20. You can now **count orphans** in a QA query.
+- Rows 101, 102 â†’ Ada, amounts 50, 50.
+- Row 103 â†’ **NULL** merchant name, amount 20. You can now **count orphans** in a QA query.
 
 ## Pitfalls that interviewers love
 
-- **Joining on the wrong grain** — joining a daily rollup to a line-item table without thinking → fan-out.
-- **Filtering on an outer join in WHERE** — \`WHERE right.col = 5\` turns your LEFT into an INNER for those predicates. Put predicates in **ON** or use careful NULL logic.
-- **Assuming 1:1** — analytics dimensions are almost never perfectly clean.
+- **Joining on the wrong grain** â€” joining a daily rollup to a line-item table without thinking â†’ fan-out.
+- **Filtering on an outer join in WHERE** â€” \`WHERE right.col = 5\` turns your LEFT into an INNER for those predicates. Put predicates in **ON** or use careful NULL logic.
+- **Assuming 1:1** â€” analytics dimensions are almost never perfectly clean.
 
 ## Worked example (narrative)
 
-You need “orders with merchant name.” Start **LEFT** from \`orders\` if revenue truth lives there and you refuse to drop orphan rows quietly. Aggregate **after** you understand duplicates: \`SUM(amount)\` per \`merchant_id\` **before** joining names if names are unique per id.
+You need â€œorders with merchant name.â€ Start **LEFT** from \`orders\` if revenue truth lives there and you refuse to drop orphan rows quietly. Aggregate **after** you understand duplicates: \`SUM(amount)\` per \`merchant_id\` **before** joining names if names are unique per id.
 
 ## On-the-job hook
 
-When a stakeholder says “the dashboard is wrong,” the first SQL question is often: **“Did a join multiply rows?”** The second is: **“Did an INNER hide NULL keys?”**
+When a stakeholder says â€œthe dashboard is wrong,â€ the first SQL question is often: **â€œDid a join multiply rows?â€** The second is: **â€œDid an INNER hide NULL keys?â€**
 
 ## What you might be asked
 
-- “Why did row counts jump after I added a table?”
-- “When do you use LEFT vs INNER in a pipeline?”
-- “How do you detect duplicate keys in a dimension?”`,
+- â€œWhy did row counts jump after I added a table?â€
+- â€œWhen do you use LEFT vs INNER in a pipeline?â€
+- â€œHow do you detect duplicate keys in a dimension?â€`,
 
     video: {
       youtubeId: "p3qvj9hO_Bo",
@@ -4584,7 +4589,7 @@ When a stakeholder says “the dashboard is wrong,” the first SQL question is 
     },
     videoFallbackMarkdown: `## If the embed is blocked
 
-Open **Web Dev Simplified — Learn SQL in 60 Minutes** and jump to the **joins / INNER vs LEFT** chapter (~41:00). Pause after each diagram and **sketch** which rows survive vs become **NULL**.`,
+Open **Web Dev Simplified â€” Learn SQL in 60 Minutes** and jump to the **joins / INNER vs LEFT** chapter (~41:00). Pause after each diagram and **sketch** which rows survive vs become **NULL**.`,
 
     tryGuidance: `In the lab below, switch join types and watch which rows stay, which become **NULL**, and how the **result grid** matches the predicate. Before each click, **predict** the row count delta.`,
 
@@ -4597,7 +4602,7 @@ Open **Web Dev Simplified — Learn SQL in 60 Minutes** and jump to the **joins 
           "The database throws an error",
         ],
         correctIndex: 0,
-        explanation: "LEFT preserves left rows; join predicate may fail to match, so right-side columns are NULL. (NULL = NULL is unknown, not true — the row still stays on the left.)",
+        explanation: "LEFT preserves left rows; join predicate may fail to match, so right-side columns are NULL. (NULL = NULL is unknown, not true â€” the row still stays on the left.)",
       },
       {
         question: "Your revenue total doubled after joining a merchants table. What is the most common root cause?",
@@ -4607,10 +4612,10 @@ Open **Web Dev Simplified — Learn SQL in 60 Minutes** and jump to the **joins 
           "Aliasing a column with AS",
         ],
         correctIndex: 0,
-        explanation: "Join fan-out / duplicate dimension keys multiply fact rows — classic analytics bug.",
+        explanation: "Join fan-out / duplicate dimension keys multiply fact rows â€” classic analytics bug.",
       },
       {
-        question: "You want a QA report: all orders including those with invalid merchant_id. Which join pattern from orders → merchants is the usual choice?",
+        question: "You want a QA report: all orders including those with invalid merchant_id. Which join pattern from orders â†’ merchants is the usual choice?",
         options: [
           "LEFT JOIN merchants so orphan orders survive with NULL merchant fields",
           "INNER JOIN merchants to hide bad rows",
@@ -4631,38 +4636,38 @@ Open **Web Dev Simplified — Learn SQL in 60 Minutes** and jump to the **joins 
     ],
     learnMarkdown: `## Outcomes
 
-You will stop hand-waving “mutable vs immutable” and instead tie it to **identity**, **aliasing**, and **why pandas copies hurt**.
+You will stop hand-waving â€œmutable vs immutableâ€ and instead tie it to **identity**, **aliasing**, and **why pandas copies hurt**.
 
 ## Motivation (Airbnb-style listing pipeline)
 
-Two engineers share a helper that “cleans” a nested dict of listing attributes. One mutates the dict in place; the other assumes callers still have the old snapshot. Production symptom: **ghost updates** in a batch job — impossible to grep because the object id never changed.
+Two engineers share a helper that â€œcleansâ€ a nested dict of listing attributes. One mutates the dict in place; the other assumes callers still have the old snapshot. Production symptom: **ghost updates** in a batch job â€” impossible to grep because the object id never changed.
 
 ## Concepts
 
-- **Mutable**: object **in place** can change; same \`id()\` after “update.”
+- **Mutable**: object **in place** can change; same \`id()\` after â€œupdate.â€
 - **Immutable**: operations return **new** objects; old references see old values.
-- **Aliasing**: two names, **one** object — \`a = []; b = a; b.append(1)\` → \`a\` is \`[1]\`.
+- **Aliasing**: two names, **one** object â€” \`a = []; b = a; b.append(1)\` â†’ \`a\` is \`[1]\`.
 
 ## Slow path
 
-Run this mental model for **lists**: \`x = [1, 2]\`, then \`y = x\`, then \`y += [3]\` (in-place extend). Both \`x\` and \`y\` show \`[1, 2, 3]\` — **one** list object.
+Run this mental model for **lists**: \`x = [1, 2]\`, then \`y = x\`, then \`y += [3]\` (in-place extend). Both \`x\` and \`y\` show \`[1, 2, 3]\` â€” **one** list object.
 
 Contrast with a **tuple** \`t = (1, 2)\`: there is no append-in-place; \`t + (3,)\` builds a **new** tuple and leaves \`t\` unchanged.
 
 ## Pitfalls
 
-- **Default mutable args** — \`def f(items=[])\` is a famous footgun; shared list across calls.
-- **Shallow vs deep copy** — \`copy.copy\` of nested lists still shares inner lists.
-- **Equality vs identity** — \`==\` vs \`is\`; interviews mix them on purpose.
+- **Default mutable args** â€” \`def f(items=[])\` is a famous footgun; shared list across calls.
+- **Shallow vs deep copy** â€” \`copy.copy\` of nested lists still shares inner lists.
+- **Equality vs identity** â€” \`==\` vs \`is\`; interviews mix them on purpose.
 
-## Tuple “immutability” caveat
+## Tuple â€œimmutabilityâ€ caveat
 
-A tuple holding a **list** is immutable **as a tuple**, but the **list inside** can still mutate. Senior interviewers check whether you say “immutable all the way down.”
+A tuple holding a **list** is immutable **as a tuple**, but the **list inside** can still mutate. Senior interviewers check whether you say â€œimmutable all the way down.â€
 
 ## Interview / on-the-job
 
-- “When would you return a tuple vs a frozen dataclass vs a dict?”
-- “How do you debug a function that mutates shared config?”
+- â€œWhen would you return a tuple vs a frozen dataclass vs a dict?â€
+- â€œHow do you debug a function that mutates shared config?â€
 
 Connect answers to **thread safety**, **hashability** (dict keys), and **reasoning about side effects**.`,
 
@@ -4674,16 +4679,16 @@ Connect answers to **thread safety**, **hashability** (dict keys), and **reasoni
     },
     videoFallbackMarkdown: `## Curated clip (search)
 
-Look up **Corey Schafer — Python mutable vs immutable** (or your favorite Python fundamentals channel). After the list/tuple segment, pause and write **three** examples of aliasing bugs in ETL configs or nested dicts.
+Look up **Corey Schafer â€” Python mutable vs immutable** (or your favorite Python fundamentals channel). After the list/tuple segment, pause and write **three** examples of aliasing bugs in ETL configs or nested dicts.
 
-This module still ships a full **written** walkthrough and the mutability lab — the clip deepens voice and pacing.`,
+This module still ships a full **written** walkthrough and the mutability lab â€” the clip deepens voice and pacing.`,
 
     tryGuidance: `Use the mutability lab below: change inputs and watch how **shared references** and **new objects** differ. Predict the outcome **before** each change.`,
 
     knowledgeCheck: [
       {
         question: "After `a = []; b = a; b.append(1)`, what is `a`?",
-        options: ["[1] — same object as b", "[] — b was a copy", "[1, 1] — append duplicates"],
+        options: ["[1] â€” same object as b", "[] â€” b was a copy", "[1, 1] â€” append duplicates"],
         correctIndex: 0,
         explanation: "b aliases a; list.append mutates in place.",
       },
@@ -4701,10 +4706,15 @@ This module still ships a full **written** walkthrough and the mutability lab �
           "It always raises SyntaxError",
         ],
         correctIndex: 0,
-        explanation: "Default arg objects are created at function definition time — shared mutable state.",
+        explanation: "Default arg objects are created at function definition time â€” shared mutable state.",
       },
     ],
   },
+
+  ...ML_FOUNDATIONS,
+  ...ML_SUPERVISED,
+  ...ML_UNSUPERVISED,
+  ...ML_EVALUATION,
 
   ...PYTHON_EXTENDED_MODULES,
 
@@ -12024,6 +12034,3159 @@ for day in experiment:
   ],
 },
 
+
+"dl-f1": {
+  durationLabel: "18 min",
+  outcomes: [
+    "Explain the **universal approximation theorem** and why it matters — and why it's not the whole story.",
+    "Describe how a single perceptron functions as a **linear classifier** and where it fails.",
+    "Articulate why **depth** beats raw width in practice through hierarchical feature learning.",
+    "Recognize when a network architecture is ignoring depth in favor of brute-force width.",
+  ],
+  learnMarkdown: `## The Perceptron: A Single Neuron
+
+A **perceptron** is the atomic unit of any neural network. It computes a weighted sum of its inputs, adds a bias, then passes the result through an activation function:
+
+\`\`\`
+y = σ(w₁x₁ + w₂x₂ + ... + wₙxₙ + b)
+  = σ(w · x + b)
+\`\`\`
+
+Without an activation function σ, this is just a linear transformation — you get a **hyperplane** slicing through input space. That makes the perceptron a linear classifier: it can separate classes only when they are **linearly separable**. The classic failure case is XOR: no single straight line can separate the four XOR outputs. This limits the perceptron to problems where the decision boundary is a hyperplane.
+
+## Adding Nonlinearity Changes Everything
+
+The activation function σ is what breaks linearity. Common choices include sigmoid, tanh, and ReLU (covered in dl-f3). Stacking layers with nonlinear activations allows the network to bend and fold input space, creating arbitrarily complex decision boundaries.
+
+A single hidden layer with a nonlinear activation can already separate XOR — the first layer learns a new representation of the inputs where the classes become linearly separable, and the output layer draws the boundary in that new space.
+
+## The Universal Approximation Theorem
+
+The **Universal Approximation Theorem (UAT)** states that a feedforward network with a single hidden layer containing a sufficient number of neurons with a nonlinear activation can approximate any continuous function on a compact subset of ℝⁿ to arbitrary precision.
+
+\`\`\`
+f(x) ≈ Σᵢ αᵢ σ(wᵢ · x + bᵢ)    (sum over N hidden units)
+\`\`\`
+
+This sounds powerful — and it is, theoretically. But the UAT comes with a critical asterisk: it guarantees existence, not learnability or efficiency. The number of neurons required for a given approximation can be **exponentially large**. A single wide layer might need millions of units to approximate what a modest deep network learns with thousands.
+
+## Why Depth Beats Width in Practice
+
+Here is where theory meets reality. Empirically and theoretically, **deep networks outperform equivalently-expressive wide networks** for structured tasks like vision, language, and speech.
+
+The core intuition is **hierarchical feature learning**. In a deep convolutional network trained on images:
+
+- Layer 1 learns edges and color gradients
+- Layer 2 combines edges into textures and corners
+- Layer 3 combines textures into parts (eyes, wheels)
+- Layer 4 combines parts into objects
+
+Each layer builds on the previous. A single wide layer has no such compositional structure — every hidden unit directly sees raw pixels, with no mechanism to reuse intermediate representations.
+
+Mathematically, deep networks can represent certain function classes (like polynomials of the input) with exponentially fewer parameters than shallow networks. This is the **depth efficiency** argument.
+
+## Practical Consequences
+
+**Optimization**: Wide shallow networks are harder to optimize. All the representational power sits in one layer, creating a harder loss landscape. Deep networks decompose the problem into stages, each with an easier local objective.
+
+**Generalization**: Depth acts as an implicit inductive bias. A deep network with good architecture encodes structural assumptions about the problem (hierarchy, locality, compositionality) that constrain the hypothesis space and improve generalization.
+
+**Gradient flow**: Very wide layers can slow training by making gradient updates diffuse across many parameters with little structured signal.
+
+The practical rule of thumb: prefer **moderate width, greater depth** for most structured tasks. Start with established depth patterns (ResNet, Transformer block counts) rather than guessing single-layer width.
+
+## Interview hook (answer like a senior)
+
+"The universal approximation theorem tells us a single hidden layer is theoretically sufficient, but in practice it's nearly useless as a design principle — the required width can be exponential in problem complexity, optimization becomes much harder with flat wide layers, and you lose the hierarchical feature reuse that makes deep networks data-efficient. Depth isn't just an engineering trick; it's an inductive bias that matches the compositional structure of most real-world problems."`,
+
+  video: null,
+  videoFallbackMarkdown: `## Deep dive
+
+### Why the UAT Doesn't Justify Shallow Networks
+
+The UAT is an **existence proof**, not a construction. It says a shallow network with enough neurons *can* represent any function — but it says nothing about:
+
+1. **How many neurons are needed** (often exponential in the input dimension)
+2. **Whether gradient descent will find the right weights** (optimization hardness grows with width)
+3. **Whether the learned function will generalize** (more parameters without structure → weaker inductive bias)
+
+### Depth and the VC Dimension
+
+Deep networks achieve high VC dimension (expressive power) with **far fewer parameters** than comparably expressive shallow networks. A depth-L network with width W has VC dimension roughly O(W²L log W), while a single-layer network needs O((WL)²) neurons to match — exponential scaling.
+
+### The XOR Proof (Constructive)
+
+Given inputs (x₁, x₂) ∈ {0,1}², XOR outputs 1 iff exactly one input is 1.
+
+A two-layer solution:
+- Neuron 1: fires if x₁ OR x₂ (w=[1,1], b=-0.5)
+- Neuron 2: fires if x₁ AND x₂ (w=[1,1], b=-1.5)
+- Output: Neuron 1 minus Neuron 2 (XOR = OR minus AND)
+
+This demonstrates that a hidden layer creates a new coordinate system where the problem becomes linearly separable.`,
+
+  tryGuidance: "Use the network diagram to add and remove hidden layers. Observe how the decision boundary changes for the XOR dataset as you increase depth vs. width. Try matching the performance of a 2-hidden-layer network using only a single wide layer — note how many neurons you need.",
+
+  interviewGraph: {
+    initialStageId: "f1_wide_click",
+    artifactDimensions: [
+      { label: "Universal Approximation", recoveryStageId: "f1_recovery_uat" },
+      { label: "Depth vs Width", recoveryStageId: "f1_recovery_depth" },
+      { label: "Linear Separability", recoveryStageId: "f1_recovery_linear", passLabel: "Architecture Mastery" },
+    ],
+    stages: {
+      f1_wide_click: {
+        id: "f1_wide_click",
+        type: "click_target",
+        badge: "Stage 1 · Architecture",
+        title: "Stage 1 · Spot the depth problem",
+        prompt: "This network is tasked with classifying ImageNet images. Click the line that trades hierarchical depth for brute-force width.",
+        code_snippet: `import tensorflow as tf
+
+model = tf.keras.Sequential([
+    tf.keras.layers.Flatten(input_shape=(224, 224, 3)),
+    tf.keras.layers.Dense(1000, activation='relu'),  # ds-target:f1_wide_layer
+    tf.keras.layers.Dense(1000, activation='softmax')
+])
+
+model.compile(optimizer='adam', loss='categorical_crossentropy')`,
+        validationCopy: {
+          f1_wide_layer: "Correct. A single Dense(1000) hidden layer forces all 150,000 pixels to be combined in one step — no hierarchy, no reuse of intermediate features. A deep network would stack many layers of moderate width to learn progressively abstract representations.",
+        },
+        branches: { f1_wide_layer: "f1_uaf_choice" },
+      },
+      f1_uaf_choice: {
+        id: "f1_uaf_choice",
+        type: "scenario_choice",
+        badge: "Stage 2 · UAT",
+        title: "Stage 2 · Universal approximation in practice",
+        prompt: "An interviewer says: 'The universal approximation theorem proves a single hidden layer is sufficient for any task. So why use deep networks?' What is the best response?",
+        code_snippet: `# Single hidden layer "universal" network
+model = Sequential([
+    Dense(10000, activation='sigmoid'),  # very wide
+    Dense(num_classes, activation='softmax')
+])
+
+# Deep alternative
+deep_model = Sequential([
+    Dense(256, activation='relu'),
+    Dense(256, activation='relu'),
+    Dense(256, activation='relu'),
+    Dense(num_classes, activation='softmax')
+])`,
+        choices: [
+          {
+            id: "a",
+            label: "The UAT guarantees existence, not learnability — required width can be exponential and optimization is harder.",
+            description: "This is the core rebuttal. The UAT is an existence proof, not a practical design principle.",
+          },
+          {
+            id: "b",
+            label: "The UAT only applies to regression tasks, not classification.",
+            description: "Incorrect. The UAT applies broadly to continuous function approximation, regardless of task type.",
+          },
+          {
+            id: "c",
+            label: "Deep networks use less memory, which is the real reason.",
+            description: "Memory is a secondary concern. The primary issues are optimization hardness and lack of hierarchical inductive bias.",
+          },
+          {
+            id: "d",
+            label: "Shallow networks cannot use backpropagation.",
+            description: "Incorrect. Backpropagation works fine on shallow networks — the issue is not the algorithm but the structural properties.",
+          },
+        ],
+        branches: { a: "f1_hierarchy_choice", b: "f1_recovery_uat", c: "f1_recovery_uat", d: "f1_recovery_uat" },
+        rationale: "The UAT is a mathematical existence result: it says a solution *exists* with enough neurons. It makes no promise about how many neurons are needed (often exponential), whether gradient descent will find the weights, or whether the model will generalize. Deep networks earn their advantage through hierarchical feature reuse, better optimization landscapes, and implicit inductive bias.",
+      },
+      f1_recovery_uat: {
+        id: "f1_recovery_uat",
+        type: "scenario_choice",
+        badge: "Recovery · UAT",
+        title: "Recovery · What the UAT actually promises",
+        prompt: "Which statement about the Universal Approximation Theorem is TRUE?",
+        code_snippet: `# UAT says: for any continuous f and ε > 0,
+# there exist weights W such that:
+# |network(x; W) - f(x)| < ε  for all x in domain
+#
+# It does NOT say:
+# - how large the network must be
+# - that gradient descent finds W
+# - that the network generalizes`,
+        choices: [
+          {
+            id: "a",
+            label: "A single hidden layer with enough neurons can approximate any continuous function.",
+            description: "True — this is precisely what the UAT states, for a compact domain.",
+          },
+          {
+            id: "b",
+            label: "The UAT guarantees gradient descent will converge to the optimal approximation.",
+            description: "False. The UAT says nothing about optimization — it's a pure existence result.",
+          },
+          {
+            id: "c",
+            label: "The UAT means shallow networks are preferable to deep ones.",
+            description: "False. The UAT shows theoretical possibility, not practical superiority.",
+          },
+        ],
+        branches: { a: "f1_hierarchy_choice", b: "f1_recovery_uat", c: "f1_recovery_uat" },
+        rationale: "The UAT states that a single hidden layer is a universal function approximator — but width may need to grow exponentially, and the theorem says nothing about optimization or generalization.",
+      },
+      f1_hierarchy_choice: {
+        id: "f1_hierarchy_choice",
+        type: "scenario_choice",
+        badge: "Stage 3 · Depth",
+        title: "Stage 3 · What deeper layers actually learn",
+        prompt: "You add a second hidden layer to a network trained on images. Relative to the first hidden layer, what does the second hidden layer typically learn?",
+        code_snippet: `model = Sequential([
+    Dense(256, activation='relu'),  # Layer 1
+    Dense(256, activation='relu'),  # Layer 2 — what does this learn?
+    Dense(10, activation='softmax')
+])`,
+        choices: [
+          {
+            id: "a",
+            label: "Higher-level combinations of Layer 1 features — more abstract representations.",
+            description: "Correct. Each layer composes the previous layer's features into increasingly abstract concepts.",
+          },
+          {
+            id: "b",
+            label: "The same features as Layer 1 but with different random initialization.",
+            description: "Incorrect. Without nonlinearity, yes — but with activations and depth, each layer specializes to a different abstraction level.",
+          },
+          {
+            id: "c",
+            label: "Raw pixel patterns, since all layers see the same input.",
+            description: "Incorrect. Only Layer 1 sees raw pixels. Layer 2 sees Layer 1's activations — a transformed representation.",
+          },
+          {
+            id: "d",
+            label: "Lower-level features to provide redundancy.",
+            description: "Incorrect. Depth creates a hierarchy of abstraction, not redundancy.",
+          },
+        ],
+        branches: { a: "f1_xor_choice", b: "f1_recovery_depth", c: "f1_recovery_depth", d: "f1_recovery_depth" },
+        rationale: "In deep networks, each layer transforms the representation from the previous layer. Layer 1 might learn edges; Layer 2 learns textures (combinations of edges); Layer 3 learns parts (combinations of textures). This compositional hierarchy is the core advantage of depth.",
+      },
+      f1_recovery_depth: {
+        id: "f1_recovery_depth",
+        type: "scenario_choice",
+        badge: "Recovery · Depth",
+        title: "Recovery · Hierarchical representations",
+        prompt: "In a deep image classification network, which ordering of learned representations is most accurate?",
+        code_snippet: `# Empirically observed in deep CNNs (e.g., Zeiler & Fergus 2014):
+# Layer 1: edges, color blobs
+# Layer 2: textures, corners, simple shapes
+# Layer 3: object parts (eyes, wheels, handles)
+# Layer 4+: whole objects, semantic categories`,
+        choices: [
+          {
+            id: "a",
+            label: "Early layers: abstract semantics. Later layers: raw pixel patterns.",
+            description: "Backwards. Early layers are closest to the input and learn low-level features.",
+          },
+          {
+            id: "b",
+            label: "Early layers: low-level features (edges). Later layers: abstract semantics (objects).",
+            description: "Correct. The hierarchy of abstraction increases with depth.",
+          },
+          {
+            id: "c",
+            label: "All layers learn the same mix of low-level and high-level features.",
+            description: "Incorrect. Depth creates specialization — each layer occupies a different level of abstraction.",
+          },
+        ],
+        branches: { a: "f1_recovery_depth", b: "f1_xor_choice", c: "f1_recovery_depth" },
+        rationale: "Depth creates a hierarchy: early layers detect simple patterns, later layers compose them into abstract concepts. This matches the compositional structure of natural data.",
+      },
+      f1_xor_choice: {
+        id: "f1_xor_choice",
+        type: "scenario_choice",
+        badge: "Stage 4 · Perceptron Limits",
+        title: "Stage 4 · Why perceptrons fail on XOR",
+        prompt: "A single perceptron (no hidden layers) is trained on the XOR problem and never converges to zero training error. What is the fundamental reason?",
+        code_snippet: `# XOR truth table
+# x1=0, x2=0 -> y=0
+# x1=0, x2=1 -> y=1
+# x1=1, x2=0 -> y=1
+# x1=1, x2=1 -> y=0
+
+# Perceptron decision boundary:
+# w1*x1 + w2*x2 + b > 0  =>  class 1
+
+perceptron = Sequential([Dense(1, activation='sigmoid')])`,
+        choices: [
+          {
+            id: "a",
+            label: "The perceptron is a linear classifier and XOR is not linearly separable.",
+            description: "Correct. No single hyperplane can separate the XOR outputs — (0,1) and (1,0) are class 1, while (0,0) and (1,1) are class 0.",
+          },
+          {
+            id: "b",
+            label: "The sigmoid activation saturates and prevents convergence.",
+            description: "Saturation is a gradient issue, not the root cause. Even a linear threshold unit (step function) cannot solve XOR.",
+          },
+          {
+            id: "c",
+            label: "XOR requires more data than two binary inputs provide.",
+            description: "Incorrect. The failure is about decision boundary geometry, not dataset size.",
+          },
+          {
+            id: "d",
+            label: "The perceptron learning rule only works for regression tasks.",
+            description: "Incorrect. The perceptron learning rule is specifically designed for binary classification.",
+          },
+        ],
+        branches: { a: "f1_terminal", b: "f1_recovery_linear", c: "f1_recovery_linear", d: "f1_recovery_linear" },
+        rationale: "A single-layer perceptron defines one linear decision boundary. XOR requires a non-linear boundary — specifically, two half-planes. Adding a hidden layer allows the network to first transform the input space into a linearly separable representation.",
+      },
+      f1_recovery_linear: {
+        id: "f1_recovery_linear",
+        type: "scenario_choice",
+        badge: "Recovery · Linear Separability",
+        title: "Recovery · Linear separability",
+        prompt: "Which dataset can a single perceptron (no hidden layers) classify perfectly?",
+        code_snippet: `# Dataset A: AND gate
+# (0,0)->0, (0,1)->0, (1,0)->0, (1,1)->1
+
+# Dataset B: XOR gate
+# (0,0)->0, (0,1)->1, (1,0)->1, (1,1)->0
+
+# Dataset C: Circle classification
+# Points inside unit circle -> 1
+# Points outside unit circle -> 0`,
+        choices: [
+          {
+            id: "a",
+            label: "Dataset A (AND gate).",
+            description: "Correct. AND is linearly separable — a single line separates (1,1) from all other inputs.",
+          },
+          {
+            id: "b",
+            label: "Dataset B (XOR gate).",
+            description: "Incorrect. XOR requires two decision boundaries and is not linearly separable.",
+          },
+          {
+            id: "c",
+            label: "Dataset C (circle classification).",
+            description: "Incorrect. A circle boundary is nonlinear — no single hyperplane can separate inside from outside.",
+          },
+        ],
+        branches: { a: "f1_terminal", b: "f1_recovery_linear", c: "f1_recovery_linear" },
+        rationale: "AND is linearly separable: the hyperplane w₁x₁ + w₂x₂ = 1.5 correctly classifies all four inputs. XOR and circle classification require nonlinear boundaries that a single perceptron cannot form.",
+      },
+      f1_terminal: {
+        id: "f1_terminal",
+        type: "scenario_choice",
+        badge: "Terminal · Synthesis",
+        title: "Revision complete · Architecture mastered",
+        terminal: true,
+        prompt: "Final check: Why do deep networks generalize better than equivalently-expressive wide networks, empirically?",
+        code_snippet: `# Equivalent parameter counts:
+wide_model = Sequential([
+    Dense(8192, activation='relu'),  # ~600M params
+    Dense(num_classes)
+])
+
+deep_model = Sequential([
+    Dense(512, activation='relu'),   # ~400K params each
+    Dense(512, activation='relu'),
+    Dense(512, activation='relu'),
+    # ... 10 layers total, still far fewer params
+    Dense(num_classes)
+])`,
+        choices: [
+          {
+            id: "a",
+            label: "Depth introduces hierarchical inductive bias matching problem structure, and each layer's gradient signal is more focused.",
+            description: "Correct. This captures both the structural and optimization advantages of depth.",
+          },
+          {
+            id: "b",
+            label: "Deep networks always use fewer parameters, so they overfit less by default.",
+            description: "Parameter count is not the whole story — a wide network can have fewer parameters than a deep one. The advantage of depth is structural, not just quantitative.",
+          },
+          {
+            id: "c",
+            label: "Wide networks cannot use dropout, so they overfit more.",
+            description: "Incorrect. Dropout can be applied to any layer regardless of width or depth.",
+          },
+        ],
+        branches: { a: "f1_terminal", b: "f1_terminal", c: "f1_terminal" },
+        rationale: "Deep networks generalize better because: (1) hierarchical inductive bias matches the compositional structure of real data, (2) each layer has a focused learning objective (local representations), (3) gradient updates are more structured than in wide layers, and (4) depth-efficient representations require fewer parameters for the same expressivity.",
+      },
+    },
+  },
+
+  knowledgeCheck: [
+    {
+      question: "The Universal Approximation Theorem states that a single hidden layer can approximate any continuous function. Why is this NOT a practical justification for using shallow networks?",
+      options: [
+        "The required number of neurons can be exponentially large, and optimization becomes significantly harder without hierarchical structure.",
+        "The UAT only applies to networks with sigmoid activations, not modern activations like ReLU.",
+        "Shallow networks cannot use gradient descent because the loss landscape is always non-convex.",
+      ],
+      correctIndex: 0,
+      explanation: "The UAT is an existence proof — it guarantees a solution exists but says nothing about how large the network must be (potentially exponential) or whether gradient descent will find the weights. Deep networks achieve the same expressivity with far fewer parameters by exploiting compositional structure.",
+    },
+    {
+      question: "A single perceptron trained on XOR fails to reach zero training error regardless of learning rate or epochs. What is the correct diagnosis?",
+      options: [
+        "The learning rate is too high, causing the weights to oscillate.",
+        "XOR is not linearly separable, so no single hyperplane can correctly classify all four input patterns.",
+        "The perceptron needs more training data to learn the XOR pattern.",
+      ],
+      correctIndex: 1,
+      explanation: "The perceptron defines a single linear decision boundary. XOR requires two separating hyperplanes — (1,0) and (0,1) must be on one side while (0,0) and (1,1) are on the other. No single straight line achieves this, regardless of training. A hidden layer is needed to transform input space into a linearly separable representation.",
+    },
+    {
+      question: "What does the second hidden layer in a deep vision network primarily learn relative to the first?",
+      options: [
+        "Duplicate copies of first-layer features for redundancy.",
+        "Raw pixel statistics that the first layer missed.",
+        "Higher-level combinations of first-layer features, such as textures composed from edges.",
+      ],
+      correctIndex: 2,
+      explanation: "Each layer in a deep network operates on the output of the previous layer, composing features into progressively abstract representations. Layer 1 detects edges; Layer 2 combines edges into textures and corners; later layers build object parts and whole objects. This hierarchical composition is the core advantage of depth over width.",
+    },
+  ],
+},
+
+"dl-f2": {
+  durationLabel: "25 min",
+  outcomes: [
+    "Trace a complete **forward pass** and explain how loss is computed from network outputs.",
+    "Apply the **chain rule** to derive how gradients flow backward through a multi-layer network.",
+    "Diagnose **vanishing and exploding gradients** by understanding sigmoid saturation and gradient magnitude accumulation.",
+    "Explain why **ReLU** improves gradient flow and when **gradient clipping** is the right tool.",
+  ],
+  learnMarkdown: `## The Forward Pass
+
+Training a neural network is a two-phase loop: **forward pass** then **backward pass**. During the forward pass, input data flows through each layer, producing an output prediction:
+
+\`\`\`
+z₁ = W₁x + b₁          # linear transform, layer 1
+a₁ = σ(z₁)             # activation
+z₂ = W₂a₁ + b₂         # linear transform, layer 2
+ŷ  = σ(z₂)             # final prediction
+L  = loss(ŷ, y)        # compare to ground truth
+\`\`\`
+
+The loss L — cross-entropy for classification, MSE for regression — is a scalar measuring how wrong the prediction is. Backpropagation uses this scalar to compute the gradient of L with respect to every weight in the network.
+
+## The Chain Rule: Gradient Flow
+
+Backpropagation is the chain rule from calculus, applied to a composition of functions. Given L = f(g(h(x))):
+
+\`\`\`
+dL/dx = (dL/df) · (df/dg) · (dg/dh) · (dh/dx)
+\`\`\`
+
+In a neural network, each layer is a function. The gradient of the loss with respect to a weight in layer k is the product of all the local gradients from the output layer back to layer k. Concretely, for a weight W in layer k of an L-layer network:
+
+\`\`\`
+∂L/∂Wₖ = (∂L/∂aₗ) · (∂aₗ/∂aₗ₋₁) · ... · (∂aₖ₊₁/∂aₖ) · (∂aₖ/∂Wₖ)
+\`\`\`
+
+Each term \`∂aₙ/∂aₙ₋₁\` includes the **derivative of the activation function** at that layer's pre-activation value.
+
+## Vanishing Gradients: Death by a Thousand Sigmoids
+
+The sigmoid activation saturates at both ends of its output range (0 and 1), and its derivative has a maximum of **0.25** at zero:
+
+\`\`\`
+σ(z)  = 1 / (1 + e^(-z))
+σ'(z) = σ(z)(1 - σ(z))   # max value: 0.25 at z=0
+\`\`\`
+
+In a 10-layer sigmoid network, the gradient reaching layer 1 is roughly the product of 10 local derivatives — each at most 0.25:
+
+\`\`\`
+|∂L/∂W₁| ≤ (0.25)^10 ≈ 9.5 × 10⁻⁷
+\`\`\`
+
+This is the **vanishing gradient problem**: early layers receive essentially zero gradient signal and stop learning. The network's early layers — which learn fundamental low-level features — stagnate while later layers continue to update. Tanh suffers the same problem (max derivative: 1.0, but still saturates at the tails).
+
+## Exploding Gradients
+
+The mirror pathology: if local gradients are consistently greater than 1, the product of many such gradients grows exponentially. A 10-layer network where each Jacobian has spectral norm 2 produces gradients with magnitude 2¹⁰ = 1024×. This causes **weight updates so large that training diverges**.
+
+Exploding gradients are most common in **recurrent neural networks** (long temporal sequences) and poorly initialized deep networks.
+
+## ReLU: The Gradient Highway
+
+**ReLU** (Rectified Linear Unit) was a breakthrough for deep learning in part because of its gradient properties:
+
+\`\`\`
+ReLU(z) = max(0, z)
+ReLU'(z) = 1  if z > 0
+           0  if z ≤ 0
+\`\`\`
+
+For positive pre-activations, the derivative is exactly **1** — the gradient passes through unchanged. The product of ten such derivatives is still 1, not 10⁻⁷. This is why deep networks became practically trainable at scale after the adoption of ReLU (Nair & Hinton, 2010; Krizhevsky et al., AlexNet 2012).
+
+The trade-off: neurons with negative pre-activations have zero gradient — they contribute nothing to learning. If a neuron's pre-activation is negative for all training examples, it becomes a **dead ReLU**: permanently stuck, contributing zero gradient regardless of input.
+
+## Gradient Clipping
+
+For scenarios where exploding gradients are unavoidable (deep RNNs, large batch training), **gradient clipping** caps the gradient norm before the optimizer step:
+
+\`\`\`python
+# Clip by global norm
+optimizer = tf.keras.optimizers.Adam(clipnorm=1.0)
+
+# Manual clip
+grads = [tf.clip_by_norm(g, 1.0) for g in grads]
+\`\`\`
+
+Clipping by norm (rescaling the entire gradient vector when its norm exceeds a threshold) is preferred over clipping by value (clipping each gradient independently), as it preserves gradient direction while constraining magnitude.
+
+## Architectural Implications
+
+Vanishing gradients led directly to modern architecture innovations:
+
+- **Batch Normalization**: normalizes layer inputs, keeping pre-activations in a regime where gradients are healthy
+- **Residual connections (ResNets)**: add an identity shortcut so gradient has a direct path from output to early layers — ∂L/∂W₁ includes a term that doesn't pass through any activations
+- **Careful initialization**: Xavier/Glorot for sigmoid/tanh, He initialization for ReLU — ensures initial gradient magnitudes are well-scaled
+
+## Interview hook (answer like a senior)
+
+"Backpropagation is just the chain rule applied to a composition of differentiable functions — the gradient of the loss with respect to any weight is the product of all local Jacobians from the output back to that weight. The vanishing gradient problem emerges when those local Jacobians are consistently less than 1, as with sigmoid's maximum derivative of 0.25 — after 10 layers, the product is near zero. ReLU fixes this by having a derivative of exactly 1 for positive inputs, so the gradient chain doesn't shrink. When exploding gradients are the problem instead, gradient clipping by norm is the standard fix."`,
+
+  video: null,
+  videoFallbackMarkdown: `## Deep dive
+
+### Computing Gradients by Hand (2-Layer Example)
+
+Given a 2-layer network with MSE loss:
+
+\`\`\`
+Forward:  z₁ = W₁x,  a₁ = ReLU(z₁),  ŷ = W₂a₁,  L = (ŷ - y)²
+
+Backward:
+∂L/∂ŷ  = 2(ŷ - y)
+∂L/∂W₂ = ∂L/∂ŷ · a₁ᵀ
+∂L/∂a₁ = W₂ᵀ · ∂L/∂ŷ
+∂L/∂z₁ = ∂L/∂a₁ ⊙ ReLU'(z₁)    # element-wise, ReLU' is 0 or 1
+∂L/∂W₁ = ∂L/∂z₁ · xᵀ
+\`\`\`
+
+This shows the clean matrix form: each layer's gradient is the upstream gradient multiplied by the local Jacobian.
+
+### Residual Connections as a Gradient Shortcut
+
+In a ResNet block: y = F(x) + x (F is a stack of conv layers). The gradient:
+
+\`\`\`
+∂L/∂x = ∂L/∂y · (∂F/∂x + I)
+\`\`\`
+
+The identity term I means there is always a gradient path that bypasses F entirely — even if ∂F/∂x vanishes, ∂L/∂x includes a direct copy of the upstream gradient. This is why ResNets can be trained with hundreds of layers.`,
+
+  tryGuidance: "Use the gradient flow visualizer to step through backpropagation layer by layer. Change the activation function between sigmoid and ReLU and observe how gradient magnitudes change at each layer. Try a 10-layer sigmoid network and a 10-layer ReLU network — compare the gradient norms at layer 1.",
+
+  interviewGraph: {
+    initialStageId: "f2_sigmoid_click",
+    artifactDimensions: [
+      { label: "Chain Rule & Backprop", recoveryStageId: "f2_recovery_chain" },
+      { label: "Vanishing Gradients", recoveryStageId: "f2_recovery_vanish" },
+      { label: "Architectural Fixes", recoveryStageId: "f2_recovery_fixes", passLabel: "Backprop Mastery" },
+    ],
+    stages: {
+      f2_sigmoid_click: {
+        id: "f2_sigmoid_click",
+        type: "click_target",
+        badge: "Stage 1 · Vanishing Gradient",
+        title: "Stage 1 · Spot the gradient killer",
+        prompt: "This 10-layer network trains very slowly and gradients in the first layer are near zero. Click the activation function line that is causing the vanishing gradient problem.",
+        code_snippet: `model = tf.keras.Sequential([
+    Dense(256, activation='sigmoid'),  # ds-target:f2_sig1
+    Dense(256, activation='sigmoid'),
+    Dense(256, activation='sigmoid'),
+    Dense(256, activation='sigmoid'),
+    Dense(256, activation='sigmoid'),
+    Dense(256, activation='sigmoid'),
+    Dense(256, activation='sigmoid'),
+    Dense(256, activation='sigmoid'),
+    Dense(256, activation='sigmoid'),
+    Dense(256, activation='sigmoid'),
+    Dense(1, activation='sigmoid')
+])`,
+        validationCopy: {
+          f2_sig1: "Correct. Each sigmoid layer has a maximum gradient of 0.25. Multiplied across 10 layers, the gradient reaching layer 1 is at most (0.25)^10 ≈ 10⁻⁶ — essentially zero. Early layers stop learning entirely.",
+        },
+        branches: { f2_sig1: "f2_vanish_choice" },
+      },
+      f2_vanish_choice: {
+        id: "f2_vanish_choice",
+        type: "scenario_choice",
+        badge: "Stage 2 · Diagnosis",
+        title: "Stage 2 · Diagnose the vanishing gradient",
+        prompt: "In a 10-layer sigmoid network, gradients at layer 1 are approximately 1e-10 after 100 training steps. What is the precise mathematical cause?",
+        code_snippet: `# Sigmoid and its derivative:
+# σ(z)  = 1 / (1 + exp(-z))
+# σ'(z) = σ(z) * (1 - σ(z))
+# max(σ'(z)) = 0.25  (at z = 0)
+
+# Gradient at layer 1 via chain rule:
+# ∂L/∂W₁ ∝ σ'(z₁₀) * σ'(z₉) * ... * σ'(z₁)
+# worst case magnitude: (0.25)^10 ≈ 9.5e-7`,
+        choices: [
+          {
+            id: "a",
+            label: "The sigmoid derivative is at most 0.25; multiplying 10 such terms produces a near-zero gradient via the chain rule.",
+            description: "Correct. This is the precise mechanism: each backward pass through a sigmoid layer multiplies the gradient by at most 0.25.",
+          },
+          {
+            id: "b",
+            label: "The learning rate is too small, causing gradients to appear near zero.",
+            description: "A small learning rate scales gradient *updates*, not the gradients themselves. The gradient magnitude of 1e-10 before the learning rate is applied is the actual problem.",
+          },
+          {
+            id: "c",
+            label: "The network is overfitting, so it deliberately reduces gradients to prevent further weight updates.",
+            description: "Incorrect. Overfitting is about generalization, not gradient magnitude. Vanishing gradients occur even with underfitting networks.",
+          },
+          {
+            id: "d",
+            label: "Sigmoid outputs are not zero-centered, causing zig-zagging gradient updates.",
+            description: "Non-zero-centered outputs cause inefficient optimization, but that's a separate issue from vanishing gradients. The root cause here is the derivative magnitude.",
+          },
+        ],
+        branches: { a: "f2_explode_choice", b: "f2_recovery_vanish", c: "f2_recovery_vanish", d: "f2_recovery_vanish" },
+        rationale: "Vanishing gradients are a direct consequence of the chain rule applied to saturating activations. Sigmoid's derivative σ'(z) = σ(z)(1-σ(z)) achieves a maximum of only 0.25. When multiplied across L layers, this produces exponentially small gradients: (0.25)^L. For L=10, that's ~10^-6. Early layers receive essentially zero training signal.",
+      },
+      f2_recovery_vanish: {
+        id: "f2_recovery_vanish",
+        type: "scenario_choice",
+        badge: "Recovery · Vanishing Gradient",
+        title: "Recovery · Sigmoid saturation mechanics",
+        prompt: "Why does the sigmoid activation cause vanishing gradients, while ReLU does not (for positive inputs)?",
+        code_snippet: `# Sigmoid derivative: max 0.25
+import numpy as np
+z = np.linspace(-5, 5, 100)
+sigmoid = 1 / (1 + np.exp(-z))
+sigmoid_grad = sigmoid * (1 - sigmoid)  # max: 0.25
+
+# ReLU derivative: 1 (for z > 0)
+relu_grad = np.where(z > 0, 1.0, 0.0)  # max: 1.0`,
+        choices: [
+          {
+            id: "a",
+            label: "Sigmoid compresses all inputs into (0,1), making its derivative always less than 1, while ReLU has derivative exactly 1 for positive inputs.",
+            description: "Correct. ReLU's gradient of 1 for positive inputs means the chain rule product doesn't shrink.",
+          },
+          {
+            id: "b",
+            label: "ReLU is faster to compute, so gradient updates arrive sooner.",
+            description: "Computational speed is not the reason for better gradient flow — it's the derivative magnitude.",
+          },
+          {
+            id: "c",
+            label: "Sigmoid is used only in output layers, where gradient magnitude doesn't matter.",
+            description: "Incorrect. Sigmoid was historically used in hidden layers, which is exactly where vanishing gradients cause damage.",
+          },
+        ],
+        branches: { a: "f2_explode_choice", b: "f2_recovery_vanish", c: "f2_recovery_vanish" },
+        rationale: "The derivative of sigmoid is bounded by 0.25, meaning every backward pass through a sigmoid layer multiplies the gradient by at most 0.25. ReLU's derivative is exactly 1 for positive inputs — the gradient passes through unchanged, preventing exponential decay.",
+      },
+      f2_explode_choice: {
+        id: "f2_explode_choice",
+        type: "scenario_choice",
+        badge: "Stage 3 · Exploding Gradients",
+        title: "Stage 3 · Fix exploding gradients",
+        prompt: "During training of a deep RNN, you observe that the gradient norm reaches 1e6 after just 50 steps and loss diverges to NaN. What is the most appropriate immediate fix?",
+        code_snippet: `# Gradient norm history:
+# Step 10:  ||∇|| = 12.3
+# Step 20:  ||∇|| = 847.2
+# Step 30:  ||∇|| = 41,203
+# Step 40:  ||∇|| = 1,892,441
+# Step 50:  ||∇|| = 1.2e9
+# Loss: NaN
+
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)`,
+        choices: [
+          {
+            id: "a",
+            label: "Apply gradient clipping by norm (e.g., clipnorm=1.0) to rescale large gradient vectors.",
+            description: "Correct. Gradient clipping by norm rescales the entire gradient vector when its norm exceeds the threshold, preserving direction while bounding magnitude.",
+          },
+          {
+            id: "b",
+            label: "Switch from Adam to SGD — Adam amplifies gradients.",
+            description: "Incorrect. Adam normalizes gradients using second-moment estimates, which actually helps with exploding gradients. Switching to SGD without clipping would make things worse.",
+          },
+          {
+            id: "c",
+            label: "Add more hidden layers to distribute the gradient across more parameters.",
+            description: "Adding depth to a network with exploding gradients will worsen the problem — more layers means more multiplications of large Jacobians.",
+          },
+          {
+            id: "d",
+            label: "Reduce the batch size to stabilize gradient estimates.",
+            description: "Batch size affects gradient variance (noise), not gradient magnitude from the chain rule. Clipping is the right fix here.",
+          },
+        ],
+        branches: { a: "f2_relu_choice", b: "f2_recovery_fixes", c: "f2_recovery_fixes", d: "f2_recovery_fixes" },
+        rationale: "Gradient clipping by norm is the standard fix for exploding gradients. When ||g|| > threshold, the gradient is rescaled: g = g * (threshold / ||g||). This preserves the direction of the gradient while capping its magnitude. It's particularly important for RNNs where long sequence dependencies make gradient explosion nearly inevitable without clipping.",
+      },
+      f2_recovery_fixes: {
+        id: "f2_recovery_fixes",
+        type: "scenario_choice",
+        badge: "Recovery · Architectural Fixes",
+        title: "Recovery · Solutions to gradient problems",
+        prompt: "Which technique provides a direct gradient highway from the output layer to early layers, bypassing the vanishing gradient problem architecturally?",
+        code_snippet: `# Option A: Batch Normalization
+x = BatchNormalization()(x)
+
+# Option B: Residual Connection
+residual = x
+x = Dense(256, activation='relu')(x)
+x = x + residual  # skip connection
+
+# Option C: Dropout
+x = Dropout(0.5)(x)
+
+# Option D: L2 Regularization
+layer = Dense(256, activation='relu', kernel_regularizer='l2')`,
+        choices: [
+          {
+            id: "a",
+            label: "Residual connections — the identity shortcut provides a direct gradient path.",
+            description: "Correct. In y = F(x) + x, the gradient ∂L/∂x includes an identity term that bypasses F entirely.",
+          },
+          {
+            id: "b",
+            label: "Dropout — randomly zeroing neurons prevents gradient buildup.",
+            description: "Dropout is a regularization technique. It has no architectural mechanism for routing gradients around vanishing regions.",
+          },
+          {
+            id: "c",
+            label: "L2 regularization — penalizing large weights prevents gradient explosion.",
+            description: "L2 regularization addresses weight magnitude, not gradient flow paths. It doesn't solve vanishing gradients.",
+          },
+        ],
+        branches: { a: "f2_relu_choice", b: "f2_recovery_fixes", c: "f2_recovery_fixes" },
+        rationale: "Residual connections (He et al., 2016) solve vanishing gradients architecturally by adding an identity shortcut: y = F(x) + x. The gradient ∂L/∂x = ∂L/∂y · (∂F/∂x + I). The identity term I ensures the gradient always has a direct path, regardless of whether F's gradient vanishes.",
+      },
+      f2_relu_choice: {
+        id: "f2_relu_choice",
+        type: "scenario_choice",
+        badge: "Stage 4 · ReLU vs Sigmoid",
+        title: "Stage 4 · Why ReLU helps gradient flow",
+        prompt: "You replace all sigmoid activations in a 20-layer network with ReLU. Training accelerates significantly. Which property of ReLU is primarily responsible?",
+        code_snippet: `# Before: sigmoid throughout
+# ∂L/∂W₁ ≈ (0.25)^20 ≈ 10^-12
+
+# After: ReLU throughout (for active neurons)
+# ∂L/∂W₁ ≈ (1.0)^20 = 1.0
+
+def relu(z): return np.maximum(0, z)
+def relu_grad(z): return (z > 0).astype(float)  # exactly 0 or 1`,
+        choices: [
+          {
+            id: "a",
+            label: "ReLU's derivative is exactly 1 for positive inputs, so the gradient product across 20 layers doesn't shrink.",
+            description: "Correct. The chain rule product of twenty 1s is still 1 — gradient flows without exponential decay.",
+          },
+          {
+            id: "b",
+            label: "ReLU outputs are always positive, making gradients positive and easier to optimize.",
+            description: "ReLU outputs are non-negative (not always positive), but this doesn't directly explain gradient flow — it's about the derivative magnitude, not the output sign.",
+          },
+          {
+            id: "c",
+            label: "ReLU is a linear function, so the network effectively reduces to a linear model with better gradient flow.",
+            description: "Incorrect. ReLU is piecewise linear — the nonlinearity comes from different neurons being active for different inputs. The network remains nonlinear.",
+          },
+          {
+            id: "d",
+            label: "ReLU avoids the vanishing gradient problem by using a larger learning rate.",
+            description: "Learning rate is a hyperparameter choice, not a property of ReLU itself. The gradient flow improvement is intrinsic to ReLU's derivative being 1.",
+          },
+        ],
+        branches: { a: "f2_terminal", b: "f2_recovery_chain", c: "f2_recovery_chain", d: "f2_recovery_chain" },
+        rationale: "ReLU's key property for gradient flow is that its derivative equals 1 for all positive inputs. In a 20-layer network using ReLU, the chain rule product through active neurons is (1)^20 = 1 — no shrinkage. Compare to sigmoid's (0.25)^20 ≈ 10^-12. Dead ReLU neurons (derivative 0) are the trade-off, addressed by careful initialization and learning rate choice.",
+      },
+      f2_recovery_chain: {
+        id: "f2_recovery_chain",
+        type: "scenario_choice",
+        badge: "Recovery · Chain Rule",
+        title: "Recovery · The chain rule in backpropagation",
+        prompt: "In a 3-layer network, what does the chain rule say about the gradient of the loss with respect to weights in Layer 1?",
+        code_snippet: `# 3-layer network:
+# x -> [Layer1] -> a1 -> [Layer2] -> a2 -> [Layer3] -> ŷ -> L
+
+# Chain rule expansion:
+# ∂L/∂W₁ = ∂L/∂ŷ · ∂ŷ/∂a₂ · ∂a₂/∂a₁ · ∂a₁/∂W₁
+#          (output)  (L3 grad)  (L2 grad)  (L1 local)`,
+        choices: [
+          {
+            id: "a",
+            label: "It is the product of all local gradients from the output layer back to Layer 1.",
+            description: "Correct. Each term in the chain rule product is the local gradient of one layer's output with respect to its input.",
+          },
+          {
+            id: "b",
+            label: "It is computed only from the loss and Layer 1's weights, ignoring intermediate layers.",
+            description: "Incorrect. Intermediate layers are part of the composition — their gradients appear as factors in the chain rule product.",
+          },
+          {
+            id: "c",
+            label: "It is the average of gradients across all layers.",
+            description: "Incorrect. The chain rule involves multiplication, not averaging, of local gradients.",
+          },
+        ],
+        branches: { a: "f2_terminal", b: "f2_recovery_chain", c: "f2_recovery_chain" },
+        rationale: "Backpropagation applies the chain rule: ∂L/∂W₁ = ∂L/∂ŷ · ∂ŷ/∂a₂ · ∂a₂/∂a₁ · ∂a₁/∂W₁. Each factor is a local Jacobian at one layer. This product structure is why deep networks can have vanishing gradients — if any factor is small, the product shrinks.",
+      },
+      f2_terminal: {
+        id: "f2_terminal",
+        type: "scenario_choice",
+        badge: "Terminal · Synthesis",
+        title: "Revision complete · Backprop mastered",
+        terminal: true,
+        prompt: "A 20-layer network with sigmoid activations has zero gradient updates in the first 5 layers after 1,000 training steps. Name the problem, its sigmoid-specific cause, and two architectural solutions.",
+        code_snippet: `# Diagnosis log:
+# Layer 20 gradient norm: 0.842
+# Layer 15 gradient norm: 0.003
+# Layer 10 gradient norm: 1.1e-6
+# Layer 5  gradient norm: 4.3e-11  # ← effectively zero
+# Layer 1  gradient norm: 1.8e-14  # ← zero
+
+# Early layers have learned nothing after 1000 steps.`,
+        choices: [
+          {
+            id: "a",
+            label: "Vanishing gradients; sigmoid max derivative 0.25 multiplied 20× ≈ 0; fix with ReLU activations and residual connections.",
+            description: "Complete and precise. This covers the problem name, the exact mechanism, and two valid architectural solutions.",
+          },
+          {
+            id: "b",
+            label: "Overfitting; too many parameters; fix with dropout and L2 regularization.",
+            description: "The gradient norm pattern (decreasing toward early layers, not all-large) is the signature of vanishing gradients, not overfitting. Overfitting would show high training accuracy with high validation loss, not zero gradient updates.",
+          },
+          {
+            id: "c",
+            label: "Exploding gradients; weights are too large; fix with gradient clipping and lower learning rate.",
+            description: "Exploding gradients produce very large gradient norms, not near-zero ones. The pattern here (norms shrinking toward early layers) is the signature of vanishing, not exploding, gradients.",
+          },
+        ],
+        branches: { a: "f2_terminal", b: "f2_terminal", c: "f2_terminal" },
+        rationale: "This is the classic vanishing gradient pattern: gradient norm decays exponentially toward early layers. The cause is sigmoid's derivative being bounded by 0.25 — the chain rule product (0.25)^20 ≈ 10^-12. Solutions: (1) Replace sigmoid with ReLU in hidden layers — derivative of 1 prevents decay. (2) Add residual connections — identity shortcuts provide direct gradient paths that bypass activation layers. (3) Batch normalization can also help by keeping pre-activations in the healthy gradient regime.",
+      },
+    },
+  },
+
+  knowledgeCheck: [
+    {
+      question: "In a 10-layer network using sigmoid activations, why do gradients at layer 1 become negligibly small?",
+      options: [
+        "The learning rate is scaled down automatically for early layers by the optimizer.",
+        "Each sigmoid backward pass multiplies the gradient by at most 0.25; across 10 layers, (0.25)^10 ≈ 10^-6.",
+        "Early layers have fewer parameters, so they receive proportionally less gradient.",
+      ],
+      correctIndex: 1,
+      explanation: "The chain rule requires multiplying local gradients across all layers. Sigmoid's derivative σ'(z) = σ(z)(1-σ(z)) has a maximum of 0.25. Multiplied across 10 layers: (0.25)^10 ≈ 9.5×10^-7. This exponential decay means early layers receive essentially no gradient signal and stop learning — this is the vanishing gradient problem.",
+    },
+    {
+      question: "Why does ReLU improve gradient flow compared to sigmoid in deep networks?",
+      options: [
+        "ReLU outputs larger values, making the network more expressive.",
+        "For positive pre-activations, ReLU's derivative is exactly 1, so the gradient product across layers does not decay exponentially.",
+        "ReLU is differentiable everywhere, making backpropagation more numerically stable.",
+      ],
+      correctIndex: 1,
+      explanation: "ReLU'(z) = 1 for z > 0. In a 20-layer ReLU network with active neurons, the chain rule product is (1)^20 = 1 — no exponential decay. Compare to sigmoid's (0.25)^20 ≈ 10^-12. Note: ReLU is not differentiable at zero (but this is handled by convention) and can produce dead neurons, but the gradient flow benefit for active neurons is decisive.",
+    },
+    {
+      question: "Gradient norm explodes to 10^8 during training of a deep RNN. What is the correct fix?",
+      options: [
+        "Gradient clipping by norm — rescale the gradient vector when its norm exceeds a threshold.",
+        "Increase the learning rate to push past the region of large gradients faster.",
+        "Add more layers to distribute the large gradients across more parameters.",
+      ],
+      correctIndex: 0,
+      explanation: "Gradient clipping by norm rescales the gradient vector g to g * (threshold / ||g||) whenever ||g|| exceeds the threshold. This preserves the gradient direction while bounding magnitude, stabilizing training. Increasing the learning rate would amplify the already-explosive updates. Adding layers would introduce more large Jacobian multiplications, worsening explosion.",
+    },
+  ],
+},
+
+"dl-f3": {
+  durationLabel: "15 min",
+  outcomes: [
+    "Explain why neural networks require **nonlinear activation functions** and what happens without them.",
+    "Compare **sigmoid, tanh, and ReLU** on saturation, gradient flow, and practical use cases.",
+    "Diagnose and fix **dead ReLU neurons** caused by initialization or learning rate issues.",
+    "Select the correct **output layer activation** for binary classification, multiclass, and regression tasks.",
+  ],
+  learnMarkdown: `## Why Activations Must Be Nonlinear
+
+Without an activation function, a neural network collapses into a single linear transformation regardless of depth:
+
+\`\`\`
+y = W₃(W₂(W₁x)) = (W₃W₂W₁)x = Wx
+\`\`\`
+
+Three linear layers are equivalent to one. You can stack as many as you like — the result is always a linear function. **Nonlinear activations are what make depth meaningful.** They allow layers to represent and compose complex, nonlinear mappings of the input.
+
+## Sigmoid: The Classic, With Baggage
+
+\`\`\`
+σ(z) = 1 / (1 + e^(-z))     # output ∈ (0, 1)
+σ'(z) = σ(z)(1 - σ(z))      # max: 0.25 at z=0
+\`\`\`
+
+**Strengths**: Smooth, differentiable, outputs interpretable as probabilities.
+
+**Problems**:
+1. **Saturation**: For |z| > 4, σ(z) ≈ 0 or 1, and σ'(z) ≈ 0. Gradients are killed.
+2. **Not zero-centered**: Outputs are always in (0,1), meaning gradients are always the same sign — causing inefficient zig-zagging updates.
+3. **Computationally expensive**: Requires exponentiation.
+
+**When to use**: Output layer for binary classification only.
+
+## Tanh: Better, Still Saturates
+
+\`\`\`
+tanh(z) = (e^z - e^(-z)) / (e^z + e^(-z))    # output ∈ (-1, 1)
+tanh'(z) = 1 - tanh²(z)                        # max: 1.0 at z=0
+\`\`\`
+
+**Strengths over sigmoid**: Zero-centered outputs (mean near 0) — gradients can be positive or negative, enabling more efficient weight updates. Max derivative of 1 is better than sigmoid's 0.25.
+
+**Same core problem**: Still saturates at the tails. For |z| > 3, tanh'(z) ≈ 0. In deep networks with many layers, vanishing gradients still occur.
+
+**When to use**: Hidden layers where zero-centering matters (e.g., RNNs), output layers for regression to (-1, 1).
+
+## ReLU: The Default Choice
+
+\`\`\`
+ReLU(z) = max(0, z)
+ReLU'(z) = 1 if z > 0, else 0
+\`\`\`
+
+**Strengths**:
+- No saturation for positive inputs — gradient is exactly 1
+- Computationally trivial (threshold operation)
+- Sparse activations (many neurons output 0) — efficient representations
+
+**The Dead Neuron Problem**: If a neuron's pre-activation is negative for all training examples, its gradient is always 0 — it never updates. Causes:
+- **High learning rate**: A large weight update drives weights to produce permanently negative pre-activations
+- **Poor initialization**: Bias initialized too negative, pre-activations start negative
+- **Monitoring**: Check the fraction of activations that are zero per layer
+
+**When to use**: Default for hidden layers in feedforward and convolutional networks.
+
+## Leaky ReLU, ELU, and GELU
+
+**Leaky ReLU** fixes dead neurons by allowing a small gradient for negative inputs:
+
+\`\`\`
+LeakyReLU(z) = z if z > 0, else αz    # α typically 0.01
+\`\`\`
+
+**ELU (Exponential Linear Unit)** produces smoother outputs for negative inputs:
+
+\`\`\`
+ELU(z) = z if z > 0, else α(e^z - 1)
+\`\`\`
+
+**GELU (Gaussian Error Linear Unit)** is the dominant activation in Transformers (BERT, GPT):
+
+\`\`\`
+GELU(z) ≈ z · Φ(z)    # Φ is the standard normal CDF
+\`\`\`
+
+GELU smoothly gates inputs — it stochastically multiplies an input by 0 or 1 depending on the magnitude. This probabilistic interpretation aligns well with the stochastic nature of dropout and the attention mechanisms in Transformers.
+
+## Output Layer Activations: A Hard Rule
+
+The output activation is determined by the task, not by gradient flow considerations:
+
+\`\`\`
+# Binary classification  → sigmoid (output: probability in (0,1))
+Dense(1, activation='sigmoid')
+
+# Multi-class (K classes) → softmax (outputs sum to 1)
+Dense(K, activation='softmax')
+
+# Regression             → linear / no activation
+Dense(1)
+
+# Multi-label            → sigmoid per output (independent probabilities)
+Dense(K, activation='sigmoid')
+\`\`\`
+
+Using ReLU on an output layer for binary classification is a critical error: ReLU outputs are unbounded and non-probabilistic. Binary cross-entropy loss with ReLU output is numerically undefined when predictions are > 1.
+
+## Interview hook (answer like a senior)
+
+"Activations need to be nonlinear because linear layers compose into a single linear transformation — depth without nonlinearity is meaningless. For hidden layers, ReLU is the practical default: its derivative of 1 for positive inputs avoids vanishing gradients, and it's computationally cheap. The tradeoff is dead neurons from negative pre-activations, which Leaky ReLU and careful initialization address. For Transformers, GELU's smooth probabilistic gating is empirically superior. For output layers, the activation is determined by the task: sigmoid for binary classification, softmax for multiclass, linear for regression — getting this wrong is a common interview pitfall."`,
+
+  video: null,
+  videoFallbackMarkdown: `## Deep dive
+
+### Why GELU Works So Well in Transformers
+
+GELU(z) = z · Φ(z) where Φ is the Gaussian CDF. Intuitively, GELU stochastically decides to pass or gate an input based on how large it is relative to other inputs. This is conceptually related to dropout (stochastic zeroing) but in a smooth, differentiable form.
+
+In practice, GELU provides:
+1. **Smoother gradient landscape** than ReLU — no hard kink at zero
+2. **Non-zero gradient for all inputs** — no dead neurons
+3. **Probabilistic regularization** built into the activation
+
+BERT, GPT-2, GPT-3, and virtually all modern large language models use GELU in their feedforward layers.
+
+### Softmax: Multinomial Probability Distribution
+
+\`\`\`
+softmax(z)ₖ = exp(zₖ) / Σⱼ exp(zⱼ)
+\`\`\`
+
+Softmax guarantees: (1) all outputs > 0, (2) outputs sum to 1. Combined with cross-entropy loss, it produces the correct gradient for multi-class classification. The numerically stable implementation shifts by max(z) before exponentiating to prevent overflow.
+
+### Choosing Activations: Quick Decision Table
+
+| Hidden layers | → | ReLU (default), Leaky ReLU if dead neurons are a problem, GELU for Transformers |
+| Binary output | → | Sigmoid |
+| Multi-class output | → | Softmax |
+| Regression output | → | Linear (none) |
+| Multi-label output | → | Sigmoid per unit |`,
+
+  tryGuidance: "Use the activation function explorer to plot σ, tanh, and ReLU alongside their derivatives. Then build a small classification network and switch output activations — observe the loss curve behavior when using ReLU instead of sigmoid on the output layer. Use the dead neuron monitor to watch what fraction of ReLU neurons output zero as you vary the learning rate.",
+
+  interviewGraph: {
+    initialStageId: "f3_output_click",
+    artifactDimensions: [
+      { label: "Output Activation Selection", recoveryStageId: "f3_recovery_output" },
+      { label: "Dead ReLU Diagnosis", recoveryStageId: "f3_recovery_dead" },
+      { label: "Activation Tradeoffs", recoveryStageId: "f3_recovery_tradeoffs", passLabel: "Activation Mastery" },
+    ],
+    stages: {
+      f3_output_click: {
+        id: "f3_output_click",
+        type: "click_target",
+        badge: "Stage 1 · Output Activation",
+        title: "Stage 1 · Spot the wrong output activation",
+        prompt: "This binary classification model fails to converge — predictions are always outside [0,1] and binary cross-entropy loss returns NaN. Click the line with the incorrect output activation.",
+        code_snippet: `model = tf.keras.Sequential([
+    Dense(128, activation='relu'),
+    Dense(64, activation='relu'),
+    Dense(32, activation='relu'),
+    Dense(1, activation='relu')   # ds-target:f3_wrong_output
+])
+
+model.compile(
+    optimizer='adam',
+    loss='binary_crossentropy',
+    metrics=['accuracy']
+)`,
+        validationCopy: {
+          f3_wrong_output: "Correct. ReLU on a binary classification output is a critical error. ReLU outputs are unbounded non-negative values — not probabilities. Binary cross-entropy is undefined (log of values > 1 is negative, log of values = 0 is -infinity). The output activation should be sigmoid, which maps to (0, 1).",
+        },
+        branches: { f3_wrong_output: "f3_dead_choice" },
+      },
+      f3_dead_choice: {
+        id: "f3_dead_choice",
+        type: "scenario_choice",
+        badge: "Stage 2 · Dead ReLU",
+        title: "Stage 2 · Diagnose dead ReLU neurons",
+        prompt: "After 500 training steps, 30% of neurons in a hidden ReLU layer output 0 for every training example and never activate. What is the most likely cause?",
+        code_snippet: `# Monitoring hook output:
+# Layer 2 activation sparsity: 30.4% dead (always 0)
+# Layer 2 weight norms: large (some > 10.0)
+# Training loss: plateaued at 0.68 (near random chance)
+
+model = Sequential([
+    Dense(512, activation='relu'),
+    Dense(512, activation='relu'),   # ← 30% dead here
+    Dense(1, activation='sigmoid')
+])
+optimizer = Adam(learning_rate=0.1)  # note: high LR`,
+        choices: [
+          {
+            id: "a",
+            label: "The learning rate is too high — large weight updates drove pre-activations permanently negative.",
+            description: "Correct. A high learning rate causes large weight updates that can permanently push weights into a regime where all inputs produce negative pre-activations for a neuron, giving it zero gradient forever.",
+          },
+          {
+            id: "b",
+            label: "The network has too many layers, causing gradient interference between neurons.",
+            description: "Layer count doesn't cause dead neurons directly. Dead neurons are caused by negative pre-activations across all inputs, typically from initialization or large updates.",
+          },
+          {
+            id: "c",
+            label: "ReLU is inherently unstable with more than 512 neurons per layer.",
+            description: "Incorrect. There is no inherent width limit for ReLU stability. The issue is learning rate and initialization, not layer width.",
+          },
+          {
+            id: "d",
+            label: "The dataset has too many zero values, causing neurons to output zero to match the data.",
+            description: "Neurons don't output zero to 'match' the data — dead neurons arise from the gradient of ReLU being zero when pre-activations are negative.",
+          },
+        ],
+        branches: { a: "f3_softmax_choice", b: "f3_recovery_dead", c: "f3_recovery_dead", d: "f3_recovery_dead" },
+        rationale: "Dead ReLU neurons occur when a neuron's pre-activation (z = Wx + b) is negative for every training example. ReLU'(z) = 0 for z ≤ 0, so the neuron receives zero gradient and never updates. Common causes: (1) high learning rate causing large weight updates that lock weights into producing negative z, (2) negative bias initialization. Fixes: lower learning rate, He initialization, Leaky ReLU, or ELU.",
+      },
+      f3_recovery_dead: {
+        id: "f3_recovery_dead",
+        type: "scenario_choice",
+        badge: "Recovery · Dead ReLU",
+        title: "Recovery · Preventing and fixing dead neurons",
+        prompt: "You notice 40% of your ReLU neurons are dead. Which combination of fixes directly addresses dead ReLU neurons?",
+        code_snippet: `# Current config (problematic):
+model = Sequential([Dense(256, activation='relu') for _ in range(5)])
+optimizer = SGD(learning_rate=0.5)  # very high LR
+initializer = tf.initializers.Zeros()  # zero init
+
+# Proposed fixes — which combination works?`,
+        choices: [
+          {
+            id: "a",
+            label: "Lower the learning rate AND switch to He initialization (or use Leaky ReLU).",
+            description: "Correct. Lower LR prevents large updates from creating permanent negative pre-activations. He initialization ensures initial pre-activations have healthy variance for ReLU.",
+          },
+          {
+            id: "b",
+            label: "Add batch normalization before the output layer only.",
+            description: "Batch normalization before the output layer doesn't help neurons in middle layers. You'd need it before ReLU layers to normalize pre-activations.",
+          },
+          {
+            id: "c",
+            label: "Increase the number of neurons per layer to compensate for dead ones.",
+            description: "Adding neurons adds capacity but doesn't fix the underlying problem — the new neurons will die too under the same conditions.",
+          },
+        ],
+        branches: { a: "f3_softmax_choice", b: "f3_recovery_dead", c: "f3_recovery_dead" },
+        rationale: "The two most effective fixes for dead ReLUs: (1) Reduce learning rate — prevents large weight updates from driving pre-activations to permanent negatives. (2) Use He initialization — designed for ReLU, ensures initial weights produce pre-activations with variance ≈ 1. Alternatively, switch to Leaky ReLU or ELU, which have non-zero gradients for negative inputs.",
+      },
+      f3_softmax_choice: {
+        id: "f3_softmax_choice",
+        type: "scenario_choice",
+        badge: "Stage 3 · Softmax",
+        title: "Stage 3 · Multi-class output activation",
+        prompt: "You're building a model to classify images into 10 categories (digits 0-9). What output layer configuration is correct?",
+        code_snippet: `# Option A
+Dense(10, activation='softmax')
+
+# Option B
+Dense(10, activation='sigmoid')
+
+# Option C
+Dense(10, activation='relu')
+
+# Option D
+Dense(1, activation='sigmoid')`,
+        choices: [
+          {
+            id: "a",
+            label: "Option A: Dense(10, activation='softmax') — outputs a probability distribution over 10 classes.",
+            description: "Correct. Softmax produces 10 outputs that are all positive and sum to 1 — a valid probability distribution over mutually exclusive classes.",
+          },
+          {
+            id: "b",
+            label: "Option B: Dense(10, activation='sigmoid') — one sigmoid output per class.",
+            description: "Sigmoid on each output independently treats classes as non-exclusive (multi-label). For single-label 10-class classification, the outputs won't sum to 1 and the model won't learn a proper distribution.",
+          },
+          {
+            id: "c",
+            label: "Option C: Dense(10, activation='relu') — positive activations for each class.",
+            description: "ReLU outputs are unbounded and don't sum to 1. This cannot produce class probabilities.",
+          },
+          {
+            id: "d",
+            label: "Option D: Dense(1, activation='sigmoid') — single output for 10 classes.",
+            description: "A single sigmoid output represents binary classification. For 10 classes you need 10 outputs.",
+          },
+        ],
+        branches: { a: "f3_gelu_choice", b: "f3_recovery_output", c: "f3_recovery_output", d: "f3_recovery_output" },
+        rationale: "Softmax is the canonical output activation for multi-class classification: softmax(z)ₖ = exp(zₖ)/Σexp(zⱼ). It guarantees all outputs are positive and sum to 1 — a proper probability distribution. Use categorical cross-entropy loss with softmax. Sigmoid is for binary or multi-label (independent classes) outputs.",
+      },
+      f3_recovery_output: {
+        id: "f3_recovery_output",
+        type: "scenario_choice",
+        badge: "Recovery · Output Activation",
+        title: "Recovery · Matching activation to task",
+        prompt: "Match the task to its correct output activation: regression predicting house prices (continuous), binary spam detection, 5-class sentiment classification.",
+        code_snippet: `# Task 1: House price prediction
+# Target: $450,000 (unbounded positive number)
+
+# Task 2: Spam detection
+# Target: 0 (not spam) or 1 (spam)
+
+# Task 3: Sentiment (very negative, negative, neutral, positive, very positive)
+# Target: one of 5 mutually exclusive classes`,
+        choices: [
+          {
+            id: "a",
+            label: "Regression: linear. Binary: sigmoid. 5-class: softmax.",
+            description: "Correct. Linear for unbounded regression, sigmoid for binary probability, softmax for mutually exclusive multiclass.",
+          },
+          {
+            id: "b",
+            label: "Regression: ReLU (prices are positive). Binary: sigmoid. 5-class: softmax.",
+            description: "House prices are positive, but ReLU on a regression output prevents predicting via negative pre-activations and introduces a kink. Linear output is standard — the loss function handles the scale.",
+          },
+          {
+            id: "c",
+            label: "Regression: sigmoid (scale to 0-1). Binary: softmax. 5-class: sigmoid.",
+            description: "Sigmoid for regression would bound predictions in (0,1), requiring manual rescaling. Softmax for binary is technically valid but adds unnecessary complexity. Sigmoid per unit for 5-class treats classes as independent.",
+          },
+        ],
+        branches: { a: "f3_gelu_choice", b: "f3_recovery_output", c: "f3_recovery_output" },
+        rationale: "Output activations are task-specific: (1) Regression: linear (no activation) — let the loss handle the range. (2) Binary classification: sigmoid — outputs probability in (0,1). (3) Multi-class (mutually exclusive): softmax — probability distribution summing to 1. (4) Multi-label: sigmoid per unit — independent probabilities.",
+      },
+      f3_gelu_choice: {
+        id: "f3_gelu_choice",
+        type: "scenario_choice",
+        badge: "Stage 4 · GELU vs ReLU",
+        title: "Stage 4 · When GELU beats ReLU",
+        prompt: "You're implementing the feedforward layers of a Transformer (like BERT or GPT). Should you use ReLU or GELU, and why?",
+        code_snippet: `# Transformer feedforward block:
+class FeedForward(tf.keras.layers.Layer):
+    def __init__(self, d_model, d_ff):
+        super().__init__()
+        self.dense1 = Dense(d_ff, activation=???)  # ReLU or GELU?
+        self.dense2 = Dense(d_model)
+
+# BERT uses: activation='gelu'
+# GPT uses:  activation='gelu'
+# Original Transformer (Vaswani 2017): activation='relu'`,
+        choices: [
+          {
+            id: "a",
+            label: "GELU — smoother gradient landscape, no dead neurons, and the probabilistic gating aligns with Transformer attention.",
+            description: "Correct. GELU = z·Φ(z) provides smooth gradients, non-zero derivatives everywhere, and stochastic gating that complements the attention mechanism's learned weighting.",
+          },
+          {
+            id: "b",
+            label: "ReLU — simpler and just as effective; the original Transformer used ReLU.",
+            description: "The original Transformer did use ReLU, but BERT, GPT, and all modern large language models switched to GELU. Empirically GELU consistently outperforms ReLU on language tasks.",
+          },
+          {
+            id: "c",
+            label: "Neither — Transformers use softmax activations in feedforward layers.",
+            description: "Softmax is used in the attention mechanism for weighting attention scores, not in the feedforward layers. Feedforward layers use ReLU or GELU.",
+          },
+          {
+            id: "d",
+            label: "Sigmoid — it was the original deep learning activation and is most reliable.",
+            description: "Sigmoid is avoided in hidden layers of deep networks due to vanishing gradients. It's appropriate only at output layers for binary classification.",
+          },
+        ],
+        branches: { a: "f3_terminal", b: "f3_recovery_tradeoffs", c: "f3_recovery_tradeoffs", d: "f3_recovery_tradeoffs" },
+        rationale: "GELU (Gaussian Error Linear Unit) is the standard for Transformers. Unlike ReLU's hard gate (0 or 1), GELU's soft gate z·Φ(z) provides: (1) smooth gradients at all points, (2) non-zero gradient for negative inputs (no dead neurons), (3) a probabilistic interpretation — larger inputs pass through more reliably. BERT, GPT-2/3/4, and virtually all modern LLMs use GELU in feedforward blocks.",
+      },
+      f3_recovery_tradeoffs: {
+        id: "f3_recovery_tradeoffs",
+        type: "scenario_choice",
+        badge: "Recovery · Activation Tradeoffs",
+        title: "Recovery · Comparing activation functions",
+        prompt: "A colleague argues: 'We should always use tanh instead of ReLU in hidden layers because tanh is zero-centered and bounded.' What is the best counter-argument?",
+        code_snippet: `# tanh properties:
+# Range: (-1, 1)  — zero-centered ✓
+# Saturates: yes, for |z| > 3  ✗
+# Max derivative: 1.0
+
+# ReLU properties:
+# Range: [0, ∞)  — not zero-centered ✗
+# Saturates: no (for z > 0)  ✓
+# Derivative: 1 for z > 0, 0 for z ≤ 0`,
+        choices: [
+          {
+            id: "a",
+            label: "Tanh still saturates at the tails, causing vanishing gradients in deep networks — ReLU avoids saturation for positive inputs.",
+            description: "Correct. Zero-centering is a real advantage of tanh, but tail saturation causes vanishing gradients in deep networks — the same fundamental problem as sigmoid.",
+          },
+          {
+            id: "b",
+            label: "ReLU is always preferable because it's computationally simpler.",
+            description: "Computational simplicity is a minor practical advantage, not the core argument. The main issue with tanh is gradient vanishing from saturation.",
+          },
+          {
+            id: "c",
+            label: "Tanh and ReLU are equivalent — the choice doesn't affect training.",
+            description: "Incorrect. In deep networks, the saturation behavior of tanh versus the non-saturation of ReLU for positive inputs produces significantly different gradient flow characteristics.",
+          },
+        ],
+        branches: { a: "f3_terminal", b: "f3_recovery_tradeoffs", c: "f3_recovery_tradeoffs" },
+        rationale: "Tanh is better than sigmoid (zero-centered, max derivative of 1 vs 0.25), but still saturates for |z| > 3. In a 20-layer tanh network, gradients can still vanish. ReLU's non-saturation for positive inputs is the decisive advantage for deep networks. Tanh remains useful in RNNs and in contexts where zero-centered outputs matter.",
+      },
+      f3_terminal: {
+        id: "f3_terminal",
+        type: "scenario_choice",
+        badge: "Terminal · Synthesis",
+        title: "Revision complete · Activation mastery",
+        terminal: true,
+        prompt: "You're debugging a network where 40% of hidden layer neurons never activate. Walk me through 3 causes and their corresponding fixes.",
+        code_snippet: `# Symptoms:
+# - 40% of ReLU neurons output 0 for all inputs
+# - These neurons' weights never change
+# - Training loss has plateaued early
+# - Effective network capacity is 60% of designed capacity
+
+model = Sequential([
+    Dense(512, activation='relu'),
+    Dense(512, activation='relu'),  # 40% dead here
+    Dense(10, activation='softmax')
+])`,
+        choices: [
+          {
+            id: "a",
+            label: "Causes: high LR (fix: lower LR), zero/negative bias init (fix: He init), no gradient for negative z (fix: Leaky ReLU or ELU).",
+            description: "Complete answer covering all three cause-fix pairs for dead ReLU neurons.",
+          },
+          {
+            id: "b",
+            label: "Cause: network is too wide. Fix: reduce layer width to 256 neurons.",
+            description: "Width doesn't cause dead neurons. The problem is negative pre-activations causing zero gradients — reducing width would just give you fewer total neurons without fixing the underlying issue.",
+          },
+          {
+            id: "c",
+            label: "Cause: the ReLU activation itself. Fix: switch to sigmoid throughout.",
+            description: "Switching to sigmoid introduces vanishing gradients — a different but equally serious problem. The issue isn't ReLU itself but the conditions causing pre-activations to be permanently negative.",
+          },
+        ],
+        branches: { a: "f3_terminal", b: "f3_terminal", c: "f3_terminal" },
+        rationale: "Dead ReLU neurons have 3 main causes and fixes: (1) High learning rate → large weight updates lock pre-activations negative → lower the learning rate or use learning rate warmup. (2) Poor initialization (zeros or large negative biases) → pre-activations negative from the start → use He initialization (variance = 2/fan_in). (3) The ReLU function itself is zero for all negative inputs → switch to Leaky ReLU (αz for z<0, α≈0.01), ELU, or add batch normalization before ReLU to keep pre-activations well-distributed.",
+      },
+    },
+  },
+
+  knowledgeCheck: [
+    {
+      question: "A binary classification model outputs values of 1.7 and 2.4, and binary cross-entropy loss returns NaN. What is the likely cause?",
+      options: [
+        "The model is using ReLU on the output layer instead of sigmoid, producing unbounded outputs outside [0,1].",
+        "The learning rate is too high, causing numerical instability in the loss computation.",
+        "Binary cross-entropy requires normalized input features — the inputs weren't scaled.",
+      ],
+      correctIndex: 0,
+      explanation: "Binary cross-entropy expects predictions in (0,1) to compute log(p) and log(1-p). ReLU on the output layer produces unbounded non-negative values — log(1.7) is negative and defined, but loss semantics break down, and values > 1 mean log(1-p) involves log of a negative number. The fix is to replace ReLU with sigmoid on the output layer.",
+    },
+    {
+      question: "After training for 200 steps, 35% of neurons in a hidden ReLU layer output zero for every input and have stopped updating. What is the most direct fix?",
+      options: [
+        "Add more training data so the neurons encounter positive pre-activations.",
+        "Reduce the learning rate and switch to He initialization to prevent pre-activations from becoming permanently negative.",
+        "Replace the ReLU layers with sigmoid layers to ensure all neurons always have non-zero gradients.",
+      ],
+      correctIndex: 1,
+      explanation: "Dead ReLU neurons occur when pre-activations are negative for all inputs, giving zero gradient. The causes are typically high learning rate (causing large updates that drive weights into negative pre-activation regimes) and poor initialization. Fixes: lower learning rate, He initialization (variance 2/fan_in, designed for ReLU), or switch to Leaky ReLU. Replacing with sigmoid introduces vanishing gradients — a different problem.",
+    },
+    {
+      question: "BERT and GPT use GELU instead of ReLU in their feedforward layers. What is the primary reason?",
+      options: [
+        "GELU is faster to compute than ReLU on GPU hardware.",
+        "GELU provides smooth gradients and non-zero derivatives for all inputs, with a probabilistic gating interpretation that empirically improves Transformer training.",
+        "ReLU is not differentiable, making it incompatible with Transformer attention mechanisms.",
+      ],
+      correctIndex: 1,
+      explanation: "GELU = z·Φ(z) is smoother than ReLU (no hard kink at zero), has non-zero gradient for negative inputs (no dead neurons), and has a stochastic interpretation where larger inputs are more reliably passed through. Empirically, GELU consistently outperforms ReLU on language modeling benchmarks. ReLU is fully differentiable almost everywhere (undefined only at z=0 by convention) — its non-differentiability is not the issue.",
+    },
+  ],
+},
+
+"dl-f4": {
+  durationLabel: "22 min",
+  outcomes: [
+    "Explain the difference between vanilla SGD, mini-batch SGD, and adaptive optimizers like Adam",
+    "Describe how momentum and Adam's moving averages shape the optimization trajectory",
+    "Identify when to prefer SGD+momentum over Adam (and vice versa)",
+    "Apply learning rate schedules (warmup, cosine decay) and explain why they matter",
+  ],
+  learnMarkdown: `## The Loss Landscape
+
+Training a neural network is an optimization problem: find the weight values that minimize a loss function over your data. Visualize the loss as a hilly terrain — your goal is to roll a ball to the lowest valley. The challenge is that this landscape is high-dimensional, non-convex, and riddled with saddle points, sharp ravines, and flat plateaus.
+
+**Gradient descent** moves in the direction of steepest descent — the negative gradient of the loss with respect to the weights. The fundamental update rule is:
+
+\`\`\`
+w ← w − η · ∇L(w)
+\`\`\`
+
+where η (eta) is the **learning rate** — the single most important hyperparameter you will tune.
+
+## Vanilla SGD and Mini-Batch Gradient Descent
+
+**Pure (stochastic) gradient descent** computes the gradient on a single sample at a time. It is very noisy — each step points in a slightly wrong direction — but that noise can help escape shallow local minima. The problem: with 1M rows, you make 1M weight updates per epoch, each requiring a forward and backward pass. This is catastrophically slow on modern hardware, which is built for parallelism.
+
+**Batch gradient descent** computes the gradient over the entire dataset before taking a step. Stable, but for large datasets you wait forever between updates and the memory cost is prohibitive.
+
+**Mini-batch gradient descent** splits the data into small batches (32–512 samples). Each batch gives a noisy-but-useful gradient estimate, and modern GPUs can process a whole batch in parallel. This is what everyone means when they say "SGD" in practice. Typical batch sizes: 32–256 for vision, up to 2048+ with gradient accumulation for language models.
+
+## Momentum
+
+Raw mini-batch SGD can oscillate in narrow ravines — bouncing back and forth across the valley floor while barely advancing toward the minimum. **Momentum** fixes this by accumulating a velocity vector:
+
+\`\`\`
+v ← β·v + ∇L(w)
+w ← w − η·v
+\`\`\`
+
+With β ≈ 0.9, the optimizer "remembers" the last ~10 gradients. Consistent directions accumulate; oscillating directions cancel. The ball rolls faster along the ravine floor and slower across it. Momentum also helps escape shallow local minima and saddle points.
+
+## Adam: Adaptive Learning Rates
+
+**Adam** (Adaptive Moment Estimation) extends momentum with per-parameter learning rate adaptation. It tracks two exponential moving averages of the gradient:
+
+\`\`\`
+m ← β₁·m + (1−β₁)·g        # first moment (mean)
+v ← β₂·v + (1−β₂)·g²       # second moment (variance)
+ŵ ← w − η · m̂ / (√v̂ + ε)   # bias-corrected update
+\`\`\`
+
+Defaults: β₁=0.9, β₂=0.999, ε=1e-8, η=0.001. Parameters with large, consistent gradients get smaller effective learning rates; rare, small-gradient parameters get larger updates. This makes Adam nearly **hyperparameter-agnostic in the early stages** — the default lr=0.001 works out of the box for most tasks.
+
+**AdamW** decouples weight decay from the gradient update (applying it directly to weights rather than the gradient), which is the standard choice for transformer training.
+
+## Learning Rate Schedules
+
+Even with Adam, a fixed learning rate is rarely optimal. Common schedules:
+
+- **Warmup**: start with a tiny lr (e.g., 1e-6) and ramp linearly to the target over the first few hundred steps. Prevents early, large gradient steps from destabilizing freshly initialized heads.
+- **Cosine decay**: after warmup, decay lr following a cosine curve to near-zero. Smooth, widely used for language models and vision transformers.
+- **Step decay**: halve the lr every N epochs. Simple and effective for ResNets.
+
+## Adam vs SGD+Momentum: When to Choose Which
+
+| Situation | Recommendation |
+|---|---|
+| Default starting point | Adam (AdamW) |
+| Fine-tuning a pretrained model | Adam with low lr (1e-5 to 5e-5) + warmup |
+| Training ResNets from scratch | SGD + momentum (0.9) + cosine schedule |
+| Transformers / NLP | AdamW + warmup + cosine decay |
+
+Research has shown that **SGD+momentum often finds flatter minima** with better generalization on vision benchmarks, but it requires more careful lr tuning. Adam gets you to a good solution faster with less tuning.
+
+## Interview Hook (answer like a senior)
+
+*"Adam is my default — it's robust and converges quickly. But for large vision models trained from scratch, I'll often switch to SGD with momentum and a cosine schedule, because the literature consistently shows better generalization. The most important thing I tune is the learning rate: too high and the loss diverges or oscillates; too low and you waste compute or get stuck. I always pair any schedule with a warmup phase to stabilize early training, especially when fine-tuning pretrained weights."*
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Adam Internals
+
+Adam's bias correction terms (1−β₁ᵗ) and (1−β₂ᵗ) compensate for the fact that m and v are initialized at zero. At step t=1 with β₁=0.9, the raw first moment m is 10× smaller than the true gradient — bias correction rescales it. After ~50 steps the correction becomes negligible.
+
+**Gradient clipping** is orthogonal to optimizer choice: clip the global gradient norm to (e.g.) 1.0 before any optimizer step. This prevents exploding gradients from blowing up training, especially in RNNs and transformers.
+
+**Learning rate finder**: a diagnostic tool that runs a mini-training loop while exponentially increasing the lr, then plots loss vs lr. The optimal starting lr is just before the loss starts to diverge.
+`,
+  tryGuidance: "Open a Colab notebook. Train a small MLP on MNIST using (a) SGD batch_size=1, (b) SGD batch_size=256, (c) Adam batch_size=256. Compare wall-clock time per epoch and final accuracy. Then try multiplying Adam's default lr by 10 and observe what happens to the loss curve.",
+  interviewGraph: {
+    initialStageId: "f4_batch_click",
+    artifactDimensions: [
+      { label: "Batch size & SGD mechanics", recoveryStageId: "f4_rec_batch" },
+      { label: "Adam & learning rate selection", recoveryStageId: "f4_rec_adam" },
+      { label: "Optimizer trade-offs", recoveryStageId: "f4_rec_tradeoff", passLabel: "Optimizer Mastery" },
+    ],
+    stages: {
+      f4_batch_click: {
+        id: "f4_batch_click",
+        type: "click_target",
+        badge: "Stage 1 · Batch Size",
+        title: "Stage 1 · Spot the performance bottleneck",
+        prompt: "This training loop runs on a 1,000,000-row dataset. One line makes it catastrophically slow because it processes a single sample per weight update instead of leveraging GPU parallelism. Click that line.",
+        code_snippet: `import tensorflow as tf
+
+model = tf.keras.Sequential([
+    tf.keras.layers.Dense(128, activation='relu'),
+    tf.keras.layers.Dense(1)
+])
+optimizer = tf.keras.optimizers.SGD(learning_rate=0.01)
+model.compile(optimizer=optimizer, loss='mse')
+
+model.fit(X_train, y_train, batch_size=1, epochs=10)  # ds-target:pure_sgd_slow`,
+        validationCopy: {
+          pure_sgd_slow: "Correct. batch_size=1 means one forward + backward pass per sample — 1,000,000 gradient steps per epoch. GPUs are designed to process hundreds of samples in parallel; a batch_size of 1 wastes ~99% of compute capacity and makes each epoch orders of magnitude slower than mini-batch training with batch_size=256 or higher.",
+        },
+        branches: { pure_sgd_slow: "f4_adam_finetune_choice" },
+      },
+
+      f4_adam_finetune_choice: {
+        id: "f4_adam_finetune_choice",
+        type: "scenario_choice",
+        badge: "Stage 2 · Adam Fine-Tuning Risk",
+        title: "Stage 2 · Fine-tuning with default Adam",
+        prompt: "You load a ResNet-50 pretrained on ImageNet and fine-tune it on a 5,000-image medical dataset using Adam with its default learning rate (lr=0.001). Training accuracy climbs in epoch 1, then collapses. What is the most likely cause?",
+        code_snippet: `base_model = tf.keras.applications.ResNet50(weights='imagenet', include_top=False)
+x = tf.keras.layers.GlobalAveragePooling2D()(base_model.output)
+output = tf.keras.layers.Dense(2, activation='softmax')(x)
+model = tf.keras.Model(base_model.input, output)
+
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)  # default lr
+model.compile(optimizer=optimizer, loss='categorical_crossentropy')
+model.fit(train_ds, epochs=20)`,
+        choices: [
+          { id: "a", label: "Learning rate too high for fine-tuning", description: "lr=0.001 is appropriate for training from scratch but is ~100× too large for fine-tuning. It destroys the pretrained weight representations in early epochs before the new head can learn anything useful." },
+          { id: "b", label: "Model is too large for the small dataset", description: "Model capacity can cause overfitting, but that shows up as a train/val gap — not a training accuracy collapse in epoch 1." },
+          { id: "c", label: "Adam is not suitable for transfer learning", description: "Adam works well for fine-tuning. The problem is configuration (lr), not the optimizer family." },
+          { id: "d", label: "The dataset is too small for any fine-tuning to work", description: "5,000 images is a common and workable fine-tuning dataset size. The problem is the learning rate, not the dataset size." },
+        ],
+        branches: { a: "f4_oscillation_choice", b: "f4_rec_adam", c: "f4_rec_adam", d: "f4_rec_batch" },
+        rationale: "When fine-tuning a pretrained model, use a much lower learning rate — typically 1e-5 to 5e-5 — with a warmup schedule. The pretrained weights encode years of training; a large lr overwrites them with noise. A common practice is to first freeze the backbone and train only the head for a few epochs, then unfreeze with a low lr.",
+      },
+
+      f4_oscillation_choice: {
+        id: "f4_oscillation_choice",
+        type: "scenario_choice",
+        badge: "Stage 3 · Loss Oscillation",
+        title: "Stage 3 · Diagnosing an unstable training run",
+        prompt: "A model's training loss oscillates wildly between epochs — spiking up and then partially recovering — but never converges. The architecture looks correct and the data is clean. What is the most likely cause?",
+        code_snippet: `# Training log:
+# Epoch 1: loss=2.31
+# Epoch 2: loss=0.85
+# Epoch 3: loss=3.12
+# Epoch 4: loss=1.02
+# Epoch 5: loss=4.78
+# ...
+
+model.compile(
+    optimizer=tf.keras.optimizers.Adam(learning_rate=0.1),
+    loss='sparse_categorical_crossentropy'
+)`,
+        choices: [
+          { id: "a", label: "Learning rate is too high — gradients overshoot the minimum", description: "With lr=0.1 for Adam (100× the usual default), each update step jumps across the loss valley. The model lands on the other side, takes another giant step back, and never settles. Reducing to 0.001 or adding a warmup + decay schedule will fix this." },
+          { id: "b", label: "The model has too many layers and is vanishing the gradient", description: "Vanishing gradients cause training to stall (loss plateaus), not oscillate. The pattern here — large swings — points to overshooting, not undershooting." },
+          { id: "c", label: "The dataset has too much label noise", description: "Label noise increases irreducible loss and can slow convergence, but it does not cause the oscillating spike-and-recover pattern seen here." },
+          { id: "d", label: "Batch normalization is computing incorrect statistics", description: "BatchNorm issues typically cause slower convergence or subtle accuracy problems — not the dramatic epoch-to-epoch oscillation pattern shown." },
+        ],
+        branches: { a: "f4_sgd_vs_adam_choice", b: "f4_rec_adam", c: "f4_rec_batch", d: "f4_rec_adam" },
+        rationale: "Loss oscillation is the canonical symptom of a learning rate that is too large. The optimizer takes steps so large that it repeatedly overshoots the loss minimum. The fix is to lower the lr (start with 10× smaller), add gradient clipping (clip_norm=1.0), or introduce a warmup schedule that ramps from a tiny lr to the target over the first few hundred steps.",
+      },
+
+      f4_sgd_vs_adam_choice: {
+        id: "f4_sgd_vs_adam_choice",
+        type: "scenario_choice",
+        badge: "Stage 4 · SGD vs Adam",
+        title: "Stage 4 · Optimizer generalization trade-off",
+        prompt: "You are training a ResNet-50 from scratch on ImageNet (1.2M images, 1000 classes). A colleague argues you should use Adam because it converges faster. You disagree. What is your best argument for SGD with momentum instead?",
+        code_snippet: `# Option A — Adam
+optimizer_a = tf.keras.optimizers.Adam(learning_rate=0.001)
+
+# Option B — SGD + momentum
+optimizer_b = tf.keras.optimizers.SGD(
+    learning_rate=0.1,
+    momentum=0.9,
+    nesterov=True
+)
+# paired with cosine decay schedule`,
+        choices: [
+          { id: "a", label: "SGD+momentum finds flatter minima, which generalize better", description: "Multiple papers (including He et al. ResNet, Keskar et al. 2017) show that well-tuned SGD+momentum reaches flatter regions of the loss landscape on large vision benchmarks, correlating with better test accuracy. Adam converges faster but often to sharper minima with slightly worse generalization." },
+          { id: "b", label: "Adam cannot handle large datasets like ImageNet", description: "Adam works fine on large datasets. The generalization gap, not dataset size handling, is the reason to prefer SGD for this task." },
+          { id: "c", label: "SGD is faster per step because it computes fewer operations", description: "SGD is marginally cheaper per step (no m/v tracking), but the difference is negligible compared to the forward/backward pass. Speed is not the argument here." },
+          { id: "d", label: "Adam's adaptive learning rates break on image data specifically", description: "Adam works on image data — it is widely used in vision (CLIP, ViTs). The issue is generalization quality, not a fundamental incompatibility." },
+        ],
+        branches: { a: "f4_terminal", b: "f4_rec_tradeoff", c: "f4_rec_tradeoff", d: "f4_rec_tradeoff" },
+        rationale: "This is a nuanced trade-off that interviewers love. Adam wins on speed and ease of tuning. SGD+momentum (with careful lr scheduling) wins on final generalization for large-scale vision. In practice: use Adam for fast prototyping and NLP; consider SGD+momentum for production vision models trained from scratch.",
+      },
+
+      f4_rec_batch: {
+        id: "f4_rec_batch",
+        type: "scenario_choice",
+        badge: "Recovery · Batch Size",
+        title: "Recovery · Batch size effects on training",
+        prompt: "You double the batch size from 256 to 512 while keeping all other hyperparameters the same. What is the most likely effect on training?",
+        code_snippet: `# Before
+model.fit(X, y, batch_size=256, epochs=100)
+
+# After
+model.fit(X, y, batch_size=512, epochs=100)`,
+        choices: [
+          { id: "a", label: "Faster wall-clock time per epoch, but may need a higher learning rate to maintain convergence speed", description: "Larger batches give more stable gradient estimates (less noise), so you can often scale the lr proportionally (linear scaling rule: 2× batch → 2× lr). Each epoch takes fewer steps but each step uses more data, so per-epoch time improves on GPUs." },
+          { id: "b", label: "The model will overfit more because it sees less data per update", description: "Larger batches see more data per update, not less. Overfitting risk is more related to model capacity and regularization than batch size directly." },
+          { id: "c", label: "Training will always be slower because more data must be processed per step", description: "GPUs parallelize within a batch. Processing 512 samples takes roughly the same time as 256 on modern hardware (up to memory limits), so wall-clock time per epoch decreases." },
+        ],
+        branches: { a: "f4_adam_finetune_choice", b: "f4_rec_batch", c: "f4_rec_batch" },
+        rationale: "The linear scaling rule: when you multiply batch size by k, multiply the learning rate by k (warmup still advised). This preserves the effective gradient step size. Beyond a certain batch size, you get diminishing GPU parallelism returns and potentially worse generalization (sharp minima).",
+      },
+
+      f4_rec_adam: {
+        id: "f4_rec_adam",
+        type: "scenario_choice",
+        badge: "Recovery · Adam Mechanics",
+        title: "Recovery · How Adam adapts learning rates",
+        prompt: "In Adam, what happens to the effective learning rate of a parameter that has received consistently large gradients over many steps?",
+        code_snippet: `# Adam update (simplified):
+# m = beta1*m + (1-beta1)*g        # 1st moment
+# v = beta2*v + (1-beta2)*g**2     # 2nd moment (variance)
+# w = w - lr * m / (sqrt(v) + eps)`,
+        choices: [
+          { id: "a", label: "Its effective learning rate decreases — large v in the denominator shrinks the step size", description: "Correct. If a parameter consistently receives large gradients, v (the second moment estimate) grows large, making sqrt(v) large, which shrinks lr / sqrt(v). This prevents any single parameter from taking runaway steps." },
+          { id: "b", label: "Its effective learning rate increases — momentum m builds up", description: "m does grow, but v grows proportionally faster for large gradients (it accumulates g²). The net effect is a smaller effective lr for high-gradient parameters, not a larger one." },
+          { id: "c", label: "Its effective learning rate stays constant — Adam normalizes all parameters equally", description: "Adam does not normalize equally. Parameters with large gradient variance get smaller steps; parameters with small, rare gradients get relatively larger steps. That is the entire point of adaptive learning rates." },
+        ],
+        branches: { a: "f4_oscillation_choice", b: "f4_rec_adam", c: "f4_rec_adam" },
+        rationale: "Adam's adaptive property means: common, high-amplitude gradient dimensions (like biases in dense layers) get conservative updates; rare, small-gradient dimensions (like embeddings for infrequent tokens) get larger updates. This is why Adam is so effective for sparse problems like NLP.",
+      },
+
+      f4_rec_tradeoff: {
+        id: "f4_rec_tradeoff",
+        type: "scenario_choice",
+        badge: "Recovery · Optimizer Trade-offs",
+        title: "Recovery · Choosing the right optimizer",
+        prompt: "For a transformer-based language model being trained from scratch, which optimizer configuration is considered the industry standard?",
+        code_snippet: `# Which of these is the standard recipe for training transformers?`,
+        choices: [
+          { id: "a", label: "AdamW + linear warmup + cosine decay schedule", description: "This is the standard recipe from GPT, BERT, and subsequent large language models. AdamW decouples weight decay from the adaptive learning rate (fixing a subtle bug in Adam). Warmup stabilizes early training. Cosine decay smoothly reduces lr as training matures." },
+          { id: "b", label: "SGD with momentum=0.9 and a fixed learning rate", description: "SGD with a fixed lr will struggle with transformer training — the adaptive rates in Adam/AdamW are particularly beneficial for the attention mechanism's diverse gradient scales." },
+          { id: "c", label: "RMSprop with no weight decay", description: "RMSprop is an older adaptive optimizer predating Adam. It lacks the first-moment (momentum) term and is rarely used for modern large-model training." },
+        ],
+        branches: { a: "f4_sgd_vs_adam_choice", b: "f4_rec_tradeoff", c: "f4_rec_tradeoff" },
+        rationale: "AdamW with warmup+cosine is the default in HuggingFace Trainer, PyTorch Lightning, and every major language model paper since 2018. The weight decay in AdamW is applied directly to weights (not absorbed into the gradient), which is mathematically cleaner and empirically better than vanilla Adam with L2 regularization.",
+      },
+
+      f4_terminal: {
+        id: "f4_terminal",
+        type: "scenario_choice",
+        badge: "Terminal · Mastery Check",
+        title: "Mastery complete · Optimizer expertise",
+        terminal: true,
+        prompt: "A model's training loss stops decreasing after epoch 10. Validation loss is still improving slightly. What does this pattern indicate, and what is the most appropriate next action?",
+        code_snippet: `# Training metrics:
+# Epoch  8: train_loss=0.42, val_loss=0.51
+# Epoch  9: train_loss=0.41, val_loss=0.50
+# Epoch 10: train_loss=0.41, val_loss=0.49
+# Epoch 11: train_loss=0.41, val_loss=0.48
+# Epoch 12: train_loss=0.41, val_loss=0.47
+# (train loss flat, val loss still falling)`,
+        choices: [
+          { id: "a", label: "Training loss hit a plateau — reduce the learning rate to escape it and allow finer convergence", description: "This is the right read. The optimizer has found a region where gradients are near-zero at the current lr. A learning rate reduction (or activating cosine decay) allows finer steps that can still improve the model. The fact that val loss is still improving confirms the model has not overfit — it is still generalizing, just not optimizing the training loss further at this lr." },
+          { id: "b", label: "The model has overfit — stop training immediately", description: "Overfitting shows as training loss continuing to drop while validation loss rises. Here val loss is still improving, so the model is not overfit. Stopping now would leave performance on the table." },
+          { id: "c", label: "The loss function is wrong — switch to a different objective", description: "A flat training loss plateau is almost never caused by a wrong loss function. It is a learning rate / optimization dynamics issue. Changing the loss function would be premature and likely counterproductive." },
+        ],
+        branches: { a: "f4_terminal", b: "f4_terminal", c: "f4_terminal" },
+        rationale: "A flat training loss with still-improving validation loss is a classic learning rate plateau signal — the optimizer is taking steps too small to escape the current basin, but the basin itself is still generalizing. Reduce the lr by 5–10× (or switch to cosine decay), monitor for a few epochs, and the training loss should resume decreasing. If it does not, check for gradient flow issues (dead ReLUs, vanishing gradients) or data pipeline bottlenecks.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "In Adam, the second moment estimate v accumulates the squared gradients. What is the direct effect of a large v value on the parameter update?",
+      options: [
+        "It shrinks the effective learning rate for that parameter",
+        "It increases the effective learning rate for that parameter",
+        "It reverses the sign of the gradient update",
+      ],
+      correctIndex: 0,
+      explanation: "The Adam update is lr * m / (sqrt(v) + eps). A large v makes sqrt(v) large, which divides the step size down. Parameters with consistently large gradient magnitudes get conservative updates — Adam's core adaptive mechanism.",
+    },
+    {
+      question: "You are fine-tuning GPT-2 on a domain-specific text corpus. Which learning rate is most appropriate?",
+      options: [
+        "0.1 — same as training from scratch on vision benchmarks",
+        "0.001 — Adam's default, safe for any task",
+        "2e-5 — a small value with warmup to preserve pretrained representations",
+      ],
+      correctIndex: 2,
+      explanation: "Fine-tuning requires a much smaller lr than training from scratch. lr=0.001 (Adam default) will overwrite pretrained weights too aggressively. A value around 1e-5 to 5e-5 with a warmup schedule is the standard HuggingFace recipe for fine-tuning language models.",
+    },
+    {
+      question: "Doubling the mini-batch size from 256 to 512 (with a linear lr scaling rule applied). What is the expected effect?",
+      options: [
+        "Fewer gradient updates per epoch, but each update uses a more accurate gradient estimate — overall training stability improves",
+        "More gradient updates per epoch because there are more samples per step",
+        "The model will overfit faster because each batch contains more repeated patterns",
+      ],
+      correctIndex: 0,
+      explanation: "With 512-sample batches on the same dataset, you take half as many gradient steps per epoch. Each step's gradient is computed over more samples, giving a lower-variance (more accurate) estimate. With linear lr scaling (2× lr), effective optimization speed is preserved. Generalization can sometimes degrade at very large batch sizes (sharp minima), but this is a separate concern from the mechanics.",
+    },
+  ],
+},
+
+"dl-f5": {
+  durationLabel: "18 min",
+  outcomes: [
+    "Explain dropout's ensemble interpretation and why you must disable it at inference",
+    "Describe how batch normalization differs between training and inference modes",
+    "Apply weight decay (L2 regularization) and explain its connection to a Gaussian prior on weights",
+    "Choose the appropriate regularization technique given network architecture and task",
+  ],
+  learnMarkdown: `## Why Regularization?
+
+A neural network with enough parameters can memorize any training set — achieving near-zero training loss while performing poorly on unseen data. This is **overfitting**: the model learns noise and idiosyncrasies of the training data rather than the underlying pattern. Regularization is any technique that reduces this gap between training and generalization performance.
+
+## Dropout
+
+**Dropout** randomly sets a fraction p of neurons to zero during each forward pass in training. With a dropout rate of 0.5, each neuron is independently zeroed with 50% probability.
+
+\`\`\`python
+# PyTorch
+self.dropout = nn.Dropout(p=0.5)
+x = self.dropout(x)  # zeros ~50% of neurons, but only during training
+\`\`\`
+
+**Why it works — the ensemble interpretation**: Each training step effectively trains a different sub-network (a random subset of neurons). By the end of training, you have implicitly trained an exponential number of overlapping sub-networks. At inference, the full network acts as an ensemble of these sub-networks, which tends to be more robust.
+
+**Inverted dropout** (the standard modern implementation): during training, surviving neuron activations are scaled up by 1/(1−p) so their expected value is preserved. This means at inference you can use the network exactly as-is — no scaling adjustment needed. This is the default in PyTorch and TensorFlow/Keras.
+
+**Critical detail**: dropout must be **disabled at inference**. In PyTorch: \`model.eval()\`. In Keras: Dropout layers automatically use inference mode during \`model.predict()\`. Forgetting this is a common production bug — activating dropout at inference introduces randomness and degrades predictions.
+
+Where to use dropout: after fully-connected (dense) layers. Using it after conv layers is less common and often less effective (use spatial dropout or batch norm instead for convolutional networks).
+
+## Batch Normalization
+
+**Batch Normalization** (BatchNorm) normalizes the inputs to each layer across the batch dimension, then applies a learned scale (γ) and shift (β):
+
+\`\`\`
+x_norm = (x − μ_batch) / sqrt(σ²_batch + ε)
+y = γ · x_norm + β
+\`\`\`
+
+During training, μ and σ² are computed from the current mini-batch. Simultaneously, BatchNorm maintains **running estimates** of the mean and variance via exponential moving average.
+
+At **inference**, BatchNorm switches to those running estimates — it does not compute statistics from the (potentially single-sample) inference batch. This is why \`model.eval()\` in PyTorch is critical: it switches BatchNorm from "use batch stats" mode to "use running stats" mode.
+
+**Why BatchNorm helps training**:
+- Reduces **internal covariate shift** — normalizing layer inputs keeps the distribution consistent as weights update, so later layers do not need to constantly re-adapt to shifting input distributions.
+- Allows much **higher learning rates** without divergence.
+- Acts as a mild regularizer (the batch-level noise in μ and σ² adds stochasticity).
+- Placed **after conv layers, before activation** (or after activation — both are used in practice).
+
+## Weight Decay (L2 Regularization)
+
+**Weight decay** adds a penalty proportional to the squared magnitude of weights to the loss:
+
+\`\`\`
+L_total = L_task + λ · Σ wᵢ²
+\`\`\`
+
+This pushes weights toward zero, preventing any single weight from dominating. Equivalently, it corresponds to placing a **Gaussian prior** on the weights (Bayesian interpretation: you believe weights are likely small). In SGD, the gradient of the penalty term simply subtracts λ·w from each weight at every step — the "decay."
+
+In Adam, weight decay should be applied as **AdamW** (decoupled weight decay) rather than L2 in the loss, because Adam's adaptive scaling interferes with how L2 interacts with the gradient update.
+
+Typical values: λ = 1e-4 to 1e-2. Too large: underfitting. Too small: no regularization benefit.
+
+## Label Smoothing
+
+Instead of using hard one-hot targets (0 or 1), **label smoothing** distributes a small probability ε across incorrect classes:
+
+\`\`\`
+y_smooth = (1 − ε) · y_onehot + ε / K
+\`\`\`
+
+This prevents the model from becoming overconfident and improves calibration. Common in image classification (ε=0.1) and neural machine translation.
+
+## Choosing the Right Regularization
+
+| Technique | Best for | Notes |
+|---|---|---|
+| Dropout | After dense layers, transformers | Rate 0.1–0.5; disable at inference |
+| Batch Normalization | After conv layers | Use eval() mode at inference |
+| Weight Decay | Almost always | AdamW for adaptive optimizers |
+| Label Smoothing | Classification heads | ε=0.1 is a safe default |
+
+## Interview Hook (answer like a senior)
+
+*"The most important thing I check when regularization is in the code is whether training/inference modes are set correctly. A model in train mode at inference has both dropout randomly zeroing neurons and batch norm using noisy batch statistics — your predictions become non-deterministic and degraded. Beyond that, my default recipe is: BatchNorm after conv layers, dropout after dense layers, weight decay everywhere via AdamW. I add label smoothing for classification heads when calibration matters."*
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Batch Norm vs Layer Norm vs Group Norm
+
+BatchNorm normalizes across the batch dimension — it needs a reasonable batch size (≥16 recommended) to compute stable statistics. This makes it unsuitable for small-batch or sequence tasks.
+
+**Layer Normalization** normalizes across the feature dimension for a single sample — no batch dependency. This is why transformers use LayerNorm: self-attention already processes one sequence at a time and batch size shouldn't affect normalization.
+
+**Group Normalization** is a middle ground: normalize across groups of channels within a single sample. Works well for object detection with small batch sizes.
+
+**Spectral Normalization** constrains weight matrices to have spectral norm ≤1, stabilizing GAN training without the training/inference mode switch.
+`,
+  tryGuidance: "Train a small MLP on MNIST without regularization until it overfits. Then add dropout(0.3) after each hidden layer and retrain. Finally, compare model.predict() outputs with model in train() mode vs eval() mode — you will see different (random) outputs for dropout in train mode. This makes the inference-mode bug viscerally concrete.",
+  interviewGraph: {
+    initialStageId: "f5_eval_click",
+    artifactDimensions: [
+      { label: "Dropout train/inference modes", recoveryStageId: "f5_rec_dropout" },
+      { label: "Batch normalization mechanics", recoveryStageId: "f5_rec_batchnorm" },
+      { label: "Regularization selection", recoveryStageId: "f5_rec_selection", passLabel: "Regularization Mastery" },
+    ],
+    stages: {
+      f5_eval_click: {
+        id: "f5_eval_click",
+        type: "click_target",
+        badge: "Stage 1 · Inference Mode Bug",
+        title: "Stage 1 · Find the inference-time mistake",
+        prompt: "This PyTorch inference function has a bug that activates dropout during prediction, making outputs non-deterministic and degraded. Click the line responsible for the incorrect behavior.",
+        code_snippet: `import torch
+
+def predict(model, dataloader):
+    model.train()  # ds-target:wrong_mode
+    predictions = []
+    with torch.no_grad():
+        for batch in dataloader:
+            outputs = model(batch)
+            predictions.append(outputs.argmax(dim=1))
+    return torch.cat(predictions)`,
+        validationCopy: {
+          wrong_mode: "Correct. model.train() activates dropout (randomly zeroing neurons) and makes BatchNorm use current-batch statistics — both behaviors are harmful at inference. model.eval() must be called before inference to disable dropout and switch BatchNorm to its accumulated running statistics. The torch.no_grad() context manager only disables gradient tracking; it does not affect dropout or BatchNorm behavior.",
+        },
+        branches: { wrong_mode: "f5_dropout_scale_choice" },
+      },
+
+      f5_dropout_scale_choice: {
+        id: "f5_dropout_scale_choice",
+        type: "scenario_choice",
+        badge: "Stage 2 · Inverted Dropout",
+        title: "Stage 2 · Dropout scaling at inference",
+        prompt: "A model uses dropout with rate p=0.5 during training. Using the standard inverted dropout implementation, what happens to neuron activations at inference time?",
+        code_snippet: `# During training (inverted dropout):
+# - Each neuron zeroed with probability p=0.5
+# - Surviving neurons scaled by 1/(1-p) = 2.0
+# - Expected activation = original activation
+
+# At inference:
+# model.eval()
+# What happens to the dropout layer?`,
+        choices: [
+          { id: "a", label: "Dropout is disabled — all neurons pass through unchanged, no scaling needed", description: "With inverted dropout, surviving neurons are scaled up during training to preserve expected activation magnitude. So at inference, you can pass activations through without any adjustment — the full network's output matches the expected output of the trained sub-networks." },
+          { id: "b", label: "Activations are multiplied by 0.5 (the keep probability) at inference", description: "This describes the older non-inverted dropout approach. Inverted dropout does the scaling at training time so that inference requires no modification. Modern libraries (PyTorch, Keras) use inverted dropout by default." },
+          { id: "c", label: "Activations are multiplied by 2.0 (1/(1-p)) at inference", description: "The 2.0 scaling factor is applied during training in inverted dropout, not at inference. Applying it again at inference would double the activations and break the model." },
+          { id: "d", label: "Half of neurons are still randomly zeroed, but with a different random seed", description: "At inference with model.eval(), dropout is completely disabled — no neurons are zeroed. Random zeroing is a training-only behavior." },
+        ],
+        branches: { a: "f5_batchnorm_stats_choice", b: "f5_rec_dropout", c: "f5_rec_dropout", d: "f5_rec_dropout" },
+        rationale: "Inverted dropout is the key insight: scale up during training, so inference is clean. This makes model deployment simpler — you don't need inference-time scaling logic. Always check your framework's default: both PyTorch nn.Dropout and Keras Dropout use inverted dropout.",
+      },
+
+      f5_batchnorm_stats_choice: {
+        id: "f5_batchnorm_stats_choice",
+        type: "scenario_choice",
+        badge: "Stage 3 · BatchNorm at Inference",
+        title: "Stage 3 · Which statistics does BatchNorm use at test time?",
+        prompt: "A ResNet model uses BatchNorm throughout. During training, BatchNorm normalizes using batch statistics. A single image is passed at inference time. What statistics does BatchNorm use to normalize the activations?",
+        code_snippet: `model = ResNet50()
+model.eval()  # switches BatchNorm to inference mode
+
+# Single image inference
+with torch.no_grad():
+    image = torch.randn(1, 3, 224, 224)  # batch_size=1
+    output = model(image)
+    # What does BatchNorm do here?`,
+        choices: [
+          { id: "a", label: "Running mean and running variance accumulated during training", description: "Correct. During training, BatchNorm maintains exponential moving averages of mean and variance across all seen batches. At inference (model.eval()), it uses these stable population statistics instead of the current batch — which would be meaningless with a batch size of 1." },
+          { id: "b", label: "Mean and variance of the single inference image's activations", description: "Using single-sample statistics would make normalization meaningless and inconsistent — every image would be normalized to the same distribution regardless of its actual content. This would destroy the model's ability to distinguish different inputs." },
+          { id: "c", label: "The learned γ and β parameters only — no normalization is applied", description: "γ and β are the learned scale and shift applied after normalization. The normalization step itself (subtract mean, divide by std) still occurs at inference — but using running statistics, not batch statistics." },
+          { id: "d", label: "BatchNorm is automatically disabled at inference, like dropout", description: "Unlike dropout (which is fully disabled at inference), BatchNorm still normalizes at inference — it just switches from batch statistics to running statistics. The normalization step is always active; only the source of statistics changes." },
+        ],
+        branches: { a: "f5_batchnorm_benefit_choice", b: "f5_rec_batchnorm", c: "f5_rec_batchnorm", d: "f5_rec_dropout" },
+        rationale: "The running stats are accumulated via: running_mean = (1-momentum)*running_mean + momentum*batch_mean, typically with momentum=0.1. After sufficient training, these estimates are stable representations of the population statistics. This is why fine-tuning with a tiny dataset can corrupt BatchNorm running stats — the few batches overwrite good running stats with noisy ones.",
+      },
+
+      f5_batchnorm_benefit_choice: {
+        id: "f5_batchnorm_benefit_choice",
+        type: "scenario_choice",
+        badge: "Stage 4 · Why BatchNorm Enables Higher LR",
+        title: "Stage 4 · The mechanism behind BatchNorm's training speedup",
+        prompt: "After adding BatchNorm before every activation in your CNN, training is dramatically faster and you can use a 10× higher learning rate without divergence. What is the primary mechanism behind this improvement?",
+        code_snippet: `# Before BatchNorm:
+# model.compile(optimizer=Adam(lr=0.0001))  # must use small lr
+
+# After BatchNorm:
+model = Sequential([
+    Conv2D(64, 3, padding='same'),
+    BatchNormalization(),
+    Activation('relu'),
+    Conv2D(128, 3, padding='same'),
+    BatchNormalization(),
+    Activation('relu'),
+    # ...
+])
+# model.compile(optimizer=Adam(lr=0.001))  # 10x larger lr is now stable`,
+        choices: [
+          { id: "a", label: "BatchNorm reduces internal covariate shift — layer inputs stay in a consistent distribution as weights update, stabilizing gradient magnitudes throughout the network", description: "Without BatchNorm, as earlier layers' weights update, the distribution of inputs to later layers shifts constantly ('internal covariate shift'). Later layers must perpetually re-adapt. BatchNorm pins the input distribution to each layer, making the effective optimization landscape smoother and allowing larger gradient steps without instability." },
+          { id: "b", label: "BatchNorm reduces the number of trainable parameters, making optimization easier", description: "BatchNorm actually adds parameters (γ and β per channel). It does not reduce parameters — its benefit is distributional stability, not parameter efficiency." },
+          { id: "c", label: "BatchNorm acts as strong L2 regularization, shrinking weights and preventing gradient explosion", description: "BatchNorm has a mild regularization effect (due to batch-level noise), but it is not equivalent to L2 regularization. Its primary benefit is distributional normalization of layer inputs, not weight penalization." },
+          { id: "d", label: "BatchNorm replaces the activation function, removing the gradient saturation problem", description: "BatchNorm is placed before or after activation functions — it does not replace them. Gradient saturation (in sigmoid/tanh) is addressed by activation function choice (ReLU), not BatchNorm." },
+        ],
+        branches: { a: "f5_terminal", b: "f5_rec_batchnorm", c: "f5_rec_selection", d: "f5_rec_batchnorm" },
+        rationale: "Ioffe and Szegedy's original BatchNorm paper (2015) framed this as reducing internal covariate shift. More recent analysis (e.g., Santurkar et al. 2018) suggests the primary benefit may actually be smoothing the loss landscape — making gradient directions more reliable across steps. Either way, the empirical result is clear: BatchNorm allows higher learning rates and faster convergence.",
+      },
+
+      f5_rec_dropout: {
+        id: "f5_rec_dropout",
+        type: "scenario_choice",
+        badge: "Recovery · Dropout Mechanics",
+        title: "Recovery · Dropout behavior during training vs inference",
+        prompt: "A Keras model includes a Dropout(0.4) layer. During training, a neuron produces activation value 1.0. What activation value propagates forward if this neuron survives the dropout mask?",
+        code_snippet: `# Keras Dropout(rate=0.4) — inverted dropout
+# rate=0.4 means 40% of neurons are zeroed
+# Surviving neurons are scaled
+
+layer = tf.keras.layers.Dropout(rate=0.4)
+x = tf.constant([[1.0, 1.0, 1.0, 1.0, 1.0]])
+output = layer(x, training=True)
+# What are the non-zero values?`,
+        choices: [
+          { id: "a", label: "1.667 (scaled by 1/(1-0.4) = 1/0.6 ≈ 1.667)", description: "Correct. Inverted dropout scales surviving neurons by 1/(1-p) to preserve the expected activation. With p=0.4, keep probability is 0.6, so surviving activations are multiplied by 1/0.6 ≈ 1.667. At inference, no scaling is needed — the full network is used as-is." },
+          { id: "b", label: "1.0 (unchanged — dropout only zeros neurons, no scaling)", description: "Without scaling, the total activation reaching the next layer would be ~60% of normal (since 40% are zeroed). This would create a train/inference mismatch — inference uses all neurons and would have ~1.67× the expected activation." },
+          { id: "c", label: "0.6 (scaled by 1-p = the keep probability)", description: "Scaling by keep probability (0.6) is the non-inverted approach: train unchanged, scale down at inference. Modern libraries invert this: scale up at train time so inference needs no modification." },
+        ],
+        branches: { a: "f5_dropout_scale_choice", b: "f5_rec_dropout", c: "f5_rec_dropout" },
+        rationale: "The key invariant inverted dropout preserves: E[output during training] = output during inference. Scaling by 1/(1-p) at train time achieves this. Without it, you'd need to multiply all activations by (1-p) at inference — which is error-prone in deployment.",
+      },
+
+      f5_rec_batchnorm: {
+        id: "f5_rec_batchnorm",
+        type: "scenario_choice",
+        badge: "Recovery · BatchNorm Mechanics",
+        title: "Recovery · BatchNorm training vs inference statistics",
+        prompt: "You fine-tune a pretrained model on a tiny dataset (100 samples, batch_size=32 — only 3 mini-batches per epoch). Training loss improves but inference quality is terrible. BatchNorm is suspected. What is the most likely cause?",
+        code_snippet: `# Pretrained model has BatchNorm layers throughout
+# Fine-tuning setup:
+model.trainable = True  # unfreeze all layers including BatchNorm
+optimizer = Adam(1e-4)
+model.fit(tiny_dataset, epochs=50, batch_size=32)
+# Inference is bad despite good training loss`,
+        choices: [
+          { id: "a", label: "The tiny fine-tuning batches are corrupting the BatchNorm running statistics accumulated during pretraining", description: "Correct. With only 3 batches per epoch over 50 epochs, the running mean/variance estimates are quickly overwritten by the tiny fine-tuning distribution. At inference, the model uses these corrupted running stats, which no longer represent the true data distribution. Fix: freeze BatchNorm layers during fine-tuning (set layer.trainable=False for BN layers, or use model.layers[i].training=False)." },
+          { id: "b", label: "BatchNorm cannot function with batch sizes smaller than 32", description: "BatchNorm works with any batch size during training — though very small batches (≤4) give noisy statistics. The issue here is not the batch size itself but the small number of batches overwriting pretrained running stats." },
+          { id: "c", label: "The learning rate is too high for fine-tuning with BatchNorm", description: "A high learning rate can destabilize fine-tuning generally, but the symptom would be training loss not converging — not good training loss with bad inference. The train/inference gap strongly points to BatchNorm running stat corruption." },
+        ],
+        branches: { a: "f5_batchnorm_stats_choice", b: "f5_rec_batchnorm", c: "f5_rec_batchnorm" },
+        rationale: "A common fine-tuning best practice: freeze BatchNorm layers (keep them in eval mode with pretrained running stats) while fine-tuning other layers. In PyTorch: model.apply(lambda m: m.eval() if isinstance(m, nn.BatchNorm2d) else None). This preserves the pretraining-era normalization statistics.",
+      },
+
+      f5_rec_selection: {
+        id: "f5_rec_selection",
+        type: "scenario_choice",
+        badge: "Recovery · Regularization Selection",
+        title: "Recovery · Choosing the right regularization",
+        prompt: "You are building a transformer-based text classifier. The architecture has multi-head attention and feedforward sublayers, no convolutional layers. Which regularization approach is most appropriate?",
+        code_snippet: `class TransformerBlock(nn.Module):
+    def __init__(self, d_model, nhead, dropout_rate):
+        super().__init__()
+        self.attention = nn.MultiheadAttention(d_model, nhead)
+        self.norm1 = ???  # What normalization?
+        self.dropout = nn.Dropout(dropout_rate)
+        self.ffn = nn.Sequential(
+            nn.Linear(d_model, 4*d_model),
+            nn.GELU(),
+            nn.Linear(4*d_model, d_model)
+        )`,
+        choices: [
+          { id: "a", label: "LayerNorm (not BatchNorm) + dropout in attention and FFN sublayers + weight decay via AdamW", description: "Transformers use LayerNorm because it normalizes per-sample across features (no batch dependency), which is correct for variable-length sequences and works with any batch size. Dropout is applied in attention weights and after FFN layers. AdamW handles weight decay." },
+          { id: "b", label: "BatchNorm after attention + no dropout (transformers don't overfit)", description: "BatchNorm is poorly suited for transformers: it normalizes across the batch, which creates dependencies between sequence positions and breaks with variable-length inputs. Transformers absolutely overfit without regularization." },
+          { id: "c", label: "Dropout only — normalization layers are not needed in transformers", description: "All modern transformer architectures (BERT, GPT, T5) include normalization layers. Without normalization, training large transformers is extremely unstable." },
+        ],
+        branches: { a: "f5_batchnorm_benefit_choice", b: "f5_rec_selection", c: "f5_rec_selection" },
+        rationale: "LayerNorm over BatchNorm for transformers is a fundamental architectural decision, not a preference. The original 'Attention is All You Need' paper used LayerNorm. Every major LLM since uses LayerNorm (often pre-norm: applied before the sublayer, not after). Dropout rates of 0.1-0.2 are standard for transformers.",
+      },
+
+      f5_terminal: {
+        id: "f5_terminal",
+        type: "scenario_choice",
+        badge: "Terminal · Mastery Check",
+        title: "Mastery complete · Regularization expertise",
+        terminal: true,
+        prompt: "A deployed model performs well during offline evaluation but produces inconsistent predictions in production — the same input sometimes yields different outputs. Dropout and BatchNorm are both used in the model. What inference-time mistake do you check first?",
+        code_snippet: `# Production inference service (Python/Flask):
+def get_prediction(image_bytes):
+    image = preprocess(image_bytes)
+    tensor = torch.from_numpy(image).unsqueeze(0)
+
+    # Is something wrong here?
+    output = model(tensor)  # model state not explicitly set
+    return output.softmax(dim=1).tolist()`,
+        choices: [
+          { id: "a", label: "model.eval() is never called — the model may be in training mode with dropout active", description: "This is the first thing to check. PyTorch models default to training mode. Without model.eval() (ideally called once at startup, before any inference), dropout randomly zeros neurons on every call — producing different outputs for the same input. BatchNorm also uses noisy batch statistics instead of stable running stats. Add model.eval() and torch.no_grad() to fix both issues." },
+          { id: "b", label: "The model is not wrapped in torch.no_grad() — gradient computation adds randomness", description: "torch.no_grad() disables gradient tracking to save memory and speed up inference — it does not affect dropout or BatchNorm behavior. The randomness symptom points specifically to dropout being active, not gradient tracking." },
+          { id: "c", label: "The softmax is being applied incorrectly — it should be in the model's forward pass", description: "Applying softmax post-hoc is fine and common in deployment. Softmax is deterministic — it does not introduce the randomness described. The non-determinism symptom points to dropout." },
+        ],
+        branches: { a: "f5_terminal", b: "f5_terminal", c: "f5_terminal" },
+        rationale: "model.eval() is the most critical inference-time call in PyTorch. Best practice for deployment: call model.eval() once when loading the model, wrap all inference in torch.no_grad(), and verify outputs are deterministic for the same input before shipping. This bug is extremely common in production ML code written by engineers who learned from training-focused tutorials.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "A model uses Dropout(p=0.5) with inverted dropout. At inference time, what is the expected output of a neuron that had activation 2.0 during the equivalent training-time forward pass?",
+      options: [
+        "2.0 — inverted dropout scales at train time so inference output is unchanged",
+        "1.0 — the output is multiplied by keep probability (0.5) at inference",
+        "4.0 — the output is multiplied by 1/(1-p) = 2.0 at inference",
+      ],
+      correctIndex: 0,
+      explanation: "Inverted dropout scales surviving neurons by 1/(1-p) during training to preserve expected activation magnitude. This means inference requires no adjustment — all neurons pass through unchanged at eval time. The 2.0 activation would have been 4.0 if it survived training-time dropout (2.0 × 1/0.5 = 4.0), and at inference it passes through as 2.0 from the un-dropped network.",
+    },
+    {
+      question: "BatchNorm is in eval() mode. Which statistics does it use to normalize activations?",
+      options: [
+        "Mean and variance of the current inference batch",
+        "Running mean and running variance accumulated across training batches",
+        "The learned γ (scale) and β (shift) parameters only",
+      ],
+      correctIndex: 1,
+      explanation: "In eval mode, BatchNorm uses the running mean and running variance — exponential moving averages accumulated across all training mini-batches. It does NOT use current-batch statistics (which would be meaningless for a single inference sample). γ and β are still applied, but after normalization with the running stats.",
+    },
+    {
+      question: "You have a deep CNN for image classification. Where should you add regularization layers?",
+      options: [
+        "BatchNorm after convolutional layers; Dropout after fully-connected layers",
+        "Dropout after every layer including conv layers; no BatchNorm needed",
+        "BatchNorm after fully-connected layers; Dropout after convolutional layers",
+      ],
+      correctIndex: 0,
+      explanation: "The standard CNN regularization recipe: BatchNorm after conv layers (normalizes spatial feature maps, allows higher learning rates), Dropout after dense/fully-connected layers (acts as ensemble regularizer for the classifier head). Applying Dropout to conv layers is less effective and can disrupt spatial feature learning — use Spatial Dropout or BatchNorm there instead.",
+    },
+  ],
+},
+
+"dl-a1": {
+  durationLabel: "25 min",
+  outcomes: [
+    "Describe how a convolution operation produces a feature map and explain parameter sharing",
+    "Calculate the output shape of a conv layer given input dimensions, kernel size, padding, and stride",
+    "Explain why CNNs need far fewer parameters than fully-connected networks for image tasks",
+    "Identify the function of pooling layers and compare max pooling vs average pooling",
+  ],
+  learnMarkdown: `## Why Not Fully-Connected Layers for Images?
+
+A 224×224 RGB image has 224×224×3 = 150,528 input values. A fully-connected layer with 1,024 hidden units would require 150,528 × 1,024 ≈ **154 million parameters** — just for the first layer. This is computationally expensive, prone to overfitting, and ignores the fundamental structure of images: nearby pixels are related, and the same pattern (an edge, a curve) can appear anywhere in the image.
+
+**Convolutional Neural Networks** exploit two key properties of images: **locality** (features are defined by nearby pixels) and **translation invariance** (a cat is a cat whether it's in the top-left or bottom-right of the frame).
+
+## The Convolution Operation
+
+A **convolution** slides a small filter (kernel) over the input image and computes a dot product at each position. For a 3×3 filter:
+
+\`\`\`
+Input patch (3×3):    Filter (3×3):      Output value:
+1  2  1               0  1  0            1·0+2·1+1·0
+0  0  0          ×    0  0  0    →     + 0·0+0·0+0·0
+1  2  1               0  1  0          + 1·0+2·1+1·0 = 4
+\`\`\`
+
+The filter slides across every position, producing a 2D **feature map**. One filter detects one type of feature (horizontal edges, diagonal lines, color blobs). A conv layer uses multiple filters in parallel, producing multiple feature maps — one per filter.
+
+**Output shape** (no padding, stride 1):
+\`\`\`
+H_out = H_in − K + 1
+W_out = W_in − K + 1
+\`\`\`
+
+With **same padding** (zero-pad the input): H_out = H_in. With **stride s**: H_out = floor((H_in − K) / s) + 1.
+
+**Example**: 28×28×1 input, 32 filters of size 3×3, valid padding, stride 1:
+Output shape = 26×26×32 (26 = 28 − 3 + 1, 32 channels from 32 filters).
+
+## Parameter Sharing and Why It Matters
+
+The critical insight: the **same filter weights are reused at every spatial position**. A 3×3×1 filter detecting horizontal edges has only 9 parameters — and those 9 numbers detect horizontal edges anywhere in the image. Compare this to a fully-connected layer where each output neuron has its own connection to every input pixel.
+
+Total parameters in a conv layer:
+\`\`\`
+Params = (K × K × C_in + 1) × C_out
+\`\`\`
+
+Where K is kernel size, C_in is input channels, C_out is number of filters. A 3×3 layer going from 1 to 32 channels: (9 × 1 + 1) × 32 = 320 parameters. The equivalent fully-connected layer: 784 × 832 ≈ 652,288 parameters.
+
+## Receptive Field
+
+Each output cell in a feature map "sees" a small patch of the input — its **receptive field**. A single 3×3 conv has a 3×3 receptive field. Stack two 3×3 convs: each cell now sees a 5×5 patch. Stack three: 7×7. **This is why deep networks with small kernels are preferred** — two 3×3 convs (18 parameters, 5×5 receptive field, two nonlinearities) beats one 5×5 conv (25 parameters, same receptive field, one nonlinearity).
+
+## Pooling: Spatial Downsampling
+
+**Pooling** reduces the spatial dimensions of feature maps, compressing information and making the representation more robust to small translations.
+
+- **Max pooling**: takes the maximum value in each pooling window. Preserves the strongest activation — "was this feature present here?" Preferred in early and middle layers.
+- **Average pooling**: takes the mean. Smoother; commonly used as **Global Average Pooling** (GAP) at the end of a network to collapse the spatial dimensions before the classifier head.
+
+A 2×2 max pool with stride 2 halves each spatial dimension: 26×26 → 13×13.
+
+## Typical CNN Architecture
+
+\`\`\`
+Input (28×28×1)
+  → Conv2D(32, 3×3) + ReLU → (26×26×32)
+  → MaxPool(2×2)            → (13×13×32)
+  → Conv2D(64, 3×3) + ReLU → (11×11×64)
+  → MaxPool(2×2)            → (5×5×64)
+  → Flatten                 → (1600,)
+  → Dense(128) + ReLU       → (128,)
+  → Dense(10) + Softmax     → (10,)
+\`\`\`
+
+Early conv layers learn low-level features (edges, colors). Deeper layers combine these into high-level concepts (eyes, wheels, faces). The fully-connected head at the end does classification using the extracted features.
+
+## Key Takeaways
+
+| Property | Fully-Connected | CNN |
+|---|---|---|
+| Parameter count | O(H × W × C × units) | O(K² × C_in × C_out) |
+| Translation invariance | No | Yes (parameter sharing) |
+| Exploits spatial structure | No | Yes (local connectivity) |
+| Good for images | Poorly | Designed for this |
+
+## Interview Hook (answer like a senior)
+
+*"The two innovations in CNNs that matter most are parameter sharing and local connectivity. Parameter sharing means one edge detector works anywhere in the image — the same 9 weights detect a horizontal edge in the top-left and bottom-right corner. Local connectivity means we only connect each output to a small neighborhood, which massively cuts parameters and encodes the inductive bias that nearby pixels are more related than distant ones. Together, these give CNNs translation equivariance — shift the input, the feature map shifts the same way — which is a fundamentally better inductive bias for image data than a fully-connected layer, which treats all pixels as completely independent inputs."*
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Modern CNN Design Patterns
+
+**Depthwise Separable Convolutions** (MobileNet): split a standard conv into a depthwise conv (one filter per input channel) + pointwise conv (1×1 conv combining channels). This reduces parameters by ~8-9× for a 3×3 conv with negligible accuracy loss.
+
+**Skip connections** (ResNet): add the input directly to the conv layer's output (x → F(x) + x). This creates identity shortcuts that let gradients flow directly to early layers, enabling training of 100+ layer networks.
+
+**Global Average Pooling** replaces the final Flatten + Dense layers with a single average over the spatial dimensions per channel. This dramatically reduces parameters in the classifier head and improves regularization.
+
+**Dilated convolutions**: insert gaps between kernel values to increase receptive field without increasing parameters or losing resolution. Used in segmentation (DeepLab) and WaveNet.
+`,
+  tryGuidance: "In a Colab notebook: (1) Build a simple model that flattens a 28×28 image directly and connects to Dense layers. Count parameters. (2) Build the equivalent CNN with two Conv2D layers. Count parameters. (3) Run both on MNIST for 5 epochs. Compare parameter counts, training speed, and final accuracy. The CNN should match or beat the MLP with 10× fewer parameters.",
+  interviewGraph: {
+    initialStageId: "a1_flatten_click",
+    artifactDimensions: [
+      { label: "Spatial structure & feature maps", recoveryStageId: "a1_rec_spatial" },
+      { label: "Conv output shape & parameters", recoveryStageId: "a1_rec_shapes" },
+      { label: "Pooling & architectural choices", recoveryStageId: "a1_rec_pooling", passLabel: "CNN Mastery" },
+    ],
+    stages: {
+      a1_flatten_click: {
+        id: "a1_flatten_click",
+        type: "click_target",
+        badge: "Stage 1 · Spatial Structure",
+        title: "Stage 1 · Find the line that discards spatial structure",
+        prompt: "This model processes 28×28 images. One line immediately destroys the 2D spatial structure — treating the image as a flat 1D vector before any feature extraction can occur. Click that line.",
+        code_snippet: `import tensorflow as tf
+
+model = tf.keras.Sequential([
+    tf.keras.layers.InputLayer(input_shape=(28, 28, 1)),
+    tf.keras.layers.Flatten(),  # ds-target:early_flatten
+    tf.keras.layers.Dense(512, activation='relu'),
+    tf.keras.layers.Dense(256, activation='relu'),
+    tf.keras.layers.Dense(10, activation='softmax')
+])`,
+        validationCopy: {
+          early_flatten: "Correct. Flattening immediately after the input collapses the 28×28 spatial grid into a 784-element vector, discarding all information about which pixels are neighbors. The subsequent Dense layers treat pixel (0,0) and pixel (27,27) as equally related as pixel (0,0) and pixel (0,1). Convolutional layers should process the image first — extracting spatial features — before Flatten is used to connect to the Dense classifier head.",
+        },
+        branches: { early_flatten: "a1_output_shape_choice" },
+      },
+
+      a1_output_shape_choice: {
+        id: "a1_output_shape_choice",
+        type: "scenario_choice",
+        badge: "Stage 2 · Output Shape Calculation",
+        title: "Stage 2 · Calculate the conv layer output shape",
+        prompt: "A Conv2D layer with 32 filters of size 3×3 is applied to a 28×28×1 input with valid padding (no padding) and stride 1. What is the output shape?",
+        code_snippet: `model = tf.keras.Sequential([
+    tf.keras.layers.InputLayer(input_shape=(28, 28, 1)),
+    tf.keras.layers.Conv2D(
+        filters=32,
+        kernel_size=(3, 3),
+        padding='valid',  # no padding
+        strides=(1, 1)
+    ),
+    # Output shape = ???
+])`,
+        choices: [
+          { id: "a", label: "26×26×32", description: "Correct. With valid padding and stride 1: H_out = H_in − K + 1 = 28 − 3 + 1 = 26. Same for width. The 32 filters each produce one feature map, so depth becomes 32. Output: 26×26×32." },
+          { id: "b", label: "28×28×32", description: "This would be the output with same padding (padding='same'), which zero-pads the input to preserve spatial dimensions. With valid padding (no padding), the output is smaller than the input by (K−1) = 2 in each spatial dimension." },
+          { id: "c", label: "26×26×1", description: "The depth of the output is determined by the number of filters, not the input channels. 32 filters produce 32 feature maps, so depth = 32." },
+          { id: "d", label: "14×14×32", description: "This would be the output after a MaxPool2D(2,2) with stride 2 applied to the conv output. The conv layer itself (stride=1, valid padding) produces 26×26×32." },
+        ],
+        branches: { a: "a1_maxpool_choice", b: "a1_rec_shapes", c: "a1_rec_shapes", d: "a1_rec_pooling" },
+        rationale: "The formula H_out = floor((H_in − K + 2P) / S) + 1 is essential. With valid padding P=0 and stride S=1: H_out = H_in − K + 1. For 'same' padding, P = floor(K/2), giving H_out = ceil(H_in / S). Number of parameters in this layer: (3×3×1 + 1) × 32 = 320 — compare to the equivalent dense layer: 784 × input_units.",
+      },
+
+      a1_maxpool_choice: {
+        id: "a1_maxpool_choice",
+        type: "scenario_choice",
+        badge: "Stage 3 · Pooling Strategy",
+        title: "Stage 3 · Max pooling vs average pooling in early layers",
+        prompt: "In the early convolutional layers of an image classifier, max pooling is almost universally preferred over average pooling. What is the primary reason?",
+        code_snippet: `# Which pooling and why?
+model = tf.keras.Sequential([
+    tf.keras.layers.Conv2D(64, 3, activation='relu', padding='same'),
+    tf.keras.layers.MaxPool2D(pool_size=2, strides=2),  # Option A
+    # vs:
+    # tf.keras.layers.AveragePooling2D(pool_size=2, strides=2),  # Option B
+    tf.keras.layers.Conv2D(128, 3, activation='relu', padding='same'),
+    # ...
+])`,
+        choices: [
+          { id: "a", label: "Max pooling captures the strongest feature activations and is more robust to small spatial translations", description: "A conv filter produces a high activation when it detects its target feature (e.g., a vertical edge). Max pooling preserves this strong signal — 'yes, this feature was strongly present somewhere in this region' — regardless of the exact pixel position. This introduces spatial invariance. Average pooling dilutes strong activations with surrounding weaker values, potentially losing the detection signal." },
+          { id: "b", label: "Max pooling reduces the feature map to fewer channels", description: "Pooling does not change the number of channels — it only reduces spatial dimensions (H and W). Both max and average pooling maintain the same channel count." },
+          { id: "c", label: "Max pooling uses fewer parameters than average pooling", description: "Neither max pooling nor average pooling has trainable parameters. Both are parameter-free operations. The choice between them is about information preservation, not parameter count." },
+          { id: "d", label: "Average pooling discards too much information by halving the spatial dimensions", description: "Both max and average pooling with stride 2 halve the spatial dimensions equally. The spatial downsampling ratio is the same — what differs is how information is aggregated within each pooling window." },
+        ],
+        branches: { a: "a1_kernel_stacking_choice", b: "a1_rec_pooling", c: "a1_rec_shapes", d: "a1_rec_pooling" },
+        rationale: "Max pooling is the standard for intermediate layers. Global Average Pooling (GAP) is used at the end of modern CNNs to collapse the spatial dimensions before the classifier — it averages each feature map to a single number, creating a compact representation without the large Dense layers that follow Flatten. GAP also acts as a regularizer.",
+      },
+
+      a1_kernel_stacking_choice: {
+        id: "a1_kernel_stacking_choice",
+        type: "scenario_choice",
+        badge: "Stage 4 · Kernel Size Trade-offs",
+        title: "Stage 4 · Two 3×3 convs vs one 5×5 conv",
+        prompt: "Modern CNNs (VGG, ResNet) use stacked 3×3 convolutions instead of single larger kernels. A colleague proposes replacing two stacked 3×3 conv layers with a single 5×5 conv layer, arguing they have the same receptive field. Why is the stacked approach preferred?",
+        code_snippet: `# Option A: one 5x5 conv
+# Receptive field: 5x5
+# Params (64→64 channels): 5*5*64*64 = 102,400
+layer_a = tf.keras.layers.Conv2D(64, kernel_size=5, activation='relu')
+
+# Option B: two stacked 3x3 convs
+# Receptive field: also 5x5 (3x3 then another 3x3)
+# Params: 2 * (3*3*64*64) = 73,728
+layer_b1 = tf.keras.layers.Conv2D(64, kernel_size=3, activation='relu')
+layer_b2 = tf.keras.layers.Conv2D(64, kernel_size=3, activation='relu')`,
+        choices: [
+          { id: "a", label: "Two 3×3 convs have fewer parameters, more nonlinearity (two ReLUs), and learn a richer feature hierarchy", description: "Three advantages: (1) Fewer parameters: 2×(9×64×64)=73,728 vs 25×64×64=102,400 — 28% fewer. (2) Two ReLU nonlinearities instead of one, giving the network greater representational power. (3) Deeper feature hierarchy — first 3×3 learns simple features, second 3×3 composes them into more complex patterns." },
+          { id: "b", label: "A single 5×5 conv is more efficient because it processes the receptive field in one pass", description: "A single pass through a 5×5 conv is slightly faster in compute, but the parameter inefficiency and loss of nonlinearity make it worse overall. This is why VGGNet (2014) moved entirely to 3×3 convs and outperformed architectures using larger kernels." },
+          { id: "c", label: "Two 3×3 convs can be parallelized across GPUs but a single 5×5 conv cannot", description: "Both single and stacked conv layers can be parallelized across GPUs. GPU parallelism is not the reason to prefer stacked 3×3 convs." },
+          { id: "d", label: "A 5×5 kernel cannot detect the same features as two 3×3 kernels because the mathematical operations differ", description: "Two stacked 3×3 convs do have the same 5×5 receptive field as a single 5×5 conv — and can theoretically approximate the same functions. The preference for stacked 3×3 is about parameter efficiency and nonlinearity, not an inability to detect the same features." },
+        ],
+        branches: { a: "a1_terminal", b: "a1_rec_pooling", c: "a1_rec_spatial", d: "a1_rec_shapes" },
+        rationale: "The Simonyan & Zisserman (VGG) paper (2014) systematically showed that replacing large kernels (7×7, 5×5) with stacks of 3×3 convs improves accuracy. This principle — small kernels stacked deep — became a defining pattern of modern CNN design. ResNet, EfficientNet, and ConvNeXt all follow it.",
+      },
+
+      a1_rec_spatial: {
+        id: "a1_rec_spatial",
+        type: "scenario_choice",
+        badge: "Recovery · Spatial Structure",
+        title: "Recovery · Parameter sharing and translation invariance",
+        prompt: "A CNN is trained to detect stop signs in images. After training, a stop sign at the top-left of an image is correctly classified. Why does the same CNN also correctly classify a stop sign at the bottom-right, without any additional training?",
+        code_snippet: `# The same CNN model processes:
+# Image A: stop sign in top-left     → correctly classified ✓
+# Image B: stop sign in bottom-right → also correctly classified ✓
+# The model was NOT specifically trained on bottom-right examples.
+# Why?`,
+        choices: [
+          { id: "a", label: "Parameter sharing — the same filter weights slide across every position, so a feature learned at one location is automatically detected everywhere", description: "The filter that learned to detect stop-sign edges uses identical weights at every spatial position. When those weights slide over the bottom-right of the image, they produce the same activations as when they were over the top-left. This is translation equivariance: shift the input → the feature map shifts by the same amount. Pooling then adds invariance (small shifts don't change the pooled output)." },
+          { id: "b", label: "The network memorizes all possible positions of stop signs during training", description: "CNNs do not memorize positions — they share weights across positions. A fully-connected network would need to see every position during training to generalize; a CNN gets translation equivariance for free from its architecture." },
+          { id: "c", label: "Data augmentation during training ensures all positions are covered", description: "Data augmentation can help, but it is not the fundamental reason. Even without augmentation, CNNs have architectural translation equivariance from parameter sharing. The question is asking about the mechanism, not the training technique." },
+        ],
+        branches: { a: "a1_output_shape_choice", b: "a1_rec_spatial", c: "a1_rec_spatial" },
+        rationale: "Translation equivariance (conv layers) + translation invariance (pooling layers) together explain why CNNs generalize spatially. Equivariance: the feature map output shifts when the input shifts. Invariance: pooling absorbs small shifts so the final representation is position-agnostic. This is the core inductive bias that makes CNNs so powerful for image tasks.",
+      },
+
+      a1_rec_shapes: {
+        id: "a1_rec_shapes",
+        type: "scenario_choice",
+        badge: "Recovery · Shapes & Parameters",
+        title: "Recovery · Parameter count in conv layers",
+        prompt: "A Conv2D layer with 64 filters of size 3×3 processes an input with 32 channels. How many trainable parameters does this layer have (including bias terms)?",
+        code_snippet: `# Conv2D layer:
+# - kernel_size: 3×3
+# - input_channels (C_in): 32
+# - num_filters (C_out): 64
+# - bias: one per filter
+
+layer = tf.keras.layers.Conv2D(
+    filters=64,
+    kernel_size=(3, 3),
+    use_bias=True
+)
+# How many parameters?`,
+        choices: [
+          { id: "a", label: "18,496 — (3×3×32 + 1) × 64", description: "Correct. Each filter has 3×3×32 = 288 weights (3×3 spatial, 32 input channels) plus 1 bias = 289 values. With 64 filters: 289 × 64 = 18,496 parameters. Compare to a Dense layer connecting 32-channel 28×28 input to 64 outputs: 32×28×28×64 + 64 = 1,605,696 parameters — 87× more." },
+          { id: "b", label: "576 — 3×3×64", description: "This omits the input channels dimension. Each filter must cover all C_in=32 input channels — it's a 3×3×32 volume, not a 3×3 matrix. Also ignores bias terms." },
+          { id: "c", label: "9,216 — 3×3×32×32 (treating output channels as input channels)", description: "The filter count (C_out=64) is not multiplied by itself. The formula is (K×K×C_in + 1) × C_out = (9×32+1)×64 = 18,496." },
+        ],
+        branches: { a: "a1_maxpool_choice", b: "a1_rec_shapes", c: "a1_rec_shapes" },
+        rationale: "The parameter formula (K×K×C_in + 1) × C_out is worth memorizing. The +1 is the bias per filter. Notice that this does not depend on the input spatial dimensions (H_in, W_in) — the same filter slides across all positions. This is why a conv layer trained on 28×28 images can be applied to 224×224 images at test time (fully convolutional inference).",
+      },
+
+      a1_rec_pooling: {
+        id: "a1_rec_pooling",
+        type: "scenario_choice",
+        badge: "Recovery · Pooling Mechanics",
+        title: "Recovery · How pooling affects spatial dimensions",
+        prompt: "A feature map of shape 26×26×32 is passed through MaxPool2D with pool_size=(2,2) and strides=(2,2). What is the output shape?",
+        code_snippet: `x = tf.random.normal([1, 26, 26, 32])  # batch, H, W, channels
+
+pool = tf.keras.layers.MaxPool2D(
+    pool_size=(2, 2),
+    strides=(2, 2)
+)
+output = pool(x)
+# output.shape = ???`,
+        choices: [
+          { id: "a", label: "(1, 13, 13, 32) — spatial dimensions halved, channels unchanged", description: "Correct. MaxPool2D with pool_size=2 and stride=2 takes the max over each non-overlapping 2×2 window. Spatial dimensions: floor(26/2)=13 for both H and W. Channel count (32) is unchanged — pooling operates independently within each channel." },
+          { id: "b", label: "(1, 13, 13, 16) — channels also halved because of the 2×2 pooling", description: "Pooling only reduces spatial dimensions (H and W). It never changes the number of channels. To change channel count, you need a conv layer (or pointwise 1×1 conv)." },
+          { id: "c", label: "(1, 24, 24, 32) — spatial dimensions reduced by pool_size−1=1 in each dim", description: "This formula applies to convolutions (H_out = H_in − K + 1), not pooling. MaxPool with pool_size=2 and stride=2 halves spatial dimensions: H_out = floor(H_in / stride) = floor(26/2) = 13." },
+        ],
+        branches: { a: "a1_kernel_stacking_choice", b: "a1_rec_pooling", c: "a1_rec_pooling" },
+        rationale: "Pooling is channel-independent — it processes each channel's spatial feature map separately. Pool size controls the window size; stride controls how far the window moves between steps. Stride=2 with pool_size=2 gives non-overlapping windows and halves each spatial dimension. With stride=1, windows overlap (used in some segmentation architectures to preserve spatial resolution).",
+      },
+
+      a1_terminal: {
+        id: "a1_terminal",
+        type: "scenario_choice",
+        badge: "Terminal · Mastery Check",
+        title: "Mastery complete · CNN expertise",
+        terminal: true,
+        prompt: "How does a CNN achieve translation invariance for image classification, and why does a fully-connected network lack this property?",
+        code_snippet: `# CNN approach:
+cnn = Sequential([
+    Conv2D(32, 3, activation='relu'),   # parameter sharing
+    MaxPool2D(2),                        # spatial invariance
+    Conv2D(64, 3, activation='relu'),
+    GlobalAveragePooling2D(),
+    Dense(10, activation='softmax')
+])
+
+# FC approach:
+fc = Sequential([
+    Flatten(),
+    Dense(512, activation='relu'),
+    Dense(10, activation='softmax')
+])`,
+        choices: [
+          { id: "a", label: "CNNs use parameter sharing (same filter at all positions) + pooling (absorbs small shifts); FC networks have independent weights per pixel so cannot generalize across locations", description: "Precisely. Parameter sharing gives translation equivariance: shift the input, the feature map shifts the same amount. Pooling converts equivariance to invariance: small shifts within the pooling window produce identical pooled outputs. An FC network has a unique weight for every (input pixel, output neuron) pair — detecting a feature at position (5,5) requires different weights than at position (10,10). It can learn translation invariance from augmented data, but it's not architecturally guaranteed." },
+          { id: "b", label: "CNNs use ReLU activations which are location-invariant; FC networks use linear activations that are location-sensitive", description: "ReLU is used in both CNNs and FC networks. The activation function is not the source of translation invariance — the architecture (weight sharing + pooling) is." },
+          { id: "c", label: "CNNs process the image in overlapping patches, which forces the network to see every location equally; FC networks favor earlier pixels due to their weight initialization", description: "CNN translation invariance comes from weight sharing and pooling, not from processing order or initialization. FC networks don't favor earlier pixels due to initialization either." },
+        ],
+        branches: { a: "a1_terminal", b: "a1_terminal", c: "a1_terminal" },
+        rationale: "The architectural inductive biases of CNNs — local connectivity, weight sharing, and pooling — encode prior knowledge about images (nearby pixels are related; features appear at multiple locations) directly into the network structure. This is why CNNs need far less data and compute to learn good image representations than FC networks. It also explains why CNNs fail on non-image structured data where spatial locality is not the right inductive bias.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "A Conv2D layer with 64 filters, kernel size 5×5, is applied to a 32×32×3 input with same padding and stride 1. What is the output shape?",
+      options: [
+        "32×32×64 — same padding preserves spatial dimensions, 64 filters create 64 channels",
+        "28×28×64 — valid padding reduces by (K−1)=4 per spatial dimension",
+        "32×32×3 — same padding and stride 1 preserve the original shape including channels",
+      ],
+      correctIndex: 0,
+      explanation: "Same padding adds zeros around the input so H_out = H_in and W_out = W_in (for stride 1). The number of output channels always equals the number of filters. So output: 32×32×64. With valid padding instead, it would be 28×28×64 (32−5+1=28).",
+    },
+    {
+      question: "A Conv2D layer with 128 filters, kernel size 3×3, processes 64-channel input. How many trainable parameters does this layer have (with bias)?",
+      options: [
+        "73,856 — (3×3×64 + 1) × 128",
+        "9,216 — 3×3×128×... (ignoring input channels)",
+        "147,456 — 3×3×64×128 (forgetting bias terms)",
+      ],
+      correctIndex: 0,
+      explanation: "Formula: (K×K×C_in + 1) × C_out = (9×64 + 1) × 128 = (576+1) × 128 = 577 × 128 = 73,856. The +1 is the bias per filter. The key insight: this is independent of input spatial dimensions (H, W) because of weight sharing — the same filter slides across all positions.",
+    },
+    {
+      question: "In the early layers of an image classifier, max pooling is preferred over average pooling primarily because:",
+      options: [
+        "Max pooling preserves the strongest feature activations and is robust to small spatial translations of detected features",
+        "Max pooling reduces the channel count, while average pooling only reduces spatial dimensions",
+        "Max pooling has trainable parameters that can be optimized, unlike average pooling",
+      ],
+      correctIndex: 0,
+      explanation: "Max pooling answers 'was this feature strongly present anywhere in this region?' — it preserves the peak activation even if the feature is slightly shifted within the pooling window. Average pooling dilutes strong activations with weaker surroundings. Neither operation changes channel count, and neither has trainable parameters. Average pooling is used as Global Average Pooling (GAP) at the network's end to aggregate spatial features before the classifier.",
+    },
+  ],
+},
+
+"dl-a2": {
+  durationLabel: "22 min",
+  outcomes: [
+    "Explain why vanilla RNNs fail on long sequences due to the **vanishing gradient problem** — not as a buzzword, but mechanically.",
+    "Describe the LSTM **cell state** and three gates and why they solve the gradient highway problem.",
+    "Choose between RNN, LSTM, GRU, and Transformer for a given sequence modeling task based on length, latency, and compute constraints.",
+    "Identify the architectural limit that makes vanilla RNNs unsuitable for sequences longer than ~50–100 steps.",
+  ],
+  learnMarkdown: `## Why sequences are different
+
+Most ML models assume inputs are independent and identically distributed. Sequences break that assumption: the meaning of token t depends on tokens 1 through t-1. Language, time series, audio, DNA — all require **memory of context**.
+
+The simplest solution is an RNN. At each time step t, it maintains a hidden state:
+
+\`\`\`
+h_t = tanh(W_h · h_{t-1} + W_x · x_t + b)
+\`\`\`
+
+The hidden state is the model's "working memory" — it's supposed to carry relevant history forward. The problem is what happens during training.
+
+## The vanishing gradient problem
+
+Backpropagation through time (BPTT) unrolls the RNN and computes gradients like any deep network. But the gradient for the loss at step T with respect to the hidden state at step 1 involves a product of T Jacobians:
+
+\`\`\`
+∂L/∂h_1 = ∂L/∂h_T · ∏(t=2..T) ∂h_t/∂h_{t-1}
+\`\`\`
+
+Each factor involves the derivative of tanh, which is bounded by 1. Repeated multiplication over 100 steps drives gradients toward zero exponentially fast. **The model simply cannot learn long-range dependencies** because the gradient signal from distant time steps disappears before it reaches the early parameters.
+
+Exploding gradients are the opposite failure — when the product grows unboundedly. Gradient clipping (clip the norm to a threshold) handles this, but clipping cannot resurrect a vanished gradient.
+
+## LSTMs: the cell state highway
+
+The Long Short-Term Memory (LSTM) adds a **cell state** C_t — a separate memory channel that flows through the network with only minor, multiplicative interactions (unlike the hidden state which is repeatedly squashed by tanh).
+
+Three gates control the cell state:
+
+- **Forget gate** f_t: how much of C_{t-1} to keep. f_t ≈ 0 → clear memory; f_t ≈ 1 → preserve it.
+- **Input gate** i_t: how much of the new candidate cell value to write.
+- **Output gate** o_t: how much of the cell state to expose as the hidden state h_t.
+
+\`\`\`
+f_t = σ(W_f · [h_{t-1}, x_t] + b_f)
+i_t = σ(W_i · [h_{t-1}, x_t] + b_i)
+C̃_t = tanh(W_C · [h_{t-1}, x_t] + b_C)
+C_t = f_t ⊙ C_{t-1} + i_t ⊙ C̃_t
+h_t = o_t ⊙ tanh(C_t)
+\`\`\`
+
+The cell state update is additive (not multiplicative through a squashing function), so gradients can flow back hundreds of steps without vanishing. This is the fundamental architectural insight.
+
+## GRU: LSTMs with fewer parameters
+
+The Gated Recurrent Unit (GRU) merges the cell and hidden state and uses only two gates (reset, update). Empirically it performs similarly to LSTM on most tasks with fewer parameters — preferred when compute is constrained.
+
+## RNN/LSTM vs Transformer
+
+| | RNN / LSTM | Transformer |
+|---|---|---|
+| Sequence length | Good up to ~200 tokens | Good for 1k–100k+ tokens |
+| Parallelism | Sequential — cannot parallelize | Fully parallel (O(n²) attention) |
+| Training speed | Slow on long sequences | Fast with GPUs |
+| Inference latency | Low (incremental) | Higher (full attention) |
+| Typical use | On-device, short sequences | NLP, long context, SOTA |
+
+For real-time streaming tasks on edge devices or short sequences (sensor data, short text), LSTMs remain competitive. For any task where Transformers are feasible, they win on accuracy.
+
+## Interview hook (answer like a senior)
+
+"Vanilla RNNs fail on long sequences because backprop through time multiplies Jacobians at each step — the gradient vanishes exponentially. LSTMs solve this with a cell state highway that uses additive updates and gated writes, preserving gradients over hundreds of steps. For most modern NLP the Transformer has superseded both due to full parallelism, but LSTMs remain relevant for low-latency streaming tasks on constrained hardware."`,
+
+  video: null,
+  videoFallbackMarkdown: `## Deep dive: build the LSTM intuition
+
+### The gradient highway mental model
+
+Think of the cell state as a conveyor belt running along the top of the network. The gates are arms that can add to or remove items from the belt. Unlike the hidden state (which gets squashed by tanh at every step), the conveyor belt can carry items unchanged from step 1 to step T.
+
+This is why forget gate values near 1.0 during a long document mean "keep this context" — the gradient signal travels back through those 1.0 multiplications essentially intact.
+
+### Practical LSTM gotchas
+
+- **Stateful vs stateless**: By default, Keras resets hidden state between batches. For time series, use stateful=True and manually reset between sequences.
+- **Bidirectional LSTM**: Runs one LSTM forward, one backward, concatenates hidden states. Useful when the full sequence is available (classification) but impossible for autoregressive generation.
+- **Return sequences vs return state**: return_sequences=True returns h_t at every step (for stacked LSTMs or seq-to-seq). return_state=True also returns the final cell state (for encoder-decoder architectures).`,
+
+  tryGuidance: "Use the viz to step through how the hidden state updates at each time step in a vanilla RNN, then switch to the LSTM tab to see how the forget/input/output gates control the cell state. Notice how the gradient magnitude (shown as color intensity) fades in the RNN but stays strong in the LSTM.",
+
+  interviewGraph: {
+    initialStageId: "a2_rnn_click",
+    artifactDimensions: [
+      { label: "Vanishing Gradient Mechanics", recoveryStageId: "a2_rec_vanish" },
+      { label: "LSTM Gate Functions", recoveryStageId: "a2_rec_gates" },
+      { label: "Sequence Model Selection", recoveryStageId: "a2_rec_selection", passLabel: "Sequence Architecture Mastery" },
+    ],
+    stages: {
+      a2_rnn_click: {
+        id: "a2_rnn_click",
+        type: "click_target",
+        badge: "Stage 1 target",
+        title: "Stage 1 · Wrong cell type for long-range dependencies",
+        prompt: "The model processes product reviews (avg 300 tokens) to predict sentiment. Click the line that will fail to capture long-range context.",
+        code_snippet: `tokenizer = Tokenizer(num_words=10000)
+sequences = tokenizer.texts_to_sequences(reviews)  # avg length 300
+X = pad_sequences(sequences, maxlen=300)
+model.add(SimpleRNN(128))  # ds-target:wrong_cell
+model.add(Dense(1, activation='sigmoid'))`,
+        validationCopy: {
+          wrong_cell: "Correct. SimpleRNN fails on sequences of length 300 due to vanishing gradients — it cannot capture dependencies between the beginning and end of a review. LSTM or a Transformer is needed.",
+        },
+        branches: { wrong_cell: "a2_vanish_choice" },
+      },
+      a2_vanish_choice: {
+        id: "a2_vanish_choice",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Why vanilla RNNs fail on long sequences",
+        prompt: "A vanilla RNN on 100 time steps has near-zero gradients in the first 20 layers during training. What is the root cause?",
+        code_snippet: `# During BPTT, the gradient at step 1 involves:
+# ∂L/∂h_1 ≈ ∏(t=2..100) ∂h_t/∂h_{t-1}
+# Each factor involves tanh derivative, max value = ?`,
+        choices: [
+          { id: "a", label: "Repeated multiplication of tanh derivatives (≤1) over 100 steps → exponential decay", description: "Each step's Jacobian has spectral radius < 1; multiplied 100 times → gradient vanishes." },
+          { id: "b", label: "The learning rate is too high for long sequences", description: "Learning rate affects step size, not whether gradients exist at all positions." },
+          { id: "c", label: "Weight initialization causes the gradients to start near zero", description: "Initialization affects magnitude at step 0; the vanishing problem compounds over time regardless of initialization." },
+          { id: "d", label: "Batch size is too small for long sequences", description: "Batch size affects gradient noise but not the fundamental vanishing gradient problem." },
+        ],
+        branches: { a: "a2_lstm_gate_choice", b: "a2_rec_vanish", c: "a2_rec_vanish", d: "a2_rec_vanish" },
+        rationale: "The vanishing gradient is a product of T Jacobians. Each ∂h_t/∂h_{t-1} involves the derivative of tanh (bounded by 1). Over 100 steps, values like 0.9^100 ≈ 2.6×10^{-5} — effectively zero.",
+      },
+      a2_rec_vanish: {
+        id: "a2_rec_vanish",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Vanishing gradient mechanics",
+        prompt: "Which architectural change in LSTM directly prevents the vanishing gradient (not just slows it)?",
+        code_snippet: `# LSTM cell state update:
+# C_t = f_t ⊙ C_{t-1} + i_t ⊙ C̃_t
+# Compare to RNN: h_t = tanh(W · h_{t-1} + ...)`,
+        choices: [
+          { id: "a", label: "Additive cell state update — gradient flows back through additions, not multiplications through tanh", description: "The cell state update is additive: gradient ∂C_t/∂C_{t-1} = f_t (a value, not squashed through tanh). With f_t ≈ 1, gradient passes through unchanged." },
+          { id: "b", label: "LSTM uses ReLU activations instead of tanh", description: "LSTM gates still use sigmoid and the cell update uses tanh. The key difference is the cell state highway, not the activation." },
+          { id: "c", label: "LSTM has more parameters so gradients are larger", description: "More parameters doesn't prevent vanishing gradients — the issue is the multiplicative path through squashing functions." },
+        ],
+        branches: { a: "a2_lstm_gate_choice", b: "a2_rec_vanish", c: "a2_rec_vanish" },
+        rationale: "The cell state update C_t = f_t ⊙ C_{t-1} + i_t ⊙ C̃_t means ∂C_t/∂C_{t-1} = f_t, which can be close to 1. Gradients travel back through this additive path without repeated tanh squashing.",
+      },
+      a2_lstm_gate_choice: {
+        id: "a2_lstm_gate_choice",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · LSTM gate behavior",
+        prompt: "Mid-sequence in a text classification task, the forget gate outputs 0.02 for all positions. What is the model doing?",
+        code_snippet: `# Forget gate: f_t = σ(W_f · [h_{t-1}, x_t] + b_f)
+# Cell state: C_t = f_t ⊙ C_{t-1} + ...
+# f_t ≈ 0.02 → C_t ≈ ?`,
+        choices: [
+          { id: "a", label: "Erasing almost all prior cell state — treating the current position as a fresh start", description: "C_t = 0.02 × C_{t-1} + new content ≈ entirely new content. This is appropriate when context resets (e.g., new sentence, topic shift)." },
+          { id: "b", label: "Preserving nearly all prior cell state unchanged", description: "Forget gate near 0 erases, near 1 preserves. 0.02 means almost everything is forgotten." },
+          { id: "c", label: "Blocking all new information from being written to cell state", description: "That's the input gate, not the forget gate. The forget gate only controls how much of C_{t-1} survives." },
+          { id: "d", label: "Forcing the hidden state output to zero", description: "The output gate controls h_t. The forget gate only affects C_{t-1} retention." },
+        ],
+        branches: { a: "a2_seq_selection_choice", b: "a2_rec_gates", c: "a2_rec_gates", d: "a2_rec_gates" },
+        rationale: "Forget gate = 0.02 means C_t ≈ 0.02 × C_{t-1} + new_content — the model effectively resets its memory. This is learned behavior at positions where history is irrelevant.",
+      },
+      a2_rec_gates: {
+        id: "a2_rec_gates",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · LSTM gates",
+        prompt: "Which gate controls how much new information is written to the cell state (not how much old information is kept)?",
+        code_snippet: `# The 3 gates:
+# f_t = σ(...)  → controls retention of C_{t-1}
+# i_t = σ(...)  → controls writing of C̃_t
+# o_t = σ(...)  → controls reading from C_t to h_t`,
+        choices: [
+          { id: "a", label: "Input gate i_t — scales how much of the candidate cell value C̃_t is written", description: "C_t = f_t ⊙ C_{t-1} + i_t ⊙ C̃_t. The input gate scales the new candidate." },
+          { id: "b", label: "Forget gate f_t", description: "Forget gate controls how much of C_{t-1} survives — it's about retention, not new writes." },
+          { id: "c", label: "Output gate o_t", description: "Output gate controls what gets exposed as the hidden state h_t — it reads from the cell, doesn't write to it." },
+        ],
+        branches: { a: "a2_seq_selection_choice", b: "a2_rec_gates", c: "a2_rec_gates" },
+        rationale: "The input gate i_t (multiplied by the candidate C̃_t) controls how much new information enters the cell state. Forget gate = what old info to keep; input gate = what new info to add.",
+      },
+      a2_seq_selection_choice: {
+        id: "a2_seq_selection_choice",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Sequence model selection",
+        prompt: "Real-time anomaly detection on IoT sensor streams: 50-value sequences, must run on a microcontroller at <10ms latency. Which architecture?",
+        code_snippet: `# Constraints:
+# - Sequence length: 50 time steps
+# - Device: ARM Cortex-M4 (no GPU)
+# - Latency requirement: <10ms per inference
+# - Training data: 500k labeled sequences`,
+        choices: [
+          { id: "a", label: "LSTM — short sequences, low-latency incremental inference, deployable on-device", description: "Sequence length 50 is well within LSTM's capability. LSTM runs incrementally (update state per new value), has tiny memory footprint, and can be quantized to run on microcontrollers." },
+          { id: "b", label: "Transformer — best accuracy on sequence tasks", description: "Transformers need full sequence present at once (O(n²) attention), need GPU for reasonable latency, and are too large for microcontrollers." },
+          { id: "c", label: "GRU — same as LSTM but fewer parameters is always better", description: "GRU would also work here, but 'fewer parameters is always better' is wrong — LSTM may learn better with the extra capacity. Both are valid; the key argument is against Transformer." },
+          { id: "d", label: "Vanilla RNN — simplest model, best for microcontrollers", description: "Vanilla RNN would work at length 50 (vanishing gradient is less severe), but LSTM is the standard choice since it handles variable-length dependencies better without much overhead." },
+        ],
+        branches: { a: "a2_terminal", b: "a2_rec_selection", c: "a2_terminal", d: "a2_rec_selection" },
+        rationale: "LSTM (or GRU) is the right call: short sequence avoids the vanishing gradient limit, incremental inference fits real-time requirements, and the model is small enough for edge deployment. Transformer is overkill and impractical here.",
+      },
+      a2_rec_selection: {
+        id: "a2_rec_selection",
+        type: "scenario_choice",
+        badge: "Recovery 3",
+        title: "Recovery · Sequence model trade-offs",
+        prompt: "Transformers replaced RNNs for most NLP tasks. Which limitation of RNNs does the Transformer most directly address?",
+        code_snippet: `# RNN: h_t depends on h_{t-1} → sequential, cannot parallelize
+# Transformer: all positions attend to all positions simultaneously`,
+        choices: [
+          { id: "a", label: "Sequential dependency — RNNs can't be parallelized during training; Transformers process all positions simultaneously", description: "This is the primary win: full GPU parallelism during training. Self-attention is O(n²) in memory but O(1) in sequential steps." },
+          { id: "b", label: "RNNs can't handle variable-length sequences", description: "RNNs handle variable-length sequences naturally — they process step by step. Padding is needed but that's not the architectural limitation." },
+          { id: "c", label: "RNNs are always slower at inference than Transformers", description: "At inference time, RNNs are actually faster for streaming (one step at a time). Transformers need full context for each prediction." },
+        ],
+        branches: { a: "a2_terminal", b: "a2_rec_selection", c: "a2_rec_selection" },
+        rationale: "The killer feature of Transformers is full parallelism: all tokens are processed simultaneously during training, enabling orders-of-magnitude faster training on long sequences with modern GPU hardware.",
+      },
+      a2_terminal: {
+        id: "a2_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Revision complete · Sequence modeling mastered",
+        terminal: true,
+        prompt: "An LSTM model is trained on financial news (avg 400 tokens) for market sentiment. Training loss drops but validation performance plateaus after epoch 3. The forget gates are near 0.9 throughout. What does the forget gate value tell you, and what would you try next?",
+        code_snippet: `# Forget gates ≈ 0.9 throughout training
+# Train loss: 0.45 → 0.18 (epoch 1-10)
+# Val loss: 0.48 → 0.41 → 0.40 (plateau)`,
+        choices: [
+          { id: "a", label: "Forget gates near 0.9 = model is retaining most context across the 400-token sequence. Plateau = overfitting. Try dropout, L2 regularization, or switch to a Transformer for better long-range modeling.", description: "Forget gate 0.9 means the cell state carries information far back — the model is trying to use long-range context. Plateau with dropping train loss = overfitting. Regularization or a more expressive architecture are the right next steps." },
+          { id: "b", label: "Forget gates near 0.9 = bad — the model is not forgetting enough irrelevant context. Lower the learning rate.", description: "High forget gate values are often correct behavior for long documents — the model needs distant context. The plateau is an overfitting issue, not a forget gate issue." },
+          { id: "c", label: "The model needs more LSTM units — increase hidden size from 128 to 512.", description: "More units increases capacity but won't address overfitting (plateaued val loss). Adding parameters to an overfitting model makes it worse." },
+        ],
+        branches: { a: "a2_terminal", b: "a2_terminal", c: "a2_terminal" },
+        rationale: "Forget gate ≈ 0.9 is informative: the model is preserving cell state over long distances, which is appropriate for 400-token news articles. The train/val gap indicates overfitting — add dropout (Keras LSTM has a recurrent_dropout parameter), reduce model size, or upgrade to a Transformer which handles long sequences more efficiently.",
+      },
+    },
+  },
+
+  knowledgeCheck: [
+    {
+      question: "Why does a vanilla RNN fail to learn dependencies between tokens 1 and 300 in a 300-token sequence?",
+      options: [
+        "Gradients vanish exponentially when backpropagated through 300 tanh-squashed time steps",
+        "RNNs can only process sequences up to 100 tokens by design",
+        "The hidden state dimension is too small to store 300 tokens of context",
+      ],
+      correctIndex: 0,
+      explanation: "BPTT multiplies Jacobians at each step. Each involves the tanh derivative (max 0.25), so gradients decay exponentially over 300 steps — effectively zero long before they reach step 1.",
+    },
+    {
+      question: "An LSTM forget gate outputs 0.01 for a specific time step. What does this mean for the cell state?",
+      options: [
+        "The cell state is almost entirely erased at this step — the model treats it as a fresh start",
+        "The cell state is preserved unchanged — the model is in 'remember everything' mode",
+        "The output gate is preventing the cell state from influencing the hidden state",
+      ],
+      correctIndex: 0,
+      explanation: "C_t = 0.01 × C_{t-1} + i_t × C̃_t ≈ i_t × C̃_t. Nearly all prior cell state is discarded — appropriate at topic boundaries or sentence breaks.",
+    },
+    {
+      question: "You need to classify documents up to 2,000 tokens. LSTM or Transformer?",
+      options: [
+        "Transformer — self-attention directly connects any two positions in O(1) steps regardless of distance",
+        "LSTM — it has been proven to handle longer sequences than Transformers",
+        "Either works identically at 2,000 tokens",
+      ],
+      correctIndex: 0,
+      explanation: "At 2,000 tokens, LSTM's vanishing gradient and sequential processing are real limitations. Transformers attend to all positions simultaneously and are the standard choice for long-document tasks when compute is available.",
+    },
+  ],
+},
+
+"dl-a3": {
+  durationLabel: "30 min",
+  outcomes: [
+    "Explain the **query-key-value attention mechanism** and why it enables direct long-range dependency modeling.",
+    "Distinguish encoder-only (BERT), decoder-only (GPT), and encoder-decoder (T5) Transformer architectures and their appropriate use cases.",
+    "Identify the **O(n²) attention complexity** bottleneck and name two approaches that address it for long contexts.",
+    "Explain why positional encoding is required and how learned vs. sinusoidal encodings differ.",
+  ],
+  learnMarkdown: `## The problem Transformers were designed to solve
+
+RNNs process sequences one token at a time — they cannot be parallelized and struggle with dependencies spanning hundreds of tokens. The 2017 paper "Attention Is All You Need" proposed replacing recurrence entirely with **self-attention**: every position attends to every other position simultaneously.
+
+This one change unlocked three things:
+1. **Full parallelism** — all positions computed simultaneously on GPU
+2. **Direct long-range connections** — no vanishing gradient over distance
+3. **Scalability** — just add more layers, heads, and parameters
+
+## The attention mechanism
+
+Attention takes three inputs for each token: a **Query** (what am I looking for?), a **Key** (what do I contain?), and a **Value** (what do I contribute?). For a sequence of n tokens:
+
+\`\`\`
+Attention(Q, K, V) = softmax(QK^T / √d_k) · V
+\`\`\`
+
+The dot product QK^T produces an n×n matrix of attention scores — how much each token should attend to every other token. Dividing by √d_k prevents softmax saturation. The softmax produces weights that sum to 1 per row, which are used to aggregate Values.
+
+**Key insight**: The cost is O(n²) in both compute and memory — a 10,000-token sequence requires 100 million attention pairs. This is why long-context Transformers require sparse attention or other approximations.
+
+## Multi-head attention
+
+Rather than a single attention operation, Transformers use H parallel attention heads, each projecting into a smaller subspace:
+
+\`\`\`
+MultiHead(Q,K,V) = Concat(head_1, ..., head_H) · W_O
+\`\`\`
+
+Different heads learn different relationship types: one might specialize in syntactic structure, another in semantic similarity, another in positional proximity. The multi-head output is a richer representation than any single attention could provide.
+
+## Positional encoding
+
+Self-attention is **permutation-invariant** — shuffle the tokens and get the same attention weights (just reordered). This means the model has no sense of order without an explicit signal. Positional encodings add position information to each token's embedding:
+
+- **Sinusoidal** (original paper): deterministic, generalizes to lengths longer than training
+- **Learned**: trainable embeddings per position — simpler, but hard to generalize beyond max training length
+- **RoPE / ALiBi** (modern): rotary or bias-based, better length generalization — used in LLaMA, GPT-NeoX
+
+## Three Transformer variants
+
+| Architecture | Training objective | Use case |
+|---|---|---|
+| Encoder-only (BERT) | Masked Language Modeling | Classification, NER, sentence embeddings |
+| Decoder-only (GPT) | Next-token prediction | Text generation, chat, completion |
+| Encoder-decoder (T5, BART) | Seq-to-seq | Translation, summarization, Q&A |
+
+BERT is bidirectional — it sees both left and right context for each token. This makes it excellent for understanding tasks but impossible to use for autoregressive generation. GPT is unidirectional (causal mask) — each token only attends to previous tokens, enabling step-by-step generation.
+
+## Interview hook (answer like a senior)
+
+"Transformers replaced RNNs because self-attention connects any two positions in a single layer — there's no path length proportional to sequence distance, so gradients flow freely and the architecture trains orders of magnitude faster on GPUs. The cost is O(n²) attention, which is why long-context models require sparse or linear attention approximations. BERT uses masked LM to build bidirectional representations; GPT uses causal language modeling for generation — the choice of objective creates fundamentally different models from the same architecture."`,
+
+  video: null,
+  videoFallbackMarkdown: `## Deep dive: build the attention intuition
+
+### The bank analogy for Q/K/V
+
+Think of a library. You walk in with a **query** ("books about gradient descent"). Each book has a **key** on its spine (title/topic tags). You compute relevance scores (dot products), pick the highest-scoring books, and combine their **values** (actual content) weighted by relevance. That's attention.
+
+In the model, Q, K, V are linear projections of the same input — the model learns what to look for (Q), how to label itself (K), and what to contribute when attended to (V).
+
+### Why scaled dot product?
+
+Without the √d_k scaling, large d_k causes dot products to grow large, pushing softmax into saturation regions where gradients become tiny. The scale keeps variance stable regardless of embedding dimension.
+
+### The causal mask in GPT
+
+GPT uses a lower-triangular mask: position t can only attend to positions 1..t. This enforces autoregressive generation — the model cannot "cheat" by looking at future tokens during training. At inference, tokens are generated one at a time, each conditioning on all previous.`,
+
+  tryGuidance: "Use the Attention visualization to trace how a query token attends to key tokens. Try sentences with coreference (pronouns) — notice how the model learns to attend across long distances. Toggle multi-head mode to see different heads specializing in different relationship types.",
+
+  interviewGraph: {
+    initialStageId: "a3_pos_enc_click",
+    artifactDimensions: [
+      { label: "Attention Mechanics", recoveryStageId: "a3_rec_attention" },
+      { label: "Architecture Variants", recoveryStageId: "a3_rec_variants" },
+      { label: "Complexity & Scale", recoveryStageId: "a3_rec_complexity", passLabel: "Transformer Architecture Mastery" },
+    ],
+    stages: {
+      a3_pos_enc_click: {
+        id: "a3_pos_enc_click",
+        type: "click_target",
+        badge: "Stage 1 target",
+        title: "Stage 1 · Missing positional encoding",
+        prompt: "A Transformer built for sentence classification. Click the line whose absence makes all token positions indistinguishable.",
+        code_snippet: `embedding = Embedding(vocab_size, d_model)(tokens)
+# positional encoding omitted here  # ds-target:missing_pos_enc
+x = MultiHeadAttention(num_heads=8, key_dim=64)(embedding, embedding)
+x = LayerNormalization()(x + embedding)
+output = Dense(num_classes, activation='softmax')(x[:, 0, :])`,
+        validationCopy: {
+          missing_pos_enc: "Correct. Without positional encoding, self-attention is permutation-invariant — 'The cat sat on the mat' and 'mat the on sat cat The' produce identical attention outputs. Position information must be explicitly injected.",
+        },
+        branches: { missing_pos_enc: "a3_attn_complexity_choice" },
+      },
+      a3_attn_complexity_choice: {
+        id: "a3_attn_complexity_choice",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Attention complexity bottleneck",
+        prompt: "A Transformer with standard self-attention processes a 4,096-token legal document. What's the primary bottleneck compared to processing a 512-token document?",
+        code_snippet: `# Attention matrix: n × n for sequence length n
+# n=512:  512² =   262,144 pairs
+# n=4096: 4096² = 16,777,216 pairs`,
+        choices: [
+          { id: "a", label: "O(n²) memory and compute — 64× more attention pairs, GPU memory explodes", description: "4096² / 512² = 64×. Both memory (storing the full attention matrix) and compute scale quadratically. This is why models like Longformer use sparse attention for long documents." },
+          { id: "b", label: "More tokens means more gradient updates — training is slower", description: "Training speed is affected by many factors, but the fundamental bottleneck is the O(n²) attention matrix size, not gradient count." },
+          { id: "c", label: "The vocabulary size must increase for longer documents", description: "Vocabulary size is independent of sequence length." },
+          { id: "d", label: "Position embeddings run out past 512 tokens", description: "Standard sinusoidal encodings generalize beyond training length; learned embeddings do have this issue, but it's separate from the core complexity bottleneck." },
+        ],
+        branches: { a: "a3_bert_gpt_choice", b: "a3_rec_attention", c: "a3_rec_attention", d: "a3_rec_attention" },
+        rationale: "Self-attention computes n² dot products and stores an n×n matrix. At n=4096, that's 64× the memory vs n=512. This is why long-context models use sliding window attention (Longformer), linear attention approximations, or chunking strategies.",
+      },
+      a3_rec_attention: {
+        id: "a3_rec_attention",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Attention mechanics",
+        prompt: "In scaled dot-product attention, what is the purpose of dividing QK^T by √d_k?",
+        code_snippet: `# Attention(Q, K, V) = softmax(QK^T / √d_k) · V
+# d_k = key dimension (e.g. 64)`,
+        choices: [
+          { id: "a", label: "Prevent softmax saturation — large dot products push softmax into near-zero gradient regions", description: "As d_k grows, dot products grow in magnitude. Dividing by √d_k keeps variance ≈ 1, preventing softmax from producing near-uniform or near-one-hot distributions prematurely." },
+          { id: "b", label: "Normalize attention weights to sum to 1 per row", description: "That's done by softmax itself. The √d_k scaling happens before softmax, for a different reason." },
+          { id: "c", label: "Reduce the number of attention parameters", description: "√d_k is a scalar constant — it doesn't change the parameter count." },
+        ],
+        branches: { a: "a3_bert_gpt_choice", b: "a3_rec_attention", c: "a3_rec_attention" },
+        rationale: "Without √d_k scaling, high-dimensional embeddings produce large dot products, pushing softmax into saturation. Dividing by √d_k (standard deviation of a random dot product) keeps values in the soft-attention region where gradients are informative.",
+      },
+      a3_bert_gpt_choice: {
+        id: "a3_bert_gpt_choice",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · BERT vs GPT architecture choice",
+        prompt: "You need to build a named entity recognition (NER) system — labeling each token as person/org/location/other. BERT or GPT?",
+        code_snippet: `# NER: label each token with a class
+# Input: "Apple Inc. was founded by Steve Jobs"
+# Output: [ORG, ORG, O, O, O, O, PER, PER]`,
+        choices: [
+          { id: "a", label: "BERT — encoder-only, bidirectional context, ideal for per-token classification tasks", description: "BERT processes each token with full left and right context (bidirectional). NER benefits from seeing what comes after a token ('Jobs' is a person because 'Steve' precedes it and nothing follows suggesting otherwise). Fine-tune a token classification head on top." },
+          { id: "b", label: "GPT — larger models generally perform better on all tasks", description: "GPT's causal mask means each token only sees left context. For NER this misses right-context signals. Model size matters, but architecture fit matters more." },
+          { id: "c", label: "Encoder-decoder (T5) — always the most flexible choice", description: "T5 can do NER framed as seq-to-seq, but it's overkill and slower than a BERT-style token classifier for this task." },
+          { id: "d", label: "GPT — its next-token prediction pre-training teaches it to understand entity boundaries", description: "GPT learns language structure, but its unidirectional attention is a structural disadvantage for token-level tasks that need full context." },
+        ],
+        branches: { a: "a3_multihead_choice", b: "a3_rec_variants", c: "a3_rec_variants", d: "a3_rec_variants" },
+        rationale: "BERT is the natural choice for token classification: bidirectional attention means each token's representation encodes full sentence context. GPT's causal mask limits it to left context only, which is a disadvantage for tasks where right context is informative.",
+      },
+      a3_rec_variants: {
+        id: "a3_rec_variants",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · Transformer architecture variants",
+        prompt: "You need to build a system that takes a long English paragraph and outputs a 2-sentence summary. Which Transformer variant?",
+        code_snippet: `# Input: long paragraph (variable length)
+# Output: short summary (different length)
+# Task type: sequence → sequence (different output length)`,
+        choices: [
+          { id: "a", label: "Encoder-decoder (T5, BART) — designed for input-output sequences of different lengths", description: "Seq-to-seq tasks with different input/output lengths are the natural home for encoder-decoder models. The encoder builds a compressed representation; the decoder generates the summary autoregressively." },
+          { id: "b", label: "Encoder-only (BERT) — encode the paragraph, truncate to 2 sentences", description: "BERT produces token-level representations, not generated text. You can't generate summaries by truncating BERT output." },
+          { id: "c", label: "Decoder-only (GPT) — frame it as completion: 'paragraph → summary:'", description: "GPT can do summarization via prompting, but it's less efficient than an encoder-decoder which explicitly compresses the input into a representation the decoder can cross-attend to." },
+        ],
+        branches: { a: "a3_multihead_choice", b: "a3_rec_variants", c: "a3_rec_variants" },
+        rationale: "Summarization is a canonical seq-to-seq task. Encoder-decoder models (T5, BART, PEGASUS) were specifically designed and pre-trained for this pattern — they compress the full input in the encoder, then generate variable-length output in the decoder.",
+      },
+      a3_multihead_choice: {
+        id: "a3_multihead_choice",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Multi-head attention purpose",
+        prompt: "A Transformer uses 12 attention heads. At inference, you visualize head 3 and head 7. Head 3 mostly attends to the previous token; head 7 attends to the subject of the sentence regardless of distance. What does this indicate?",
+        code_snippet: `# 12 heads, each with d_k = 64 (d_model = 768)
+# head_3: strong attention to position t-1 (local)
+# head_7: strong attention to sentence subject (long-range)`,
+        choices: [
+          { id: "a", label: "Different heads specialize in different relationship types — multi-head attention learns a richer, multi-aspect representation", description: "This is the intended behavior: each head projects to a different subspace and learns to capture a different linguistic or structural relationship. The outputs are concatenated to give a joint representation." },
+          { id: "b", label: "This is a training instability — all heads should attend to the same positions", description: "Head specialization is a feature, not a bug. Diversity of attention patterns is what makes multi-head attention more expressive than a single large head." },
+          { id: "c", label: "Head 3 is underfitting because it only looks one position back", description: "Local attention heads (focusing on nearby tokens) are valuable for capturing syntactic patterns like subject-verb agreement across short spans." },
+          { id: "d", label: "12 heads is too many — reduce to 1 to eliminate redundant computation", description: "Fewer heads means less representational diversity. 12 heads (as in BERT-base) is a standard architecture choice backed by empirical performance." },
+        ],
+        branches: { a: "a3_terminal", b: "a3_rec_complexity", c: "a3_rec_complexity", d: "a3_rec_complexity" },
+        rationale: "Multi-head attention is specifically designed to allow different heads to learn different relationship types in parallel. Head specialization (local vs. long-range, syntactic vs. semantic) is a key empirical finding — it's why multi-head consistently outperforms single-head with equivalent parameter count.",
+      },
+      a3_rec_complexity: {
+        id: "a3_rec_complexity",
+        type: "scenario_choice",
+        badge: "Recovery 3",
+        title: "Recovery · Attention complexity",
+        prompt: "A startup wants to run a Transformer on 100,000-token legal contracts in real time. Standard self-attention fails. What's the architectural approach?",
+        code_snippet: `# Standard attention: O(n²) memory
+# n=100,000 → 10^10 attention pairs
+# At fp16: ~20TB memory just for attention matrix`,
+        choices: [
+          { id: "a", label: "Sparse / sliding window attention — only attend to local windows + selected global tokens", description: "Longformer, BigBird: each token attends to a fixed local window (e.g., 512 tokens) plus a few global tokens. O(n) instead of O(n²). FlashAttention also reduces memory via tiling." },
+          { id: "b", label: "Just use a larger GPU", description: "At 100k tokens, even an 80GB A100 cannot fit the standard attention matrix. Hardware cannot solve an algorithmic scaling problem of this magnitude." },
+          { id: "c", label: "Reduce vocabulary size to shrink the model", description: "Vocabulary size is unrelated to the attention complexity over sequence length." },
+        ],
+        branches: { a: "a3_terminal", b: "a3_rec_complexity", c: "a3_rec_complexity" },
+        rationale: "For very long sequences, O(n²) attention is infeasible. Sparse attention (Longformer, BigBird) restricts each token to attend only to a local window and designated global tokens, reducing complexity to O(n). FlashAttention achieves the same outputs as standard attention but with O(n) memory via careful tiling.",
+      },
+      a3_terminal: {
+        id: "a3_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Revision complete · Transformer architecture mastered",
+        terminal: true,
+        prompt: "Explain the key architectural difference between BERT and GPT, and give one task each is better suited for — in 3 sentences or fewer.",
+        code_snippet: `# BERT: bidirectional encoder, masked LM pre-training
+# GPT: causal decoder, next-token prediction pre-training`,
+        choices: [
+          { id: "a", label: "BERT is bidirectional (sees full context per token) → best for classification/NER/QA. GPT is causal (left context only) → best for generation. Both are Transformers but trained with different objectives creating fundamentally different representations.", description: "Complete and accurate — captures the architectural difference (attention mask), the training objective difference, and the task implication." },
+          { id: "b", label: "BERT is bigger so it's better for classification; GPT is smaller so it's better for generation", description: "Model size is not the defining difference — the attention mask and pre-training objective are." },
+          { id: "c", label: "They are the same architecture with different fine-tuning data", description: "The causal mask in GPT vs. bidirectional attention in BERT creates fundamentally different token representations, not just different fine-tuning behavior." },
+        ],
+        branches: { a: "a3_terminal", b: "a3_terminal", c: "a3_terminal" },
+        rationale: "BERT uses a bidirectional (unmasked) encoder — every token attends to every other token, giving context-rich representations ideal for understanding tasks (classification, NER, QA). GPT uses a causal decoder — each token only attends to previous tokens, which naturally supports autoregressive text generation. The pre-training objectives (masked LM vs. next-token prediction) reinforce these different capabilities.",
+      },
+    },
+  },
+
+  knowledgeCheck: [
+    {
+      question: "Why is positional encoding required in a Transformer but not in an RNN?",
+      options: [
+        "Self-attention is permutation-invariant — without position encoding, 'cat sat mat' and 'mat cat sat' produce identical outputs",
+        "Transformers use larger vocabularies that require position-aware embeddings",
+        "RNNs also require positional encoding but it is implicit in the recurrent weights",
+      ],
+      correctIndex: 0,
+      explanation: "Self-attention computes dot products between all pairs of tokens regardless of order. Without an explicit position signal, the model has no way to distinguish token order. RNNs inherently encode position through the sequential hidden state update.",
+    },
+    {
+      question: "What does the O(n²) complexity of self-attention refer to?",
+      options: [
+        "The number of attention score computations grows quadratically with sequence length",
+        "The model needs n² training examples to learn n attention patterns",
+        "The number of parameters in the Transformer grows quadratically with vocabulary size",
+      ],
+      correctIndex: 0,
+      explanation: "For a sequence of n tokens, each token computes a dot product with every other token — n² operations total. Memory required to store the attention matrix is also O(n²), which becomes prohibitive for n > a few thousand tokens.",
+    },
+    {
+      question: "You need to generate product descriptions from structured feature data (price, category, specs). Which Transformer variant?",
+      options: [
+        "Encoder-decoder — encodes the structured input, decodes to natural language output",
+        "Encoder-only (BERT) — best for text generation tasks",
+        "A decoder-only model trained only on descriptions with no input conditioning",
+      ],
+      correctIndex: 0,
+      explanation: "Generating text from a structured input of a different format is a seq-to-seq task. Encoder-decoder models (T5, BART) are designed for exactly this: the encoder compresses the structured input, and the decoder generates the output text via cross-attention to the encoder's representation.",
+    },
+  ],
+},
+
+"dl-a4": {
+  durationLabel: "18 min",
+  outcomes: [
+    "Choose between **feature extraction** and **fine-tuning** based on dataset size and domain similarity.",
+    "Explain why fine-tuning at a high learning rate causes **catastrophic forgetting** of pretrained weights.",
+    "Apply **discriminative learning rates** — lower LR for early layers, higher for later layers.",
+    "Describe parameter-efficient fine-tuning (LoRA) and when it is preferred over full fine-tuning.",
+  ],
+  learnMarkdown: `## Why transfer learning works
+
+Training a deep network from scratch requires vast data and compute. But the lower layers of any network trained on a large, diverse dataset learn surprisingly general features: edges and textures in vision models; token co-occurrence patterns in language models. These features are reusable.
+
+Transfer learning copies a **pretrained model** and adapts it to a new task, letting you benefit from millions of training examples you never had to collect.
+
+## The three strategies
+
+### Feature extraction (freeze everything)
+
+Freeze all pretrained weights. Add a new classification head (or MLP) on top. Only train the head.
+
+**When**: small target dataset (< a few thousand examples), or when target domain is very similar to pretraining domain (e.g., fine-tuning an ImageNet model for a different object category).
+
+**Risk**: if your task is sufficiently different, frozen features may not be expressive enough.
+
+### Partial fine-tuning (unfreeze top N layers)
+
+Freeze early layers (generic features); unfreeze and retrain later layers (task-specific features). Use a small learning rate (1e-5 to 1e-4) to avoid destroying pretrained representations.
+
+**When**: moderate-size dataset, domain shift exists but isn't extreme.
+
+### Full fine-tuning (unfreeze all layers)
+
+Train all weights, with a very low learning rate. Early layers change slowly (they're good already); later layers adapt more aggressively.
+
+**When**: large target dataset, domain shift is significant (e.g., adapting a general LLM to medical records).
+
+**Risk**: catastrophic forgetting — if LR is too high, gradient updates overwrite pretrained knowledge, often performing worse than feature extraction on small data.
+
+## Discriminative learning rates
+
+Different layers need different learning rates:
+
+\`\`\`
+layer_1_lr = base_lr / 100    # almost frozen
+layer_2_lr = base_lr / 10     # gentle updates
+layer_3_lr = base_lr          # full updates (task-specific head)
+\`\`\`
+
+Early layers encode low-level, general features (edges, syntax) — a small LR preserves them. Later layers encode high-level, task-specific features — a larger LR lets them adapt quickly.
+
+## LoRA: parameter-efficient fine-tuning
+
+Full fine-tuning of a 7B-parameter LLM requires updating all 7B parameters — expensive in compute and memory. LoRA (Low-Rank Adaptation) instead adds small trainable rank-decomposition matrices alongside the frozen original weights:
+
+\`\`\`
+W' = W_frozen + ΔW
+ΔW = A · B   where A is (d × r), B is (r × k), r << min(d, k)
+\`\`\`
+
+With rank r=8 and d=k=4096, ΔW has 8×2×4096 = 65,536 parameters instead of 4096² = 16.7M. LoRA reduces trainable parameters by 100–10,000× while matching full fine-tuning on most benchmarks. It's the standard approach for fine-tuning large language models.
+
+## Interview hook (answer like a senior)
+
+"Transfer learning reuses pretrained feature hierarchies rather than learning from scratch. The key decision is how much to unfreeze: frozen (feature extraction) for small data or similar domains; partially or fully fine-tuned for larger data or domain shift. The critical constraint is learning rate — fine-tuning at a high LR causes catastrophic forgetting of pretrained representations. For large language models, LoRA reduces this to training <1% of parameters with comparable task performance."`,
+
+  video: null,
+  videoFallbackMarkdown: `## Deep dive: the domain shift spectrum
+
+### How to think about domain similarity
+
+Pretrained model → target task combinations fall on a 2D grid:
+
+| | Similar domain | Different domain |
+|---|---|---|
+| Large dataset | Fine-tune all layers | Fine-tune all layers carefully |
+| Small dataset | Feature extraction | Try feature extraction; augment aggressively |
+
+When target domain is very different and you have little data, you're in trouble — feature extraction may not work (wrong features) and fine-tuning will overfit. Collect more data or find a more similar pretrained model.
+
+### Why catastrophic forgetting happens
+
+A pretrained model's weights encode a complex, high-dimensional representation of its training distribution. A high learning rate on a new task's gradient descent takes large steps in weight space — large enough to walk far from the pretrained solution. The new task doesn't have enough signal to rebuild the general representation from scratch, so you end up with a model that partially learns the new task while forgetting the pretrained features entirely.
+
+The fix: small LR keeps you close to the pretrained solution while nudging the weights toward the new task — you're in the "fine-tuning" regime, not the "retraining" regime.`,
+
+  tryGuidance: "Use the Transfer Learning viz to adjust how many layers are frozen. Observe the parameter count change and the learning rate strategy for each configuration. Switch between the three strategies and read the trade-off cards — try to predict the right strategy before reading the recommendation.",
+
+  interviewGraph: {
+    initialStageId: "a4_lr_click",
+    artifactDimensions: [
+      { label: "Fine-Tuning Strategy Selection", recoveryStageId: "a4_rec_strategy" },
+      { label: "Catastrophic Forgetting", recoveryStageId: "a4_rec_forgetting" },
+      { label: "Parameter-Efficient Methods", recoveryStageId: "a4_rec_lora", passLabel: "Transfer Learning Mastery" },
+    ],
+    stages: {
+      a4_lr_click: {
+        id: "a4_lr_click",
+        type: "click_target",
+        badge: "Stage 1 target",
+        title: "Stage 1 · Fine-tuning with a destructively high learning rate",
+        prompt: "A pretrained ResNet-50 is being fine-tuned on 500 medical X-ray images. Click the line that will cause catastrophic forgetting of pretrained ImageNet features.",
+        code_snippet: `base_model = ResNet50(weights='imagenet', include_top=False)
+base_model.trainable = True
+optimizer = Adam(learning_rate=0.01)  # ds-target:high_lr
+model.compile(optimizer=optimizer, loss='binary_crossentropy')
+model.fit(x_train, y_train, epochs=20)`,
+        validationCopy: {
+          high_lr: "Correct. lr=0.01 is 100–1000× too high for fine-tuning a pretrained model. Large gradient steps overwrite the ImageNet features the network spent millions of images learning. Use lr=1e-4 to 1e-5 for fine-tuning, with even lower rates for early layers.",
+        },
+        branches: { high_lr: "a4_strategy_choice" },
+      },
+      a4_strategy_choice: {
+        id: "a4_strategy_choice",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Feature extraction vs fine-tuning decision",
+        prompt: "You have a pretrained ResNet-50 (ImageNet) and 400 labeled medical images (chest X-rays). Which strategy?",
+        code_snippet: `# Pretrained on: ImageNet (1.2M images, 1000 classes)
+# Target task: pneumonia detection (binary)
+# Available labeled data: 400 images
+# Domain similarity: low (photos ≠ X-rays)`,
+        choices: [
+          { id: "a", label: "Feature extraction — freeze all ResNet layers, train only a new binary classification head", description: "With only 400 images and domain shift, full fine-tuning will overfit badly. Frozen ImageNet features (edges, textures) still provide useful signal even for X-rays — start here, then try unfreezing last block if needed." },
+          { id: "b", label: "Full fine-tuning with lr=1e-3 — more parameters = better performance on medical images", description: "400 images is far too few for full fine-tuning. You'll overfit to the training set and the high LR will destroy pretrained features without learning medical-specific ones." },
+          { id: "c", label: "Train from scratch — ImageNet features are too different from X-rays to be useful", description: "Even with domain shift, low-level features (edges, textures) from ImageNet are transferable. Training from scratch with 400 images will underfit severely." },
+          { id: "d", label: "Use a pretrained radiology model — ImageNet is irrelevant for medical imaging", description: "A radiology-pretrained model would be better, but if unavailable, ImageNet transfer still outperforms training from scratch for small medical datasets." },
+        ],
+        branches: { a: "a4_discrim_lr_choice", b: "a4_rec_strategy", c: "a4_rec_strategy", d: "a4_discrim_lr_choice" },
+        rationale: "With 400 images and domain shift, feature extraction is the safe starting point. Freeze all ImageNet layers, add a small classification head, train the head only. If performance is insufficient, gradually unfreeze later blocks with a very low LR.",
+      },
+      a4_rec_strategy: {
+        id: "a4_rec_strategy",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Fine-tuning strategy selection",
+        prompt: "You have 100,000 labeled customer support emails and a pretrained BERT. Domain: similar (English text). Which strategy?",
+        code_snippet: `# Pretrained: BERT-base (English Wikipedia + BooksCorpus)
+# Target: customer support intent classification
+# Data: 100,000 labeled examples
+# Domain similarity: high`,
+        choices: [
+          { id: "a", label: "Full fine-tuning with a low LR (1e-5 to 5e-5) — enough data, similar domain", description: "100k examples is more than sufficient to fine-tune all BERT layers without overfitting. Similar domain means pretrained features are highly relevant. Standard BERT fine-tuning recipe." },
+          { id: "b", label: "Feature extraction — freeze BERT, train only a linear classifier head", description: "Feature extraction wastes available training data. With 100k examples and domain match, you can safely update all parameters." },
+          { id: "c", label: "Train BERT from scratch on customer support data", description: "Discards millions of training examples worth of pretrained knowledge. Always prefer starting from a pretrained checkpoint if available." },
+        ],
+        branches: { a: "a4_discrim_lr_choice", b: "a4_rec_strategy", c: "a4_rec_strategy" },
+        rationale: "Large dataset + domain similarity = full fine-tuning. Use the standard BERT fine-tuning recipe: unfreeze all layers, lr=2e-5 to 5e-5, 3-5 epochs, linear warmup + decay.",
+      },
+      a4_discrim_lr_choice: {
+        id: "a4_discrim_lr_choice",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Discriminative learning rates",
+        prompt: "You're fine-tuning a 12-layer BERT for text classification. Why should layer 1 use a smaller LR than layer 12?",
+        code_snippet: `# Layer 1 (close to input): learns low-level syntax, subword patterns
+# Layer 12 (close to output): learns task-specific representations
+# layer_1_lr << layer_12_lr`,
+        choices: [
+          { id: "a", label: "Early layers encode general language features that transfer well — large updates destroy this; later layers need more task-specific adaptation", description: "Layer 1 of BERT encodes syntax and morphology — useful for almost any NLP task and already well-trained. Layer 12 encodes high-level semantics that should shift toward the target task. Discriminative LRs preserve the former while adapting the latter." },
+          { id: "b", label: "Early layers have more parameters so a lower LR prevents gradient explosion", description: "All layers in BERT-base have the same number of parameters per layer. The LR choice is about preserving general vs. adapting task-specific features, not parameter count." },
+          { id: "c", label: "Early layers train faster, so a lower LR makes training more uniform", description: "Layer training speed is not the reason. The argument is about what each layer has learned and how much it should change for the new task." },
+          { id: "d", label: "Lower LR everywhere is always better to prevent catastrophic forgetting", description: "A uniformly low LR is conservative but misses the insight that later layers should adapt more aggressively than earlier ones to the new task." },
+        ],
+        branches: { a: "a4_lora_choice", b: "a4_rec_forgetting", c: "a4_rec_forgetting", d: "a4_rec_forgetting" },
+        rationale: "Discriminative learning rates (Howard & Ruder, ULMFiT) reflect the feature hierarchy: early layers learn transferable, general features; later layers learn task-specific representations. Smaller LR for early layers preserves general knowledge while later layers adapt.",
+      },
+      a4_rec_forgetting: {
+        id: "a4_rec_forgetting",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · Catastrophic forgetting",
+        prompt: "After fine-tuning a pretrained model with lr=0.01, your model performs worse than feature extraction alone. What most likely happened?",
+        code_snippet: `# Before fine-tuning: feature extraction val_acc = 0.82
+# After full fine-tuning (lr=0.01, 20 epochs): val_acc = 0.71`,
+        choices: [
+          { id: "a", label: "Catastrophic forgetting — high LR overwrote pretrained feature representations before the new task could be learned from limited data", description: "lr=0.01 takes large parameter update steps. On a small dataset, the gradient signal from the new task is insufficient to rebuild the destroyed pretrained representations. You end up worse than frozen features." },
+          { id: "b", label: "The pretrained model is too large for the new task and overfits", description: "Model size contributes to overfitting, but the immediate cause of worse-than-frozen performance is catastrophic forgetting from the high LR." },
+          { id: "c", label: "The optimizer (Adam) is incompatible with fine-tuning pretrained models", description: "Adam is standard for fine-tuning. The LR is the problem, not the optimizer choice." },
+        ],
+        branches: { a: "a4_lora_choice", b: "a4_rec_forgetting", c: "a4_rec_forgetting" },
+        rationale: "Catastrophic forgetting is the defining failure mode of fine-tuning with too-high LR. The fix: use lr=1e-4 to 1e-5, apply discriminative LRs, and use gradual unfreezing (unfreeze one block at a time).",
+      },
+      a4_lora_choice: {
+        id: "a4_lora_choice",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · LoRA vs full fine-tuning for LLMs",
+        prompt: "You need to fine-tune a 7B-parameter LLM for a domain-specific task. You have one 24GB GPU. Full fine-tuning requires ~56GB just for the model in fp16 + optimizer states. What's the practical approach?",
+        code_snippet: `# 7B params × 2 bytes (fp16) = 14 GB model
+# + optimizer states (Adam: 2× params) = 28 GB
+# + gradients = 14 GB
+# Total: ~56 GB → exceeds single GPU
+# LoRA rank=8: adds ~0.1% trainable params`,
+        choices: [
+          { id: "a", label: "LoRA — freeze original weights, add small trainable rank-decomposition matrices; fits on 24GB GPU", description: "LoRA (rank=8) adds ~50M trainable parameters to a 7B model. Original weights stay frozen (loaded in 4-bit or 8-bit quantization). Total memory budget: ~12GB quantized model + small LoRA gradients — fits easily on 24GB." },
+          { id: "b", label: "Use gradient checkpointing and it will fit on one GPU", description: "Gradient checkpointing trades compute for memory (recomputes activations instead of storing), saving ~50% activation memory. It doesn't solve the fundamental issue of optimizer states for 7B parameters." },
+          { id: "c", label: "Train from scratch on domain data — full fine-tuning is not possible so LoRA is not worth trying", description: "Training from scratch is orders of magnitude harder and almost always worse than LoRA fine-tuning. LoRA is specifically designed for this exact scenario." },
+          { id: "d", label: "Feature extraction — freeze the entire 7B model, add a task-specific head", description: "For generative tasks or when you need the model's generation behavior to change, a frozen head is insufficient. LoRA adapts the model's generation capability while keeping memory manageable." },
+        ],
+        branches: { a: "a4_terminal", b: "a4_rec_lora", c: "a4_rec_lora", d: "a4_rec_lora" },
+        rationale: "LoRA is the standard approach for fine-tuning large language models on consumer hardware. Combined with quantization (QLoRA), a 7B model fine-tuning fits on a 12–24GB GPU. The trainable parameter count drops from 7B to ~50M (rank=8), while performance matches full fine-tuning on most tasks.",
+      },
+      a4_rec_lora: {
+        id: "a4_rec_lora",
+        type: "scenario_choice",
+        badge: "Recovery 3",
+        title: "Recovery · Parameter-efficient fine-tuning",
+        prompt: "In LoRA, the weight update is ΔW = A·B where A is (d×r) and B is (r×k). What is r and why is it set to a small value like 4 or 8?",
+        code_snippet: `# Original weight matrix W: shape (d, k) = (4096, 4096)
+# W_frozen: not updated during training
+# A: (4096, 8), B: (8, 4096)  [rank r=8]
+# Trainable params: 2 × 4096 × 8 = 65,536 vs 4096² = 16.7M`,
+        choices: [
+          { id: "a", label: "r is the rank of the decomposition — small r means ΔW is a low-rank matrix, which is the hypothesis that task-specific adaptations live in a low-dimensional subspace", description: "The key insight: the weight changes needed for fine-tuning are often low-rank (they lie in a small-dimensional subspace). r=8 captures most of this with 256× fewer parameters than the full matrix." },
+          { id: "b", label: "r controls the learning rate — smaller r means slower, more stable training", description: "r is the rank of the decomposition, not a learning rate schedule. The learning rate is set separately." },
+          { id: "c", label: "r is the number of attention heads to adapt — other heads are frozen", description: "LoRA can be applied to attention weights, but r is the matrix rank, not the head count." },
+        ],
+        branches: { a: "a4_terminal", b: "a4_rec_lora", c: "a4_rec_lora" },
+        rationale: "LoRA's hypothesis: fine-tuning weight changes have low intrinsic rank — most of the useful adaptation can be expressed as a product of two small matrices. This lets you train <1% of parameters while achieving comparable performance to full fine-tuning.",
+      },
+      a4_terminal: {
+        id: "a4_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Revision complete · Transfer Learning mastered",
+        terminal: true,
+        prompt: "A PM asks: 'We have 200 customer support tickets and want to classify them into 5 intent categories using a pretrained language model. What's your plan?' Give the 3 most important decisions.",
+        code_snippet: `# Available: BERT-base pretrained model
+# Data: 200 labeled tickets, 5 categories
+# Constraint: production latency < 100ms`,
+        choices: [
+          { id: "a", label: "1) Feature extraction (freeze BERT, train head only — 200 examples is too few for fine-tuning). 2) Evaluate if frozen features are expressive enough; if not, unfreeze last 2 layers with lr=1e-5. 3) Monitor for overfitting with validation split.", description: "The three critical decisions: strategy (feature extraction given small data), progressive unfreezing fallback, and overfitting monitoring. Latency is handled by BERT-base being a standard size." },
+          { id: "b", label: "1) Full fine-tuning with high LR. 2) Use all 200 examples for training (no validation). 3) Run for 50 epochs to maximize accuracy.", description: "All three choices are wrong: full fine-tuning with 200 examples causes overfitting/forgetting; no validation means you can't detect overfitting; 50 epochs with small data will massively overfit." },
+          { id: "c", label: "1) Train from scratch to avoid domain mismatch. 2) Use 100 examples for training and 100 for test. 3) Increase model size for better accuracy.", description: "Training from scratch with 200 examples is the worst possible choice. Pretrained features are almost always better than random initialization for small datasets." },
+        ],
+        branches: { a: "a4_terminal", b: "a4_terminal", c: "a4_terminal" },
+        rationale: "With 200 examples: (1) Start with feature extraction — frozen BERT + new classification head, trained for 10-20 epochs. (2) If accuracy is insufficient, unfreeze the last 1-2 transformer blocks with lr=1e-5. (3) Use 80/20 train/val split to catch overfitting. This is the industry-standard small-data BERT fine-tuning recipe.",
+      },
+    },
+  },
+
+  knowledgeCheck: [
+    {
+      question: "You have 300 images and a pretrained ResNet. Training from scratch gives 65% accuracy; feature extraction gives 79%; full fine-tuning gives 61%. Why does full fine-tuning underperform feature extraction?",
+      options: [
+        "Catastrophic forgetting — high LR with limited data overwrote pretrained ImageNet features before the new task could be learned",
+        "Full fine-tuning has too many parameters for 300 images and always overfits",
+        "ResNet is not compatible with fine-tuning and must be used as a fixed feature extractor",
+      ],
+      correctIndex: 0,
+      explanation: "With 300 images and insufficient LR tuning, full fine-tuning destroys the pretrained representations faster than the small dataset can rebuild task-specific ones. Use lr=1e-4 or lower, or gradual unfreezing.",
+    },
+    {
+      question: "Why use a lower learning rate for early layers than late layers when fine-tuning a deep network?",
+      options: [
+        "Early layers encode general, transferable features — large updates destroy them; later layers need more task-specific adaptation",
+        "Early layers have more parameters so they need smaller updates to remain numerically stable",
+        "Early layers converge faster, so a smaller LR slows them down to match later layers",
+      ],
+      correctIndex: 0,
+      explanation: "Discriminative learning rates reflect the feature hierarchy. Early layers learn transferable, general features (edges, syntax) that should change very little. Later layers encode task-specific features that need aggressive adaptation to the new task.",
+    },
+    {
+      question: "What is the key advantage of LoRA over full fine-tuning for a 7B-parameter LLM?",
+      options: [
+        "Reduces trainable parameters by 100-1000× by adding low-rank matrices alongside frozen weights, making fine-tuning feasible on consumer hardware",
+        "LoRA always achieves higher accuracy than full fine-tuning because it prevents overfitting",
+        "LoRA eliminates the need for a learning rate schedule during fine-tuning",
+      ],
+      correctIndex: 0,
+      explanation: "LoRA (rank=8) adds ~50M trainable parameters to a 7B model instead of updating all 7B. Combined with quantization, this makes fine-tuning feasible on 16-24GB GPUs. Performance typically matches full fine-tuning at a fraction of the compute cost.",
+    },
+  ],
+},
+
 };
 
 
@@ -12123,7 +15286,7 @@ export function getResolvedLessonModule(lesson, course) {
       : fallbackDeepDive(lesson),
     tryGuidance: lesson.hasViz
       ? "Use the interactive lab in the **Try it** section: change one control at a time and narrate what moved before you read the label text."
-      : "No primary visualization is mapped for this lesson yet. Use **Practice** questions and the tutor to simulate the same predict→verify loop.",
+      : "No primary visualization is mapped for this lesson yet. Use **Practice** questions and the tutor to simulate the same predictâ†’verify loop.",
     knowledgeCheck: FALLBACK_CHECKS,
   };
 
