@@ -84,6 +84,9 @@ import StatBootstrapViz from "../visualizations/StatBootstrapViz.jsx";
 import StatBayesFrequentistViz from "../visualizations/StatBayesFrequentistViz.jsx";
 import DLRNNLSTMViz from "../visualizations/DLRNNLSTMViz.jsx";
 import DLTransferLearningViz from "../visualizations/DLTransferLearningViz.jsx";
+import ChunkingStrategyViz from "../visualizations/ChunkingStrategyViz.jsx";
+import RAGPipelineViz from "../visualizations/RAGPipelineViz.jsx";
+import AdvancedRAGViz from "../visualizations/AdvancedRAGViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import LessonModule from "../components/platform/LessonModule.jsx";
 import { getResolvedLessonModule, auditPythonLessonIntegrity, PYTHON_CLUSTER_MILESTONES } from "../data/lesson-modules.js";
@@ -403,36 +406,69 @@ const CURRICULUM = [
     id: "genai",
     title: "GenAI & LLMs",
     mark: "GEN",
-    color: "#10B981",
-    accent: "#34D399",
-    description: "The frontier. Understand how LLMs work, how to build with them, and how to evaluate AI-powered systems.",
+    color: "#06B6D4",
+    accent: "#22D3EE",
+    description: "The frontier. LLMs, RAG at every level, agents, evaluation, fine-tuning, and responsible AI — everything you need to build and ship production LLM systems.",
     topics: [
       {
         id: "genai-foundations",
         title: "LLM Foundations",
         lessons: [
-          { id: "ga-f1", title: "How Language Models Actually Work", duration: "22 min", hasViz: true },
+          { id: "ga-f1", title: "How Language Models Actually Work", duration: "22 min", hasViz: false },
           { id: "ga-f2", title: "Tokenization & Embeddings", duration: "18 min", hasViz: true },
           { id: "ga-f3", title: "Attention Mechanism Deep Dive", duration: "25 min", hasViz: true },
-          { id: "ga-f4", title: "Fine-Tuning vs RAG vs Prompting", duration: "20 min", hasViz: true },
+          { id: "ga-f4", title: "Fine-Tuning vs RAG vs Prompting: The Strategy Map", duration: "20 min", hasViz: false },
         ]
       },
       {
-        id: "genai-applied",
-        title: "Building with LLMs",
+        id: "genai-rag",
+        title: "Retrieval & RAG",
         lessons: [
-          { id: "ga-a1", title: "Prompt Engineering: Principles & Patterns", duration: "25 min", hasViz: false },
-          { id: "ga-a2", title: "RAG: Retrieval Augmented Generation", duration: "22 min", hasViz: true },
-          { id: "ga-a3", title: "Agentic Frameworks & LangGraph", duration: "25 min", hasViz: true },
-          { id: "ga-a4", title: "Building UIs with Streamlit", duration: "18 min", hasViz: false },
-          { id: "ga-a5", title: "LLM Evaluation: How to Know If It's Good", duration: "20 min", hasViz: true },
+          { id: "ga-r1", title: "Embeddings & Vector Representations", duration: "22 min", hasViz: false },
+          { id: "ga-r2", title: "Vector Databases: Storage, Indexing & ANN Search", duration: "25 min", hasViz: false },
+          { id: "ga-r3", title: "Semantic Search & Hybrid Retrieval", duration: "20 min", hasViz: false },
+          { id: "ga-r4", title: "Chunking Strategies: From Fixed to Contextual", duration: "25 min", hasViz: true },
+          { id: "ga-r5", title: "Naive RAG Pipeline: Ingest, Retrieve, Generate", duration: "25 min", hasViz: true },
+          { id: "ga-r6", title: "Advanced RAG: Reranking, HyDE & Agentic Retrieval", duration: "30 min", hasViz: true },
         ]
-      }
+      },
+      {
+        id: "genai-agents",
+        title: "Agents & Orchestration",
+        lessons: [
+          { id: "ga-a1", title: "Prompt Engineering: CoT, Few-Shot & System Design", duration: "25 min", hasViz: false },
+          { id: "ga-a3", title: "Agentic Frameworks: LangGraph, AutoGen & CrewAI", duration: "25 min", hasViz: false },
+          { id: "ga-ag1", title: "Tool Use & Function Calling", duration: "22 min", hasViz: false },
+          { id: "ga-ag2", title: "Reasoning Loops: ReAct, ToT & Self-Reflection", duration: "22 min", hasViz: false },
+          { id: "ga-ag3", title: "Multi-Agent Workflows & Coordination Patterns", duration: "25 min", hasViz: false },
+        ]
+      },
+      {
+        id: "genai-ops",
+        title: "Ops & Evaluation",
+        lessons: [
+          { id: "ga-a5", title: "LLM Evaluation: LLM-as-Judge, RAGAS & Benchmarks", duration: "20 min", hasViz: false },
+          { id: "ga-ops1", title: "Optimization: Latency, Caching & Prompt Compression", duration: "22 min", hasViz: false },
+          { id: "ga-ops2", title: "Fine-Tuning in Practice: LoRA, PEFT & When to Use It", duration: "25 min", hasViz: false },
+          { id: "ga-ops3", title: "Human-in-the-Loop & Product Thinking", duration: "18 min", hasViz: false },
+        ]
+      },
+      {
+        id: "genai-safety",
+        title: "Safety & Ethics",
+        lessons: [
+          { id: "ga-s1", title: "Bias, Fairness & Hallucination in LLMs", duration: "20 min", hasViz: false },
+          { id: "ga-s2", title: "Security, Privacy & Compliance", duration: "18 min", hasViz: false },
+          { id: "ga-s3", title: "Prompt Injection & Red Teaming", duration: "22 min", hasViz: false },
+        ]
+      },
     ],
     questions: [
       { id: "aiq1", title: "Design a Data Quality Classifier Prompt", difficulty: "Medium", type: "open-ended", prompt: "Design a system prompt for Claude that classifies CSV data quality. Include the prompt, few-shot strategy, output schema, validation approach, and fallback for misclassification.", tags: ["prompt-engineering", "system-design", "data-quality"] },
       { id: "aiq2", title: "RAG vs Fine-Tuning Decision", difficulty: "Medium", type: "open-ended", prompt: "Your company has 10,000 internal documents and wants an AI assistant for employees. Compare RAG vs fine-tuning across cost, accuracy, freshness, and maintenance. What do you recommend?", tags: ["RAG", "architecture", "decision-making"] },
       { id: "aiq3", title: "LLM Evaluation Pipeline for Text-to-SQL", difficulty: "Hard", type: "open-ended", prompt: "Design an eval pipeline for an LLM text-to-SQL feature. Cover metrics, test data construction, handling multiple valid SQLs, production readiness thresholds, and post-deployment monitoring.", tags: ["evaluation", "text-to-SQL", "MLOps"] },
+      { id: "aiq4", title: "Design an Advanced RAG Architecture", difficulty: "Hard", type: "open-ended", prompt: "Your team's naive RAG system has 58% answer relevancy. Design a systematic improvement roadmap: identify failure modes, propose retrieval/reranking/generation improvements, and define evaluation metrics to track progress.", tags: ["RAG", "architecture", "evaluation"] },
+      { id: "aiq5", title: "Multi-Agent System Design", difficulty: "Hard", type: "open-ended", prompt: "Design a multi-agent system that monitors 500 enterprise customers, detects churn signals from support tickets + usage data, and drafts personalized outreach emails. Cover agent roles, orchestration, tool access, safety guardrails, and failure modes.", tags: ["agents", "multi-agent", "system-design"] },
     ]
   },
   {
@@ -982,6 +1018,9 @@ const VISUALIZATIONS = {
   "sq-a1": WindowFunctions,
   "ga-f2": WordEmbeddings,
   "ga-f3": Attention,
+  "ga-r4": ChunkingStrategyViz,
+  "ga-r5": RAGPipelineViz,
+  "ga-r6": AdvancedRAGViz,
   "ps-e1": ABTestSimulator,
   "ps-m4": FunnelAnalysis,
   "sp-t1": TimeSeriesDecomposition,
