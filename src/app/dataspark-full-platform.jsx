@@ -84,6 +84,9 @@ import StatBootstrapViz from "../visualizations/StatBootstrapViz.jsx";
 import StatBayesFrequentistViz from "../visualizations/StatBayesFrequentistViz.jsx";
 import DLRNNLSTMViz from "../visualizations/DLRNNLSTMViz.jsx";
 import DLTransferLearningViz from "../visualizations/DLTransferLearningViz.jsx";
+import ChunkingStrategyViz from "../visualizations/ChunkingStrategyViz.jsx";
+import RAGPipelineViz from "../visualizations/RAGPipelineViz.jsx";
+import AdvancedRAGViz from "../visualizations/AdvancedRAGViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import LessonModule from "../components/platform/LessonModule.jsx";
 import { getResolvedLessonModule, auditPythonLessonIntegrity, PYTHON_CLUSTER_MILESTONES } from "../data/lesson-modules.js";
@@ -141,11 +144,11 @@ function CourseMark({ color, mark, size = "lg" }) {
   );
 }
 
-// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
-// DATASPARK â€” Complete Data Science Learning Platform
-// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// DATASPARK — Complete Data Science Learning Platform
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-// â”€â”€â”€ FULL CURRICULUM DATA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── FULL CURRICULUM DATA ────────────────────────────────────────────────────
 const CURRICULUM = [
   {
     id: "python",
@@ -153,7 +156,7 @@ const CURRICULUM = [
     mark: "PY",
     color: "#3B82F6",
     accent: "#60A5FA",
-    description: "The foundation of every data science career. Master Python's core â€” not just syntax, but how to think programmatically.",
+    description: "The foundation of every data science career. Master Python's core — not just syntax, but how to think programmatically.",
     topics: [
       {
         id: "py-basics",
@@ -244,7 +247,7 @@ const CURRICULUM = [
     questions: [
       { id: "sqq1", title: "Revenue by Customer Segment", difficulty: "Easy", type: "code", prompt: "Write a query returning each customer segment, unique purchasers, total revenue (completed orders only), and avg order value. Filter to segments with >$10K revenue.", tags: ["joins", "aggregation", "HAVING"] },
       { id: "sqq2", title: "Cohort Retention Analysis", difficulty: "Hard", type: "code", prompt: "Build a monthly cohort retention table showing cohort_month, cohort_size, months_since_signup (0-6), retained_users, and retention_rate for the last 12 months.", tags: ["CTEs", "window-functions", "cohort-analysis"] },
-      { id: "sqq3", title: "Funnel Conversion by City", difficulty: "Medium", type: "code", prompt: "Calculate step-over-step conversion rates for a 5-step funnel (app_open â†’ search â†’ select â†’ confirm â†’ complete) broken down by city for the last 30 days.", tags: ["conditional-aggregation", "funnel", "product-analytics"] },
+      { id: "sqq3", title: "Funnel Conversion by City", difficulty: "Medium", type: "code", prompt: "Calculate step-over-step conversion rates for a 5-step funnel (app_open → search → select → confirm → complete) broken down by city for the last 30 days.", tags: ["conditional-aggregation", "funnel", "product-analytics"] },
       { id: "sqq4", title: "Recursive Org Chart", difficulty: "Hard", type: "code", prompt: "Using a recursive CTE, generate a full org hierarchy showing employee, manager, level, full chain path, and team size (all direct + indirect reports).", tags: ["recursive-CTE", "hierarchy", "self-join"] },
       { id: "sqq5", title: "Running Total with Gaps", difficulty: "Medium", type: "code", prompt: "Calculate daily signups with a running total, day-over-day change, and 7-day moving average. Handle days with zero signups using a date series.", tags: ["window-functions", "date-series", "running-totals"] },
       { id: "sqq6", title: "Duplicate Detection & Cleanup", difficulty: "Easy", type: "code", prompt: "Find duplicate listings (same host_id, title, city), show counts, then write a DELETE keeping only the most recently updated record per group.", tags: ["deduplication", "ROW_NUMBER", "data-quality"] },
@@ -256,7 +259,7 @@ const CURRICULUM = [
     mark: "STAT",
     color: "#8B5CF6",
     accent: "#A78BFA",
-    description: "The mathematical backbone. Understand distributions, hypothesis testing, and statistical thinking â€” not just formulas, but intuition.",
+    description: "The mathematical backbone. Understand distributions, hypothesis testing, and statistical thinking — not just formulas, but intuition.",
     topics: [
       {
         id: "stat-foundations",
@@ -403,36 +406,69 @@ const CURRICULUM = [
     id: "genai",
     title: "GenAI & LLMs",
     mark: "GEN",
-    color: "#10B981",
-    accent: "#34D399",
-    description: "The frontier. Understand how LLMs work, how to build with them, and how to evaluate AI-powered systems.",
+    color: "#06B6D4",
+    accent: "#22D3EE",
+    description: "The frontier. LLMs, RAG at every level, agents, evaluation, fine-tuning, and responsible AI — everything you need to build and ship production LLM systems.",
     topics: [
       {
         id: "genai-foundations",
         title: "LLM Foundations",
         lessons: [
-          { id: "ga-f1", title: "How Language Models Actually Work", duration: "22 min", hasViz: true },
+          { id: "ga-f1", title: "How Language Models Actually Work", duration: "22 min", hasViz: false },
           { id: "ga-f2", title: "Tokenization & Embeddings", duration: "18 min", hasViz: true },
           { id: "ga-f3", title: "Attention Mechanism Deep Dive", duration: "25 min", hasViz: true },
-          { id: "ga-f4", title: "Fine-Tuning vs RAG vs Prompting", duration: "20 min", hasViz: true },
+          { id: "ga-f4", title: "Fine-Tuning vs RAG vs Prompting: The Strategy Map", duration: "20 min", hasViz: false },
         ]
       },
       {
-        id: "genai-applied",
-        title: "Building with LLMs",
+        id: "genai-rag",
+        title: "Retrieval & RAG",
         lessons: [
-          { id: "ga-a1", title: "Prompt Engineering: Principles & Patterns", duration: "25 min", hasViz: false },
-          { id: "ga-a2", title: "RAG: Retrieval Augmented Generation", duration: "22 min", hasViz: true },
-          { id: "ga-a3", title: "Agentic Frameworks & LangGraph", duration: "25 min", hasViz: true },
-          { id: "ga-a4", title: "Building UIs with Streamlit", duration: "18 min", hasViz: false },
-          { id: "ga-a5", title: "LLM Evaluation: How to Know If It's Good", duration: "20 min", hasViz: true },
+          { id: "ga-r1", title: "Embeddings & Vector Representations", duration: "22 min", hasViz: false },
+          { id: "ga-r2", title: "Vector Databases: Storage, Indexing & ANN Search", duration: "25 min", hasViz: false },
+          { id: "ga-r3", title: "Semantic Search & Hybrid Retrieval", duration: "20 min", hasViz: false },
+          { id: "ga-r4", title: "Chunking Strategies: From Fixed to Contextual", duration: "25 min", hasViz: true },
+          { id: "ga-r5", title: "Naive RAG Pipeline: Ingest, Retrieve, Generate", duration: "25 min", hasViz: true },
+          { id: "ga-r6", title: "Advanced RAG: Reranking, HyDE & Agentic Retrieval", duration: "30 min", hasViz: true },
         ]
-      }
+      },
+      {
+        id: "genai-agents",
+        title: "Agents & Orchestration",
+        lessons: [
+          { id: "ga-a1", title: "Prompt Engineering: CoT, Few-Shot & System Design", duration: "25 min", hasViz: false },
+          { id: "ga-a3", title: "Agentic Frameworks: LangGraph, AutoGen & CrewAI", duration: "25 min", hasViz: false },
+          { id: "ga-ag1", title: "Tool Use & Function Calling", duration: "22 min", hasViz: false },
+          { id: "ga-ag2", title: "Reasoning Loops: ReAct, ToT & Self-Reflection", duration: "22 min", hasViz: false },
+          { id: "ga-ag3", title: "Multi-Agent Workflows & Coordination Patterns", duration: "25 min", hasViz: false },
+        ]
+      },
+      {
+        id: "genai-ops",
+        title: "Ops & Evaluation",
+        lessons: [
+          { id: "ga-a5", title: "LLM Evaluation: LLM-as-Judge, RAGAS & Benchmarks", duration: "20 min", hasViz: false },
+          { id: "ga-ops1", title: "Optimization: Latency, Caching & Prompt Compression", duration: "22 min", hasViz: false },
+          { id: "ga-ops2", title: "Fine-Tuning in Practice: LoRA, PEFT & When to Use It", duration: "25 min", hasViz: false },
+          { id: "ga-ops3", title: "Human-in-the-Loop & Product Thinking", duration: "18 min", hasViz: false },
+        ]
+      },
+      {
+        id: "genai-safety",
+        title: "Safety & Ethics",
+        lessons: [
+          { id: "ga-s1", title: "Bias, Fairness & Hallucination in LLMs", duration: "20 min", hasViz: false },
+          { id: "ga-s2", title: "Security, Privacy & Compliance", duration: "18 min", hasViz: false },
+          { id: "ga-s3", title: "Prompt Injection & Red Teaming", duration: "22 min", hasViz: false },
+        ]
+      },
     ],
     questions: [
       { id: "aiq1", title: "Design a Data Quality Classifier Prompt", difficulty: "Medium", type: "open-ended", prompt: "Design a system prompt for Claude that classifies CSV data quality. Include the prompt, few-shot strategy, output schema, validation approach, and fallback for misclassification.", tags: ["prompt-engineering", "system-design", "data-quality"] },
       { id: "aiq2", title: "RAG vs Fine-Tuning Decision", difficulty: "Medium", type: "open-ended", prompt: "Your company has 10,000 internal documents and wants an AI assistant for employees. Compare RAG vs fine-tuning across cost, accuracy, freshness, and maintenance. What do you recommend?", tags: ["RAG", "architecture", "decision-making"] },
       { id: "aiq3", title: "LLM Evaluation Pipeline for Text-to-SQL", difficulty: "Hard", type: "open-ended", prompt: "Design an eval pipeline for an LLM text-to-SQL feature. Cover metrics, test data construction, handling multiple valid SQLs, production readiness thresholds, and post-deployment monitoring.", tags: ["evaluation", "text-to-SQL", "MLOps"] },
+      { id: "aiq4", title: "Design an Advanced RAG Architecture", difficulty: "Hard", type: "open-ended", prompt: "Your team's naive RAG system has 58% answer relevancy. Design a systematic improvement roadmap: identify failure modes, propose retrieval/reranking/generation improvements, and define evaluation metrics to track progress.", tags: ["RAG", "architecture", "evaluation"] },
+      { id: "aiq5", title: "Multi-Agent System Design", difficulty: "Hard", type: "open-ended", prompt: "Design a multi-agent system that monitors 500 enterprise customers, detects churn signals from support tickets + usage data, and drafts personalized outreach emails. Cover agent roles, orchestration, tool access, safety guardrails, and failure modes.", tags: ["agents", "multi-agent", "system-design"] },
     ]
   },
   {
@@ -475,7 +511,7 @@ const CURRICULUM = [
     ],
     questions: [
       { id: "psq1", title: "Slack Huddles: Define Success Metrics", difficulty: "Medium", type: "open-ended", prompt: "Slack is launching Huddles. Define the North Star metric, 3-5 supporting metrics, guardrails, 90-day targets, instrumentation plan, and kill criteria.", tags: ["metrics", "product-launch", "KPIs"] },
-      { id: "psq2", title: "Conversion Dropped 25% â€” Now What?", difficulty: "Hard", type: "open-ended", prompt: "DoorDash weekend conversion dropped from 32% to 24%. Walk through your investigation: framework, first 5 analyses, hypotheses ranked, distinguishing data issues from real problems, and what you present to the VP by EOD.", tags: ["metric-investigation", "debugging", "stakeholders"] },
+      { id: "psq2", title: "Conversion Dropped 25% — Now What?", difficulty: "Hard", type: "open-ended", prompt: "DoorDash weekend conversion dropped from 32% to 24%. Walk through your investigation: framework, first 5 analyses, hypotheses ranked, distinguishing data issues from real problems, and what you present to the VP by EOD.", tags: ["metric-investigation", "debugging", "stakeholders"] },
       { id: "psq3", title: "A/B Test Shows Contradictory Results", difficulty: "Hard", type: "open-ended", prompt: "Netflix A/B test: +5% CTR, -3% viewing hours, +8% titles started. PM wants to ship. Content team is worried. Interpret the results, propose additional analyses, and make a recommendation.", tags: ["AB-testing", "tradeoffs", "experimentation"] },
       { id: "psq4", title: "Build vs Buy: ML Monitoring", difficulty: "Medium", type: "open-ended", prompt: "Team of 6, patchwork monitoring. Evaluate build vs buy for ML monitoring. Cover decision criteria, cost comparison, hidden costs, recommendation, and executive presentation.", tags: ["build-vs-buy", "decision-framework", "communication"] },
     ]
@@ -511,7 +547,7 @@ const CURRICULUM = [
     ],
     questions: [
       { id: "sdq1", title: "Real-Time Fraud Detection Pipeline", difficulty: "Hard", type: "open-ended", prompt: "Design a fraud detection pipeline: 10K TPS, <500ms latency, rules + ML, cold start handling, 3x scaling for Black Friday, audit trail. Cover architecture, tech choices, model updates, monitoring, phased rollout.", tags: ["streaming", "fraud", "architecture"] },
-      { id: "sdq2", title: "Recommendation System for 400M Users", difficulty: "Hard", type: "open-ended", prompt: "Design a multi-stage recommendation pipeline: candidate gen â†’ ranking â†’ re-ranking. Cover embedding strategy, explore/exploit, offline vs online evaluation, real-time personalization, and cold-start.", tags: ["recommendations", "scale", "ML-systems"] },
+      { id: "sdq2", title: "Recommendation System for 400M Users", difficulty: "Hard", type: "open-ended", prompt: "Design a multi-stage recommendation pipeline: candidate gen → ranking → re-ranking. Cover embedding strategy, explore/exploit, offline vs online evaluation, real-time personalization, and cold-start.", tags: ["recommendations", "scale", "ML-systems"] },
       { id: "sdq3", title: "Data Warehouse Migration Plan", difficulty: "Medium", type: "open-ended", prompt: "Migrate from Postgres to cloud warehouse. 5TB data, 300 dbt models, 50 Looker dashboards, team of 7. Cover warehouse choice, migration strategy, zero downtime, validation, dbt changes, timeline.", tags: ["migration", "data-warehouse", "dbt"] },
     ]
   },
@@ -556,7 +592,7 @@ const CURRICULUM = [
     ],
     questions: [
       { id: "moq1", title: "Design a CI/CD Pipeline for ML", difficulty: "Medium", type: "open-ended", prompt: "Design a CI/CD pipeline for an ML model: include linting, testing, data validation, model training, evaluation gates, staging deployment, canary release, and rollback strategy.", tags: ["CI/CD", "MLOps", "deployment"] },
-      { id: "moq2", title: "Your Model is Drifting â€” Now What?", difficulty: "Medium", type: "open-ended", prompt: "You get an alert that your production model's prediction distribution has shifted significantly from training. Walk through your response: investigation, diagnosis, short-term fix, long-term prevention.", tags: ["monitoring", "drift", "production"] },
+      { id: "moq2", title: "Your Model is Drifting — Now What?", difficulty: "Medium", type: "open-ended", prompt: "You get an alert that your production model's prediction distribution has shifted significantly from training. Walk through your response: investigation, diagnosis, short-term fix, long-term prevention.", tags: ["monitoring", "drift", "production"] },
       { id: "moq3", title: "Build a Model Serving API", difficulty: "Easy", type: "code", prompt: "Build a FastAPI endpoint that loads a trained sklearn model, accepts JSON input, validates it with Pydantic, returns predictions with confidence scores, and handles errors gracefully.", tags: ["FastAPI", "deployment", "API"] },
     ]
   },
@@ -566,7 +602,7 @@ const CURRICULUM = [
     mark: "ADV",
     color: "#EF4444",
     accent: "#F87171",
-    description: "Deep dives into recommendation engines, time series analysis, and NLP â€” the specialized skills that make you stand out.",
+    description: "Deep dives into recommendation engines, time series analysis, and NLP — the specialized skills that make you stand out.",
     topics: [
       {
         id: "spec-recsys",
@@ -607,7 +643,7 @@ const CURRICULUM = [
   }
 ];
 
-// â”€â”€â”€ INTERACTIVE VISUALIZATIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── INTERACTIVE VISUALIZATIONS ──────────────────────────────────────────────
 
 const NormalDistViz = () => {
   const canvasRef = useRef(null);
@@ -711,7 +747,7 @@ const NormalDistViz = () => {
       ctx.fillStyle = "#F59E0B";
       ctx.font = "bold 22px 'JetBrains Mono'";
       ctx.textAlign = "center";
-      ctx.fillText(`Î¼ = ${mean.toFixed(1)}`, meanX, 30);
+      ctx.fillText(`μ = ${mean.toFixed(1)}`, meanX, 30);
 
       animRef.current = requestAnimationFrame(draw);
     };
@@ -722,15 +758,15 @@ const NormalDistViz = () => {
   return (
     <>
       <div style={{ fontSize: 17, fontWeight: 700, color: DS.t1, marginBottom: 4, fontFamily: "var(--ds-sans), sans-serif" }}>Normal distribution explorer</div>
-      <div style={{ fontSize: 12, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 16, lineHeight: 1.55 }}>Drag the sliders to see how Î¼ and Ïƒ change the shape â€” same family as the landing â€œsystemsâ€ story: intuition first.</div>
+      <div style={{ fontSize: 12, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 16, lineHeight: 1.55 }}>Drag the sliders to see how μ and σ change the shape — same family as the landing “systems" story: intuition first.</div>
       <canvas ref={canvasRef} style={{ width: "100%", height: 280, borderRadius: 12, border: `1px solid ${DS.border}`, background: "rgba(255,255,255,0.02)" }} />
       <div style={{ display: "flex", gap: 24, marginTop: 16 }}>
         <label style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Mean (Î¼): {mean.toFixed(1)}</div>
+          <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Mean (μ): {mean.toFixed(1)}</div>
           <input type="range" min={-3} max={3} step={0.1} value={mean} onChange={e => setMean(+e.target.value)} style={{ width: "100%", accentColor: DS.indB }} />
         </label>
         <label style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Std Dev (Ïƒ): {stdDev.toFixed(1)}</div>
+          <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Std Dev (σ): {stdDev.toFixed(1)}</div>
           <input type="range" min={0.3} max={3} step={0.1} value={stdDev} onChange={e => setStdDev(+e.target.value)} style={{ width: "100%", accentColor: DS.ind }} />
         </label>
       </div>
@@ -840,13 +876,13 @@ const GradientDescentViz = () => {
     ctx.fillText(`x = ${ballPos.toFixed(2)}`, 20, 36);
     ctx.fillText(`f(x) = ${f(ballPos).toFixed(2)}`, 20, 62);
     ctx.fillStyle = "#10B981";
-    ctx.fillText(`âˆ‡f = ${df(ballPos).toFixed(2)}`, 20, 88);
+    ctx.fillText(`∇f = ${df(ballPos).toFixed(2)}`, 20, 88);
   }, [ballPos, trail]);
 
   return (
     <>
       <div style={{ fontSize: 17, fontWeight: 700, color: DS.t1, marginBottom: 4, fontFamily: "var(--ds-sans), sans-serif" }}>Gradient descent in action</div>
-      <div style={{ fontSize: 12, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 16, lineHeight: 1.55 }}>Watch the ball roll downhill following the gradient â€” learning rate is the step size.</div>
+      <div style={{ fontSize: 12, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 16, lineHeight: 1.55 }}>Watch the ball roll downhill following the gradient — learning rate is the step size.</div>
       <canvas ref={canvasRef} style={{ width: "100%", height: 250, borderRadius: 12, border: `1px solid ${DS.border}`, background: "rgba(255,255,255,0.02)" }} />
       <div style={{ display: "flex", gap: 16, marginTop: 16, alignItems: "flex-end", flexWrap: "wrap" }}>
         <label style={{ flex: 1, minWidth: 160 }}>
@@ -898,7 +934,7 @@ const BiasVarianceViz = () => {
       ctx.fillText(label, toX(labelX) + 8, toY(fn(labelX)) - 10);
     };
 
-    drawCurve(bias, "#3B82F6", "BiasÂ²", 1);
+    drawCurve(bias, "#3B82F6", "Bias²", 1);
     drawCurve(variance, "#EF4444", "Variance", 8);
     drawCurve(total, "#F59E0B", "Total Error", 6);
 
@@ -926,17 +962,17 @@ const BiasVarianceViz = () => {
     ctx.fillStyle = "#64748B";
     ctx.font = "16px 'JetBrains Mono'";
     ctx.textAlign = "center";
-    ctx.fillText("Simple â† Model Complexity â†’ Complex", W / 2, H - 6);
+    ctx.fillText("Simple ← Model Complexity → Complex", W / 2, H - 6);
   }, [complexity]);
 
   return (
     <>
-      <div style={{ fontSize: 17, fontWeight: 700, color: DS.t1, marginBottom: 4, fontFamily: "var(--ds-sans), sans-serif" }}>Biasâ€“variance tradeoff</div>
-      <div style={{ fontSize: 12, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 16, lineHeight: 1.55 }}>Drag complexity â€” the landing page promises reasoning, not memorization; this is the core tension behind that.</div>
+      <div style={{ fontSize: 17, fontWeight: 700, color: DS.t1, marginBottom: 4, fontFamily: "var(--ds-sans), sans-serif" }}>Bias–variance tradeoff</div>
+      <div style={{ fontSize: 12, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 16, lineHeight: 1.55 }}>Drag complexity — the landing page promises reasoning, not memorization; this is the core tension behind that.</div>
       <canvas ref={canvasRef} style={{ width: "100%", height: 250, borderRadius: 12, border: `1px solid ${DS.border}`, background: "rgba(255,255,255,0.02)" }} />
       <label style={{ display: "block", marginTop: 16 }}>
         <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>
-          Model complexity: {complexity.toFixed(1)} â€” {complexity < 3 ? "Underfitting (high bias)" : complexity > 6 ? "Overfitting (high variance)" : "Good balance"}
+          Model complexity: {complexity.toFixed(1)} — {complexity < 3 ? "Underfitting (high bias)" : complexity > 6 ? "Overfitting (high variance)" : "Good balance"}
         </div>
         <input type="range" min={0.5} max={9.5} step={0.1} value={complexity} onChange={e => setComplexity(+e.target.value)} style={{ width: "100%", accentColor: DS.grn }} />
       </label>
@@ -982,6 +1018,9 @@ const VISUALIZATIONS = {
   "sq-a1": WindowFunctions,
   "ga-f2": WordEmbeddings,
   "ga-f3": Attention,
+  "ga-r4": ChunkingStrategyViz,
+  "ga-r5": RAGPipelineViz,
+  "ga-r6": AdvancedRAGViz,
   "ps-e1": ABTestSimulator,
   "ps-m4": FunnelAnalysis,
   "sp-t1": TimeSeriesDecomposition,
@@ -1090,10 +1129,10 @@ function resolveLessonVizComponent(lessonId, courseId, hasViz) {
   return null;
 }
 
-// â”€â”€â”€ AI CHATBOT COMPONENT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+// ─── AI CHATBOT COMPONENT ────────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MAIN APP
-// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const DEFAULT_PRACTICE_RUBRIC = [
   "Addresses the core question directly",
@@ -1214,7 +1253,7 @@ export default function DataSparkPlatform() {
     return <span style={{ background: `${c[d]}18`, color: c[d], padding: "3px 10px", borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", border: `1px solid ${c[d]}35`, fontFamily: "var(--ds-mono), monospace" }}>{d}</span>;
   };
 
-  // â”€â”€â”€ HOME VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── HOME VIEW ─────────────────────────────────────────────────────────────
   const renderHome = () => (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 clamp(16px, 4vw, 28px)" }}>
       <div style={{ textAlign: "center", padding: "48px 0 40px" }}>
@@ -1380,7 +1419,7 @@ export default function DataSparkPlatform() {
               <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${course.color}, ${DS.ind}40, transparent)` }} />
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <CourseMark color={course.color} mark={course.mark} size="lg" />
-                <span style={{ fontSize: 10, color: DS.dim, fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>{lessonCount} lessons Â· {course.questions.length} Qs</span>
+                <span style={{ fontSize: 10, color: DS.dim, fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>{lessonCount} lessons · {course.questions.length} Qs</span>
               </div>
               <div style={{ fontSize: 17, fontWeight: 700, color: DS.t1, fontFamily: "var(--ds-sans), sans-serif", marginBottom: 8 }}>{course.title}</div>
               <div style={{ fontSize: 13, color: DS.t3, lineHeight: 1.55, fontFamily: "var(--ds-sans), sans-serif", marginBottom: 14, minHeight: 44 }}>{course.description}</div>
@@ -1401,14 +1440,14 @@ export default function DataSparkPlatform() {
     </div>
   );
 
-  // â”€â”€â”€ COURSE VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── COURSE VIEW ───────────────────────────────────────────────────────────
   const renderCourse = () => {
     if (!activeCourse) return null;
     const c = activeCourse;
 
     return (
       <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 clamp(16px, 4vw, 28px)" }}>
-        <button type="button" onClick={() => setView("home")} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>â† All courses</button>
+        <button type="button" onClick={() => setView("home")} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>← All courses</button>
 
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 8 }}>
           <CourseMark color={c.color} mark={c.mark} size="md" />
@@ -1462,7 +1501,7 @@ export default function DataSparkPlatform() {
                             display: "flex", alignItems: "center", justifyContent: "center",
                             fontSize: 12, color: isDone ? DS.grn : DS.dim, fontWeight: 700, fontFamily: "var(--ds-mono), monospace",
                           }}>
-                            {isDone ? "âœ“" : li + 1}
+                            {isDone ? "✓" : li + 1}
                           </div>
                           <div>
                             <div style={{ fontSize: 14, fontWeight: 600, color: DS.t1 }}>{lesson.title}</div>
@@ -1527,7 +1566,7 @@ export default function DataSparkPlatform() {
     );
   };
 
-  // â”€â”€â”€ LESSON VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── LESSON VIEW ───────────────────────────────────────────────────────────
   const renderLesson = () => {
     if (!activeLesson || !activeCourse) return null;
     const VizComponent = resolveLessonVizComponent(
@@ -1545,7 +1584,7 @@ export default function DataSparkPlatform() {
         VizComponent={VizComponent}
         vizComingSoon={!VizComponent && !!activeLesson.hasViz}
         onBack={() => setView("course")}
-        backLabel={`â† Back to ${activeCourse.title}`}
+        backLabel={`← Back to ${activeCourse.title}`}
         onMarkComplete={() => {
           try {
             trackLvsEvent({
@@ -1567,14 +1606,14 @@ export default function DataSparkPlatform() {
     );
   };
 
-  // â”€â”€â”€ QUESTION VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── QUESTION VIEW ─────────────────────────────────────────────────────────
   const renderQuestion = () => {
     if (!activeQuestion || !activeCourse) return null;
     const q = activeQuestion;
 
     return (
       <div style={{ maxWidth: 860, margin: "0 auto", padding: "0 clamp(16px, 4vw, 28px)" }}>
-        <button type="button" onClick={() => { setCourseTab("practice"); setView("course"); }} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>â† Back to practice</button>
+        <button type="button" onClick={() => { setCourseTab("practice"); setView("course"); }} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>← Back to practice</button>
 
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -1596,7 +1635,7 @@ export default function DataSparkPlatform() {
         <textarea
           value={userAnswer}
           onChange={e => setUserAnswer(e.target.value)}
-          placeholder={q.type === "code" ? "Write your code here..." : "Write your answer â€” explain your reasoning, tradeoffs, and approach..."}
+          placeholder={q.type === "code" ? "Write your code here..." : "Write your answer — explain your reasoning, tradeoffs, and approach..."}
           disabled={submitted}
           style={{
             width: "100%", minHeight: 280, background: "rgba(255,255,255,0.03)", border: `1px solid ${DS.border}`,
@@ -1648,7 +1687,7 @@ export default function DataSparkPlatform() {
             <div style={{ fontSize: 11, fontWeight: 700, color: DS.ind, fontFamily: "var(--ds-mono), monospace", letterSpacing: "0.12em", marginBottom: 12 }}>
               AI SCORECARD
             </div>
-            {evalLoading && <p style={{ color: DS.t3, fontSize: 14 }}>Scoring your answerâ€¦</p>}
+            {evalLoading && <p style={{ color: DS.t3, fontSize: 14 }}>Scoring your answer…</p>}
             {evalError && <p style={{ color: "#FCA5A5", fontSize: 14 }}>{evalError}</p>}
             {evalResult && !evalLoading && (
               <>
@@ -1672,7 +1711,7 @@ export default function DataSparkPlatform() {
                           border: `1px solid ${DS.border}`,
                         }}
                       >
-                        <span style={{ marginRight: 8 }}>{rs.met ? "âœ“" : "â—‹"}</span>
+                        <span style={{ marginRight: 8 }}>{rs.met ? "✓" : "○"}</span>
                         {rs.criterion}
                         <span style={{ color: DS.dim, marginLeft: 8 }}>({rs.confidence})</span>
                       </li>
