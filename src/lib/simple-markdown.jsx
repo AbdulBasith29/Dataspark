@@ -1,7 +1,15 @@
 import { DS } from "./ds-platform-tokens.js";
 import { renderInlineMarkdown } from "./inline-markdown.jsx";
 
-/** Minimal markdown: ## / ### headings, paragraphs, - lists, **bold**, `code`. No deps. */
+/** Minimal markdown: ## / ### / #### headings, paragraphs, - lists, **bold**, `code`, tables. No deps. */
+
+function parseTableRow(line) {
+  return line.replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+}
+
+function isSeparatorRow(line) {
+  return /^\|[\s\-:|]+\|/.test(line);
+}
 
 export function SimpleMarkdown({ text, accent }) {
   if (!text?.trim()) return null;
@@ -49,6 +57,82 @@ export function SimpleMarkdown({ text, accent }) {
         </h3>,
       );
       i += 1;
+      continue;
+    }
+    if (line.startsWith("#### ")) {
+      out.push(
+        <h4
+          key={key++}
+          style={{
+            fontSize: 13,
+            fontWeight: 700,
+            color: DS.t2,
+            margin: "16px 0 6px",
+            fontFamily: "var(--ds-sans), sans-serif",
+          }}
+        >
+          {line.slice(5).trim()}
+        </h4>,
+      );
+      i += 1;
+      continue;
+    }
+    if (line.trimStart().startsWith("|")) {
+      const tableLines = [];
+      while (i < lines.length && lines[i].trimStart().startsWith("|")) {
+        tableLines.push(lines[i]);
+        i += 1;
+      }
+      const nonSep = tableLines.filter((l) => !isSeparatorRow(l));
+      if (nonSep.length > 0) {
+        const [headerRow, ...bodyRows] = nonSep;
+        const headers = parseTableRow(headerRow);
+        out.push(
+          <div key={key++} style={{ overflowX: "auto", margin: "0 0 18px" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, fontFamily: "var(--ds-sans), sans-serif" }}>
+              <thead>
+                <tr>
+                  {headers.map((h, j) => (
+                    <th
+                      key={j}
+                      style={{
+                        padding: "8px 12px",
+                        textAlign: "left",
+                        fontWeight: 700,
+                        color: DS.t1,
+                        background: "rgba(255,255,255,0.05)",
+                        borderBottom: `2px solid ${accent || DS.ind}`,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {renderInlineMarkdown(h)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {bodyRows.map((row, ri) => (
+                  <tr key={ri} style={{ borderBottom: `1px solid ${DS.border}` }}>
+                    {parseTableRow(row).map((cell, ci) => (
+                      <td
+                        key={ci}
+                        style={{
+                          padding: "7px 12px",
+                          color: DS.t2,
+                          verticalAlign: "top",
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        {renderInlineMarkdown(cell)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>,
+        );
+      }
       continue;
     }
     if (line.startsWith("```")) {
@@ -116,7 +200,7 @@ export function SimpleMarkdown({ text, accent }) {
     // this safeguard the outer while hangs forever.
     para.push(lines[i]);
     i += 1;
-    while (i < lines.length && lines[i].trim() !== "" && !lines[i].startsWith("#") && !lines[i].startsWith("- ")) {
+    while (i < lines.length && lines[i].trim() !== "" && !lines[i].startsWith("#") && !lines[i].startsWith("- ") && !lines[i].trimStart().startsWith("|")) {
       para.push(lines[i]);
       i += 1;
     }
