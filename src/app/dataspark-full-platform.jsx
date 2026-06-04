@@ -144,11 +144,11 @@ function CourseMark({ color, mark, size = "lg" }) {
   );
 }
 
-// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // DATASPARK — Complete Data Science Learning Platform
-// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-// â”€â”€â”€ FULL CURRICULUM DATA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── FULL CURRICULUM DATA ────────────────────────────────────────────────────
 const CURRICULUM = [
   {
     id: "python",
@@ -643,7 +643,7 @@ const CURRICULUM = [
   }
 ];
 
-// â”€â”€â”€ INTERACTIVE VISUALIZATIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── INTERACTIVE VISUALIZATIONS ──────────────────────────────────────────────
 
 const NormalDistViz = () => {
   const canvasRef = useRef(null);
@@ -934,7 +934,7 @@ const BiasVarianceViz = () => {
       ctx.fillText(label, toX(labelX) + 8, toY(fn(labelX)) - 10);
     };
 
-    drawCurve(bias, "#3B82F6", "BiasÂ²", 1);
+    drawCurve(bias, "#3B82F6", "Bias²", 1);
     drawCurve(variance, "#EF4444", "Variance", 8);
     drawCurve(total, "#F59E0B", "Total Error", 6);
 
@@ -962,7 +962,7 @@ const BiasVarianceViz = () => {
     ctx.fillStyle = "#64748B";
     ctx.font = "16px 'JetBrains Mono'";
     ctx.textAlign = "center";
-    ctx.fillText("Simple ← Model Complexity → Complex", W / 2, H - 6);
+    ctx.fillText("Simple ← Model Complexity → Complex", W / 2, H - 6);
   }, [complexity]);
 
   return (
@@ -1129,10 +1129,10 @@ function resolveLessonVizComponent(lessonId, courseId, hasViz) {
   return null;
 }
 
-// â”€â”€â”€ AI CHATBOT COMPONENT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+// ─── AI CHATBOT COMPONENT ────────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // MAIN APP
-// â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const DEFAULT_PRACTICE_RUBRIC = [
   "Addresses the core question directly",
@@ -1253,7 +1253,7 @@ export default function DataSparkPlatform() {
     return <span style={{ background: `${c[d]}18`, color: c[d], padding: "3px 10px", borderRadius: 999, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", border: `1px solid ${c[d]}35`, fontFamily: "var(--ds-mono), monospace" }}>{d}</span>;
   };
 
-  // â”€â”€â”€ HOME VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── HOME VIEW ─────────────────────────────────────────────────────────────
   const renderHome = () => (
     <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 clamp(16px, 4vw, 28px)" }}>
       <div style={{ textAlign: "center", padding: "48px 0 40px" }}>
@@ -1419,7 +1419,7 @@ export default function DataSparkPlatform() {
               <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${course.color}, ${DS.ind}40, transparent)` }} />
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <CourseMark color={course.color} mark={course.mark} size="lg" />
-                <span style={{ fontSize: 10, color: DS.dim, fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>{lessonCount} lessons Â· {course.questions.length} Qs</span>
+                <span style={{ fontSize: 10, color: DS.dim, fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>{lessonCount} lessons · {course.questions.length} Qs</span>
               </div>
               <div style={{ fontSize: 17, fontWeight: 700, color: DS.t1, fontFamily: "var(--ds-sans), sans-serif", marginBottom: 8 }}>{course.title}</div>
               <div style={{ fontSize: 13, color: DS.t3, lineHeight: 1.55, fontFamily: "var(--ds-sans), sans-serif", marginBottom: 14, minHeight: 44 }}>{course.description}</div>
@@ -1440,14 +1440,14 @@ export default function DataSparkPlatform() {
     </div>
   );
 
-  // â”€â”€â”€ COURSE VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── COURSE VIEW ───────────────────────────────────────────────────────────
   const renderCourse = () => {
     if (!activeCourse) return null;
     const c = activeCourse;
 
     return (
       <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 clamp(16px, 4vw, 28px)" }}>
-        <button type="button" onClick={() => setView("home")} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>← All courses</button>
+        <button type="button" onClick={() => setView("home")} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>← All courses</button>
 
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 8 }}>
           <CourseMark color={c.color} mark={c.mark} size="md" />
@@ -1566,7 +1566,7 @@ export default function DataSparkPlatform() {
     );
   };
 
-  // â”€â”€â”€ LESSON VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── LESSON VIEW ───────────────────────────────────────────────────────────
   const renderLesson = () => {
     if (!activeLesson || !activeCourse) return null;
     const VizComponent = resolveLessonVizComponent(
@@ -1584,7 +1584,7 @@ export default function DataSparkPlatform() {
         VizComponent={VizComponent}
         vizComingSoon={!VizComponent && !!activeLesson.hasViz}
         onBack={() => setView("course")}
-        backLabel={`← Back to ${activeCourse.title}`}
+        backLabel={`← Back to ${activeCourse.title}`}
         onMarkComplete={() => {
           try {
             trackLvsEvent({
@@ -1606,14 +1606,14 @@ export default function DataSparkPlatform() {
     );
   };
 
-  // â”€â”€â”€ QUESTION VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── QUESTION VIEW ─────────────────────────────────────────────────────────
   const renderQuestion = () => {
     if (!activeQuestion || !activeCourse) return null;
     const q = activeQuestion;
 
     return (
       <div style={{ maxWidth: 860, margin: "0 auto", padding: "0 clamp(16px, 4vw, 28px)" }}>
-        <button type="button" onClick={() => { setCourseTab("practice"); setView("course"); }} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>← Back to practice</button>
+        <button type="button" onClick={() => { setCourseTab("practice"); setView("course"); }} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>← Back to practice</button>
 
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
