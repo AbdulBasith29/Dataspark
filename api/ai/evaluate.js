@@ -1,5 +1,5 @@
 const DEFAULT_MODEL = "claude-sonnet-4-20250514";
-const DEFAULT_GEMINI_MODEL = "gemini-flash-latest";
+const DEFAULT_GEMINI_MODEL = "gemini-2.0-flash";
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const GEMINI_API_URL =
   "https://generativelanguage.googleapis.com/v1beta/models";
