@@ -42,8 +42,10 @@ function buildEvaluationPrompt(questionPrompt, userAnswer, rubric) {
 }
 
 function parseEvaluationJson(rawText) {
+  // Gemini sometimes wraps JSON in ```json ... ``` code fences — strip them.
+  const stripped = rawText.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
   try {
-    return JSON.parse(rawText);
+    return JSON.parse(stripped);
   } catch {
     return null;
   }
@@ -134,7 +136,6 @@ export default async function handler(req, res) {
           contents: [{ role: "user", parts: [{ text: userContent }] }],
           generationConfig: {
             maxOutputTokens: 700,
-            responseMimeType: "application/json",
           },
         }),
       }
