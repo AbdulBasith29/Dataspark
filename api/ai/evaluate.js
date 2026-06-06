@@ -1,5 +1,5 @@
 const DEFAULT_MODEL = "claude-sonnet-4-20250514";
-const DEFAULT_GEMINI_MODEL = "gemini-2.0-flash";
+const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const GEMINI_API_URL =
   "https://generativelanguage.googleapis.com/v1beta/models";
@@ -42,10 +42,13 @@ function buildEvaluationPrompt(questionPrompt, userAnswer, rubric) {
 }
 
 function parseEvaluationJson(rawText) {
-  // Gemini sometimes wraps JSON in ```json ... ``` code fences — strip them.
-  const stripped = rawText.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  // Strip leading/trailing code fences (Gemini sometimes wraps JSON).
+  let text = rawText.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  // If thinking tokens appear before the JSON object, jump to the first '{'.
+  const brace = text.indexOf("{");
+  if (brace > 0) text = text.slice(brace);
   try {
-    return JSON.parse(stripped);
+    return JSON.parse(text);
   } catch {
     return null;
   }
@@ -136,6 +139,7 @@ export default async function handler(req, res) {
           contents: [{ role: "user", parts: [{ text: userContent }] }],
           generationConfig: {
             maxOutputTokens: 700,
+            thinkingConfig: { thinkingBudget: 0 },
           },
         }),
       }
@@ -144,8 +148,10 @@ export default async function handler(req, res) {
     if (!upstream.ok) {
       return res.status(200).json(fallbackEvaluation(rubric));
     }
+    // Filter out thinking tokens (thought:true parts) before joining text.
     const rawText =
       data?.candidates?.[0]?.content?.parts
+        ?.filter((part) => !part?.thought)
         ?.map((part) => part?.text || "")
         .join("") || "";
     const parsed = parseEvaluationJson(rawText);

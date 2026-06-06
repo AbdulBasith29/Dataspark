@@ -128,7 +128,7 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
     padding: "2px 6px",
     borderRadius: 4,
     fontSize: 12,
-    fontFamily: "'JetBrains Mono', monospace",
+    fontFamily: "var(--ds-mono), monospace",
     color: course.accent,
   };
 
@@ -231,7 +231,7 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
               style={{
                 background: "#1E293B",
                 color: "#CBD5E1",
-                fontFamily: "'JetBrains Mono'",
+                fontFamily: "var(--ds-mono), monospace",
                 fontSize: 11,
                 padding: "6px 10px",
               }}
@@ -244,7 +244,7 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
               margin: 0,
               padding: "12px 14px",
               overflowX: "auto",
-              fontFamily: "'JetBrains Mono', monospace",
+              fontFamily: "var(--ds-mono), monospace",
               color: "#E2E8F0",
               fontSize: 12,
               lineHeight: 1.55,
@@ -315,7 +315,7 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontFamily: "'JetBrains Mono', monospace",
+                fontFamily: "var(--ds-mono), monospace",
                 fontSize: courseMark.length > 3 ? 9 : 11,
                 fontWeight: 700,
                 color: course.color,
@@ -333,7 +333,7 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
                 fontSize: 14,
                 fontWeight: 700,
                 color: "#F8FAFC",
-                fontFamily: "'Outfit'",
+                fontFamily: "var(--ds-sans), sans-serif",
               }}
             >
               {tutorName} · {course.title}
@@ -342,7 +342,7 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
               style={{
                 fontSize: 10,
                 color: course.accent,
-                fontFamily: "'JetBrains Mono'",
+                fontFamily: "var(--ds-mono), monospace",
               }}
             >
               {headerSubtitle}
@@ -400,7 +400,7 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
                   fontSize: 13,
                   color: "#CBD5E1",
                   lineHeight: 1.65,
-                  fontFamily: "'Outfit'",
+                  fontFamily: "var(--ds-sans), sans-serif",
                 }}
               >
                 {renderMessageContent(m.content)}
@@ -449,7 +449,7 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
               padding: "10px 14px",
               color: "#F8FAFC",
               fontSize: 13,
-              fontFamily: "'Outfit'",
+              fontFamily: "var(--ds-sans), sans-serif",
               outline: "none",
             }}
           />
@@ -467,7 +467,7 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
               fontSize: 13,
               cursor:
                 input.trim() && !loading ? "pointer" : "not-allowed",
-              fontFamily: "'Outfit'",
+              fontFamily: "var(--ds-sans), sans-serif",
             }}
           >
             Send

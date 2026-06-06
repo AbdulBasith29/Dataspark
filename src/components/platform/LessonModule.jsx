@@ -272,7 +272,7 @@ function InterviewGraphStage({ graph, stage, branchPath, clickedTargets, graphCh
               >
                 <span style={{ fontFamily: "var(--ds-mono), monospace", color: DS.dim, marginRight: 8 }}>{choice.id.toUpperCase()}.</span>
                 <strong style={{ color: DS.t1 }}>{choice.label}</strong>
-                {choice.description && <span style={{ display: "block", marginTop: 4, color: DS.t3 }}>{choice.description}</span>}
+                {choice.description && hasAnswered && <span style={{ display: "block", marginTop: 4, color: DS.t3 }}>{choice.description}</span>}
               </button>
             );
           })}
