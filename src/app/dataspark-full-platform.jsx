@@ -89,9 +89,14 @@ import RAGPipelineViz from "../visualizations/RAGPipelineViz.jsx";
 import AdvancedRAGViz from "../visualizations/AdvancedRAGViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import LessonModule from "../components/platform/LessonModule.jsx";
+import PracticeQuestion from "../components/platform/PracticeQuestion.jsx";
 import { getResolvedLessonModule, auditPythonLessonIntegrity, PYTHON_CLUSTER_MILESTONES } from "../data/lesson-modules.js";
 import { PYTHON_QUESTIONS } from "../data/questions-python.js";
 import { STATISTICS_QUESTIONS } from "../data/questions-statistics.js";
+import { SQL_QUESTIONS } from "../data/questions-sql.js";
+import { ML_QUESTIONS } from "../data/questions-ml.js";
+import { DL_QUESTIONS } from "../data/questions-dl.js";
+import { GENAI_QUESTIONS } from "../data/questions-genai.js";
 import { DS, dsGlassCard } from "../lib/ds-platform-tokens.js";
 import { trackLvsEvent, buildLvsMetadata, LVS_EVENT_NAMES, buildPythonProgressArtifacts } from "../lib/analytics.js";
 import useLearnerIntent from "../lib/use-learner-intent.js";
@@ -244,14 +249,7 @@ const CURRICULUM = [
         ]
       }
     ],
-    questions: [
-      { id: "sqq1", title: "Revenue by Customer Segment", difficulty: "Easy", type: "code", prompt: "Write a query returning each customer segment, unique purchasers, total revenue (completed orders only), and avg order value. Filter to segments with >$10K revenue.", tags: ["joins", "aggregation", "HAVING"] },
-      { id: "sqq2", title: "Cohort Retention Analysis", difficulty: "Hard", type: "code", prompt: "Build a monthly cohort retention table showing cohort_month, cohort_size, months_since_signup (0-6), retained_users, and retention_rate for the last 12 months.", tags: ["CTEs", "window-functions", "cohort-analysis"] },
-      { id: "sqq3", title: "Funnel Conversion by City", difficulty: "Medium", type: "code", prompt: "Calculate step-over-step conversion rates for a 5-step funnel (app_open → search → select → confirm → complete) broken down by city for the last 30 days.", tags: ["conditional-aggregation", "funnel", "product-analytics"] },
-      { id: "sqq4", title: "Recursive Org Chart", difficulty: "Hard", type: "code", prompt: "Using a recursive CTE, generate a full org hierarchy showing employee, manager, level, full chain path, and team size (all direct + indirect reports).", tags: ["recursive-CTE", "hierarchy", "self-join"] },
-      { id: "sqq5", title: "Running Total with Gaps", difficulty: "Medium", type: "code", prompt: "Calculate daily signups with a running total, day-over-day change, and 7-day moving average. Handle days with zero signups using a date series.", tags: ["window-functions", "date-series", "running-totals"] },
-      { id: "sqq6", title: "Duplicate Detection & Cleanup", difficulty: "Easy", type: "code", prompt: "Find duplicate listings (same host_id, title, city), show counts, then write a DELETE keeping only the most recently updated record per group.", tags: ["deduplication", "ROW_NUMBER", "data-quality"] },
-    ]
+    questions: SQL_QUESTIONS,
   },
   {
     id: "statistics",
@@ -358,13 +356,7 @@ const CURRICULUM = [
         ]
       }
     ],
-    questions: [
-      { id: "mlq1", title: "Churn Feature Engineering Pipeline", difficulty: "Medium", type: "code", prompt: "Build a feature engineering function for churn prediction: compute recency, frequency, monetary features, activity trends, and engagement ratios from raw event logs.", tags: ["feature-engineering", "pandas", "churn"] },
-      { id: "mlq2", title: "Model Selection: Why Not Always XGBoost?", difficulty: "Medium", type: "open-ended", prompt: "Your junior DS always defaults to XGBoost. For these 4 scenarios (linear relationship with 10 features, 50M rows with 3 features, highly interpretable model needed for compliance, sparse text data), explain which model you'd choose and why.", tags: ["model-selection", "tradeoffs", "reasoning"] },
-      { id: "mlq3", title: "Debug a Leaking Pipeline", difficulty: "Hard", type: "open-ended", prompt: "Your model has 99.2% accuracy in development but 61% in production. Walk through your systematic debugging process. What are the most likely causes? How do you prevent this in the future?", tags: ["data-leakage", "debugging", "ML-pipelines"] },
-      { id: "mlq4", title: "End-to-End ML Pipeline", difficulty: "Hard", type: "code", prompt: "Build a complete sklearn pipeline: imputation, encoding, scaling, feature selection, model training with cross-validation, and hyperparameter tuning. Use Pipeline and ColumnTransformer.", tags: ["sklearn", "pipelines", "end-to-end"] },
-      { id: "mlq5", title: "Explain Your Model to the CEO", difficulty: "Easy", type: "open-ended", prompt: "You built a gradient boosting model that predicts which customers will churn. The CEO asks 'how does it work?' and 'why should I trust it?'. Explain without jargon. Then explain what SHAP values show.", tags: ["explainability", "communication", "SHAP"] },
-    ]
+    questions: ML_QUESTIONS,
   },
   {
     id: "deep-learning",
@@ -396,11 +388,7 @@ const CURRICULUM = [
         ]
       }
     ],
-    questions: [
-      { id: "dlq1", title: "CNN vs RNN vs Transformer", difficulty: "Medium", type: "open-ended", prompt: "For each scenario (image classification, time series forecasting, document summarization, audio classification), pick the best architecture and explain the tradeoffs.", tags: ["architecture-selection", "tradeoffs"] },
-      { id: "dlq2", title: "Training Loss Not Decreasing", difficulty: "Medium", type: "open-ended", prompt: "Your neural network's training loss is flat after 10 epochs. Walk through a systematic debugging checklist: what could be wrong and what would you try in what order?", tags: ["debugging", "training", "practical"] },
-      { id: "dlq3", title: "Implement a Simple Neural Network from Scratch", difficulty: "Hard", type: "code", prompt: "Build a 2-layer neural network using only NumPy. Implement forward pass, backprop, and training loop. Train it on a simple classification task.", tags: ["from-scratch", "numpy", "backprop"] },
-    ]
+    questions: DL_QUESTIONS,
   },
   {
     id: "genai",
@@ -463,13 +451,7 @@ const CURRICULUM = [
         ]
       },
     ],
-    questions: [
-      { id: "aiq1", title: "Design a Data Quality Classifier Prompt", difficulty: "Medium", type: "open-ended", prompt: "Design a system prompt for Claude that classifies CSV data quality. Include the prompt, few-shot strategy, output schema, validation approach, and fallback for misclassification.", tags: ["prompt-engineering", "system-design", "data-quality"] },
-      { id: "aiq2", title: "RAG vs Fine-Tuning Decision", difficulty: "Medium", type: "open-ended", prompt: "Your company has 10,000 internal documents and wants an AI assistant for employees. Compare RAG vs fine-tuning across cost, accuracy, freshness, and maintenance. What do you recommend?", tags: ["RAG", "architecture", "decision-making"] },
-      { id: "aiq3", title: "LLM Evaluation Pipeline for Text-to-SQL", difficulty: "Hard", type: "open-ended", prompt: "Design an eval pipeline for an LLM text-to-SQL feature. Cover metrics, test data construction, handling multiple valid SQLs, production readiness thresholds, and post-deployment monitoring.", tags: ["evaluation", "text-to-SQL", "MLOps"] },
-      { id: "aiq4", title: "Design an Advanced RAG Architecture", difficulty: "Hard", type: "open-ended", prompt: "Your team's naive RAG system has 58% answer relevancy. Design a systematic improvement roadmap: identify failure modes, propose retrieval/reranking/generation improvements, and define evaluation metrics to track progress.", tags: ["RAG", "architecture", "evaluation"] },
-      { id: "aiq5", title: "Multi-Agent System Design", difficulty: "Hard", type: "open-ended", prompt: "Design a multi-agent system that monitors 500 enterprise customers, detects churn signals from support tickets + usage data, and drafts personalized outreach emails. Cover agent roles, orchestration, tool access, safety guardrails, and failure modes.", tags: ["agents", "multi-agent", "system-design"] },
-    ]
+    questions: GENAI_QUESTIONS,
   },
   {
     id: "product-sense",
@@ -968,7 +950,7 @@ const BiasVarianceViz = () => {
   return (
     <>
       <div style={{ fontSize: 17, fontWeight: 700, color: DS.t1, marginBottom: 4, fontFamily: "var(--ds-sans), sans-serif" }}>Bias–variance tradeoff</div>
-      <div style={{ fontSize: 12, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 16, lineHeight: 1.55 }}>Drag complexity — the landing page promises reasoning, not memorization; this is the core tension behind that.</div>
+      <div style={{ fontSize: 12, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 16, lineHeight: 1.55 }}>Drag complexity — DataSpark is built on reasoning, not memorization; this is the core tension.</div>
       <canvas ref={canvasRef} style={{ width: "100%", height: 250, borderRadius: 12, border: `1px solid ${DS.border}`, background: "rgba(255,255,255,0.02)" }} />
       <label style={{ display: "block", marginTop: 16 }}>
         <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>
@@ -1153,9 +1135,6 @@ export default function DataSparkPlatform() {
   const [activeQuestion, setActiveQuestion] = useState(null);
   const [chatbotCourse, setChatbotCourse] = useState(null);
   const [chatbotSeed, setChatbotSeed] = useState("");
-  const [userAnswer, setUserAnswer] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [showModel, setShowModel] = useState(false);
   const [progress, setProgress] = useState({});
   const [courseTab, setCourseTab] = useState("learn");
   const [diffFilter, setDiffFilter] = useState("All");
@@ -1218,9 +1197,8 @@ export default function DataSparkPlatform() {
     }
   }, [view, activeLesson, activeCourse]);
 
-  const submitPracticeAnswer = useCallback(async () => {
-    if (!activeQuestion || !userAnswer.trim()) return;
-    setSubmitted(true);
+  const submitPracticeAnswer = useCallback(async (answerText) => {
+    if (!activeQuestion || !answerText?.trim()) return;
     setEvalLoading(true);
     setEvalError(null);
     setEvalResult(null);
@@ -1231,7 +1209,7 @@ export default function DataSparkPlatform() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           questionPrompt: `${activeQuestion.title}\n\n${activeQuestion.prompt}`,
-          userAnswer: userAnswer.trim(),
+          userAnswer: answerText.trim(),
           rubric,
         }),
       });
@@ -1246,7 +1224,7 @@ export default function DataSparkPlatform() {
     } finally {
       setEvalLoading(false);
     }
-  }, [activeQuestion, userAnswer]);
+  }, [activeQuestion]);
 
   const diffBadge = (d) => {
     const c = { Easy: DS.grn, Medium: "#F59E0B", Hard: "#EF4444" };
@@ -1282,7 +1260,7 @@ export default function DataSparkPlatform() {
           fontWeight: 400,
         }}
         >
-          Same promise as the landing page: <span style={{ color: DS.ind }}>systems thinking</span>
+          The DataSpark approach: <span style={{ color: DS.ind }}>systems thinking</span>
           {" "}over syntax drills. Learn visually, practice with context, and use the tutor when you are stuck.
         </p>
         <div style={{
@@ -1537,8 +1515,8 @@ export default function DataSparkPlatform() {
                   key={q.id}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveQuestion(q); setUserAnswer(""); setSubmitted(false); setShowModel(false); setEvalLoading(false); setEvalResult(null); setEvalError(null); setView("question"); } }}
-                  onClick={() => { setActiveQuestion(q); setUserAnswer(""); setSubmitted(false); setShowModel(false); setEvalLoading(false); setEvalResult(null); setEvalError(null); setView("question"); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveQuestion(q); setEvalLoading(false); setEvalResult(null); setEvalError(null); setView("question"); } }}
+                  onClick={() => { setActiveQuestion(q); setEvalLoading(false); setEvalResult(null); setEvalError(null); setView("question"); }}
                   style={{
                     ...dsGlassCard({ padding: "16px 18px", cursor: "pointer", transition: "border-color 0.2s" }),
                   }}
@@ -1612,159 +1590,18 @@ export default function DataSparkPlatform() {
     const q = activeQuestion;
 
     return (
-      <div style={{ maxWidth: 860, margin: "0 auto", padding: "0 clamp(16px, 4vw, 28px)" }}>
-        <button type="button" onClick={() => { setCourseTab("practice"); setView("course"); }} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>← Back to practice</button>
+      <div style={{ padding: "0 clamp(8px, 2vw, 16px)" }}>
+        <button type="button" onClick={() => { setCourseTab("practice"); setView("course"); }} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "16px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>← Back to practice</button>
 
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-            {diffBadge(q.difficulty)}
-            <span style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace" }}>{q.type === "code" ? "Coding problem" : "Open-ended case study"}</span>
-          </div>
-          <h1 style={{ fontSize: "clamp(20px, 3.5vw, 26px)", fontWeight: 800, color: DS.t1, margin: 0, letterSpacing: "-0.02em" }}>{q.title}</h1>
-          <div style={{ display: "flex", gap: 5, marginTop: 8, flexWrap: "wrap" }}>
-            {(q.tags || []).map(t => <span key={t} style={{ fontSize: 9, padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: DS.t3, fontFamily: "var(--ds-mono), monospace", border: `1px solid ${DS.border}` }}>{t}</span>)}
-          </div>
-        </div>
-
-        <div style={{
-          ...dsGlassCard({ padding: "22px 24px", marginBottom: 20, fontSize: 14, color: DS.t2, lineHeight: 1.75, whiteSpace: "pre-wrap" }),
-        }}>
-          {q.prompt}
-        </div>
-
-        <textarea
-          value={userAnswer}
-          onChange={e => setUserAnswer(e.target.value)}
-          placeholder={q.type === "code" ? "Write your code here..." : "Write your answer — explain your reasoning, tradeoffs, and approach..."}
-          disabled={submitted}
-          style={{
-            width: "100%", minHeight: 280, background: "rgba(255,255,255,0.03)", border: `1px solid ${DS.border}`,
-            borderRadius: DS.radiusMd, padding: 18, color: DS.t1, fontSize: 14, resize: "vertical",
-            fontFamily: q.type === "code" ? "var(--ds-mono), monospace" : "var(--ds-sans), sans-serif",
-            lineHeight: 1.7, outline: "none", boxSizing: "border-box", opacity: submitted ? 0.6 : 1,
-          }}
+        <PracticeQuestion
+          question={q}
+          courseAccent={activeCourse.color}
+          onSubmit={submitPracticeAnswer}
+          evalLoading={evalLoading}
+          evalResult={evalResult}
+          evalError={evalError}
+          onAskTutor={() => setChatbotCourse(activeCourse)}
         />
-
-        <div style={{ display: "flex", gap: 10, marginTop: 16, marginBottom: 20, flexWrap: "wrap" }}>
-          {!submitted && (
-            <button
-              type="button"
-              onClick={() => void submitPracticeAnswer()}
-              disabled={!userAnswer.trim() || evalLoading}
-              style={{
-                flex: 1, minWidth: 160, background: userAnswer.trim() && !evalLoading ? DS.indB : "rgba(255,255,255,0.06)",
-                border: "none", borderRadius: DS.radiusSm, padding: "14px 0", color: userAnswer.trim() && !evalLoading ? "#fff" : DS.dim,
-                fontSize: 14, fontWeight: 700, cursor: userAnswer.trim() && !evalLoading ? "pointer" : "not-allowed", fontFamily: "var(--ds-sans), sans-serif",
-                boxShadow: userAnswer.trim() && !evalLoading ? DS.shadowCta : "none",
-              }}>
-              Submit & score
-            </button>
-          )}
-          {submitted && !showModel && (
-            <button
-              type="button"
-              onClick={() => setShowModel(true)}
-              style={{
-                flex: 1, minWidth: 200, background: DS.grn, border: "none", borderRadius: DS.radiusSm, padding: "14px 0",
-                color: "#020617", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "var(--ds-sans), sans-serif",
-              }}>
-              Show model answer & rubric
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setChatbotCourse(activeCourse)}
-            style={{
-              background: "rgba(255,255,255,0.04)", border: `1px solid ${DS.border}`, borderRadius: DS.radiusSm, padding: "14px 20px",
-              color: DS.t1, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "var(--ds-sans), sans-serif",
-            }}>
-            Get help
-          </button>
-        </div>
-
-        {(submitted || evalLoading) && (
-          <div style={{ ...dsGlassCard({ padding: "20px 22px", marginBottom: 20, border: `1px solid ${DS.indB}40` }) }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: DS.ind, fontFamily: "var(--ds-mono), monospace", letterSpacing: "0.12em", marginBottom: 12 }}>
-              AI SCORECARD
-            </div>
-            {evalLoading && <p style={{ color: DS.t3, fontSize: 14 }}>Scoring your answer…</p>}
-            {evalError && <p style={{ color: "#FCA5A5", fontSize: 14 }}>{evalError}</p>}
-            {evalResult && !evalLoading && (
-              <>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 14, marginBottom: 14, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 36, fontWeight: 800, color: DS.t1 }}>{Math.round(evalResult.score)}</span>
-                  <span style={{ color: DS.t3, fontFamily: "var(--ds-mono), monospace", fontSize: 13 }}>{evalResult.totalScore}</span>
-                </div>
-                <p style={{ fontSize: 14, color: DS.t2, lineHeight: 1.65, marginBottom: 16 }}>{evalResult.feedback}</p>
-                {Array.isArray(evalResult.rubricScores) && (
-                  <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 8 }}>
-                    {evalResult.rubricScores.map((rs, i) => (
-                      <li
-                        key={i}
-                        style={{
-                          fontSize: 12,
-                          fontFamily: "var(--ds-mono), monospace",
-                          color: rs.met ? DS.grn : DS.t3,
-                          padding: "8px 10px",
-                          borderRadius: 8,
-                          background: "rgba(255,255,255,0.03)",
-                          border: `1px solid ${DS.border}`,
-                        }}
-                      >
-                        <span style={{ marginRight: 8 }}>{rs.met ? "✓" : "○"}</span>
-                        {rs.criterion}
-                        <span style={{ color: DS.dim, marginLeft: 8 }}>({rs.confidence})</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </>
-            )}
-          </div>
-        )}
-
-        {showModel && (
-          <div style={{
-            ...dsGlassCard({ padding: "22px 24px", marginBottom: 40, border: `1px solid rgba(52,211,153,0.25)` }),
-          }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: DS.grn, fontFamily: "var(--ds-mono), monospace", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.12em" }}>
-              Model answer & evaluation criteria
-            </div>
-            {q.modelAnswer ? (
-              <div style={{ fontSize: 14, color: DS.t2, lineHeight: 1.75, fontWeight: 400, whiteSpace: "pre-wrap", marginBottom: 16 }}>{q.modelAnswer}</div>
-            ) : (
-              <div style={{ fontSize: 14, color: DS.t3, lineHeight: 1.7, fontWeight: 400 }}>
-                <p style={{ marginBottom: 12 }}>A strong answer to this question would demonstrate clear understanding of the core concepts, structured reasoning about tradeoffs, and practical awareness of real-world constraints.</p>
-                <p style={{ marginBottom: 12 }}>Compare your scorecard above to these expectations.</p>
-                <p style={{ color: DS.dim, fontSize: 13, fontStyle: "italic" }}>Use the AI tutor to dig into your specific answer line by line.</p>
-              </div>
-            )}
-            {Array.isArray(q.rubric) && q.rubric.length > 0 && (
-              <div style={{ marginTop: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 8 }}>Rubric</div>
-                <ul style={{ margin: 0, paddingLeft: 20, color: DS.t2, fontSize: 13, lineHeight: 1.65 }}>
-                  {q.rubric.map((line, i) => <li key={i}>{line}</li>)}
-                </ul>
-              </div>
-            )}
-            {Array.isArray(q.hints) && q.hints.length > 0 && (
-              <div style={{ marginTop: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 8 }}>Hints</div>
-                <ul style={{ margin: 0, paddingLeft: 20, color: DS.t2, fontSize: 13, lineHeight: 1.65 }}>
-                  {q.hints.map((h, i) => <li key={i}>{h}</li>)}
-                </ul>
-              </div>
-            )}
-            {Array.isArray(q.commonMistakes) && q.commonMistakes.length > 0 && (
-              <div style={{ marginTop: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#FCA5A5", fontFamily: "var(--ds-mono), monospace", marginBottom: 8 }}>Common mistakes</div>
-                <ul style={{ margin: 0, paddingLeft: 20, color: DS.t2, fontSize: 13, lineHeight: 1.65 }}>
-                  {q.commonMistakes.map((m, i) => <li key={i}>{m}</li>)}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
       </div>
     );
   };
@@ -1828,7 +1665,7 @@ export default function DataSparkPlatform() {
               flexShrink: 0,
             }}
           >
-            Landing
+            Home
           </Link>
           <Link
             to="/platform/insights"
