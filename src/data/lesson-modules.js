@@ -27660,6 +27660,1930 @@ def logistic_regression_loss(X, y, beta):
     ],
   },
 
+// ml_remaining_lessons.js
+
+  "ml-s3": {
+    durationLabel: "22 min",
+    outcomes: [
+      "Compute **Gini impurity** and **information gain** by hand for a binary split and explain why the tree always picks the highest-gain split.",
+      "Trace the **greedy, top-down** growth algorithm and articulate why greedy does not guarantee a globally optimal tree.",
+      "Apply **pre-pruning** (max_depth, min_samples_leaf, min_samples_split) and **post-pruning** (ccp_alpha) and predict the bias–variance tradeoff each parameter controls.",
+      "Interpret **mean decrease impurity** feature importances and name the systematic bias they carry toward high-cardinality features.",
+    ],
+    learnMarkdown: `## The core question: what makes a good split?
+
+A decision tree partitions the feature space by asking binary questions — "is feature j ≤ threshold t?" — at each node. The algorithm must decide which (j, t) pair to try at each node. It does this by measuring **impurity**: how mixed are the class labels in the resulting child nodes? A perfect split sends all positives left and all negatives right; impurity is zero in both children.
+
+Two impurity measures dominate interviews:
+
+### Gini impurity
+
+\`\`\`
+Gini(node) = 1 − Σ pᵢ²
+\`\`\`
+
+where \`pᵢ\` is the fraction of class i in the node. For a binary classification node with 60% positives and 40% negatives:
+
+\`\`\`
+Gini = 1 − (0.6² + 0.4²) = 1 − (0.36 + 0.16) = 0.48
+\`\`\`
+
+A pure node (all one class) has Gini = 0. The maximally impure 50/50 node has Gini = 0.5. Gini is fast to compute — no logarithms — and is the scikit-learn default.
+
+### Entropy and information gain
+
+\`\`\`
+Entropy(node) = −Σ pᵢ log₂(pᵢ)
+\`\`\`
+
+Same 60/40 node: \`−(0.6 log₂ 0.6 + 0.4 log₂ 0.4) ≈ 0.971\` bits. A pure node has entropy 0; a 50/50 node has entropy 1.0 bit.
+
+**Information gain** of a split = parent entropy − weighted sum of child entropies:
+
+\`\`\`
+IG = Entropy(parent) − (n_left/n)·Entropy(left) − (n_right/n)·Entropy(right)
+\`\`\`
+
+The tree picks the split with the **highest information gain**. Gini impurity and entropy almost always choose the same split — in practice the choice matters far less than max_depth or min_samples_leaf.
+
+## The greedy growth algorithm
+
+\`\`\`
+def grow(node, depth):
+    if stopping_condition(node, depth):
+        node.label = majority_class(node.samples)
+        return
+    best_j, best_t = argmax_{j,t} information_gain(node, j, t)
+    left, right = split(node.samples, best_j, best_t)
+    grow(left, depth+1)
+    grow(right, depth+1)
+\`\`\`
+
+**Greedy** means: the best split *right now*, with no lookahead. A split that looks mediocre at depth 2 might unlock a perfect separation at depth 4 — the greedy algorithm will never find it. Optimal tree construction is NP-hard; greedy is a heuristic that works well in practice.
+
+## Overfitting and pruning
+
+A fully grown decision tree memorizes training data. Every leaf can represent a single training point; training accuracy is 100% while test accuracy collapses. The fix is to **constrain growth** (pre-pruning) or **simplify after the fact** (post-pruning).
+
+### Pre-pruning parameters
+
+| Parameter | Effect | Bias–variance |
+|---|---|---|
+| \`max_depth\` | Hard ceiling on tree depth | Low depth → high bias, low variance |
+| \`min_samples_leaf\` | Leaf must have ≥ n samples | Smooths noisy regions |
+| \`min_samples_split\` | Node must have ≥ n samples before splitting | Prevents tiny splits |
+| \`max_features\` | Try only a random subset of features per split | Reduces variance, used in Random Forest |
+
+Start with \`max_depth=3–5\` in practice. Tune via cross-validated accuracy or validation set.
+
+### Post-pruning: cost–complexity pruning (ccp_alpha)
+
+scikit-learn implements **minimal cost–complexity pruning**. Grow the full tree, then iteratively collapse the subtree whose removal increases error the least per leaf removed. \`ccp_alpha\` is the regularization strength: higher α → more collapsed, simpler tree. Use \`DecisionTreeClassifier.cost_complexity_pruning_path(X, y)\` to plot alphas vs node counts, then CV over the resulting alpha grid.
+
+\`\`\`python
+path = clf.cost_complexity_pruning_path(X_train, y_train)
+alphas = path.ccp_alphas
+
+# CV over alpha values
+scores = [cross_val_score(DecisionTreeClassifier(ccp_alpha=a), X, y, cv=5).mean()
+          for a in alphas]
+best_alpha = alphas[np.argmax(scores)]
+\`\`\`
+
+## Feature importances
+
+scikit-learn's \`feature_importances_\` is the **mean decrease impurity (MDI)**: for each feature, sum the impurity decrease (weighted by samples) across all nodes that split on it, normalized to sum to 1. Fast to compute — no extra evaluation needed.
+
+**Systematic bias**: high-cardinality features (continuous values, many unique categories) have more candidate thresholds, so they are more likely to get selected even if they are noise. If cardinality varies widely across features, use **permutation importance** instead — shuffle each feature and measure the drop in test-set score. It is slower but unbiased with respect to cardinality.
+
+## Pitfalls
+
+- **Reporting training accuracy on a deep tree.** Always validate on held-out data.
+- **Forgetting that Gini and entropy usually give the same tree.** The impurity measure is rarely the bottleneck.
+- **Ignoring feature cardinality bias in MDI importances.** A continuous feature will almost always rank first on MDI even if a binary feature matters more.
+- **Not standardizing before the tree.** Decision trees are invariant to monotone feature transformations — unlike SVM or linear regression, you do not need to scale. But downstream ensembles that mix tree and linear models still need it.
+
+## Interview questions
+
+- "Compute Gini for a node with 60% positives." (1 − 0.36 − 0.16 = 0.48)
+- "What max_depth would you start with?" (3–5; tune via CV. Start shallow — bias is cheap to fix, variance is expensive.)
+- "Why is the greedy tree not globally optimal?" (No lookahead; a locally weak split may unlock globally strong subtrees — finding the true optimum is NP-hard.)
+- "What is the bias in MDI feature importances?" (High-cardinality features are artificially favored — use permutation importance on a test set instead.)`,
+    video: { youtubeId: "7VeUPuFGJHk", title: "Decision Trees, Part 1 — Using Entropy", channel: "StatQuest", startSeconds: 0 },
+    videoFallbackMarkdown: `## Deep dive (no video)
+
+1. On paper, draw a 2-feature, 6-point dataset — 3 positive, 3 negative — and manually compute Gini for two candidate splits. Pick the best.
+2. Grow the tree one level deeper and compute the information gain at the second split.
+3. Write out in plain English what \`min_samples_leaf=5\` does to a node with 4 samples — trace the tree growth halting.
+4. Two-sentence answer: "A decision tree splits on the feature and threshold that maximise ___. It tends to overfit because ___."`,
+    tryGuidance: "Use the Decision Tree visualizer to step through splits one level at a time. Before each split, predict which feature will be chosen. Then increase max_depth and watch training vs validation accuracy diverge — that gap is the overfitting story.",
+    interviewGraph: {
+      initialStageId: "s3_gini_click",
+      artifactDimensions: [
+        { label: "Gini / Info Gain", recoveryStageId: "s3_recovery_gini" },
+        { label: "Pruning & Overfitting", recoveryStageId: "s3_recovery_pruning" },
+      ],
+      stages: {
+        s3_gini_click: {
+          id: "s3_gini_click",
+          type: "click_target",
+          badge: "Stage 1",
+          title: "Stage 1 · Impurity computation",
+          prompt: "A node has 60 positive and 40 negative samples. Click the line that correctly computes its Gini impurity.",
+          code_snippet: `n_pos, n_neg, n = 60, 40, 100
+p_pos = n_pos / n   # 0.60
+p_neg = n_neg / n   # 0.40
+
+gini_a = 1 - (p_pos + p_neg)          # ds-target:wrong_linear
+gini_b = 1 - (p_pos**2 + p_neg**2)    # ds-target:correct_gini
+gini_c = p_pos * (1 - p_pos)          # ds-target:wrong_single`,
+          validationCopy: {
+            wrong_linear: "Not quite. Gini uses squared probabilities: 1 − Σpᵢ². Summing the raw probabilities always gives 0.",
+            correct_gini: "Correct. Gini = 1 − (0.6² + 0.4²) = 1 − 0.52 = 0.48. This correctly measures how mixed the node is.",
+            wrong_single: "This is p(1−p), which equals Gini only for binary problems with one class probability. The general formula uses both class probabilities.",
+          },
+          branches: { wrong_linear: "s3_recovery_gini", correct_gini: "s3_split_choice", wrong_single: "s3_recovery_gini" },
+        },
+        s3_recovery_gini: {
+          id: "s3_recovery_gini",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Re-anchor Gini",
+          prompt: "A perfectly pure node (all samples the same class) has Gini = ?",
+          choices: [
+            { id: "a", label: "0", description: "1 − (1.0²) = 0. One class has p=1, all others p=0." },
+            { id: "b", label: "0.5", description: "0.5 is the maximum Gini for a binary problem (50/50 split)." },
+            { id: "c", label: "1", description: "Gini ranges 0 to 1−1/k. For a pure node it is 0, not 1." },
+          ],
+          branches: { a: "s3_split_choice", b: "s3_split_choice", c: "s3_split_choice" },
+          rationale: "Pure node → one class has p=1, all others p=0, so Gini = 1 − 1² = 0. The tree stops splitting when Gini is already 0 — nothing to gain.",
+        },
+        s3_split_choice: {
+          id: "s3_split_choice",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Greedy vs optimal",
+          prompt: "A colleague says: 'Our decision tree must find the globally optimal set of splits because it always picks the highest information-gain split at each node.' What is wrong?",
+          choices: [
+            { id: "a", label: "The tree is greedy — it has no lookahead, so a locally weaker split that enables better downstream splits is never explored", description: "Greedy top-down induction is a heuristic. Optimal tree construction is NP-hard." },
+            { id: "b", label: "Information gain is biased, so the splits are always suboptimal regardless", description: "IG bias toward high-cardinality features is real, but that is a different issue from global optimality." },
+            { id: "c", label: "Nothing is wrong — greedy search on an impurity criterion is provably optimal", description: "This is not true. Greedy induction finds a local optimum, not a global one." },
+          ],
+          branches: { a: "s3_pruning_choice", b: "s3_recovery_pruning", c: "s3_recovery_pruning" },
+          rationale: "Greedy = best split right now, no lookahead. A split that looks mediocre at depth 2 might enable a perfect separation at depth 4 — the algorithm never finds it. This is why ensembles (random forests, boosting) outperform single trees.",
+        },
+        s3_recovery_pruning: {
+          id: "s3_recovery_pruning",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Overfitting and pruning",
+          prompt: "A fully grown decision tree achieves 100% training accuracy but 62% test accuracy. Which parameter is the most direct lever to reduce this gap?",
+          choices: [
+            { id: "a", label: "max_depth", description: "Capping tree depth prevents it from memorising individual training points." },
+            { id: "b", label: "n_estimators", description: "That parameter belongs to Random Forest / Gradient Boosting, not a single Decision Tree." },
+            { id: "c", label: "learning_rate", description: "learning_rate is a boosting hyperparameter, not a pruning parameter for a standalone tree." },
+          ],
+          branches: { a: "s3_pruning_choice", b: "s3_pruning_choice", c: "s3_pruning_choice" },
+          rationale: "max_depth is the most direct pre-pruning lever. Start at 3–5 and tune via cross-validation. min_samples_leaf and ccp_alpha are complementary options.",
+        },
+        s3_pruning_choice: {
+          id: "s3_pruning_choice",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · Feature importance bias",
+          prompt: "Your decision tree reports that a continuous 'age' feature has the highest MDI importance, but domain experts say a binary 'has_account' feature should matter more. What is the most likely explanation?",
+          choices: [
+            { id: "a", label: "MDI is biased toward high-cardinality features because they have more candidate thresholds", description: "More thresholds = more chances to be selected, inflating apparent importance." },
+            { id: "b", label: "The domain experts are wrong — MDI is unbiased", description: "MDI is actually biased toward high-cardinality features. Domain expertise is a useful sanity check." },
+            { id: "c", label: "The tree was not pruned enough, causing the bias", description: "Pruning affects overfitting, not MDI cardinality bias. Use permutation importance instead." },
+          ],
+          branches: { a: "s3_terminal", b: "s3_terminal", c: "s3_terminal" },
+          rationale: "MDI = mean decrease impurity is fast but biased toward features with many split candidates (continuous or high-cardinality). Use permutation importance on a held-out set for a fairer ranking.",
+        },
+        s3_terminal: {
+          id: "s3_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · Decision Trees mastered",
+          prompt: "Final reflection: how would you explain Gini impurity and pruning in a 30-second answer?",
+          choices: [
+            { id: "a", label: "Got it", description: "Gini measures label mixing at a node (0 = pure, 0.5 = maximally mixed). The tree greedily picks the split that reduces Gini most. Pruning (max_depth, ccp_alpha) trades some training accuracy for much better generalization." },
+          ],
+          branches: { a: "s3_terminal" },
+          terminal: true,
+          rationale: "Decision trees are transparent and fast, but overfit aggressively without pruning. Their real value is as a building block for ensembles (Random Forest, Gradient Boosting), where the bias of shallow trees and the variance reduction of aggregation complement each other.",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "A node has 70% class A and 30% class B. What is its Gini impurity?",
+        options: ["0.42", "0.58", "0.21"],
+        correctIndex: 0,
+        explanation: "Gini = 1 − (0.7² + 0.3²) = 1 − (0.49 + 0.09) = 1 − 0.58 = 0.42.",
+      },
+      {
+        question: "Which pruning approach grows the full tree first and then removes branches?",
+        options: ["max_depth (pre-pruning)", "cost-complexity pruning / ccp_alpha (post-pruning)", "min_samples_split (pre-pruning)"],
+        correctIndex: 1,
+        explanation: "Post-pruning (ccp_alpha in scikit-learn) grows the tree fully then iteratively collapses subtrees that give the least error increase per leaf removed.",
+      },
+      {
+        question: "Why are MDI feature importances biased toward continuous features?",
+        options: [
+          "Continuous features have more candidate thresholds, so they are selected more often by chance",
+          "The Gini formula weights continuous features higher by definition",
+          "Continuous features always have higher variance, which inflates their impurity reduction",
+        ],
+        correctIndex: 0,
+        explanation: "More split candidates means more opportunities to appear useful even on random data. Use permutation importance on a held-out set to avoid this bias.",
+      },
+    ],
+  },
+
+  "ml-s4": {
+    durationLabel: "18 min",
+    outcomes: [
+      "Explain **bootstrap sampling** precisely — sample n points *with replacement* from n — and calculate the probability (~63.2%) that any given point appears in a bootstrap sample.",
+      "State why using a **random subset of features** at each split is the critical ingredient that **decorrelates** trees, and how max_features = √p is chosen for classification.",
+      "Interpret **out-of-bag (OOB) error** as free validation: each tree predicts only the ~36.8% of samples it never saw during training.",
+      "Articulate why averaging many decorrelated trees reduces **variance without increasing bias**, and identify which knobs control the bias–variance tradeoff.",
+    ],
+    learnMarkdown: `## Why a single tree fails
+
+A single deep decision tree is a high-variance learner: change a few training points and the entire structure can shift. The root split — which governs every downstream prediction — is unstable. The insight behind Random Forest is that if you could average many *independent* trees, the variance would shrink toward zero while bias stays roughly constant. The problem is that trees trained on the same data are not independent — they are correlated. Random Forest breaks that correlation with **two sources of randomness**.
+
+## Bootstrap sampling (bagging)
+
+**Bootstrap aggregating (bagging)**: for each tree, sample \`n\` training points *with replacement* from the original \`n\`. Some points appear two or three times; about **36.8%** of points never appear.
+
+The probability that a specific point is NOT in a single bootstrap draw is \`(1 − 1/n)^n → e⁻¹ ≈ 0.368\` as n → ∞. So each tree sees roughly 63.2% of the data. The "out-of-bag" (OOB) 36.8% is the free validation set.
+
+\`\`\`python
+from sklearn.ensemble import RandomForestClassifier
+
+rf = RandomForestClassifier(
+    n_estimators=200,
+    max_features="sqrt",   # √p features tried per split
+    oob_score=True,        # enable OOB evaluation
+    n_jobs=-1,
+)
+rf.fit(X_train, y_train)
+print(f"OOB accuracy: {rf.oob_score_:.3f}")  # no separate val set needed
+\`\`\`
+
+## Random feature subsets — the decorrelation trick
+
+Bagging alone does not fully decorrelate trees because if one feature is very strong, *every* tree will use it at the root. Replace that feature with a different one and the tree structure barely changes. Trees remain correlated, and variance reduction stalls.
+
+The fix: at **each split**, randomly sample \`max_features\` features and choose the best split only among those. Typical defaults:
+
+| Task | max_features |
+|---|---|
+| Classification | \`sqrt(p)\` |
+| Regression | \`p/3\` or \`1.0\` |
+
+With \`max_features = sqrt(p)\`, the dominant feature is absent from a large fraction of split decisions, forcing diversity across trees. The weaker, complementary features get to shine. This is what makes Random Forest more than just bagged trees.
+
+## Out-of-bag error
+
+Each tree trains on ~63.2% of data. The other ~36.8% (OOB samples) can be used for prediction. For any given training point, aggregate the predictions of all trees that did NOT see it. This gives an unbiased generalization estimate — mathematically similar to leave-one-out CV but free (no extra computation).
+
+Set \`oob_score=True\` in scikit-learn. The OOB score closely tracks 5-fold CV accuracy for large forests (n_estimators ≥ 100) and is the go-to validation when you need to move quickly.
+
+## Variance reduction math
+
+For \`B\` trees each with variance \`σ²\`, pairwise correlation \`ρ\`:
+
+\`\`\`
+Var(average) = ρ·σ² + (1−ρ)·σ²/B
+\`\`\`
+
+As B → ∞, the second term vanishes. The floor is \`ρ·σ²\` — determined purely by the correlation between trees. This is why decorrelation (random features) matters more than adding trees indefinitely: once B is large enough (~100–500), more trees stop helping. The residual error is all correlation — and that is what \`max_features\` controls.
+
+Key takeaway: **variance goes down, bias stays the same** (approximately). Each individual tree is still a high-variance learner; the average is what converges. A single tree with \`max_depth=None\` is nearly unbiased but wildly variable; the forest of such trees preserves that near-zero bias while slashing variance.
+
+## n_estimators vs max_features tradeoff
+
+| Knob | Effect on variance | Effect on bias | Cost |
+|---|---|---|---|
+| ↑ n_estimators | ↓ (diminishing returns after ~200) | ≈ none | Linear in training time |
+| ↓ max_features | ↓ (more decorrelation) | ↑ slightly (weaker individual trees) | Faster splits |
+| ↑ max_depth | ↑ | ↓ | More splits, deeper trees |
+
+Practical recipe: start with \`n_estimators=200\`, \`max_features="sqrt"\`, \`min_samples_leaf=1\`. If the OOB error is high, try ↑ n_estimators or ↓ max_features. If overfitting persists (gap between OOB and train), raise \`min_samples_leaf\`.
+
+## Why Random Forest does not overfit as badly as one deep tree
+
+A deep single tree can achieve 0% training error by memorizing individual samples. Its test error is high and unstable. A Random Forest also achieves near-0% training error (each tree overfits its bootstrap sample) — but the *aggregated* prediction smooths out the individual mistakes because different trees overfit different noise. The errors are roughly independent (low ρ), so they cancel in the average. In the limit of infinite decorrelated trees, random fluctuations in the training sample vanish and you approach the Bayes-optimal predictor for the tree hypothesis class.
+
+## Pitfalls
+
+- **Equating OOB error to test error on held-out data.** OOB is still in-distribution; leakage or distribution shift will not be caught.
+- **Forgetting that more trees help less each time.** n_estimators=2000 is usually not worth 10× the compute vs n_estimators=200.
+- **Using max_features="auto" without checking the sklearn version.** The default changed from \`"auto"\` (= sqrt) to \`"sqrt"\` in sklearn 1.1+.
+- **Ignoring class imbalance.** Random Forest inherits the majority-class bias; use \`class_weight="balanced"\` or resample.`,
+    video: { youtubeId: "J4Wdy0Wc_xQ", title: "Random Forests Part 1 — Building, Using and Evaluating", channel: "StatQuest", startSeconds: 0 },
+    videoFallbackMarkdown: `## Deep dive (no video)
+
+1. Compute by hand: probability that data point #7 appears at least once in a bootstrap sample of n=10. (Answer: 1 − (9/10)^10 ≈ 0.651)
+2. With p=16 features and max_features=sqrt, how many features does each split consider? (4)
+3. Set up the variance formula: if individual tree σ²=0.04 and tree correlation ρ=0.1 with 200 trees, what is the forest variance? (ρσ² + (1−ρ)σ²/B ≈ 0.004 + 0.00018 ≈ 0.0042)
+4. Two-sentence answer: "A Random Forest reduces variance vs a single tree because ___. It avoids overfitting because ___."`,
+    tryGuidance: "In the Random Forest visualizer, slide n_estimators from 1 to 200 and watch OOB error plateau. Then reduce max_features and observe how individual tree predictions diverge while the aggregate stays stable — that divergence is the decorrelation working.",
+    interviewGraph: {
+      initialStageId: "s4_oob_click",
+      artifactDimensions: [
+        { label: "Bootstrap & OOB", recoveryStageId: "s4_recovery_bootstrap" },
+        { label: "Variance Reduction", recoveryStageId: "s4_recovery_variance" },
+      ],
+      stages: {
+        s4_oob_click: {
+          id: "s4_oob_click",
+          type: "click_target",
+          badge: "Stage 1",
+          title: "Stage 1 · OOB validation",
+          prompt: "Click the line that correctly enables out-of-bag error estimation without a separate validation set.",
+          code_snippet: `from sklearn.ensemble import RandomForestClassifier
+
+rf_a = RandomForestClassifier(n_estimators=100)          # ds-target:no_oob
+rf_b = RandomForestClassifier(n_estimators=100,
+                               oob_score=True)            # ds-target:with_oob
+rf_c = RandomForestClassifier(n_estimators=100,
+                               bootstrap=False)           # ds-target:no_bootstrap
+
+rf_b.fit(X_train, y_train)
+print(rf_b.oob_score_)`,
+          validationCopy: {
+            no_oob: "Close — but without oob_score=True, scikit-learn won't compute the OOB estimate. The OOB samples are discarded unless you explicitly ask for the score.",
+            with_oob: "Correct. oob_score=True tells scikit-learn to aggregate predictions on the ~36.8% of samples each tree never saw during training — a free, unbiased validation estimate.",
+            no_bootstrap: "bootstrap=False means every tree sees the full training set — no OOB samples exist. You lose both the decorrelation benefit and the free validation.",
+          },
+          branches: { no_oob: "s4_recovery_bootstrap", with_oob: "s4_decorr_choice", no_bootstrap: "s4_recovery_bootstrap" },
+        },
+        s4_recovery_bootstrap: {
+          id: "s4_recovery_bootstrap",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Bootstrap and OOB",
+          prompt: "Approximately what fraction of training samples does each tree in a Random Forest NOT see during training?",
+          choices: [
+            { id: "a", label: "~36.8% (e⁻¹)", description: "Each bootstrap sample draws n points with replacement from n; probability of never being drawn → e⁻¹ ≈ 0.368." },
+            { id: "b", label: "~50%", description: "With replacement sampling is asymmetric — you get slightly less than 50% excluded." },
+            { id: "c", label: "~10%", description: "10% would imply nearly all points always appear, which contradicts the with-replacement math." },
+          ],
+          branches: { a: "s4_decorr_choice", b: "s4_decorr_choice", c: "s4_decorr_choice" },
+          rationale: "The limit (1 − 1/n)^n → e⁻¹ ≈ 0.368, so roughly 36.8% of points are OOB for each tree. Those points form a free validation set.",
+        },
+        s4_decorr_choice: {
+          id: "s4_decorr_choice",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Decorrelation mechanism",
+          prompt: "A dataset has one overwhelmingly dominant feature. A colleague says bagging alone (sampling rows with replacement, but using all features for splits) will fully decorrelate the trees. Are they right?",
+          choices: [
+            { id: "a", label: "No — without random feature subsets, all trees will use the dominant feature at the root and remain correlated", description: "Row subsampling alone does not prevent all trees from picking the same root split on the dominant feature." },
+            { id: "b", label: "Yes — different bootstrap samples will produce different root splits", description: "Different samples shift which *points* are seen but the dominant feature still wins the split criterion on almost every bootstrap sample." },
+            { id: "c", label: "Yes — bagging reduces variance by the full factor 1/B regardless of correlation", description: "The variance floor is ρ·σ², not 0. High correlation means bagging alone barely helps." },
+          ],
+          branches: { a: "s4_variance_choice", b: "s4_recovery_variance", c: "s4_recovery_variance" },
+          rationale: "Random feature subsets (max_features=sqrt(p)) are the crucial ingredient. They force trees to find the best split *among a random subset of features*, preventing the dominant feature from controlling every tree's structure.",
+        },
+        s4_recovery_variance: {
+          id: "s4_recovery_variance",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Variance math",
+          prompt: "For averaging B uncorrelated trees (ρ=0) each with variance σ², what is the variance of the average?",
+          choices: [
+            { id: "a", label: "σ²/B", description: "With zero correlation, variance divides by B. This is why more trees keep helping — until correlation dominates." },
+            { id: "b", label: "σ²", description: "That would be one tree — averaging independent trees improves on this." },
+            { id: "c", label: "B·σ²", description: "That would be summing, not averaging. Averaging divides variance by B." },
+          ],
+          branches: { a: "s4_variance_choice", b: "s4_variance_choice", c: "s4_variance_choice" },
+          rationale: "Var(mean of B independent estimators) = σ²/B. With correlation ρ, the floor becomes ρ·σ² — correlation is the limiting factor, not B.",
+        },
+        s4_variance_choice: {
+          id: "s4_variance_choice",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · Hyperparameter intuition",
+          prompt: "Your Random Forest has high OOB error. Which change is most likely to help?",
+          choices: [
+            { id: "a", label: "Increase n_estimators from 50 to 300", description: "50 trees may not have converged. Increasing to 200–300 often closes the remaining OOB gap." },
+            { id: "b", label: "Set bootstrap=False to use the full training set for each tree", description: "This removes OOB samples entirely and loses the decorrelation from row subsampling." },
+            { id: "c", label: "Increase max_features to use all features at each split", description: "More features per split increases correlation between trees, which typically hurts generalization." },
+          ],
+          branches: { a: "s4_terminal", b: "s4_terminal", c: "s4_terminal" },
+          rationale: "Start by ensuring enough trees (200+) before tuning anything else — OOB error often plateaus between 100–300 trees. Then tune max_features and min_samples_leaf.",
+        },
+        s4_terminal: {
+          id: "s4_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · Random Forests mastered",
+          prompt: "Final reflection: how does a Random Forest avoid overfitting as badly as a single deep tree?",
+          choices: [
+            { id: "a", label: "Got it", description: "Individual trees overfit their bootstrap sample, but errors are decorrelated by random feature subsets. Averaging washes out individual errors — variance falls while bias stays roughly constant." },
+          ],
+          branches: { a: "s4_terminal" },
+          terminal: true,
+          rationale: "The two randomness sources — row bootstrap and feature subsets — are what make Random Forest more than bagging. OOB error is the practical bonus: free validation without a held-out split.",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "Approximately what percentage of training samples are in the out-of-bag set for each tree?",
+        options: ["36.8%", "50%", "20%"],
+        correctIndex: 0,
+        explanation: "The probability of a point never being sampled in n draws with replacement is (1 − 1/n)^n → e⁻¹ ≈ 0.368, so ~36.8% of points are OOB.",
+      },
+      {
+        question: "Why does Random Forest use a random subset of features at each split, not just bootstrap row sampling?",
+        options: [
+          "To decorrelate trees by preventing a dominant feature from controlling every tree's root split",
+          "To speed up training by computing fewer split candidates",
+          "To reduce bias by exposing each tree to more diverse data",
+        ],
+        correctIndex: 0,
+        explanation: "Without random feature subsets, all trees would use the dominant feature at the root and remain correlated. The variance floor is ρ·σ², so high correlation limits variance reduction no matter how many trees you add.",
+      },
+      {
+        question: "Increasing n_estimators from 200 to 2000 in a Random Forest will:",
+        options: [
+          "Have diminishing returns — variance reduction plateaus after ~200 trees",
+          "Always reduce bias proportionally to the number of trees added",
+          "Risk overfitting because the forest becomes too complex",
+        ],
+        correctIndex: 0,
+        explanation: "The variance formula Var = ρσ² + (1−ρ)σ²/B shows that as B grows, the second term vanishes. The remaining error is ρσ² — set by correlation, not tree count. Beyond ~200–500 trees you get diminishing returns.",
+      },
+    ],
+  },
+
+  "ml-s5": {
+    durationLabel: "25 min",
+    outcomes: [
+      "Describe gradient boosting as **sequential additive modeling**: each new tree fits the **negative gradient** (pseudo-residuals) of the loss, not the raw residuals.",
+      "Explain the **learning rate × shrinkage** tradeoff: lower η → more trees needed, but better generalization; cite the typical practical range (0.01–0.1).",
+      "Distinguish **XGBoost** (level-wise tree growth, L1+L2 regularization on leaf weights) from **LightGBM** (leaf-wise growth, faster for large datasets, higher default depth).",
+      "Read feature importance output — **split count vs total gain** — and explain which is more reliable and why.",
+    ],
+    learnMarkdown: `## The big idea: fix the residuals sequentially
+
+Boosting builds an **additive model** one tree at a time. After each tree, the model is updated: new prediction = old prediction + η × new_tree_prediction. Each new tree is trained to **fix what the current ensemble gets wrong**.
+
+For squared error loss this literally means fitting the residuals. For arbitrary differentiable losses, we fit the **negative gradient of the loss with respect to the current predictions** — these are called *pseudo-residuals*:
+
+\`\`\`
+F₀(x) = constant (e.g., mean of y)
+for m = 1 to M:
+    rᵢₘ = −∂L(yᵢ, Fₘ₋₁(xᵢ)) / ∂Fₘ₋₁(xᵢ)   # pseudo-residuals
+    hₘ = fit a tree to {(xᵢ, rᵢₘ)}
+    Fₘ(x) = Fₘ₋₁(x) + η · hₘ(x)
+\`\`\`
+
+For squared loss, ∂L/∂F = F − y, so pseudo-residuals = y − F (literally the residual). For log-loss the derivation is slightly messier but the loop is identical. This generality is why gradient boosting handles classification, ranking, and custom objectives with the same engine.
+
+## Learning rate and shrinkage
+
+The **learning rate η** (also called *shrinkage*) scales each tree's contribution before adding it to the ensemble. Lower η means each tree takes a smaller step:
+
+- **η too high** → each tree overshoots, the ensemble oscillates or overfits in few steps.
+- **η too low** → you need many trees (high M) to converge; but each addition is conservative, giving better generalization.
+
+The fundamental tradeoff: **lower η + more trees = better test performance** (up to a point). In practice, start with η = 0.05–0.1 and n_estimators = 300–1000 with **early stopping**.
+
+\`\`\`python
+import xgboost as xgb
+
+model = xgb.XGBClassifier(
+    n_estimators=1000,
+    learning_rate=0.05,
+    max_depth=5,
+    early_stopping_rounds=50,    # stop if no improvement on eval set
+    eval_metric="logloss",
+)
+model.fit(X_train, y_train,
+          eval_set=[(X_val, y_val)],
+          verbose=50)
+\`\`\`
+
+Early stopping is mandatory with low learning rates — it finds the right M automatically.
+
+## XGBoost regularization
+
+XGBoost adds explicit regularization to the leaf weight optimization, which standard gradient boosting (sklearn GBM) omits:
+
+\`\`\`
+Obj = Σ L(yᵢ, ŷᵢ) + Σ_leaves [ (1/2)λ·wⱼ² + α·|wⱼ| ]
+\`\`\`
+
+- **λ (reg_lambda)**: L2 penalty on leaf weights — shrinks all weights smoothly toward 0, handles correlated features well.
+- **α (reg_alpha)**: L1 penalty — drives some leaf weights to exactly 0, effectively pruning.
+- **γ (min_split_loss)**: minimum impurity decrease required to split a node — the "pruning gamma."
+- **subsample / colsample_bytree**: row and column subsampling per tree, similar to Random Forest's bootstrap and max_features — add randomness, reduce correlation.
+
+XGBoost also uses **second-order Taylor expansion** of the loss (uses both gradient and Hessian), which gives more accurate leaf weight estimates than first-order gradient-only methods.
+
+## LightGBM: leaf-wise vs level-wise growth
+
+Standard and XGBoost trees grow **level-wise** (breadth-first): all nodes at depth d are split before going to depth d+1. This is conservative and symmetric.
+
+LightGBM grows **leaf-wise** (best-first): it always splits the leaf with the highest loss reduction, regardless of depth. This produces asymmetric trees that concentrate capacity on the most informative region.
+
+| | XGBoost | LightGBM |
+|---|---|---|
+| Tree growth | Level-wise | Leaf-wise |
+| Speed | Fast | Faster (especially large n) |
+| Default max_depth | 6 | 31 leaves (num_leaves) |
+| Categorical features | Requires encoding | Native support |
+| GPU support | Yes | Yes |
+
+Use LightGBM when: dataset is large (millions of rows), training speed matters, or you have many categorical features. Use XGBoost when: you need a mature, well-documented baseline or are competing on Kaggle tabular benchmarks where XGBoost param grids are well-known.
+
+## Feature importance: split count vs gain
+
+Two main importance modes in XGBoost/LightGBM:
+
+| Mode | What it counts | Bias |
+|---|---|---|
+| \`weight\` (split count) | Number of times a feature is used to split across all trees | Biased toward high-cardinality and continuous features |
+| \`gain\` (total/mean gain) | Total impurity reduction attributed to splits on this feature | More informative — measures actual contribution to the objective |
+
+Always report **gain-based** importance in production; split count can be wildly misleading for the same reasons as MDI in single trees.
+
+## Pitfalls
+
+- **Forgetting early stopping.** With η = 0.05 and n_estimators = 5000, you will overfit without early stopping. Always pass an eval set.
+- **Using the same data for early stopping and final reporting.** The eval set used for early stopping should be held out from the final test report — or use cross-validated early stopping.
+- **Confusing n_estimators with model complexity.** Complexity is set by max_depth and min_child_weight; n_estimators is about ensemble size. With low η you *need* many estimators to converge — that is not the same as the model being complex.
+- **Ignoring LightGBM's num_leaves parameter.** With leaf-wise growth, max_depth is less meaningful; use num_leaves (default 31) as the primary complexity control.
+
+## Interview questions
+
+- "Explain gradient boosting in plain English." (Sequentially build trees, each fitting the negative gradient of the loss on the current predictions. Multiply each tree by a small learning rate before adding.)
+- "XGBoost vs LightGBM — when do you choose each?" (LightGBM for speed on large data; XGBoost for a well-understood baseline. Both are excellent; LightGBM is often faster and handles categoricals natively.)
+- "Why does lower learning rate usually give better generalization?" (Smaller steps + more trees + early stopping = finer-grained optimization that overshoots less and finds a flatter, more generalizable minimum.)`,
+    video: { youtubeId: "3CC4N4z3GJc", title: "Gradient Boost Part 1 — Regression Main Ideas", channel: "StatQuest", startSeconds: 0 },
+    videoFallbackMarkdown: `## Deep dive (no video)
+
+1. Write the pseudo-residual formula for squared loss: \`rᵢ = yᵢ − F(xᵢ)\`. Now write it for log-loss. Confirm they share the same sequential structure.
+2. Sketch a learning-rate sweep experiment: η ∈ {0.3, 0.1, 0.03} with early stopping on a validation set. Which converges to the lowest val loss?
+3. Look up \`xgb.plot_importance(model, importance_type='gain')\`. Try it on a toy dataset and compare gain vs weight rankings.
+4. Two-sentence answer: "The key difference between XGBoost and standard GBM is ___. LightGBM outperforms XGBoost in speed because ___."`,
+    tryGuidance: "In the Gradient Boosting visualizer, start with η=0.3 and 10 trees. Watch how quickly the residuals shrink but notice the overfitting gap. Then set η=0.05 with early stopping and observe the smoother convergence.",
+    interviewGraph: {
+      initialStageId: "s5_residual_click",
+      artifactDimensions: [
+        { label: "Boosting Mechanics", recoveryStageId: "s5_recovery_boosting" },
+        { label: "LR & Regularization", recoveryStageId: "s5_recovery_lr" },
+      ],
+      stages: {
+        s5_residual_click: {
+          id: "s5_residual_click",
+          type: "click_target",
+          badge: "Stage 1",
+          title: "Stage 1 · Pseudo-residuals",
+          prompt: "Click the line that computes the correct pseudo-residuals for squared-error loss in gradient boosting.",
+          code_snippet: `import numpy as np
+
+y = np.array([1.0, 2.0, 3.0])
+F = np.array([0.8, 2.3, 2.5])   # current ensemble predictions
+
+pseudo_a = y + F                 # ds-target:wrong_add
+pseudo_b = y - F                 # ds-target:correct_residuals
+pseudo_c = (y - F) ** 2          # ds-target:wrong_squared`,
+          validationCopy: {
+            wrong_add: "Not quite. The pseudo-residual is the negative gradient of squared loss: −∂(½(y−F)²)/∂F = y − F. Adding would point the tree in the wrong direction.",
+            correct_residuals: "Correct. For squared error, pseudo-residuals = y − F — the ordinary residuals. Each new tree is fitted to bring these toward zero.",
+            wrong_squared: "That computes squared errors, not the gradient. The tree would fit very different targets and gradient descent would not converge correctly.",
+          },
+          branches: { wrong_add: "s5_recovery_boosting", correct_residuals: "s5_lr_choice", wrong_squared: "s5_recovery_boosting" },
+        },
+        s5_recovery_boosting: {
+          id: "s5_recovery_boosting",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Boosting core idea",
+          prompt: "In gradient boosting, each new tree is fitted to:",
+          choices: [
+            { id: "a", label: "The negative gradient of the loss with respect to current predictions (pseudo-residuals)", description: "This generalizes 'fit the residuals' to any differentiable loss function." },
+            { id: "b", label: "The original target y, same as the first tree", description: "Each tree corrects the current ensemble's mistakes — not the original targets." },
+            { id: "c", label: "A random bootstrap sample of the training data", description: "Bootstrap sampling is a bagging technique; boosting is sequential, not parallel." },
+          ],
+          branches: { a: "s5_lr_choice", b: "s5_lr_choice", c: "s5_lr_choice" },
+          rationale: "Gradient boosting minimizes loss by gradient descent in function space. Each tree is a 'step' in the direction that most reduces the loss — the negative gradient direction.",
+        },
+        s5_lr_choice: {
+          id: "s5_lr_choice",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Learning rate tradeoff",
+          prompt: "You set learning_rate=0.01 and n_estimators=100 with no early stopping. Your model underfits. What is the most likely cause?",
+          choices: [
+            { id: "a", label: "Too few trees for the low learning rate — with η=0.01 you need ~1000+ trees to converge", description: "Lower η means smaller steps; you need more steps (trees) to reach a good solution." },
+            { id: "b", label: "The learning rate is too low — raise it to 0.9 to fix underfitting", description: "A very high learning rate causes overfitting and oscillation, not better generalization." },
+            { id: "c", label: "Gradient boosting cannot underfit — it always overfits with more trees", description: "With a very low learning rate and few trees, the ensemble can absolutely underfit." },
+          ],
+          branches: { a: "s5_xgb_choice", b: "s5_recovery_lr", c: "s5_recovery_lr" },
+          rationale: "η=0.01 requires roughly 10× more trees than η=0.1. Use early stopping to let the algorithm find the right n_estimators automatically.",
+        },
+        s5_recovery_lr: {
+          id: "s5_recovery_lr",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Learning rate intuition",
+          prompt: "Which combination typically gives the best generalization in gradient boosting?",
+          choices: [
+            { id: "a", label: "Low learning rate (0.01–0.05) + many trees (500–2000) + early stopping", description: "Small steps in function space overshoot less and find flatter, more generalizable minima." },
+            { id: "b", label: "High learning rate (0.5) + few trees (20)", description: "This often overfits on the training set and poorly generalizes." },
+            { id: "c", label: "Learning rate does not affect generalization, only convergence speed", description: "Learning rate directly affects generalization by controlling the step size and overfitting risk." },
+          ],
+          branches: { a: "s5_xgb_choice", b: "s5_xgb_choice", c: "s5_xgb_choice" },
+          rationale: "Low η + many trees + early stopping is the gold standard. The small steps ensure the model 'explores' more of the loss landscape before committing.",
+        },
+        s5_xgb_choice: {
+          id: "s5_xgb_choice",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · XGBoost vs LightGBM",
+          prompt: "You have 10 million rows, 200 features, several high-cardinality categoricals, and a 30-minute training budget. Which framework and why?",
+          choices: [
+            { id: "a", label: "LightGBM — leaf-wise growth, faster on large data, native categorical support", description: "LightGBM is typically 3–10× faster on large datasets and handles categoricals without manual encoding." },
+            { id: "b", label: "XGBoost — always more accurate than LightGBM", description: "On large data, LightGBM is often equally accurate and much faster. Neither framework dominates universally." },
+            { id: "c", label: "sklearn GradientBoostingClassifier — the simplest option", description: "sklearn GBM is much slower than XGBoost or LightGBM and does not scale to 10M rows in 30 minutes." },
+          ],
+          branches: { a: "s5_terminal", b: "s5_terminal", c: "s5_terminal" },
+          rationale: "LightGBM's leaf-wise growth and histogram-based algorithm make it the go-to for large datasets with time constraints. XGBoost is the preferred alternative when you need the second-order optimization or have a well-tuned existing param grid.",
+        },
+        s5_terminal: {
+          id: "s5_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · Gradient Boosting mastered",
+          prompt: "Final reflection: explain gradient boosting in one sentence.",
+          choices: [
+            { id: "a", label: "Got it", description: "Build trees sequentially, each fitting the negative gradient (pseudo-residuals) of the loss, scaled by a learning rate η — so the ensemble slowly walks downhill on the training loss." },
+          ],
+          branches: { a: "s5_terminal" },
+          terminal: true,
+          rationale: "The sequential nature means gradient boosting has lower bias than Random Forest (can fit complex patterns with enough trees) but needs careful regularization (η, max_depth, early stopping) to avoid high variance.",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "What does each new tree in gradient boosting fit?",
+        options: [
+          "The negative gradient of the loss function with respect to the current predictions (pseudo-residuals)",
+          "A bootstrap sample of the original targets y",
+          "The squared predictions of the previous tree",
+        ],
+        correctIndex: 0,
+        explanation: "Each tree approximates the negative gradient direction in function space, generalizing 'fit the residuals' to any differentiable loss.",
+      },
+      {
+        question: "You set learning_rate=0.01 and n_estimators=50. The model underfits. What is the fix?",
+        options: [
+          "Increase n_estimators to ~1000 or use early stopping — low η requires many more trees to converge",
+          "Increase learning_rate to 1.0",
+          "Switch to a linear model — gradient boosting cannot fit this data",
+        ],
+        correctIndex: 0,
+        explanation: "Lower η means smaller gradient steps. You need proportionally more trees. Use early stopping with an eval set to find the optimal number automatically.",
+      },
+      {
+        question: "The main architectural difference between LightGBM and XGBoost tree growth is:",
+        options: [
+          "LightGBM grows leaf-wise (best-first); XGBoost grows level-wise (breadth-first)",
+          "LightGBM uses random forests internally; XGBoost uses boosting",
+          "XGBoost supports GPU; LightGBM does not",
+        ],
+        correctIndex: 0,
+        explanation: "Leaf-wise growth makes LightGBM faster and often more accurate on large datasets, but requires controlling num_leaves carefully to avoid overfitting. Both support GPU.",
+      },
+    ],
+  },
+
+  "ml-s6": {
+    durationLabel: "20 min",
+    outcomes: [
+      "Define the **maximum-margin hyperplane** and explain why only the **support vectors** determine it — all other training points can be removed without changing the solution.",
+      "Contrast **hard-margin SVM** (linearly separable, C=∞) with **soft-margin SVM** (C controls penalty for margin violations) and predict how changing C affects bias and variance.",
+      "Explain the **kernel trick** conceptually: instead of computing an explicit high-dimensional feature map Φ(x), compute K(x, x') = Φ(x)·Φ(x') directly in the original space.",
+      "State when SVM is the right tool and when it is not, including the practical limitations at large n.",
+    ],
+    learnMarkdown: `## The goal: find the widest street between classes
+
+Imagine a 2D scatter plot with two classes. Infinitely many lines separate them. SVM picks the one that **maximizes the margin** — the width of the empty band between the nearest positive and negative examples. The nearest examples on each side are the **support vectors**; they are the only points that define the street.
+
+Mathematically, for a hyperplane \`w·x + b = 0\`, the margin width is \`2/‖w‖\`. Maximizing the margin = minimizing \`‖w‖\` (or equivalently \`½‖w‖²\` for convex QP). Subject to: every training point is correctly classified with margin ≥ 1:
+
+\`\`\`
+minimize   ½‖w‖²
+subject to yᵢ(w·xᵢ + b) ≥ 1   for all i
+\`\`\`
+
+This is a **convex quadratic program** — it has a unique global solution, unlike neural networks.
+
+## Support vectors: what they mean
+
+The solution depends only on the training points where \`yᵢ(w·xᵢ + b) = 1\` — the ones touching the margin boundary. Everything else is irrelevant. You can delete 90% of training points and the hyperplane will not move, as long as the support vectors stay. This is both an insight and a practical fact: at prediction time you only need to store the support vectors, not the full training set.
+
+Flip this around: if your training set has very few support vectors, the decision boundary is determined by a small, well-characterized subset of examples. If it has many (close to n), the model is memorizing noise.
+
+## Soft margin: tolerating violations
+
+Real data is never perfectly separable. The **soft-margin SVM** introduces **slack variables ξᵢ ≥ 0** that allow misclassification:
+
+\`\`\`
+minimize   ½‖w‖² + C Σ ξᵢ
+subject to yᵢ(w·xᵢ + b) ≥ 1 − ξᵢ,   ξᵢ ≥ 0
+\`\`\`
+
+**C** is the regularization parameter:
+
+| C | Effect | Bias–variance |
+|---|---|---|
+| Large C | Penalize violations heavily → narrow margin, few errors on training | Low bias, high variance (overfits) |
+| Small C | Tolerate more violations → wide margin, more misclassifications | High bias, low variance (underfits) |
+
+Think of C as the inverse of a regularization strength (like 1/λ in L2). Default in sklearn is C=1.0; tune via cross-validation.
+
+## The kernel trick
+
+For non-linearly separable data, you want to work in a higher-dimensional feature space where a hyperplane *can* separate the classes. Explicitly computing Φ(x) (a degree-3 polynomial has O(p³) terms, RBF is infinite-dimensional) is intractable.
+
+The key observation: the SVM dual problem only involves **dot products** of training points, never the individual feature vectors. If you can compute \`K(xᵢ, xⱼ) = Φ(xᵢ)·Φ(xⱼ)\` cheaply, you never need Φ explicitly.
+
+\`\`\`
+# Common kernels
+K_linear(x, x') = x · x'                          # standard dot product
+K_poly(x, x') = (γ x·x' + r)^d                   # polynomial degree d
+K_rbf(x, x') = exp(−γ ‖x − x'‖²)                # Gaussian / RBF
+K_sigmoid(x, x') = tanh(γ x·x' + r)              # rarely used
+\`\`\`
+
+The **RBF kernel** is the most common non-linear choice. Its hyperparameter **γ** controls the width:
+- **Large γ**: each training point has narrow influence → complex, wiggly boundary → overfitting.
+- **Small γ**: smooth, wide-influence boundary → underfitting.
+
+Together, C and γ form the primary two-dimensional tuning space for RBF SVM. Use grid search or random search on a log scale: C ∈ {0.01, 0.1, 1, 10, 100}, γ ∈ {0.001, 0.01, 0.1, 1}.
+
+## Why the kernel trick works without explicit Φ
+
+The "trick" is that **Mercer's theorem** guarantees that any valid kernel function (symmetric, positive semi-definite) corresponds to *some* inner product in *some* Hilbert space. You do not need to know what that space is — just the kernel function. You are implicitly working in a high-dimensional space while only ever computing n×n inner products.
+
+This is also the limit: the kernel matrix is n×n. With n = 100k, storing and inverting it costs O(n²) to O(n³). SVM does not scale to large n without approximations (Nyström method, SGD with hinge loss, etc.).
+
+## When SVM is the right tool
+
+SVM shines when:
+- **Small-to-medium n** (< 100k rows), the algorithm is exact.
+- **High-dimensional sparse features** — e.g., TF-IDF text vectors. In this regime, the linear kernel works and the max-margin property is powerful.
+- **Clear margin exists** — biological or image data with clean class structure.
+
+SVM struggles when:
+- **Large n** — kernel matrix is O(n²) memory and O(n³) solve.
+- **Many classes** — SVM is inherently binary; multiclass via OvO or OvR adds overhead.
+- **Probability outputs needed** — SVM gives decisions, not calibrated probabilities (Platt scaling is a post-hoc fix).
+- **Feature engineering matters a lot** — gradient boosting and neural networks typically win on raw tabular and image data.
+
+## Pitfalls
+
+- **Not standardizing features.** SVM with an RBF kernel is distance-based — features on different scales will dominate the kernel. Always standardize.
+- **Treating C and γ as independent.** There is a correlation between them — use a 2D grid search, not sequential 1D searches.
+- **Forgetting that SVM gives no probability.** \`predict_proba\` in sklearn adds Platt scaling (an extra LR fit) and can be miscalibrated; do not confuse it with a native probability output.`,
+    video: { youtubeId: "efR1C6CvhmE", title: "Support Vector Machines, Clearly Explained", channel: "StatQuest", startSeconds: 0 },
+    videoFallbackMarkdown: `## Deep dive (no video)
+
+1. Draw a 2D linearly separable problem. Mark the margin, the hyperplane, and circle the support vectors. Remove a non-support point — confirm the hyperplane does not move.
+2. Sketch what happens to the margin when you double C. When you halve C.
+3. Write K_rbf for two 2D points x=(1,0) and x'=(0,1) with γ=1. Compute by hand: exp(−1·‖(1,0)−(0,1)‖²) = exp(−2) ≈ 0.135.
+4. Two-sentence answer: "Support vectors are ___. The kernel trick avoids computing Φ(x) explicitly by ___."`,
+    tryGuidance: "In the SVM visualizer, draw two clusters and observe how the margin forms. Then add an outlier near the boundary and slide C — watch the margin widen or narrow. Switch to the RBF kernel and adjust γ to see the boundary become more complex.",
+    interviewGraph: {
+      initialStageId: "s6_sv_click",
+      artifactDimensions: [
+        { label: "Support Vectors & Margin", recoveryStageId: "s6_recovery_sv" },
+        { label: "Kernel Trick", recoveryStageId: "s6_recovery_kernel" },
+      ],
+      stages: {
+        s6_sv_click: {
+          id: "s6_sv_click",
+          type: "click_target",
+          badge: "Stage 1",
+          title: "Stage 1 · Support vectors in code",
+          prompt: "After training an SVM, click the attribute that stores only the support vectors — the points that determine the decision boundary.",
+          code_snippet: `from sklearn.svm import SVC
+import numpy as np
+
+clf = SVC(kernel="rbf", C=1.0, gamma="scale")
+clf.fit(X_train, y_train)
+
+all_points     = X_train              # ds-target:all_train
+support_vecs   = clf.support_vectors_ # ds-target:correct_sv
+decision_score = clf.decision_function(X_train)  # ds-target:df`,
+          validationCopy: {
+            all_train: "That is the full training set. Support vectors are a subset — only the points on or inside the margin boundary. Storing all points misses the point (pun intended).",
+            correct_sv: "Correct. clf.support_vectors_ contains only the points that determine the hyperplane — often a small fraction of training data. Everything else can be discarded.",
+            df: "decision_function gives signed distances from the hyperplane, not the support vectors themselves.",
+          },
+          branches: { all_train: "s6_recovery_sv", correct_sv: "s6_c_choice", df: "s6_recovery_sv" },
+        },
+        s6_recovery_sv: {
+          id: "s6_recovery_sv",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Support vectors defined",
+          prompt: "You remove all non-support-vector training points and re-train the SVM. What happens to the decision boundary?",
+          choices: [
+            { id: "a", label: "Nothing — the boundary is identical because only support vectors determine it", description: "The max-margin hyperplane is defined by the support vectors; all other points are irrelevant." },
+            { id: "b", label: "The boundary shifts significantly", description: "Non-support-vector points do not influence the quadratic program solution; removing them changes nothing." },
+            { id: "c", label: "The margin widens because there are fewer points", description: "The margin is determined by the closest points (support vectors), not the total count." },
+          ],
+          branches: { a: "s6_c_choice", b: "s6_c_choice", c: "s6_c_choice" },
+          rationale: "The SVM dual solution depends only on the support vectors. Removing everything else leaves the same QP and the same solution. This is the geometric meaning of 'maximum margin'.",
+        },
+        s6_c_choice: {
+          id: "s6_c_choice",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · C parameter",
+          prompt: "Your SVM with C=100 has perfect training accuracy but 60% test accuracy. What does C=100 imply and how would you fix it?",
+          choices: [
+            { id: "a", label: "C=100 penalizes margin violations heavily — narrow margin, memorizes training points. Reduce C to allow a wider, more generalizable margin.", description: "Lower C = more regularization = wider margin = better generalization." },
+            { id: "b", label: "C=100 means the kernel is too simple. Switch to a polynomial kernel.", description: "C controls the margin/violation tradeoff, independent of the kernel choice." },
+            { id: "c", label: "C=100 is fine. The issue is that n_estimators is too low.", description: "n_estimators is a Random Forest / boosting parameter. SVM has no ensemble component." },
+          ],
+          branches: { a: "s6_kernel_choice", b: "s6_recovery_kernel", c: "s6_recovery_kernel" },
+          rationale: "High C → narrow margin → overfitting. Reduce C to penalize violations less, allowing a wider margin that tolerates noise and generalizes better.",
+        },
+        s6_recovery_kernel: {
+          id: "s6_recovery_kernel",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Kernel trick intuition",
+          prompt: "Why does the RBF kernel avoid computing the full high-dimensional feature vector Φ(x)?",
+          choices: [
+            { id: "a", label: "The SVM dual only needs dot products K(xᵢ, xⱼ) = Φ(xᵢ)·Φ(xⱼ), which the RBF formula computes directly without ever forming Φ(x)", description: "This is Mercer's theorem in practice — evaluate K cheaply in the original space, implicitly work in infinite dimensions." },
+            { id: "b", label: "RBF projects data to 2D before training, so no high-dimensional computation is needed", description: "RBF maps to infinite-dimensional space, not 2D. The trick is not dimensionality reduction but avoiding explicit computation of Φ." },
+            { id: "c", label: "The kernel trick only works for linear data — non-linear data still requires explicit Φ", description: "The kernel trick is designed precisely for non-linear problems. Linear data needs no trick." },
+          ],
+          branches: { a: "s6_kernel_choice", b: "s6_kernel_choice", c: "s6_kernel_choice" },
+          rationale: "K(x, x') = Φ(x)·Φ(x'). The SVM objective only ever uses these dot products. Computing K directly skips forming Φ — that is the trick.",
+        },
+        s6_kernel_choice: {
+          id: "s6_kernel_choice",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · SVM at scale",
+          prompt: "A colleague proposes using kernel SVM (RBF) on a 5-million-row dataset. What is the fundamental scaling problem?",
+          choices: [
+            { id: "a", label: "The kernel matrix is n×n (5M×5M), requiring ~200 TB of memory and O(n³) solve time", description: "Kernel SVM is O(n²) in memory and O(n³) in training time — completely infeasible at 5M rows." },
+            { id: "b", label: "SVM cannot be parallelized, so it will be slow but will eventually finish", description: "The memory constraint is fundamental, not just a speed issue. 5M×5M float32 matrix ≈ 93 GB." },
+            { id: "c", label: "Kernel SVM scales linearly with n — 5M rows is fine with enough CPU cores", description: "Kernel SVM scales O(n²)–O(n³). There is no parallel trick that makes it linear in n." },
+          ],
+          branches: { a: "s6_terminal", b: "s6_terminal", c: "s6_terminal" },
+          rationale: "Kernel SVM is impractical beyond ~100k rows. Alternatives: linear SVM with SGD (sklearn LinearSVC or SGDClassifier with hinge loss), gradient boosting, or neural networks.",
+        },
+        s6_terminal: {
+          id: "s6_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · SVM mastered",
+          prompt: "Final reflection: explain the kernel trick without math.",
+          choices: [
+            { id: "a", label: "Got it", description: "Instead of transforming each data point into a huge feature space, compute a similarity score (the kernel) between pairs of points directly. SVM only needs these similarity scores, not the features themselves — so you get the power of high-dimensional space without the computational cost." },
+          ],
+          branches: { a: "s6_terminal" },
+          terminal: true,
+          rationale: "SVM is elegant and provably optimal under its assumptions, but does not scale to large n. In practice, gradient boosting and neural nets dominate large tabular and vision tasks. SVM's niche is small-medium high-dimensional data — text, biological sequences.",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "What are support vectors?",
+        options: [
+          "The training points closest to the decision boundary that define the maximum-margin hyperplane",
+          "All training points used during SVM optimization",
+          "The feature weights (w) learned by the SVM",
+        ],
+        correctIndex: 0,
+        explanation: "Only the points on or within the margin boundary (support vectors) influence the solution. Removing all other training points leaves the boundary unchanged.",
+      },
+      {
+        question: "Increasing C in a soft-margin SVM:",
+        options: [
+          "Penalizes margin violations more, producing a narrower margin and lower training error (risk of overfitting)",
+          "Widens the margin by allowing more violations",
+          "Has no effect on the margin — C only controls the kernel width",
+        ],
+        correctIndex: 0,
+        explanation: "High C → heavily penalize any point inside the margin → narrow margin → overfit. Low C → tolerate violations → wide margin → more regularized.",
+      },
+      {
+        question: "Why does the RBF kernel enable non-linear classification without explicitly computing high-dimensional features?",
+        options: [
+          "The SVM dual only requires inner products K(xᵢ,xⱼ) = Φ(xᵢ)·Φ(xⱼ), which RBF computes directly from original features via exp(−γ‖x−x'‖²)",
+          "RBF reduces dimensionality to 2D before fitting",
+          "RBF is a linear kernel in disguise — it does not actually change the feature space",
+        ],
+        correctIndex: 0,
+        explanation: "Mercer's theorem guarantees RBF corresponds to an inner product in an infinite-dimensional space. The kernel formula evaluates this inner product cheaply without forming Φ(x).",
+      },
+    ],
+  },
+
+  "ml-u1": {
+    durationLabel: "18 min",
+    outcomes: [
+      "Trace **Lloyd's algorithm** step by step — random init → assign → update → repeat — and state why it converges but only to a local optimum.",
+      "Use **k-means++ initialization** to reduce sensitivity to bad starting centroids and explain the distance-proportional seeding strategy.",
+      "Select k using the **elbow method** (inertia vs k) and **silhouette score** (range −1 to 1) and articulate the limitations of each.",
+      "Identify the four implicit assumptions k-means makes and predict which data geometries will cause it to fail.",
+    ],
+    learnMarkdown: `## Lloyd's algorithm: the simplest clustering loop
+
+K-means partitions \`n\` points into \`k\` clusters by minimizing **inertia** — the total within-cluster sum of squared distances from each point to its centroid:
+
+\`\`\`
+Inertia = Σᵢ ‖xᵢ − μ_k(i)‖²
+\`\`\`
+
+where \`μ_k(i)\` is the centroid of the cluster assigned to point i. Minimizing this exactly is NP-hard, so we use **Lloyd's algorithm**:
+
+\`\`\`
+1. Initialize k centroids (random or k-means++)
+2. Assign: label each point to its nearest centroid
+3. Update: move each centroid to the mean of its assigned points
+4. Repeat steps 2–3 until labels do not change (or max_iter)
+\`\`\`
+
+Each iteration decreases or maintains inertia — convergence is guaranteed. But convergence to the **global** minimum is not. Bad initialization can trap the algorithm in a local minimum where clusters are clearly wrong.
+
+## Why the mean? (the precision question)
+
+The centroid update uses the **arithmetic mean** because the mean minimizes the sum of squared Euclidean distances to a set of points. This is exactly the quantity k-means optimizes. If you minimize sum of absolute distances (L1), the minimizer is the median (k-medians). If you need cluster centers to be actual data points, use k-medoids. Knowing this derivation separates engineers who understand the algorithm from those who just call \`fit\`.
+
+## k-means++ initialization
+
+Random centroid initialization often picks seeds that are close together, leading to poor local minima. **k-means++** spreads seeds probabilistically:
+
+\`\`\`
+1. Pick first centroid uniformly at random
+2. For each subsequent centroid:
+   Compute D(x) = distance from x to nearest already-chosen centroid
+   Pick next centroid with probability ∝ D(x)²
+3. Proceed with Lloyd's algorithm from these seeds
+\`\`\`
+
+Points far from existing centroids are more likely to be picked as the next seed. This guarantees O(log k) approximation vs optimal in expectation. sklearn defaults to \`init='k-means++'\`. The practical effect: much more stable results with fewer restarts needed (\`n_init=10\` default).
+
+## Choosing k: elbow and silhouette
+
+### Elbow method
+
+Plot inertia vs k. As k increases, inertia always decreases (more clusters → closer centroids). The "elbow" is where the rate of decrease sharply flattens:
+
+\`\`\`python
+inertias = []
+K = range(1, 11)
+for k in K:
+    km = KMeans(n_clusters=k, init="k-means++", n_init=10)
+    km.fit(X)
+    inertias.append(km.inertia_)
+# plot K vs inertias — look for the kink
+\`\`\`
+
+**Limitation**: real data often produces a smooth curve with no clear elbow. The elbow is subjective and inconsistent.
+
+### Silhouette score
+
+For each point i:
+- \`a(i)\` = mean distance to other points in the same cluster (cohesion)
+- \`b(i)\` = mean distance to points in the nearest other cluster (separation)
+- \`s(i) = (b(i) − a(i)) / max(a(i), b(i))\`
+
+Range: −1 (assigned to the wrong cluster) to +1 (well-separated). Average over all points gives a scalar. Pick the k with the highest mean silhouette score.
+
+\`\`\`python
+from sklearn.metrics import silhouette_score
+scores = [silhouette_score(X, KMeans(n_clusters=k).fit_predict(X))
+          for k in range(2, 11)]
+best_k = np.argmax(scores) + 2
+\`\`\`
+
+**Limitation**: silhouette score favors convex, compact clusters — the same shapes k-means already prefers. It will not guide you toward the right k for non-convex data.
+
+## The four silent assumptions
+
+K-means implicitly assumes clusters are:
+
+| Assumption | What it means | When it breaks |
+|---|---|---|
+| **Spherical** | Clusters are roughly round in Euclidean space | Elongated or crescent shapes (use DBSCAN or GMM) |
+| **Equal size** | Each cluster has a similar number of points | One large + one tiny cluster → centroid drifts toward large |
+| **Equal density** | Clusters have similar variance | Tight cluster near a diffuse cloud → everything assigned to diffuse cluster |
+| **Euclidean distance** | Straight-line distance is the right metric | Image pixels, text, graphs where cosine or graph distance matters more |
+
+## Inertia vs silhouette: what they measure
+
+**Inertia** is NOT a measure of "quality" in the ground-truth sense. It is just the optimization objective. Adding k+1 clusters always reduces inertia, even if the extra cluster is noise. Inertia is for comparing models at the same k, or for the elbow heuristic — nothing more.
+
+**Silhouette** measures how well-separated clusters are relative to each other. It is more interpretable but still assumes convex geometry.
+
+## Pitfalls
+
+- **Calling inertia a quality metric.** It is the training loss, not a validation metric. Always supplement with domain knowledge or silhouette.
+- **Forgetting to standardize.** K-means uses Euclidean distance — features with larger scales dominate. Always apply StandardScaler before k-means.
+- **Using k-means on non-convex clusters.** Two interlocking crescents: k-means always gets it wrong regardless of k. Use DBSCAN.
+- **Single run with random init.** Even with k-means++, run multiple inits (\`n_init=10\`) and keep the best inertia.`,
+    video: { youtubeId: "4b5d3muPQmA", title: "K-means clustering: how it works", channel: "StatQuest", startSeconds: 0 },
+    videoFallbackMarkdown: `## Deep dive (no video)
+
+1. On paper, run Lloyd's algorithm on 6 points in 1D: {1, 2, 8, 9, 10, 11} with k=2. Initialize centroids at {1, 2}. Trace assign→update→assign→update until convergence.
+2. Compute the silhouette score for a single point in a cluster of mean 5, with nearest other cluster mean 15. (a=distance to cluster mean, b=distance to other cluster mean — rough approximation.)
+3. Two-sentence answer: "K-means fails on non-convex clusters because ___. The silhouette score helps choose k but is also biased toward ___ shapes."`,
+    tryGuidance: "In the K-Means visualizer, start with k=2 on a clearly bimodal dataset and step through the assign/update iterations. Then switch to a crescent or ring dataset and observe how k-means fails. Use the silhouette slider to find the optimal k on the normal dataset.",
+    interviewGraph: {
+      initialStageId: "u1_init_choice",
+      artifactDimensions: [
+        { label: "K-Means Algorithm", recoveryStageId: "u1_recovery_algo" },
+        { label: "Choosing k", recoveryStageId: "u1_recovery_k" },
+      ],
+      stages: {
+        u1_init_choice: {
+          id: "u1_init_choice",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · Initialization matters",
+          prompt: "Two runs of k-means on the same dataset give very different cluster assignments. What is the most likely cause?",
+          choices: [
+            { id: "a", label: "Different random centroid initializations led to different local optima", description: "Lloyd's algorithm converges but not necessarily to the global optimum. Bad seeds → bad local minimum." },
+            { id: "b", label: "K-means is non-deterministic and produces random output each run", description: "With a fixed seed, k-means is deterministic. Different outcomes come from different starting points, not inherent randomness." },
+            { id: "c", label: "The dataset is too large for k-means to converge", description: "Convergence is guaranteed regardless of dataset size. Different outcomes reflect local optima, not non-convergence." },
+          ],
+          branches: { a: "u1_inertia_click", b: "u1_recovery_algo", c: "u1_recovery_algo" },
+          rationale: "K-means converges to a local minimum of inertia. Different initializations lead to different local minima. Use k-means++ (init='k-means++') and multiple restarts (n_init=10) to mitigate.",
+        },
+        u1_recovery_algo: {
+          id: "u1_recovery_algo",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Lloyd's algorithm",
+          prompt: "In the Update step of Lloyd's algorithm, each centroid moves to:",
+          choices: [
+            { id: "a", label: "The arithmetic mean of all points currently assigned to it", description: "Mean minimizes sum of squared distances — exactly the quantity k-means optimizes." },
+            { id: "b", label: "The median of all points assigned to it", description: "Median minimizes sum of absolute distances (L1). That is k-medians, not k-means." },
+            { id: "c", label: "The nearest actual data point to the current centroid", description: "That would be k-medoids. K-means centroids can be arbitrary points in space, not just data points." },
+          ],
+          branches: { a: "u1_inertia_click", b: "u1_inertia_click", c: "u1_inertia_click" },
+          rationale: "The arithmetic mean minimizes sum of squared Euclidean distances. That is why it is 'k-means' — the algorithm is doing coordinate descent on the sum-of-squares objective.",
+        },
+        u1_inertia_click: {
+          id: "u1_inertia_click",
+          type: "click_target",
+          badge: "Stage 2",
+          title: "Stage 2 · Inertia vs silhouette",
+          prompt: "Click the metric that measures cluster quality relative to separation — NOT just the training objective.",
+          code_snippet: `from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+
+km = KMeans(n_clusters=3, init="k-means++", n_init=10)
+km.fit(X)
+
+training_loss   = km.inertia_              # ds-target:inertia
+cluster_quality = silhouette_score(X, km.labels_)  # ds-target:silhouette`,
+          validationCopy: {
+            inertia: "Inertia is the optimization objective — it always decreases as you add clusters. It does not measure how well-separated or meaningful the clusters are.",
+            silhouette: "Correct. Silhouette score measures cohesion vs separation (range −1 to +1). It is a better guide for choosing k than inertia alone.",
+          },
+          branches: { inertia: "u1_recovery_k", silhouette: "u1_failure_choice" },
+        },
+        u1_recovery_k: {
+          id: "u1_recovery_k",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Choosing k",
+          prompt: "The silhouette score for k-means ranges from −1 to +1. What does a score near −1 for a point mean?",
+          choices: [
+            { id: "a", label: "The point is likely misassigned — it is closer to a neighboring cluster than its own", description: "s(i) = (b − a)/max(a,b). If b < a (closer to other cluster), s < 0 — the point is in the wrong cluster." },
+            { id: "b", label: "The point is perfectly centered in its cluster with no nearby neighbors", description: "A centered, isolated point would have high a and very high b — silhouette near +1." },
+            { id: "c", label: "The clustering has too many clusters", description: "A silhouette near −1 is a per-point measure of misassignment, not a global statement about too many clusters." },
+          ],
+          branches: { a: "u1_failure_choice", b: "u1_failure_choice", c: "u1_failure_choice" },
+          rationale: "Silhouette s(i) = (b−a)/max(a,b). Negative means the point's average distance to its own cluster (a) exceeds its distance to the nearest other cluster (b) — it belongs elsewhere.",
+        },
+        u1_failure_choice: {
+          id: "u1_failure_choice",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · When k-means fails",
+          prompt: "K-means with k=2 is applied to two interlocking crescent shapes. It always produces incorrect clusters. Why?",
+          choices: [
+            { id: "a", label: "K-means assumes spherical clusters; crescents are non-convex and cannot be separated by a Voronoi boundary", description: "K-means assigns each point to the nearest centroid, creating convex Voronoi regions. Non-convex shapes cross region boundaries." },
+            { id: "b", label: "K-means needs k≥10 to handle non-convex shapes", description: "No choice of k will fix non-convex cluster geometry for k-means. The algorithm is fundamentally wrong for this shape." },
+            { id: "c", label: "The problem is that crescents have unequal size, not shape", description: "Size imbalance is a separate failure mode. Shape (non-convexity) is the issue here." },
+          ],
+          branches: { a: "u1_terminal", b: "u1_terminal", c: "u1_terminal" },
+          rationale: "K-means creates Voronoi partitions — regions closest to each centroid. These are always convex. Non-convex clusters will always be split incorrectly regardless of k. Use DBSCAN for arbitrary shapes.",
+        },
+        u1_terminal: {
+          id: "u1_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · K-Means mastered",
+          prompt: "Final reflection: when is k-means the right choice and when do you reach for something else?",
+          choices: [
+            { id: "a", label: "Got it", description: "K-means: fast, scalable, great for spherical equal-density clusters, needs k upfront. Reach for DBSCAN when clusters are non-convex, have noise, or you do not know k. Reach for GMM when you want soft assignments and can model elliptical clusters." },
+          ],
+          branches: { a: "u1_terminal" },
+          terminal: true,
+          rationale: "K-means is the clustering workhorse for large-scale, roughly spherical data. Its limitations (spherical assumption, needs k, sensitive to outliers) are exactly what DBSCAN and hierarchical methods address.",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "K-means++ improves over random initialization by:",
+        options: [
+          "Seeding centroids with probability proportional to squared distance from existing centroids, spreading seeds far apart",
+          "Running the full algorithm 100 times and keeping the best result",
+          "Using the median instead of the mean for each centroid update",
+        ],
+        correctIndex: 0,
+        explanation: "k-means++ picks each new centroid proportionally to D(x)² — the squared distance to the nearest existing centroid. This spreads seeds and gives an O(log k) approximation guarantee.",
+      },
+      {
+        question: "The elbow method plots inertia vs k. A limitation of this approach is:",
+        options: [
+          "Inertia always decreases with k, and real data often shows no clear elbow — making the choice subjective",
+          "Inertia is undefined for k > 5",
+          "The elbow only works for data with exactly 3 clusters",
+        ],
+        correctIndex: 0,
+        explanation: "More clusters always reduce inertia. On smooth data, the elbow may be ambiguous. Use silhouette score or domain knowledge as a complement.",
+      },
+      {
+        question: "K-means fails on two interlocking crescent shapes because:",
+        options: [
+          "K-means creates convex Voronoi regions; non-convex clusters always straddle region boundaries regardless of k",
+          "K-means requires Gaussian clusters, and crescents are not Gaussian",
+          "The algorithm diverges on non-convex data and never converges",
+        ],
+        correctIndex: 0,
+        explanation: "K-means assigns each point to its nearest centroid, partitioning space into convex Voronoi cells. Non-convex shapes cannot fit into a single convex cell. DBSCAN handles arbitrary shapes.",
+      },
+    ],
+  },
+
+  "ml-u2": {
+    durationLabel: "15 min",
+    outcomes: [
+      "Classify any point as **core, border, or noise** given ε and min_samples, and trace DBSCAN's density-reachability expansion.",
+      "Predict how ε and min_samples interact — a small ε produces many noise points; large ε merges everything into one cluster.",
+      "Read a **dendrogram** to choose the number of clusters from a horizontal cut, and explain why **Ward linkage** minimizes within-cluster variance.",
+      "Choose between k-means, DBSCAN, and hierarchical clustering given a data description.",
+    ],
+    learnMarkdown: `## DBSCAN: density-based spatial clustering
+
+DBSCAN groups points based on **density**, not distance to a centroid. Two parameters define a neighborhood:
+- **ε (epsilon)**: maximum radius of a point's neighborhood.
+- **min_samples**: minimum number of points (including the point itself) to qualify as a **core point**.
+
+### Three point types
+
+\`\`\`
+For each point p:
+  N(p) = {q in dataset : dist(p, q) ≤ ε}
+
+  if |N(p)| ≥ min_samples:  → core point  (dense interior)
+  elif p is within ε of a core point:  → border point  (on the edge)
+  else:  → noise point  (outlier, labeled −1)
+\`\`\`
+
+### Cluster expansion
+
+Start from an unvisited core point. All points in its ε-neighborhood join the cluster. If any of those are also core points, expand their neighborhoods too. Repeat until no new points can be added. This is a **breadth-first density-reachability** traversal.
+
+\`\`\`python
+from sklearn.cluster import DBSCAN
+from sklearn.preprocessing import StandardScaler
+
+X_scaled = StandardScaler().fit_transform(X)
+db = DBSCAN(eps=0.5, min_samples=5)
+labels = db.fit_predict(X_scaled)
+# labels == -1 are noise points
+n_clusters = len(set(labels)) - (1 if -1 in labels else 0)
+\`\`\`
+
+## DBSCAN advantages
+
+| Advantage | Why it matters |
+|---|---|
+| **Arbitrary cluster shapes** | Density-reachability follows the data's geometry, not centroid distance |
+| **Automatic outlier detection** | Noise points are labeled −1 — no need for a separate outlier detection step |
+| **No k needed** | Number of clusters emerges from the data density |
+
+## ε sensitivity: the critical gotcha
+
+ε is the most important parameter and the hardest to tune:
+
+- **ε too small**: many points become noise; dense clusters fragment.
+- **ε too large**: distinct clusters merge into one giant cluster.
+
+**Heuristic for ε**: compute the k-nearest-neighbor distance for each point (k = min_samples − 1). Sort and plot. The elbow of this curve is a good ε estimate.
+
+\`\`\`python
+from sklearn.neighbors import NearestNeighbors
+nbrs = NearestNeighbors(n_neighbors=5).fit(X_scaled)
+distances, _ = nbrs.kneighbors(X_scaled)
+distances = np.sort(distances[:, -1])
+# plot distances — pick ε at the elbow
+\`\`\`
+
+DBSCAN also struggles when clusters have **very different densities** — a single ε cannot be both large enough for the sparse cluster and small enough not to merge the dense clusters. HDBSCAN (hierarchical DBSCAN) handles this by running at all ε values and extracting stable clusters.
+
+## Hierarchical / agglomerative clustering
+
+Builds a tree (dendrogram) by repeatedly merging the two closest clusters, bottom-up:
+
+\`\`\`
+1. Start: each point is its own cluster (n clusters)
+2. Find the two clusters with the minimum linkage distance
+3. Merge them into one
+4. Repeat until one cluster remains
+\`\`\`
+
+The result is a full dendrogram. To get k clusters, **cut the dendrogram horizontally** at a height that leaves k branches.
+
+### Linkage methods
+
+| Linkage | Distance between clusters | Behavior |
+|---|---|---|
+| **Ward** | Increase in total within-cluster variance after merge | Minimizes variance, produces compact equal-size clusters |
+| **Complete** | Max distance between any two points in different clusters | Compact clusters, sensitive to outliers |
+| **Average** | Mean distance between all pairs | Compromise |
+| **Single** | Min distance (nearest neighbor) | Chaining effect — elongated clusters |
+
+**Ward linkage** is the scikit-learn default and works best in most cases: it minimizes the same objective as k-means (within-cluster variance), which is why it often gives cleaner results.
+
+\`\`\`python
+from sklearn.cluster import AgglomerativeClustering
+from scipy.cluster.hierarchy import dendrogram, linkage
+import matplotlib.pyplot as plt
+
+# Draw dendrogram
+Z = linkage(X_scaled, method="ward")
+dendrogram(Z)
+plt.axhline(y=4.0, color="red")   # cut at height 4 → inspect how many clusters result
+
+# Get labels at k clusters
+agg = AgglomerativeClustering(n_clusters=3, linkage="ward")
+labels = agg.fit_predict(X_scaled)
+\`\`\`
+
+## Reading a dendrogram
+
+- **Horizontal axis**: individual points (leaves) or clusters.
+- **Vertical axis**: merge height — distance at which two clusters joined.
+- **Horizontal cut**: draw a horizontal line at height h; the number of vertical lines it intersects = number of clusters.
+- **Tall vertical lines before a merge**: two clusters were very far apart before being forced together — a meaningful gap suggests a natural k at that cut.
+
+## DBSCAN vs k-means vs hierarchical: the decision table
+
+| Criterion | K-means | DBSCAN | Hierarchical |
+|---|---|---|---|
+| Cluster shape | Spherical only | Arbitrary | Depends on linkage |
+| k required? | Yes | No | No (cut dendrogram) |
+| Outlier handling | Assigns to nearest centroid | Labels as noise (−1) | Merges into clusters |
+| Scalability | O(nkI) — fast | O(n log n) with indexing | O(n² log n) — slow at scale |
+| Interpretability | Centroids | Density neighborhoods | Full merge history |
+
+## Pitfalls
+
+- **Not standardizing before DBSCAN.** ε is in feature-space units — unstandardized features make ε meaningless.
+- **Expecting DBSCAN to work at varying densities.** Use HDBSCAN for multi-density data.
+- **Cutting the dendrogram arbitrarily.** Always look for the longest vertical line before the cut — that is the natural gap.
+- **Single linkage with noisy data.** Single linkage causes "chaining" — one bridge point merges two distant clusters. Use Ward or complete.`,
+    video: null,
+    videoFallbackMarkdown: `## Deep dive (no video)
+
+1. On paper: 7 points with ε=1.5, min_samples=3. Label each as core, border, or noise.
+2. Trace the cluster expansion from a core point — which points get added?
+3. Draw a dendrogram for 5 points. Mark the cut that gives k=2 and k=3.
+4. Two-sentence answer: "DBSCAN is preferred over k-means when ___. Ward linkage minimizes ___."`,
+    tryGuidance: "In the DBSCAN visualizer, start with the default ε and min_samples on a blob dataset, then switch to a crescent dataset — observe DBSCAN handling the non-convex shape. Slide ε from tiny to large and watch noise points disappear as clusters merge.",
+    interviewGraph: {
+      initialStageId: "u2_core_choice",
+      artifactDimensions: [
+        { label: "DBSCAN Mechanics", recoveryStageId: "u2_recovery_dbscan" },
+        { label: "Dendrogram Reading", recoveryStageId: "u2_recovery_dendro" },
+      ],
+      stages: {
+        u2_core_choice: {
+          id: "u2_core_choice",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · Core / border / noise",
+          prompt: "With ε=1.0 and min_samples=4, point P has 3 points within distance 1.0 (including itself). What is P's type?",
+          choices: [
+            { id: "a", label: "Border point — within ε of a core point but does not have min_samples neighbors itself", description: "P has 3 neighbors (< min_samples=4), so it cannot be a core point. If a core point is within ε, P is a border point." },
+            { id: "b", label: "Core point — it has at least one neighbor within ε", description: "Core requires |N(p)| ≥ min_samples = 4. P only has 3 neighbors." },
+            { id: "c", label: "Noise point — any point with fewer than min_samples neighbors", description: "P is noise only if no core point is within ε of it. If a core point is nearby, P is a border point." },
+          ],
+          branches: { a: "u2_eps_click", b: "u2_recovery_dbscan", c: "u2_recovery_dbscan" },
+          rationale: "Core requires ≥ min_samples points in ε-neighborhood. Border: < min_samples but within ε of a core. Noise: neither. P has 3 neighbors, so it is border or noise depending on whether a core point is nearby.",
+        },
+        u2_recovery_dbscan: {
+          id: "u2_recovery_dbscan",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · DBSCAN fundamentals",
+          prompt: "DBSCAN labels some points as −1. What does that mean?",
+          choices: [
+            { id: "a", label: "Those points are noise/outliers — not reachable from any core point within ε", description: "Label −1 means the point is not a core point and no core point is within ε. DBSCAN treats it as noise." },
+            { id: "b", label: "−1 means the first cluster — DBSCAN labels from −1 upward", description: "DBSCAN labels clusters 0, 1, 2, … and reserves −1 specifically for noise." },
+            { id: "c", label: "−1 means the algorithm failed to converge for that point", description: "DBSCAN always terminates deterministically. −1 is a deliberate noise label." },
+          ],
+          branches: { a: "u2_eps_click", b: "u2_eps_click", c: "u2_eps_click" },
+          rationale: "Noise points (label −1) are a feature, not a bug. They let DBSCAN model data with outliers naturally, unlike k-means which forces every point into a cluster.",
+        },
+        u2_eps_click: {
+          id: "u2_eps_click",
+          type: "click_target",
+          badge: "Stage 2",
+          title: "Stage 2 · ε sensitivity",
+          prompt: "Click the DBSCAN call that is most likely to produce meaningful clusters on standardized 2D data as a starting point.",
+          code_snippet: `from sklearn.cluster import DBSCAN
+from sklearn.preprocessing import StandardScaler
+
+X_s = StandardScaler().fit_transform(X)
+
+# Three candidate configurations:
+labels_a = DBSCAN(eps=0.01, min_samples=5).fit_predict(X_s)  # ds-target:too_small_eps
+labels_b = DBSCAN(eps=0.5,  min_samples=5).fit_predict(X_s)  # ds-target:reasonable_eps
+labels_c = DBSCAN(eps=50.0, min_samples=5).fit_predict(X_s)  # ds-target:too_large_eps`,
+          validationCopy: {
+            too_small_eps: "ε=0.01 on standardized data is extremely tight — almost every point will be noise. Use the k-NN distance plot heuristic to pick a sensible starting ε (~0.3–1.0 on standardized 2D data).",
+            reasonable_eps: "Good starting point. On standardized data, ε≈0.5 is a common first try. Adjust based on the k-NN elbow plot for your specific dataset.",
+            too_large_eps: "ε=50 on standardized data will encompass every point in the dataset — everything merges into one cluster. ε must be in the same scale as the data's pairwise distances.",
+          },
+          branches: { too_small_eps: "u2_recovery_dendro", reasonable_eps: "u2_dendro_choice", too_large_eps: "u2_recovery_dendro" },
+        },
+        u2_recovery_dendro: {
+          id: "u2_recovery_dendro",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Dendrogram reading",
+          prompt: "In a dendrogram, what does a horizontal cut at height h give you?",
+          choices: [
+            { id: "a", label: "The number of clusters equals the number of vertical lines the cut intersects", description: "Each vertical line at the cut level represents a cluster. Count intersections = count clusters." },
+            { id: "b", label: "The cut height is the number of clusters directly", description: "Height is a distance (dissimilarity) between merged clusters, not a cluster count." },
+            { id: "c", label: "Points above the cut are noise, points below are in clusters", description: "Dendrograms do not distinguish noise — that is DBSCAN's strength, not hierarchical clustering's." },
+          ],
+          branches: { a: "u2_dendro_choice", b: "u2_dendro_choice", c: "u2_dendro_choice" },
+          rationale: "Draw a horizontal line at height h across the dendrogram. Count vertical branches that the line crosses — that is your number of clusters at that cut.",
+        },
+        u2_dendro_choice: {
+          id: "u2_dendro_choice",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · Choosing the right method",
+          prompt: "Your dataset has elongated curved clusters, several outlier points, and you do not know k. Which algorithm do you use first?",
+          choices: [
+            { id: "a", label: "DBSCAN — handles arbitrary shapes, automatically labels outliers, no k needed", description: "Exactly the scenario DBSCAN was designed for." },
+            { id: "b", label: "K-means with k=10 — more clusters will capture the curves", description: "K-means with large k might fit curves but cannot distinguish outliers and requires guessing k." },
+            { id: "c", label: "Hierarchical clustering with single linkage — good for non-convex shapes", description: "Single linkage suffers from chaining — one bridge point merges distant clusters. Better to use DBSCAN for non-convex data with outliers." },
+          ],
+          branches: { a: "u2_terminal", b: "u2_terminal", c: "u2_terminal" },
+          rationale: "Curved clusters + outliers + unknown k = DBSCAN. Tune ε with the k-NN distance plot, use min_samples ≥ dimensionality + 1 as a rule of thumb.",
+        },
+        u2_terminal: {
+          id: "u2_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · DBSCAN & Hierarchical mastered",
+          prompt: "Final reflection: the key advantage DBSCAN has over k-means in two words.",
+          choices: [
+            { id: "a", label: "Got it", description: "Arbitrary shapes + outlier detection. DBSCAN's density-reachability follows the data geometry and labels isolated points as noise automatically." },
+          ],
+          branches: { a: "u2_terminal" },
+          terminal: true,
+          rationale: "DBSCAN for unknown k, non-convex shapes, outlier data. Hierarchical for a full merge picture and when you want to explore multiple k values. K-means for large spherical data where speed matters.",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "In DBSCAN with ε=0.5 and min_samples=5, a point with 6 neighbors within ε is a:",
+        options: ["Core point", "Border point", "Noise point"],
+        correctIndex: 0,
+        explanation: "A core point has ≥ min_samples (5) points in its ε-neighborhood. 6 ≥ 5, so this is a core point.",
+      },
+      {
+        question: "Which Ward linkage minimizes when merging two clusters?",
+        options: [
+          "The increase in total within-cluster sum of squares (variance) after the merge",
+          "The maximum pairwise distance between the two clusters",
+          "The number of points in the smaller cluster",
+        ],
+        correctIndex: 0,
+        explanation: "Ward linkage picks the merge that minimizes the increase in within-cluster variance — the same objective as k-means — producing compact, roughly equal-size clusters.",
+      },
+      {
+        question: "When does DBSCAN fail to separate two true clusters?",
+        options: [
+          "When ε is too large — density bridges connect the clusters, merging them",
+          "When the clusters have equal density",
+          "When n > 10,000 — DBSCAN cannot scale beyond that",
+        ],
+        correctIndex: 0,
+        explanation: "ε too large causes DBSCAN to connect points across cluster boundaries via density bridges. Too small: points become noise. The k-NN distance plot helps find the right ε.",
+      },
+    ],
+  },
+
+  "ml-u3": {
+    durationLabel: "22 min",
+    outcomes: [
+      "Describe PCA as finding **orthogonal directions of maximum variance** (eigenvectors of the covariance matrix) and state what eigenvalues represent.",
+      "Use the **cumulative explained variance** curve to choose n_components defensibly, and read a scree plot.",
+      "Interpret **loadings** — which original features contribute to each principal component — and explain why you must **standardize first**.",
+      "Distinguish PCA's three use cases: visualization (2D/3D), preprocessing (noise reduction, decorrelation), and compression.",
+    ],
+    learnMarkdown: `## What PCA is doing geometrically
+
+PCA rotates the data into a new coordinate system where the **first axis points in the direction of maximum variance**, the second axis in the direction of maximum residual variance (orthogonal to the first), and so on. These axes are the **principal components**.
+
+Algebraically: PCA finds the eigenvectors of the **covariance matrix** Σ = (1/n)XᵀX (when X is mean-centered). The eigenvectors are the PC directions; the corresponding eigenvalues λᵢ are the variances captured along each PC.
+
+\`\`\`python
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+
+# ALWAYS standardize first
+X_scaled = StandardScaler().fit_transform(X)
+
+pca = PCA(n_components=10)
+X_pca = pca.fit_transform(X_scaled)
+
+print(pca.explained_variance_ratio_)         # fraction of variance per PC
+print(pca.explained_variance_ratio_.cumsum()) # cumulative
+print(pca.components_)                        # loadings: shape (n_components, n_features)
+\`\`\`
+
+## Why standardize before PCA?
+
+Covariance mixes up variance across features. If feature A ranges 0–1 and feature B ranges 0–1000, B's variance is ~10⁶× larger. The first PC will almost entirely be "B goes up." The geometry is dominated by the scale of units, not the information content.
+
+**Standardize** (zero mean, unit variance) first. Now each feature contributes to the covariance equally before PCA decides which combinations are interesting. Exception: when features are naturally on the same scale and you want magnitude differences to count (e.g., gene expression counts already normalized per sample), you can skip standardization — but be intentional.
+
+## Choosing n_components: the scree plot and cumulative variance
+
+**Scree plot**: plot eigenvalue (or explained variance ratio) vs PC index. Look for the "elbow" — the point where variance drops off. PCs after the elbow mostly capture noise.
+
+**Cumulative explained variance**: a more practical rule is "keep enough PCs to explain X% of total variance" (e.g., 95%). Plot cumsum and read off the crossing point.
+
+\`\`\`python
+import matplotlib.pyplot as plt
+
+# Fit on all components first
+pca_full = PCA().fit(X_scaled)
+cumvar = pca_full.explained_variance_ratio_.cumsum()
+
+# Find n_components for 95% variance
+n95 = np.argmax(cumvar >= 0.95) + 1
+print(f"Need {n95} PCs for 95% explained variance")
+\`\`\`
+
+There is no universally correct threshold. In preprocessing for ML, 95–99% is common. For visualization, you always take 2 or 3.
+
+## Reading loadings: what does each PC represent?
+
+\`pca.components_\` has shape (n_components, n_features). Row i is the loading vector for PC i — the coefficients that express PC i as a weighted sum of original features.
+
+\`\`\`
+PC₁ = 0.71·age − 0.08·income + 0.70·experience + …
+\`\`\`
+
+Large positive loading: feature moves in the same direction as the PC. Large negative: opposite. Near-zero: feature barely contributes to that PC.
+
+This is how you interpret PCA in a business context: "PC1 is a 'seniority' axis — age and experience load together." It is also how you audit for data leakage or spurious correlations: if PC1 is dominated by a single feature with loading ≈ 1, the other features contribute nothing.
+
+## Variance explained vs information
+
+A common interview mistake: confusing "variance explained" with "information preserved." PCA maximizes linear variance. It may discard variance that is label-relevant (low variance but highly predictive) while keeping label-irrelevant variance. This is the core reason to use **supervised dimensionality reduction** (LDA, UMAP with labels) in some settings.
+
+Also: PCA captures linear structure only. Curved manifolds in the data (e.g., faces at different angles) require non-linear methods like t-SNE/UMAP for visualization.
+
+## PCA for noise reduction
+
+A classic use case: hyperspectral images or sensor arrays with many correlated channels. Project to the top-k PCs (capturing signal) and reconstruct: \`X_reconstructed = pca.inverse_transform(X_pca)\`. The reconstruction discards low-variance components, which are often dominated by sensor noise. The denoised reconstruction lives in the subspace that the data actually spans.
+
+## Pitfalls
+
+- **Running PCA on the test set before fitting.** Always \`fit\` on training data only; \`transform\` both train and test with the same fitted PCA object.
+- **Not standardizing.** Dominant-variance features hijack the first PC.
+- **Interpreting principal components as features with independent meaning.** PCs are rotations of the original features — they often blend several original features and may not have clean semantic interpretations.
+- **Using PCA to prevent overfitting.** PCA reduces dimensionality but does not guarantee better generalization. Regularization or more data is more principled.
+
+## Interview questions
+
+- "Why standardize before PCA?" (Otherwise high-variance features dominate the covariance matrix regardless of their information content.)
+- "What does the first PC represent?" (The direction in feature space along which the data varies the most.)
+- "Can PCA capture non-linear structure?" (No — it is linear. For non-linear manifolds use t-SNE, UMAP, or autoencoders.)
+- "How do you choose n_components?" (Cumulative explained variance threshold, e.g. 95%, or scree plot elbow.)`,
+    video: { youtubeId: "FgakZw6K1QQ", title: "StatQuest: PCA Main Ideas in only 5 Minutes!", channel: "StatQuest", startSeconds: 0 },
+    videoFallbackMarkdown: `## Deep dive (no video)
+
+1. With features A (variance=100) and B (variance=1), what will PC1 look like before and after standardization?
+2. Fit PCA on a 2D dataset by hand: compute the covariance matrix, find its eigenvectors, project the data. Check that PC1 aligns with the long axis of the data cloud.
+3. \`pca.components_[0]\` on sklearn iris gives [0.52, -0.27, 0.58, 0.56]. Which original features dominate PC1? (petal length ~0.58, petal width ~0.56, sepal length ~0.52)
+4. Two-sentence answer: "The first principal component is ___. I should standardize before PCA because ___."`,
+    tryGuidance: "In the PCA visualizer, load the default dataset and observe the explained variance curve. Add a high-variance noise feature and watch PC1 shift toward it. Then standardize and see the PCs redistribute. Project to 2D and try to interpret what each axis represents.",
+    interviewGraph: {
+      initialStageId: "u3_standardize_click",
+      artifactDimensions: [
+        { label: "Standardization & Variance", recoveryStageId: "u3_recovery_std" },
+        { label: "Components & Loadings", recoveryStageId: "u3_recovery_loadings" },
+      ],
+      stages: {
+        u3_standardize_click: {
+          id: "u3_standardize_click",
+          type: "click_target",
+          badge: "Stage 1",
+          title: "Stage 1 · Standardize before PCA",
+          prompt: "Click the correct pipeline ordering — standardize before fitting PCA.",
+          code_snippet: `from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.pipeline import Pipeline
+
+# Option A
+pipe_a = Pipeline([
+    ("pca",    PCA(n_components=5)),
+    ("scaler", StandardScaler()),    # ds-target:pca_first
+])
+
+# Option B
+pipe_b = Pipeline([
+    ("scaler", StandardScaler()),
+    ("pca",    PCA(n_components=5)), # ds-target:scaler_first
+])`,
+          validationCopy: {
+            pca_first: "Wrong order. Fitting PCA on raw (unscaled) data means high-variance features dominate the first PC regardless of their importance. Always scale first.",
+            scaler_first: "Correct. StandardScaler → PCA is the standard pipeline. Each feature gets zero mean and unit variance before PCA computes the covariance matrix.",
+          },
+          branches: { pca_first: "u3_recovery_std", scaler_first: "u3_variance_choice" },
+        },
+        u3_recovery_std: {
+          id: "u3_recovery_std",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Why standardize?",
+          prompt: "Feature A ranges 0–0.01 and feature B ranges 0–10000. Without standardization, what will PCA's first component look like?",
+          choices: [
+            { id: "a", label: "Almost entirely feature B — its variance dominates the covariance matrix", description: "Var(B) ≈ 10⁸ × Var(A). PCA maximizes variance, so PC1 ≈ direction of B." },
+            { id: "b", label: "An equal mix of A and B — PCA balances features automatically", description: "PCA maximizes variance — it has no concept of 'balancing'. High-variance features win." },
+            { id: "c", label: "Feature A dominates because smaller values are more stable", description: "PCA cares about variance, not magnitude or stability. Larger variance = more influence." },
+          ],
+          branches: { a: "u3_variance_choice", b: "u3_variance_choice", c: "u3_variance_choice" },
+          rationale: "PCA finds directions of maximum variance. Without standardization, the scale of features (not their information) determines the PCs. Feature B's huge variance makes it dominate.",
+        },
+        u3_variance_choice: {
+          id: "u3_variance_choice",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Choosing n_components",
+          prompt: "You need to reduce 100 features for downstream classification. The cumulative explained variance crosses 95% at 12 PCs and 99% at 28 PCs. How do you decide?",
+          choices: [
+            { id: "a", label: "Run cross-validated accuracy with n_components ∈ {12, 20, 28} and pick what generalizes best", description: "The right threshold is the one that maximizes downstream task performance, not a fixed % rule." },
+            { id: "b", label: "Always use 95% — using more PCs is always worse", description: "95% is a rule of thumb. For some datasets, the extra 4% variance (28 PCs) may contain useful signal for classification." },
+            { id: "c", label: "Always use all 100 PCs — more information is always better", description: "With 100 PCs you have not reduced dimensionality at all. The point of PCA is compression and noise reduction." },
+          ],
+          branches: { a: "u3_loadings_choice", b: "u3_loadings_choice", c: "u3_recovery_loadings" },
+          rationale: "Treat n_components as a hyperparameter. CV over a range is more principled than a fixed % threshold, especially when the downstream task cares about specific signal that may live in the last few PCs.",
+        },
+        u3_recovery_loadings: {
+          id: "u3_recovery_loadings",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Loadings interpretation",
+          prompt: "pca.components_[0] = [0.7, 0.0, 0.7, 0.0] on 4 features: [age, income, experience, education]. What is PC1 measuring?",
+          choices: [
+            { id: "a", label: "A 'seniority' axis: age and experience move together in the same direction", description: "High loadings on age and experience, near-zero on income and education." },
+            { id: "b", label: "Purely income — the 0.7 values are noise", description: "The 0.7 loadings on age and experience are the dominant contributors, not income (loading ≈ 0)." },
+            { id: "c", label: "PC1 has no interpretable meaning — PCs are always abstract", description: "PCs often have interpretable meanings when loadings cluster on semantically related features." },
+          ],
+          branches: { a: "u3_loadings_choice", b: "u3_loadings_choice", c: "u3_loadings_choice" },
+          rationale: "Read loadings: large absolute values identify which original features the PC summarizes. Here PC1 ≈ (age + experience)/√2 — a 'career seniority' composite.",
+        },
+        u3_loadings_choice: {
+          id: "u3_loadings_choice",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · PCA limitations",
+          prompt: "You visualize high-dimensional image embeddings with PCA (2 components). The 2D plot shows complete overlap between classes. A colleague suggests t-SNE shows clear separation. Why?",
+          choices: [
+            { id: "a", label: "PCA is linear and maximizes variance globally; class-separating structure may live in low-variance, non-linear directions that PCA discards", description: "t-SNE preserves local neighborhood structure in any direction, not just high-variance ones." },
+            { id: "b", label: "PCA always fails on image data — it requires text features", description: "PCA works on any numeric data. The issue is linear vs non-linear structure, not data type." },
+            { id: "c", label: "2 components is always too few — use 50 PCA components", description: "50 PCs can't be visualized. The fundamental issue is that class separation may be non-linear." },
+          ],
+          branches: { a: "u3_terminal", b: "u3_terminal", c: "u3_terminal" },
+          rationale: "PCA captures linear variance — if class structure is encoded in curved manifolds or low-variance directions, PCA's 2D projection will obscure it. t-SNE/UMAP preserve local neighborhoods and reveal non-linear cluster structure.",
+        },
+        u3_terminal: {
+          id: "u3_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · PCA mastered",
+          prompt: "Final reflection: what does the first principal component represent?",
+          choices: [
+            { id: "a", label: "Got it", description: "PC1 is the direction in the original feature space along which the data has maximum variance. It is the best single linear combination of features for representing the data's spread." },
+          ],
+          branches: { a: "u3_terminal" },
+          terminal: true,
+          rationale: "PCA is the workhorse linear dimensionality reduction technique. Standardize first, choose n_components via CV or cumulative variance, and interpret loadings to understand what each PC represents.",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "Why must you standardize features before applying PCA?",
+        options: [
+          "PCA maximizes variance; without standardization, features with larger numeric ranges dominate the principal components regardless of their information content",
+          "Standardization makes the data Gaussian, which PCA requires mathematically",
+          "PCA cannot converge on unstandardized data — the algorithm will fail",
+        ],
+        correctIndex: 0,
+        explanation: "PCA is a variance-maximizing rotation. Features measured in large units (salary in dollars) have huge variance and hijack PC1. Standardization puts all features on equal footing before the rotation.",
+      },
+      {
+        question: "pca.explained_variance_ratio_ = [0.52, 0.23, 0.12, 0.08, 0.05]. How many PCs explain at least 87% of variance?",
+        options: ["3 (cumsum: 0.52, 0.75, 0.87)", "2 (0.52 + 0.23 = 0.75)", "4 (0.52+0.23+0.12+0.08=0.95)"],
+        correctIndex: 0,
+        explanation: "Cumulative: PC1=0.52, PC1+PC2=0.75, PC1+PC2+PC3=0.87. Three components reach exactly 87%.",
+      },
+      {
+        question: "PCA's first component represents:",
+        options: [
+          "The linear combination of features with the maximum variance in the dataset",
+          "The feature with the highest individual variance",
+          "The average of all features, weighted by their correlation",
+        ],
+        correctIndex: 0,
+        explanation: "PC1 is the eigenvector of the covariance matrix with the largest eigenvalue — the direction along which the data spreads the most. It is a weighted combination of all features, not a single feature.",
+      },
+    ],
+  },
+
+  "ml-u4": {
+    durationLabel: "15 min",
+    outcomes: [
+      "Explain t-SNE's optimization goal: match **KL divergence** between high-dim neighborhood probabilities and low-dim Student-t probabilities.",
+      "State why cluster **distances across t-SNE plots are not interpretable** and why the same dataset produces different plots with different seeds.",
+      "Set **perplexity** (≈ effective number of neighbors, 5–50) and explain the crowding problem that motivated using a t-distribution in low-dim.",
+      "Contrast UMAP: faster, preserves more **global structure**, consistent across runs, governed by n_neighbors and min_dist.",
+    ],
+    learnMarkdown: `## t-SNE: intuition before the math
+
+t-SNE (t-Distributed Stochastic Neighbor Embedding) creates a 2D (or 3D) map of high-dimensional data that **preserves local neighborhood structure**. If two points are close in the original space, they should be close in the map. Distant points are less constrained — and this asymmetry is the source of both t-SNE's power and its most common misinterpretation.
+
+### The two probability distributions
+
+**High-dim**: for each pair (i, j), compute a conditional probability pⱼ|ᵢ measuring how likely j is a neighbor of i, using a Gaussian kernel centered at i. The bandwidth σᵢ is chosen so that the effective number of neighbors (perplexity) matches the chosen hyperparameter.
+
+**Low-dim**: for each pair in the 2D embedding, compute qᵢⱼ using a **Student-t distribution with 1 degree of freedom** (heavy tails):
+
+\`\`\`
+q_ij ∝ (1 + ‖yᵢ − yⱼ‖²)⁻¹
+\`\`\`
+
+**Optimization**: minimize KL(P ‖ Q) — push the low-dim probabilities to match the high-dim ones via gradient descent. Points that are neighbors in high-dim are attracted; non-neighbors are (softly) repelled.
+
+### Why the t-distribution? (the crowding problem)
+
+In 2D you have far less space than in, say, 100D. If you use a Gaussian in both spaces, moderately-distant high-dim points would need to be mapped so far apart in 2D that they crowd together with unrelated points — the **crowding problem**. The t-distribution's heavy tails allow moderately-distant points to be mapped to reasonable distances in 2D without forcing them too far from the center, freeing up space for nearby points.
+
+## Perplexity
+
+Perplexity ≈ the effective number of neighbors considered for each point. Typical range: 5–50. It controls the bandwidth σᵢ of the Gaussian in high-dim:
+
+- **Low perplexity (5–10)**: very local — tiny neighborhood. Captures fine-grained local structure; can produce many small disconnected clusters or fracture real clusters.
+- **High perplexity (30–50)**: larger neighborhood — more global-ish, fewer small clusters.
+
+Rule of thumb: try multiple perplexity values. **Stable clusters across perplexities are more trustworthy** than clusters that appear at only one perplexity.
+
+\`\`\`python
+from sklearn.manifold import TSNE
+
+# Always run at multiple perplexities and compare
+for perp in [5, 30, 50]:
+    embed = TSNE(n_components=2, perplexity=perp,
+                 random_state=42, n_iter=1000).fit_transform(X_scaled)
+\`\`\`
+
+## Critical misinterpretations
+
+### 1. Cluster distances are NOT meaningful
+
+KL divergence is asymmetric and non-metrically defined for global distances. Two clusters far apart in a t-SNE plot may be close or distant in the original space — you cannot tell. Only *within-cluster* tightness and *between-cluster* separation in the 2D plot are informative.
+
+### 2. Different seeds → different plots
+
+t-SNE is **stochastic** (random initialization). Run it twice with different seeds and you get different plots — same clusters, different orientations and positions. Always use \`random_state\` for reproducibility.
+
+### 3. Cluster size is not meaningful
+
+Because t-SNE optimizes local probabilities, dense clusters may appear stretched and sparse clusters may appear tight — the layout adapts to local density, not absolute distance.
+
+## UMAP: a faster, more principled alternative
+
+UMAP (Uniform Manifold Approximation and Projection) uses a different mathematical framework (topological data analysis / fuzzy simplicial sets) but is conceptually similar: preserve neighborhood structure in a low-dimensional embedding.
+
+| | t-SNE | UMAP |
+|---|---|---|
+| Speed | Slow (O(n log n) with BH-tree) | Fast (can handle millions of points) |
+| Global structure | Poor — distances not reliable | Better — global topology partially preserved |
+| Consistency | Stochastic, layout varies | More consistent across runs |
+| Hyperparameters | perplexity, n_iter | n_neighbors, min_dist |
+| Primary use | Visualization only | Visualization + preprocessing |
+
+**n_neighbors** (UMAP): like perplexity — larger values → more global structure, fewer small clusters.  
+**min_dist**: how tightly points are packed in low-dim. Small min_dist → tight clusters (good for visualization). Large → more spread out (better for preserving global topology).
+
+\`\`\`python
+import umap
+
+reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, random_state=42)
+embed = reducer.fit_transform(X_scaled)
+\`\`\`
+
+## When to use each
+
+| Use case | Recommendation |
+|---|---|
+| Publication-quality 2D scatter, cluster visualization | t-SNE or UMAP (t-SNE is more established) |
+| Large dataset (> 50k points) | UMAP |
+| Need consistency across experiments | UMAP (deterministic with fixed seed, more stable) |
+| Preprocessing for downstream ML | UMAP (preserves more global structure) |
+| Communicating to non-technical stakeholders | t-SNE (more recognized name, visually striking) |
+
+## Pitfalls
+
+- **Comparing cluster distances across t-SNE plots.** Never. The optimization does not preserve global distances.
+- **Reporting a single t-SNE run without a seed.** Always set \`random_state\` and note the perplexity.
+- **Over-interpreting cluster count.** t-SNE will fragment a continuous distribution into apparent clusters. Validate with domain knowledge.
+- **Using t-SNE as a preprocessing step for ML.** t-SNE is for visualization only — it is stochastic and has no \`transform\` for new data without re-running the full optimization. Use UMAP if you need a reusable embedding.`,
+    video: null,
+    videoFallbackMarkdown: `## Deep dive (no video)
+
+1. Run t-SNE on sklearn's digits dataset with perplexity=5, 30, 50. Which perplexity best separates the 10 digit classes? Note that the answer varies — that is the point.
+2. Run UMAP with n_neighbors=5 and n_neighbors=50. What changes in the embedding?
+3. Two-sentence answer: "Distances between t-SNE clusters are not interpretable because ___. UMAP is preferred for large datasets because ___."`,
+    tryGuidance: "In the t-SNE vs UMAP visualizer, use the perplexity slider and observe how cluster structure appears and disappears. Then switch to UMAP and compare how the global layout is more consistent across different n_neighbors settings.",
+    interviewGraph: {
+      initialStageId: "u4_distance_choice",
+      artifactDimensions: [
+        { label: "t-SNE Interpretation", recoveryStageId: "u4_recovery_tsne" },
+        { label: "UMAP vs t-SNE", recoveryStageId: "u4_recovery_umap" },
+      ],
+      stages: {
+        u4_distance_choice: {
+          id: "u4_distance_choice",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · t-SNE distance interpretation",
+          prompt: "In a t-SNE plot, cluster A is 3 cm from cluster B, and cluster C is 0.5 cm from cluster B. A colleague concludes B and C are closely related in the original space. Is this valid?",
+          choices: [
+            { id: "a", label: "No — t-SNE does not preserve global distances. Proximity in the t-SNE plot only reflects local neighborhood structure", description: "The KL divergence optimization is asymmetric and non-metric for global distances. Only within-cluster tightness is meaningful." },
+            { id: "b", label: "Yes — t-SNE is an accurate 2D projection of the original geometry", description: "t-SNE optimizes local neighborhoods, not global distances. Far-away points in the original space can appear close in the plot." },
+            { id: "c", label: "Only if the perplexity was set to 30 — that value preserves global structure", description: "No perplexity setting makes t-SNE globally distance-preserving. That is UMAP's partial claim, and even UMAP is approximate." },
+          ],
+          branches: { a: "u4_perplexity_click", b: "u4_recovery_tsne", c: "u4_recovery_tsne" },
+          rationale: "t-SNE is a local-structure-preserving method. Global distances are meaningless in the output. Never compare inter-cluster distances across a t-SNE visualization.",
+        },
+        u4_recovery_tsne: {
+          id: "u4_recovery_tsne",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · t-SNE what you CAN trust",
+          prompt: "Which observation from a t-SNE plot IS reliable?",
+          choices: [
+            { id: "a", label: "Clusters that are tightly packed and clearly separated from others at multiple perplexity values", description: "Consistency across perplexity settings is a sign the clusters are real, not artifacts." },
+            { id: "b", label: "The distance between two clusters tells you how different the classes are", description: "Inter-cluster distances are not interpretable in t-SNE." },
+            { id: "c", label: "The number of clusters in the plot equals the number of true classes", description: "t-SNE can fragment continuous distributions into many apparent clusters, or merge distinct classes." },
+          ],
+          branches: { a: "u4_perplexity_click", b: "u4_perplexity_click", c: "u4_perplexity_click" },
+          rationale: "Local structure (tight, well-separated clusters) that is stable across perplexity values is the most trustworthy signal from t-SNE. Everything else requires validation.",
+        },
+        u4_perplexity_click: {
+          id: "u4_perplexity_click",
+          type: "click_target",
+          badge: "Stage 2",
+          title: "Stage 2 · Perplexity setting",
+          prompt: "Click the t-SNE call with a perplexity in the recommended range for most datasets.",
+          code_snippet: `from sklearn.manifold import TSNE
+
+embed_a = TSNE(n_components=2,
+               perplexity=2,           # ds-target:too_low_perp
+               random_state=42).fit_transform(X)
+
+embed_b = TSNE(n_components=2,
+               perplexity=30,          # ds-target:good_perp
+               random_state=42).fit_transform(X)
+
+embed_c = TSNE(n_components=2,
+               perplexity=5000,        # ds-target:too_high_perp
+               random_state=42).fit_transform(X)`,
+          validationCopy: {
+            too_low_perp: "Perplexity=2 is extremely local — each point only considers 2 effective neighbors. The embedding often looks fragmented and noisy.",
+            good_perp: "Perplexity=30 is the canonical default and recommended range (5–50). It balances local and semi-global neighborhood information.",
+            too_high_perp: "Perplexity=5000 is larger than most datasets. Scikit-learn will raise an error if perplexity ≥ n_samples. Even if it runs, the embedding loses local structure.",
+          },
+          branches: { too_low_perp: "u4_recovery_umap", good_perp: "u4_umap_choice", too_high_perp: "u4_recovery_umap" },
+        },
+        u4_recovery_umap: {
+          id: "u4_recovery_umap",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · UMAP advantages",
+          prompt: "You have 500,000 data points and need a 2D visualization for a presentation. t-SNE takes 4 hours. What is the better choice?",
+          choices: [
+            { id: "a", label: "UMAP — significantly faster than t-SNE at large n, and can transform new points without re-running", description: "UMAP scales to millions of points. t-SNE's O(n log n) BH-tree is still slow at 500k." },
+            { id: "b", label: "PCA — the only scalable option for large datasets", description: "PCA is scalable but only captures linear structure. UMAP captures non-linear structure at scale." },
+            { id: "c", label: "Sub-sample to 1000 points and run t-SNE", description: "Sub-sampling introduces sampling bias and you lose the full dataset's structure." },
+          ],
+          branches: { a: "u4_umap_choice", b: "u4_umap_choice", c: "u4_umap_choice" },
+          rationale: "UMAP was designed to scale. For production-scale datasets or when you need a reusable transform (e.g., projecting new data points), UMAP is the practical choice.",
+        },
+        u4_umap_choice: {
+          id: "u4_umap_choice",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · UMAP hyperparameters",
+          prompt: "A UMAP visualization shows all points merged into one indistinct blob. Which parameter change is most likely to help?",
+          choices: [
+            { id: "a", label: "Decrease min_dist — this packs points tighter in the embedding, revealing cluster separation", description: "Small min_dist produces tight clusters; large min_dist spreads everything out." },
+            { id: "b", label: "Increase n_components to 10 — more dimensions capture more structure", description: "n_components=10 cannot be visualized and does not fix a blob in 2D." },
+            { id: "c", label: "Switch back to t-SNE — UMAP always produces blobs", description: "UMAP does not always produce blobs. min_dist is likely too large for the current data scale." },
+          ],
+          branches: { a: "u4_terminal", b: "u4_terminal", c: "u4_terminal" },
+          rationale: "min_dist controls how tightly UMAP packs points in the low-dimensional space. If the embedding looks like a blob, lower min_dist (e.g., 0.01 to 0.1). Also ensure you are standardizing input features first.",
+        },
+        u4_terminal: {
+          id: "u4_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · t-SNE & UMAP mastered",
+          prompt: "Final check: can you compare cluster distances across two different t-SNE plots of the same data?",
+          choices: [
+            { id: "a", label: "No — t-SNE is stochastic, different seeds give different layouts, and inter-cluster distances are not globally meaningful in any single plot", description: "Each t-SNE run has a different global orientation and distance scale. Only local cluster structure is repeatable." },
+          ],
+          branches: { a: "u4_terminal" },
+          terminal: true,
+          rationale: "t-SNE and UMAP are visualization tools, not distance-preserving projections. Use them to identify clusters and communicate structure — not to measure how similar two groups are.",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "Two clusters appear far apart in a t-SNE plot. What can you conclude?",
+        options: [
+          "Nothing about their global distance — t-SNE only preserves local neighborhood structure, not global distances",
+          "The clusters are far apart in the original high-dimensional space",
+          "The clusters are the two most different groups in the dataset",
+        ],
+        correctIndex: 0,
+        explanation: "t-SNE minimizes KL divergence over local neighborhood probabilities. Global distances in the embedding are not meaningful. Only within-cluster tightness and existence of separation are reliable signals.",
+      },
+      {
+        question: "t-SNE perplexity controls:",
+        options: [
+          "The effective number of neighbors considered for each point's local probability distribution (range 5–50)",
+          "The number of output dimensions",
+          "The learning rate of the gradient descent optimization",
+        ],
+        correctIndex: 0,
+        explanation: "Perplexity ≈ effective number of neighbors. It sets the bandwidth of the Gaussian kernel in high-dimensional space. Low perplexity = hyper-local; high perplexity = more global-ish. Try multiple values.",
+      },
+      {
+        question: "The main reason UMAP is preferred over t-SNE for large datasets is:",
+        options: [
+          "UMAP is significantly faster and scales to millions of points while also preserving more global structure",
+          "UMAP always produces better cluster separation than t-SNE",
+          "t-SNE requires the data to be linearly separable; UMAP does not",
+        ],
+        correctIndex: 0,
+        explanation: "t-SNE's O(n log n) complexity (even with Barnes-Hut) is slow at large n. UMAP uses approximate nearest-neighbor graphs and is often 10–100× faster, with the added benefit of better global structure preservation.",
+      },
+    ],
+  },
+
 };
 
 
