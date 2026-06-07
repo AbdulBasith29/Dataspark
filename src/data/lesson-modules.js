@@ -25154,6 +25154,2512 @@ def handle_query(user_input):
   ],
 },
 
+// ml_foundations_lessons.js
+// Machine Learning Foundation lessons: ml-f1, ml-f3, ml-f4, ml-f5
+// These are standalone entries to be merged into ML_FOUNDATIONS in src/data/ml/foundations.js
+
+
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ml-f1 · Supervised vs Unsupervised vs Reinforcement Learning
+  // ─────────────────────────────────────────────────────────────────────────────
+  "ml-f1": {
+    durationLabel: "15 min",
+    outcomes: [
+      "Classify any ML problem as **supervised, unsupervised, or reinforcement** by examining the *feedback signal*, not the algorithm used.",
+      "Explain why **labels** — their existence, cost, and timeliness — determine the paradigm, and quantify the real cost of acquiring them.",
+      "Name the **hybrid paradigms** (self-supervised, semi-supervised, contextual bandits) that production systems actually ship, and when each is warranted.",
+      "Avoid the canonical interview traps: treating clustering as classification, reward leakage in RL, and assuming labels are free.",
+    ],
+    learnMarkdown: `## The one question that separates all paradigms
+
+Every "what kind of ML is this?" interview answer collapses to one question: **what does the world tell the model after it makes a prediction?**
+
+- **Supervised** — the world hands you the *correct answer* for each example, up front. You learn a mapping \`f(X) → y\` from labeled input–output pairs.
+- **Unsupervised** — the world hands you *nothing*. No targets. You discover structure latent in the data itself.
+- **Reinforcement** — the world hands you a *scalar reward, delayed and sparse*, in response to a sequence of actions. You learn a policy that maximizes cumulative reward.
+
+Notice what is *not* in that list: the algorithm. A neural network can do all three. Gradient boosting is usually supervised but powers bandit systems too. **The paradigm is a property of the supervision signal, not the model architecture.** Junior candidates say "it's deep learning because we use a neural net"; senior candidates say "we have one click label per impression, delayed by an hour — so it's supervised with a noisy target, unless we model the full recommendation sequence, in which case it becomes a contextual bandit."
+
+## A real-world story: three engineers, one fraud problem
+
+A payments company wants to stop card fraud. Three engineers each pitch a different approach — this is the cleanest way to feel the distinction between paradigms.
+
+**Engineer A (supervised).** "We have 18 months of disputed transactions, each labeled fraud or not-fraud by the chargeback process. Train a classifier on \`amount\`, \`merchant_category\`, \`time_since_last_txn\`, \`geo_distance\`." This works *if* labels are trustworthy and the future resembles the past. The hidden cost: chargebacks arrive **60–90 days late**, so the freshest, most adversarial fraud is exactly the data you *cannot* label yet.
+
+**Engineer B (unsupervised).** "Forget labels — fraud is anomalous by definition. Fit a density model on normal behavior; flag low-probability transactions." This catches novel fraud the labeled model has never seen. The hidden cost: "rare" is not the same as "bad." A customer's first international trip is rare and legitimate. Unsupervised methods surface *structure*; turning that structure into a *decision* still needs human judgment.
+
+**Engineer C (reinforcement).** "The real objective is choosing an *action sequence*: allow, challenge with 2FA, or block — over a customer's lifetime — to maximize retained revenue minus fraud losses." Now feedback is a delayed reward, and actions change future state. The hidden cost: RL needs a simulator or expensive online exploration, and exploration that blocks real customers has real dollar cost.
+
+The punchline: **the same business problem maps to all three paradigms depending on how you frame the feedback signal.** Interviewers love this framing.
+
+## Supervised learning, precisely
+
+You are given pairs \`(x, y)\` and you learn \`f\` so that \`f(x) ≈ y\` on *unseen* inputs. Two sub-flavors:
+
+- **Regression** — \`y\` is continuous (price, latency, lifetime value). Loss is usually squared or absolute error.
+- **Classification** — \`y\` is categorical (spam/ham, one-of-K disease). Loss is usually cross-entropy.
+
+The defining constraint: you must have a target column that is correct, available at training time, and *unavailable for the same reason it's useful* at prediction time. If a feature is only knowable after the label exists, it's **leakage** — the most common reason offline models die in production (covered in ml-f3).
+
+## Unsupervised learning, precisely
+
+No \`y\`. You model the structure of \`x\` itself. The main families:
+
+- **Clustering** (k-means, DBSCAN, GMM) — group similar points. Output is a *grouping*, not a *meaning*. Clusters have no names; *you* interpret them.
+- **Dimensionality reduction** (PCA, UMAP, autoencoders) — compress \`x\` into fewer coordinates preserving important variation.
+- **Density / anomaly** — model \`p(x)\`, flag low-probability points.
+- **Association rules** — find co-occurrence patterns ("people who buy X also buy Y").
+
+The trap: **clustering is not classification with the labels hidden.** Three clusters do not mean three classes. The algorithm optimizes geometric compactness, which may have nothing to do with your business categories.
+
+## Reinforcement learning, precisely
+
+An **agent** observes a **state**, takes an **action**, receives a **reward**, and transitions to a new state. It learns a **policy** \`π(action | state)\` that maximizes *expected cumulative discounted reward*. Three properties make RL hard:
+
+- **Delayed reward** — the payoff for a move may come many steps later (credit assignment problem).
+- **Exploration vs exploitation** — to learn, you must sometimes take actions you believe are suboptimal.
+- **Non-i.i.d. data** — your own policy decides what data you see next; the distribution shifts as you learn.
+
+A **contextual bandit** is the one-step special case (no state transitions): observe context, pick an action, get immediate reward. Most "RL in production" at ad and recommendation companies is actually bandits, because full RL's instability and sample cost rarely pay off.
+
+## The hybrids that actually ship in production
+
+Pure paradigms are textbook idealizations. Real systems live in between:
+
+- **Self-supervised** — generate labels *from the data itself* (predict the next token; predict a masked pixel). Trained like supervised learning but requires no human labels. This is how LLMs and modern vision backbones are built.
+- **Semi-supervised** — a little labeled data + a lot of unlabeled data. The unlabeled mass shapes the representation; labels anchor the downstream task.
+- **Weak / distant supervision** — noisy, cheap, programmatic labels (regex rules, heuristics) instead of gold human labels.
+
+If an interviewer says "we have a million images but only 5,000 are labeled," the senior answer is **semi-supervised or self-supervised pretraining**, not "label the rest."
+
+## Diagnostic table — identify the paradigm fast
+
+| What you observe | Feedback signal | Paradigm | Typical method |
+|---|---|---|---|
+| Rows with a target column | Correct answer per example, upfront | Supervised | GBM, logistic regression, NN |
+| Rows, no target | Nothing — find structure | Unsupervised | k-means, PCA, DBSCAN |
+| Agent acting in environment | Delayed scalar reward | Reinforcement | Q-learning, PPO |
+| Context → action → instant reward | Immediate reward, no transitions | Contextual bandit | LinUCB, Thompson sampling |
+| Data that predicts part of itself | Auto-generated targets | Self-supervised | Masked modeling, contrastive |
+| Few labels + many unlabeled | Sparse correct answers | Semi-supervised | Pseudo-labeling, consistency |
+
+## Pitfalls senior interviewers probe
+
+- **"Labels are free."** They are the single most expensive, slowest, and most error-prone part of most supervised systems. Always ask: who labels, how fast, how noisy, and what's the cost of a wrong label?
+- **Confusing clustering with classification.** Clusters are geometry, not meaning. A labeling or validation step is needed to make them actionable.
+- **Reward leakage in RL.** If the reward function can be gamed, the agent *will* game it. Classic example: rewarding "time on site" trains the system to maximize rage-scrolling.
+- **Reaching for RL when a bandit suffices.** RL is justified only when *actions change future state and reward is genuinely delayed*. Most ranking problems are bandits in disguise.
+
+## Cold interview questions
+
+- "I have 10M product images and want to find near-duplicates. Which paradigm?" (*Unsupervised — no labels, structure-finding. Similarity search has no right answer to memorize.*)
+- "We label fraud via chargebacks that arrive 90 days late. What breaks?" (*Label latency means the model trains on stale fraud; anomaly detection or self-supervision can cover the unlabeled recent window.*)
+- "Why is recommendation usually a bandit and not full RL?" (*Reward is near-immediate (click), and modeling full state transitions rarely pays for the instability and sample cost.*)`,
+    video: {
+      youtubeId: "1FZ0A1QCMWc",
+      title: "StatQuest: Machine Learning Fundamentals — Supervised, Unsupervised, Semi-supervised",
+      channel: "StatQuest with Josh Starmer",
+      startSeconds: 0,
+    },
+    videoFallbackMarkdown: `## Deep dive — redesign the feedback signal
+
+Pick three real product features you use daily (a spam filter, a "customers also bought" row, a fitness app goal reminder). For each, write one sentence answering: **"After the model acts, what does the world tell it?"**
+
+- Right answer per example, upfront → supervised
+- Nothing, find structure → unsupervised
+- Delayed score for a sequence of actions → reinforcement
+
+Then flip one: redesign the *same product* under a different paradigm. Turn the spam filter from supervised classification into unsupervised anomaly detection — what labeled knowledge do you lose, and what novel spam do you now catch? The act of *re-framing the feedback signal* is exactly the muscle interviewers test.`,
+    tryGuidance: `Toggle between the three paradigms in the lab and watch how the feedback signal changes — labeled colored points, an unlabeled cloud you must cluster yourself, or an agent chasing reward. Before you switch, **predict** what disappears from the screen when labels go away.`,
+    interviewGraph: {
+      initialStageId: "f1_paradigm_click",
+      artifactDimensions: [
+        {
+          label: "Supervision Signal",
+          recoveryStageId: "f1_recovery_supervision",
+        },
+        {
+          label: "Paradigm Classification",
+          recoveryStageId: "f1_recovery_paradigm",
+        },
+        {
+          label: "Hybrid & Edge Cases",
+          recoveryStageId: "f1_recovery_hybrid",
+          passLabel: "Paradigm Mastery",
+        },
+      ],
+      stages: {
+        f1_paradigm_click: {
+          id: "f1_paradigm_click",
+          type: "click_target",
+          badge: "Stage 1",
+          title: "Stage 1 · Unsupervised evaluation mistake",
+          prompt: "A colleague ran a clustering pipeline and then measured its quality. Click the line that most directly contradicts the fundamental principle that unsupervised learning has no ground-truth labels.",
+          code_snippet: `from sklearn.cluster import KMeans
+from sklearn.metrics import accuracy_score
+
+X = load_customer_data()
+labels_true = load_ground_truth_labels()    # ds-target:load_labels
+
+kmeans = KMeans(n_clusters=4, random_state=42)
+kmeans.fit(X)
+preds = kmeans.labels_
+
+acc = accuracy_score(labels_true, preds)    # ds-target:accuracy_eval
+print("Cluster accuracy:", acc)`,
+          validationCopy: {
+            load_labels: "Closer — loading labels isn't itself the contradiction, but it sets up the problem. The paradigm violation is actually *using* those labels to score an unsupervised model. Click the accuracy_score line.",
+            accuracy_eval: "Correct. Unsupervised learning has no ground-truth labels by definition. Using accuracy_score with true labels treats clustering as a classification task — a direct contradiction. Use intrinsic metrics (silhouette score, inertia) instead, or compare to labels only in a post-hoc analysis after deploying the clusters.",
+          },
+          branches: {
+            load_labels: "f1_recovery_supervision",
+            accuracy_eval: "f1_recommendation_choice",
+          },
+        },
+        f1_recommendation_choice: {
+          id: "f1_recommendation_choice",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Recommendation paradigm",
+          prompt: "A recommendation system learns from implicit signals: clicks, dwell-time, and skips. Users never provide star ratings. The model updates after each session with no explicit label ever collected. Which learning paradigm best describes this system?",
+          code_snippet: `# System receives per-session:
+# - user_id
+# - item_id
+# - event_type: "click" | "skip" | "dwell_30s"
+# - session_context: {time_of_day, device}
+
+# Model updates after each session.
+# No explicit y label is ever recorded.`,
+          choices: [
+            {
+              id: "a",
+              label: "Self-supervised / implicit-signal learning",
+              description: "Implicit signals (clicks, skips, dwell) are proxy labels derived from user behavior — no human annotation required. This is the dominant paradigm for collaborative filtering and contrastive recommendation models.",
+            },
+            {
+              id: "b",
+              label: "Supervised learning with user-provided labels",
+              description: "Supervised learning requires explicit, intentional labels (e.g., a star rating). Implicit signals are noisy behavioral proxies, not ground-truth targets.",
+            },
+            {
+              id: "c",
+              label: "Full reinforcement learning",
+              description: "RL requires a formal action-reward loop with delayed outcomes affecting future state. A system learning from historical interaction logs without an explicit policy-gradient loop is not full RL by default.",
+            },
+            {
+              id: "d",
+              label: "Semi-supervised learning",
+              description: "Semi-supervised combines a small labeled set with a large unlabeled set. This system has no labeled set at all — only implicit behavioral feedback.",
+            },
+          ],
+          branches: {
+            a: "f1_novel_fraud_choice",
+            b: "f1_recovery_supervision",
+            c: "f1_recovery_supervision",
+            d: "f1_recovery_paradigm",
+          },
+          rationale: "Implicit feedback recommendation systems occupy the self-supervised / unsupervised space. Clicks and dwell-time are behavioral proxies, not ground-truth labels. RL would apply only if the model explicitly acts (e.g., selects content) and receives a delayed reward that propagates through a policy-gradient update loop.",
+        },
+        f1_novel_fraud_choice: {
+          id: "f1_novel_fraud_choice",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · Novel fraud, no labels yet",
+          prompt: "Your team has 90 days of labeled fraud transactions (fraud=1 / legitimate=0). Last week a new fraud ring emerged with entirely different patterns — no labels exist for these new events. Which approach best covers the novel patterns?",
+          code_snippet: `# Available:
+# - 90 days of transactions with fraud labels (historical)
+# - 7 days of recent transactions (no labels yet)
+# - Known fraud patterns: account-takeover, card-testing
+
+# Goal: detect BOTH known fraud types AND the novel ring.`,
+          choices: [
+            {
+              id: "a",
+              label: "Unsupervised anomaly detection on the recent unlabeled data",
+              description: "Anomaly detection (isolation forest, autoencoder reconstruction error) flags statistical outliers without needing labels — exactly the right tool for patterns the model has never been trained on.",
+            },
+            {
+              id: "b",
+              label: "Retrain the supervised classifier on the full 90-day labeled set",
+              description: "The supervised classifier only recognizes patterns it was trained on. Novel fraud from last week is out-of-distribution — the classifier will assign it low fraud probability.",
+            },
+            {
+              id: "c",
+              label: "Use reinforcement learning to penalize fraudulent transactions",
+              description: "RL requires a clear reward signal and a sequential decision environment. Without labels for novel patterns and a defined state-action loop, RL does not apply here.",
+            },
+            {
+              id: "d",
+              label: "Wait for labels to accumulate before deploying anything new",
+              description: "Waiting weeks leaves you exposed to an active fraud ring. Anomaly detection can flag suspicious clusters now, which analysts can label to bootstrap a future supervised model.",
+            },
+          ],
+          branches: {
+            a: "f1_terminal",
+            b: "f1_recovery_paradigm",
+            c: "f1_recovery_paradigm",
+            d: "f1_recovery_hybrid",
+          },
+          rationale: "Novel patterns have no labels by definition, so supervised learning is blind to them. Unsupervised anomaly detection identifies transactions deviating from the learned 'normal' distribution — it catches what it has never seen before. Production systems typically layer both: the supervised model handles known fraud types with high precision, while an anomaly detector surfaces emerging threats for analyst review.",
+        },
+        f1_recovery_supervision: {
+          id: "f1_recovery_supervision",
+          type: "scenario_choice",
+          badge: "Recovery A",
+          title: "Recovery · Supervision signal",
+          prompt: "What is the single defining characteristic that separates supervised learning from unsupervised learning?",
+          code_snippet: `# Supervised:
+# X_train, y_train = load_labelled_data()
+# model.fit(X_train, y_train)   # y is ground-truth targets
+
+# Unsupervised:
+# X_train = load_raw_data()
+# model.fit(X_train)             # no y`,
+          choices: [
+            {
+              id: "a",
+              label: "The presence of ground-truth labels (y) provided during training",
+              description: "Correct. Supervised learning optimizes a model against explicit targets. Unsupervised learning finds structure in X alone — no y is available or used.",
+            },
+            {
+              id: "b",
+              label: "The size of the training dataset",
+              description: "Dataset size is irrelevant to the paradigm. A tiny labeled set is still supervised; a massive unlabeled corpus is still unsupervised.",
+            },
+            {
+              id: "c",
+              label: "Whether the model uses gradient descent",
+              description: "Both paradigms can use gradient descent. The optimization algorithm does not determine the paradigm.",
+            },
+            {
+              id: "d",
+              label: "Whether the model makes predictions on new data",
+              description: "All trained models make predictions on new data. The paradigm is determined by training, not inference.",
+            },
+          ],
+          branches: {
+            a: "f1_recommendation_choice",
+            b: "f1_recovery_supervision",
+            c: "f1_recovery_supervision",
+            d: "f1_recovery_supervision",
+          },
+          rationale: "The supervision signal is the label y. In supervised learning the model minimizes a loss against known targets. In unsupervised learning no y exists — the model discovers structure, clusters, or representations purely from X.",
+        },
+        f1_recovery_paradigm: {
+          id: "f1_recovery_paradigm",
+          type: "scenario_choice",
+          badge: "Recovery B",
+          title: "Recovery · Reinforcement vs supervised",
+          prompt: "A game-playing AI receives +1 for winning, -1 for losing, and 0 for all intermediate moves. It plays millions of games and improves its move selection. Which paradigm is this?",
+          code_snippet: `# After each complete game:
+# reward = +1  # win
+# reward = -1  # loss
+# reward =  0  # draw or any intermediate move
+
+# The agent updates its policy weights based on the terminal reward.
+# No labeled "correct move" dataset exists.`,
+          choices: [
+            {
+              id: "a",
+              label: "Reinforcement learning",
+              description: "Correct. The agent takes actions (moves) that affect future game state, and a delayed reward signal updates a policy. This is the canonical RL setup.",
+            },
+            {
+              id: "b",
+              label: "Supervised learning",
+              description: "There are no pre-labeled 'correct move' examples for every game state. The agent learns from outcomes, not from labeled decisions.",
+            },
+            {
+              id: "c",
+              label: "Unsupervised learning",
+              description: "There is an explicit reward signal. Unsupervised learning has no such signal — it finds structure with no external feedback.",
+            },
+            {
+              id: "d",
+              label: "Self-supervised learning",
+              description: "Self-supervised learning generates pseudo-labels from the data itself. A game reward from the environment is an RL signal, not a self-generated label.",
+            },
+          ],
+          branches: {
+            a: "f1_novel_fraud_choice",
+            b: "f1_recovery_paradigm",
+            c: "f1_recovery_paradigm",
+            d: "f1_recovery_paradigm",
+          },
+          rationale: "RL is defined by the agent–environment loop: the agent selects actions, the environment transitions state, and a reward is received. The key distinction from supervised is the absence of pre-labeled correct actions — only delayed outcome signals.",
+        },
+        f1_recovery_hybrid: {
+          id: "f1_recovery_hybrid",
+          type: "scenario_choice",
+          badge: "Recovery C",
+          title: "Recovery · Semi-supervised fit",
+          prompt: "Semi-supervised learning is most powerful when labeling is expensive. Which scenario is the best fit?",
+          code_snippet: `# Scenario A: 1M medical images, 600 labeled by radiologists
+# Scenario B: 10,000 fully labeled customer records
+# Scenario C: 2M transactions, zero labels exist anywhere
+# Scenario D: 200 labeled + 200 unlabeled samples`,
+          choices: [
+            {
+              id: "a",
+              label: "Scenario A — 1M images, 600 labeled by radiologists",
+              description: "Correct. Semi-supervised shines when unlabeled data is cheap to collect but labeling is expensive. The model learns representations from 1M unlabeled images and fine-tunes on the 600 labeled ones.",
+            },
+            {
+              id: "b",
+              label: "Scenario B — 10,000 fully labeled records",
+              description: "When all data is labeled, fully supervised learning is the right choice. Semi-supervised adds complexity without benefit.",
+            },
+            {
+              id: "c",
+              label: "Scenario C — 2M transactions, no labels at all",
+              description: "With zero labels you cannot use semi-supervised learning — it requires at least some labeled examples. This is a pure unsupervised setting.",
+            },
+            {
+              id: "d",
+              label: "Scenario D — 200 labeled + 200 unlabeled",
+              description: "Technically semi-supervised, but 200 unlabeled samples is usually too few to gain meaningful representation learning. The power ratio is off.",
+            },
+          ],
+          branches: {
+            a: "f1_terminal",
+            b: "f1_recovery_hybrid",
+            c: "f1_recovery_hybrid",
+            d: "f1_recovery_hybrid",
+          },
+          rationale: "Semi-supervised is the paradigm for high-label-cost domains: medical imaging, legal documents, scientific annotation. The key ratio is a tiny labeled set surrounded by a large unlabeled pool. The model uses unlabeled data for self-supervised pre-training or consistency regularization, then fine-tunes on the labeled subset.",
+        },
+        f1_terminal: {
+          id: "f1_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · ML Paradigms mastered",
+          terminal: true,
+          prompt: "A content moderation system flags posts, human reviewers approve or reject flags, and the model updates based on reviewer decisions. Which paradigm does this most closely resemble, and what is the key systemic risk?",
+          code_snippet: `# Pipeline:
+# 1. flag_score = model.predict(post)
+# 2. if flag_score > threshold:
+#        send_to_human_review_queue(post)
+# 3. reviewer labels: approved_flag | rejected_flag
+# 4. model.update(post, reviewer_label)  # online learning`,
+          choices: [
+            {
+              id: "a",
+              label: "Supervised / active learning — risk: reviewer bias is encoded into the model at scale",
+              description: "Correct. Reviewer decisions are ground-truth labels used to update the model — supervised learning with a human in the loop. The key risk: systematic reviewer bias (under-flagging certain content types) is learned by the model and then amplified at scale.",
+            },
+            {
+              id: "b",
+              label: "Reinforcement learning — risk: reward hacking",
+              description: "RL requires a formal action-reward loop with delayed outcomes. Reviewer labels are immediate supervised signals, not delayed environmental rewards.",
+            },
+            {
+              id: "c",
+              label: "Unsupervised — risk: no interpretability",
+              description: "The system has explicit labels from reviewers. It is not unsupervised.",
+            },
+          ],
+          branches: {
+            a: "f1_terminal",
+            b: "f1_terminal",
+            c: "f1_terminal",
+          },
+          rationale: "Human-in-the-loop systems are a form of active supervised learning — the human label IS the ground truth. This creates a compounding feedback loop: model errors influence what gets reviewed (only flagged posts reach reviewers), and reviewer biases become training data. Auditing reviewer agreement and maintaining a random unflagged sample for review are essential safeguards.",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "A team has 2M server logs and wants to surface 'unusual' behavior with no examples of what unusual means. Which paradigm fits, and what is the key risk?",
+        options: [
+          "Unsupervised anomaly detection — but 'rare' is not the same as 'bad', so legitimate-but-rare events get flagged",
+          "Supervised classification — label a few and the model generalizes perfectly to all anomaly types",
+          "Reinforcement learning — the logs form an environment with delayed rewards",
+        ],
+        correctIndex: 0,
+        explanation: "No labels of 'unusual' exist, so it's unsupervised. The core failure mode is conflating low probability with undesirable behavior — a first-ever legitimate event is rare yet fine.",
+      },
+      {
+        question: "Why is the learning paradigm a property of the supervision signal rather than the model architecture?",
+        options: [
+          "Because only neural networks can switch paradigms",
+          "Because the same model family (e.g. a neural net or gradient boosted trees) can be trained supervised, self-supervised, or as part of an RL policy — what differs is the feedback signal after each prediction",
+          "Because model architecture is irrelevant to accuracy",
+        ],
+        correctIndex: 1,
+        explanation: "The defining axis is the feedback: correct answers (supervised), nothing (unsupervised), or delayed reward (RL). One architecture can serve all three paradigms.",
+      },
+      {
+        question: "A recommendation system shows an item, the user clicks or skips within seconds, and the system updates. Actions barely change future state. What is the best paradigm framing?",
+        options: [
+          "Full reinforcement learning, because there is a reward signal",
+          "Pure unsupervised clustering of users",
+          "A contextual bandit — immediate reward, negligible state transitions — full RL's instability is not justified",
+        ],
+        correctIndex: 2,
+        explanation: "Immediate reward and no meaningful state transitions is the textbook bandit case. Full RL adds complexity and sample cost that this problem doesn't repay.",
+      },
+    ],
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ml-f3 · Train / Val / Test Split & Cross-Validation
+  // ─────────────────────────────────────────────────────────────────────────────
+  "ml-f3": {
+    durationLabel: "15 min",
+    outcomes: [
+      "Justify *why* the test set must be touched **exactly once**, and what statistical guarantee you forfeit the moment you peek.",
+      "Choose the right resampling scheme — **k-fold, stratified, grouped, or time-series CV** — from the *structure of the data*, not habit.",
+      "Detect and prevent the four leakage families: **target leakage, preprocessing contamination, temporal leakage, and group leakage**.",
+      "Explain why **all preprocessing must be fit inside the CV loop** and what 'fitting the scaler on all data' silently inflates.",
+    ],
+    learnMarkdown: `## Why we split at all — the only honest estimate of the future
+
+A model's training error is a *lie about the future*. It measures how well you memorized data you already have — and you can always memorize harder. The thing you actually care about is **generalization**: performance on data the model has never seen and will face in production. The only way to estimate that honestly is to *withhold* some data and treat it as the future.
+
+The canonical three-way split:
+
+- **Train** — the model fits its parameters here.
+- **Validation (dev)** — you tune *hyperparameters and architectural choices* here. You look at this **many times**.
+- **Test** — a vault. You open it **once**, at the very end, to report an unbiased estimate of generalization. The moment you tune *anything* based on test set feedback, it is no longer a test set — it has become a second validation set, and your reported metric is optimistically biased.
+
+Why not just two splits? Because every decision you make using a dataset overfits to that dataset. Validation error is itself an *underestimate* of true error, because you chose the best of many configurations using it (winner's curse / multiple comparisons). The test set exists precisely to give you one number untainted by selection.
+
+## The lending model post-mortem: three independent leaks
+
+A startup builds a loan default model. Cross-validated AUC: **0.91**. They deploy. Real-world AUC: **0.68**. Three independent leaks:
+
+1. **Target leakage.** A feature \`num_collection_calls\` was included. Collection calls only happen *after* a borrower starts defaulting — the model was observing default, not predicting it. **A feature that cannot exist at prediction time was the model's best predictor.**
+2. **Preprocessing contamination.** They computed the imputation mean and scaler statistics on the *entire dataset* before splitting. Training folds "knew" the mean of the test fold. Subtle, but it inflates CV scores by leaking summary statistics across the boundary.
+3. **Temporal leakage.** They used random k-fold on time-ordered loans. So the model trained on 2023 data and validated on 2021 data — predicting the past from the future. In production only the past is available.
+
+Any *one* of these turns a 0.68 model into a 0.91 mirage. Detecting leakage is among the highest-signal senior skills.
+
+## k-fold cross-validation — more data-efficient than a single split
+
+A single train/val split wastes data and is noisy — your estimate depends on *which* rows landed in val. **k-fold CV** fixes both: partition into k folds, train on k−1, validate on the held-out one, rotate k times, average the k scores. Every row is used for validation exactly once; every row trains k−1 times. With k=5 or k=10 you get a *mean and standard deviation* of performance. The standard deviation tells you how stable the estimate is — an interviewer asking "how confident are you in that AUC?" expects you to quote ± not just a point estimate.
+
+**Leave-one-out (k=n):** near-unbiased but high-variance and expensive. Rarely worth it except with very small datasets.
+
+**The crucial discipline:** the test set still stays in the vault. CV happens *within* the train+val portion. You do not cross-validate over the test set.
+
+## Choosing the CV strategy from data structure
+
+| Data structure | CV strategy | Why |
+|---|---|---|
+| i.i.d. rows, balanced classes | Standard k-fold | Default — each fold is representative |
+| Imbalanced classes (rare fraud, rare disease) | Stratified k-fold | Each fold preserves class proportions |
+| Time-ordered data (stock prices, log streams) | Time-series split (forward walk) | Never train on the future to predict the past |
+| Groups (multiple rows per patient / user / device) | Group k-fold | Rows from the same group must never span folds |
+| Small dataset, high variance | Repeated k-fold | Average over multiple shuffled repetitions |
+
+**Time-series CV** is the one most often missed by candidates. The rule: all training data must precede all validation data. A random shuffle that trains on March to predict January is predicting the past from the future — valid in CV but illegal in production.
+
+**Group k-fold** prevents a subtler leak: if you have 50 rows per patient and they split across folds, the model sees the same patient in both train and val. Medical models routinely fail this way; they look great in CV and fail on new patients.
+
+## Preprocessing must live inside the loop
+
+The most common subtle contamination:
+
+\`\`\`python
+# WRONG — fits scaler on ALL data including validation fold
+scaler = StandardScaler().fit(X)
+X_scaled = scaler.transform(X)
+cross_val_score(model, X_scaled, y, cv=5)
+
+# RIGHT — scaler sees only the training fold at each split
+pipeline = Pipeline([("scaler", StandardScaler()), ("model", LogisticRegression())])
+cross_val_score(pipeline, X, y, cv=5)
+\`\`\`
+
+When you fit preprocessing on all data, the scaler's mean and std are computed using statistics from the validation fold. The model now implicitly "knows" the scale of held-out data — a silent leak that inflates every fold's score.
+
+The fix is always to wrap preprocessing and model inside a **Pipeline** and pass the pipeline to \`cross_val_score\`. Sklearn pipelines guarantee that fit operations only see the training fold.
+
+## Choosing k — the practical tradeoff
+
+Larger k → lower bias estimate (more training data per fold), higher variance (folds more similar), higher compute. Smaller k → noisier estimate, faster. k=5 is the practical default for most datasets above a few thousand rows. k=10 is common for smaller datasets. The choice matters less than *using CV at all* versus a single split.
+
+## What leakage looks like in an interview code review
+
+Interviewers often hand you a notebook and ask "what's wrong here?" The four things to check:
+
+1. Is any feature computed using information from *after the event you're predicting*? (**target leak**)
+2. Is preprocessing fit before the train/val split? (**preprocessing contamination**)
+3. Is there a time dimension that a random split would violate? (**temporal leak**)
+4. Are there natural groups (users, patients, devices) whose rows must stay together? (**group leak**)
+
+If you spot all four and know the fix for each, you're in the top decile of CV interviews.`,
+    video: {
+      youtubeId: "fSytzGwwBVw",
+      title: "StatQuest: Machine Learning Fundamentals — Cross Validation",
+      channel: "StatQuest with Josh Starmer",
+      startSeconds: 0,
+    },
+    videoFallbackMarkdown: `## Deep dive — reconstruct the CV audit checklist
+
+Without notes, write down the four leakage families and the Python pattern that creates each one. For each, write the one-line fix.
+
+Then sketch the difference between standard k-fold and time-series split on a timeline: draw five folds and label which rows train and which validate for folds 1, 3, and 5. If the training rows are ever *after* the validation rows in time, you have a temporal leak.
+
+If you can reproduce both the checklist and the time-series diagram from scratch, you can handle any CV question in an interview.`,
+    tryGuidance: `In the visualization, drag the **split point** and watch how test-set leakage inflates the reported metric. Try switching between random split and time-ordered split on a dataset with a trend — notice how random split is optimistic in a way that time-ordered split is not.`,
+    interviewGraph: {
+      initialStageId: "f3_leakage_click",
+      artifactDimensions: [
+        {
+          label: "Leakage Detection",
+          recoveryStageId: "f3_recovery_leakage",
+        },
+        {
+          label: "CV Strategy Selection",
+          recoveryStageId: "f3_recovery_cv_choice",
+        },
+        {
+          label: "Pipeline Discipline",
+          recoveryStageId: "f3_recovery_pipeline",
+          passLabel: "CV Mastery",
+        },
+      ],
+      stages: {
+        f3_leakage_click: {
+          id: "f3_leakage_click",
+          type: "click_target",
+          badge: "Stage 1",
+          title: "Stage 1 · Target leakage in a churn model",
+          prompt: "A data scientist built a churn classifier. The model has suspiciously high accuracy. Click the line that introduces target leakage — a feature that could not exist at prediction time.",
+          code_snippet: `import pandas as pd
+from sklearn.ensemble import GradientBoostingClassifier
+
+df = load_churn_data()
+
+features = [
+    "days_since_last_login",      # ds-target:days_login
+    "num_support_tickets",        # ds-target:support_tickets
+    "account_cancellation_date",  # ds-target:cancel_date
+    "total_spend_last_90d",       # ds-target:total_spend
+]
+
+X = df[features]
+y = df["churned"]
+
+model = GradientBoostingClassifier()
+model.fit(X, y)`,
+          validationCopy: {
+            days_login: "Good instinct to check, but days_since_last_login is available before the customer churns — it measures historical behavior. This is a valid feature. Try another line.",
+            support_tickets: "Support tickets are logged during the subscription period and are observable before churn occurs. This feature is legitimate. Try the account_cancellation_date line.",
+            cancel_date: "Correct. account_cancellation_date is only populated when a customer has already churned — it is a direct proxy for the target variable. Using it is a textbook target leak. In production this field is empty for active customers, so the model would have no signal from it at prediction time.",
+            total_spend: "Total spend in the last 90 days is a historical behavioral feature — it's available before churn and is a legitimate predictor. Try the account_cancellation_date line.",
+          },
+          branches: {
+            days_login: "f3_recovery_leakage",
+            support_tickets: "f3_recovery_leakage",
+            cancel_date: "f3_temporal_split_choice",
+            total_spend: "f3_recovery_leakage",
+          },
+        },
+        f3_temporal_split_choice: {
+          id: "f3_temporal_split_choice",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · CV strategy for time-ordered data",
+          prompt: "You are building a model to predict next month's customer churn using 3 years of monthly snapshots. Your colleague used standard 5-fold CV and got AUC 0.88. You suspect this is too optimistic. Why, and what CV strategy should you use instead?",
+          code_snippet: `# 3 years of monthly snapshots: Jan-2021 through Dec-2023
+# Each row = one customer-month record
+# Colleague's approach:
+from sklearn.model_selection import cross_val_score, KFold
+cv = KFold(n_splits=5, shuffle=True, random_state=42)
+scores = cross_val_score(model, X, y, cv=cv)
+# AUC mean: 0.88
+
+# Question: what is wrong, and what replaces it?`,
+          choices: [
+            {
+              id: "a",
+              label: "Standard k-fold trains on future months to predict past months — use TimeSeriesSplit instead",
+              description: "Correct. shuffle=True destroys temporal order, so fold 3 might train on Dec-2023 and validate on Jan-2021. The model predicts the past from the future — valid in CV, illegal in production. TimeSeriesSplit always uses earlier months as training and later months as validation.",
+            },
+            {
+              id: "b",
+              label: "Use stratified k-fold to preserve class balance in each fold",
+              description: "Stratified k-fold addresses class imbalance, not temporal order. It still shuffles rows randomly, which destroys the time ordering and allows training on future data.",
+            },
+            {
+              id: "c",
+              label: "Use leave-one-out CV to get the most data-efficient estimate",
+              description: "LOO CV still shuffles — a 'leave-one-out' fold might train on Dec-2023 rows and validate on a Jan-2021 row. And with 3 years of monthly data, LOO would be computationally prohibitive.",
+            },
+            {
+              id: "d",
+              label: "The AUC is fine — k-fold is always unbiased regardless of data structure",
+              description: "k-fold is unbiased only for i.i.d. data. Time-series data violates the i.i.d. assumption because tomorrow's patterns are correlated with today's and because future data cannot be known at prediction time.",
+            },
+          ],
+          branches: {
+            a: "f3_pipeline_choice",
+            b: "f3_recovery_cv_choice",
+            c: "f3_recovery_cv_choice",
+            d: "f3_recovery_cv_choice",
+          },
+          rationale: "Time-series data has a causal arrow pointing forward in time. Any CV strategy that allows training on later timesteps to predict earlier ones leaks future information. TimeSeriesSplit (forward walk-forward validation) is the only valid CV for ordered time data: each fold uses all earlier months as training and the immediately following month(s) as validation.",
+        },
+        f3_pipeline_choice: {
+          id: "f3_pipeline_choice",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · Preprocessing inside the CV loop",
+          prompt: "A team fitted StandardScaler on the full training dataset before running 5-fold CV. Their CV AUC is 0.84. What has gone wrong, and what is the fix?",
+          code_snippet: `from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_score
+
+# CURRENT APPROACH:
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X_train)   # fit on ALL training data
+
+cv_scores = cross_val_score(
+    LogisticRegression(), X_scaled, y_train, cv=5
+)
+print("CV AUC:", cv_scores.mean())  # 0.84`,
+          choices: [
+            {
+              id: "a",
+              label: "The scaler was fit on all data including validation folds — wrap scaler and model in a Pipeline",
+              description: "Correct. Fitting the scaler on all training data (including the rows that will become each validation fold) leaks scale statistics — the model implicitly knows the mean and variance of held-out data. The fix: Pipeline([('scaler', StandardScaler()), ('clf', LogisticRegression())]) passed directly to cross_val_score ensures the scaler only sees each training fold.",
+            },
+            {
+              id: "b",
+              label: "Logistic regression doesn't need feature scaling — remove the scaler",
+              description: "Logistic regression *does* benefit from scaling (especially with L2 regularization where the penalty is sensitive to feature magnitude). Removing the scaler is not the fix.",
+            },
+            {
+              id: "c",
+              label: "The CV score is fine — scaling before CV is a best practice",
+              description: "Fitting any transformer on data that includes validation rows is a form of leakage. The best practice is exactly the opposite: fit transformers only on training folds.",
+            },
+            {
+              id: "d",
+              label: "Use min-max scaling instead of standard scaling to avoid leakage",
+              description: "The choice of scaler is irrelevant. Any scaler fit on all data (including validation rows) leaks. The issue is when you call fit, not which scaler you use.",
+            },
+          ],
+          branches: {
+            a: "f3_terminal",
+            b: "f3_recovery_pipeline",
+            c: "f3_recovery_pipeline",
+            d: "f3_recovery_pipeline",
+          },
+          rationale: "Any preprocessing step that uses statistics computed from the validation fold contaminates the CV estimate. StandardScaler computes mean and std from whatever data you call .fit() on — if that includes validation rows, the scaler encodes knowledge of those rows. Sklearn Pipelines solve this cleanly: cross_val_score refits the entire pipeline on each training fold and only transforms the validation fold.",
+        },
+        f3_recovery_leakage: {
+          id: "f3_recovery_leakage",
+          type: "scenario_choice",
+          badge: "Recovery A",
+          title: "Recovery · Target leakage definition",
+          prompt: "Which of the following features would introduce target leakage in a model predicting loan default (event = first missed payment)?",
+          code_snippet: `# Predicting: will this loan default within 6 months of origination?
+# Features under consideration:
+
+# A: credit_score_at_origination    (from credit bureau at loan start)
+# B: num_late_payments_before_loan  (historical payment record)
+# C: collection_agency_contact_date (date collections first contacted borrower)
+# D: monthly_income_at_origination  (from application form)`,
+          choices: [
+            {
+              id: "a",
+              label: "C — collection_agency_contact_date",
+              description: "Correct. Collections only contact a borrower *after* they have missed payments — which is the event being predicted. This feature is a consequence of default, not a cause. It cannot exist at prediction time for a new loan.",
+            },
+            {
+              id: "b",
+              label: "A — credit_score_at_origination",
+              description: "The credit score at loan origination is available before the loan is issued and before any default occurs. It is a valid predictor with no leakage.",
+            },
+            {
+              id: "c",
+              label: "B — num_late_payments_before_loan",
+              description: "Historical late payments before the loan was issued are available at prediction time and are legitimate predictors of future default. No leakage.",
+            },
+            {
+              id: "d",
+              label: "D — monthly_income_at_origination",
+              description: "Income at origination is documented on the application form and is available at prediction time. It is a valid feature.",
+            },
+          ],
+          branches: {
+            a: "f3_temporal_split_choice",
+            b: "f3_recovery_leakage",
+            c: "f3_recovery_leakage",
+            d: "f3_recovery_leakage",
+          },
+          rationale: "Target leakage occurs when a feature encodes information that is only available *after* the target event occurs. Collection contact dates are a consequence of default, not a predictor — using them guarantees artificially high offline performance and guaranteed failure in production, where no collection date yet exists for a live loan.",
+        },
+        f3_recovery_cv_choice: {
+          id: "f3_recovery_cv_choice",
+          type: "scenario_choice",
+          badge: "Recovery B",
+          title: "Recovery · Stratified CV use case",
+          prompt: "You are building a fraud classifier where only 0.2% of transactions are fraudulent. Which CV strategy should you use and why?",
+          code_snippet: `# Dataset: 100,000 transactions
+# Fraud prevalence: 0.2% (200 fraud, 99,800 legitimate)
+# Without stratification, a fold of 20,000 rows might contain
+# 0, 1, or 3 fraud cases by chance.`,
+          choices: [
+            {
+              id: "a",
+              label: "Stratified k-fold — preserves the 0.2% fraud rate in each fold",
+              description: "Correct. With 0.2% prevalence, a random fold might have zero fraud cases — making that fold's evaluation meaningless. Stratified k-fold enforces that each fold has approximately the same fraud rate as the full dataset.",
+            },
+            {
+              id: "b",
+              label: "Standard k-fold — random splitting is always sufficient",
+              description: "With 0.2% prevalence, random splitting creates high variance in fraud counts per fold. One fold might have 0 fraud cases; another might have 8. This makes per-fold AUC estimates unreliable.",
+            },
+            {
+              id: "c",
+              label: "Time-series split — fraud detection is always temporal",
+              description: "Time-series split is appropriate when data has temporal ordering that must be respected. If transactions are not time-ordered in a way that matters for this CV, temporal split is unnecessary and reduces effective training set size.",
+            },
+            {
+              id: "d",
+              label: "Leave-one-out — more folds always means a better estimate",
+              description: "LOO CV is extremely expensive on 100K rows and is overkill for stable class distributions. Stratified k-fold gives the same statistical benefit with far less compute.",
+            },
+          ],
+          branches: {
+            a: "f3_pipeline_choice",
+            b: "f3_recovery_cv_choice",
+            c: "f3_recovery_cv_choice",
+            d: "f3_recovery_cv_choice",
+          },
+          rationale: "Stratified k-fold is critical for imbalanced datasets. Without it, individual folds may have wildly different class ratios, making per-fold performance estimates unreliable and the overall CV metric noisy. sklearn's StratifiedKFold ensures each fold reflects the overall class distribution.",
+        },
+        f3_recovery_pipeline: {
+          id: "f3_recovery_pipeline",
+          type: "scenario_choice",
+          badge: "Recovery C",
+          title: "Recovery · Pipeline discipline",
+          prompt: "Which sklearn pattern correctly prevents preprocessing leakage in cross-validation?",
+          code_snippet: `# Option A:
+scaler = StandardScaler().fit(X_train)
+X_scaled = scaler.transform(X_train)
+cross_val_score(LogisticRegression(), X_scaled, y_train, cv=5)
+
+# Option B:
+pipe = Pipeline([("scaler", StandardScaler()),
+                 ("clf",    LogisticRegression())])
+cross_val_score(pipe, X_train, y_train, cv=5)
+
+# Option C:
+for train_idx, val_idx in KFold(5).split(X_train):
+    scaler = StandardScaler().fit(X_train[train_idx])
+    X_tr = scaler.transform(X_train[train_idx])
+    X_val = scaler.transform(X_train[val_idx])
+    # ... fit model manually`,
+          choices: [
+            {
+              id: "a",
+              label: "Option B — Pipeline passed to cross_val_score",
+              description: "Correct. When a Pipeline is passed to cross_val_score, sklearn refits all pipeline steps (including the scaler) on each training fold and only transforms the validation fold. This is the idiomatic, correct, and concise pattern.",
+            },
+            {
+              id: "b",
+              label: "Option A — fit scaler once on all training data before CV",
+              description: "Option A fits the scaler on the full X_train, which includes the rows that become each validation fold. The scaler's statistics leak into every fold's validation set.",
+            },
+            {
+              id: "c",
+              label: "Option C — manual loop fitting scaler per fold",
+              description: "Option C is technically correct (scaler is fit only on train_idx rows), but it is verbose, error-prone, and exactly what Pipeline automates. Options B and C are equivalent in correctness, but Option B is the correct production pattern.",
+            },
+            {
+              id: "d",
+              label: "None — scaling always causes leakage regardless of when it is fit",
+              description: "Scaling does not inherently cause leakage. The problem is fitting the scaler on data that includes validation rows. Fitting inside the training fold is leak-free.",
+            },
+          ],
+          branches: {
+            a: "f3_terminal",
+            b: "f3_recovery_pipeline",
+            c: "f3_recovery_pipeline",
+            d: "f3_recovery_pipeline",
+          },
+          rationale: "sklearn Pipelines are the idiomatic defense against preprocessing leakage. When cross_val_score receives a Pipeline, it calls pipeline.fit(X_train_fold, y_train_fold) on each split — which fits the scaler only on that fold's training rows. The validation fold is only ever transformed, never fit upon.",
+        },
+        f3_terminal: {
+          id: "f3_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · CV & Leakage mastered",
+          terminal: true,
+          prompt: "A model is tuned over 50 hyperparameter combinations using the test set's AUC as the selection criterion. A colleague claims the reported test AUC of 0.89 is still valid because 'we only used the test set for evaluation, not training.' What is the flaw, and how should the evaluation have been structured?",
+          code_snippet: `# What happened:
+for params in hyperparameter_grid:   # 50 configs
+    model = train(X_train, y_train, **params)
+    score = evaluate(model, X_test, y_test)   # test set used each iteration
+    if score > best_score:
+        best_score = score
+        best_params = params
+
+# Final reported metric: best_score = 0.89 (test AUC)`,
+          choices: [
+            {
+              id: "a",
+              label: "The test set became a validation set — use val set for tuning, report test set once at the very end",
+              description: "Correct. Using the test set 50 times to select hyperparameters is exactly what the test set must never do. The reported 0.89 is the maximum of 50 test-set evaluations — a severely optimistic estimate due to multiple comparisons. Fix: tune on a validation set (or via CV), then evaluate on the test set exactly once.",
+            },
+            {
+              id: "b",
+              label: "The model was not trained on the test set, so the AUC is unbiased",
+              description: "The model's *parameters* were not fit on the test set, but the *hyperparameters* were selected based on test set performance. This is a form of overfitting to the test set — the reported AUC is the result of selecting the luckiest of 50 configurations.",
+            },
+            {
+              id: "c",
+              label: "Use leave-one-out CV instead of a test set",
+              description: "LOO CV addresses variance of the estimate but does not solve the multiple comparisons problem if the test metric is still used 50 times for selection.",
+            },
+          ],
+          branches: {
+            a: "f3_terminal",
+            b: "f3_terminal",
+            c: "f3_terminal",
+          },
+          rationale: "Every time you look at the test set and make a decision, you are effectively training on it. With 50 evaluations, the best-of-50 test AUC is a badly biased estimator — you've selected for lucky test performance. The correct structure is: tune hyperparameters using CV or a held-out validation set, then touch the test set exactly once at the end for the final reported number.",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "A fraud model is built with random 5-fold CV on time-ordered transaction data. The CV AUC is 0.91. In production, AUC is 0.74. What is the most likely cause?",
+        options: [
+          "Temporal leakage — random shuffling allowed training on future transactions to predict past ones; TimeSeriesSplit should have been used",
+          "The model has too many features and overfit the training folds",
+          "The test set was too small to get an accurate estimate",
+        ],
+        correctIndex: 0,
+        explanation: "Shuffling destroys temporal order. The model trained on later months predicting earlier months — valid statistically but illegal in production where you only know the past. TimeSeriesSplit enforces that training always precedes validation in time.",
+      },
+      {
+        question: "Why must StandardScaler be fit inside the CV loop rather than on the full dataset before CV?",
+        options: [
+          "StandardScaler is too slow to run inside each fold",
+          "Fitting on all data leaks the validation fold's mean and variance into the scaler's statistics, inflating CV scores; Pipelines passed to cross_val_score handle this correctly",
+          "CV does not support scaled features",
+        ],
+        correctIndex: 1,
+        explanation: "Any statistic computed using validation rows is a form of leakage. StandardScaler fitted on all data encodes the scale of future data. The fix is a Pipeline that refits the scaler only on each fold's training rows.",
+      },
+      {
+        question: "You evaluate 100 hyperparameter combinations by comparing test set AUC for each. The best model gets test AUC 0.93. Is this a valid generalization estimate?",
+        options: [
+          "Yes — the model was never trained on the test set",
+          "No — selecting the best of 100 test-set evaluations is equivalent to overfitting the test set; the test AUC is optimistically biased and the set must be treated as a validation set",
+          "Yes — more hyperparameter search always yields a more generalizable model",
+        ],
+        correctIndex: 1,
+        explanation: "Every test-set evaluation that informs a decision contaminates the test set. 100 evaluations with selection pressure on the maximum is a form of multiple comparisons — the winner's-curse inflation can be substantial. Use CV or a validation set for tuning; reserve the test set for a single final report.",
+      },
+    ],
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ml-f4 · Feature Engineering: The Art
+  // ─────────────────────────────────────────────────────────────────────────────
+  "ml-f4": {
+    durationLabel: "22 min",
+    outcomes: [
+      "Apply the right **transformation** — log, bin, polynomial, interaction — to each type of raw feature, and explain *why* it helps a given model family.",
+      "Build **lag and rolling features** for time-series correctly without introducing temporal leakage.",
+      "Choose between **target encoding and one-hot encoding** for high-cardinality categoricals, and prevent target encoding from leaking.",
+      "Use **variance threshold and mutual information** for feature selection, and explain when selection helps vs. hurts.",
+    ],
+    learnMarkdown: `## Feature engineering is where model accuracy actually comes from
+
+A decade of Kaggle competitions and production ML deployments converge on one finding: **the most important lever in most real-world ML projects is not the choice of algorithm — it is the quality of the features.** A thoughtfully engineered feature space let a logistic regression beat a poorly featurized gradient boosted tree on dozens of practical problems.
+
+Feature engineering is the translation from raw domain knowledge into signals a model can use. Its cost is human time and domain expertise. Its reward is usually the biggest accuracy jump in the pipeline.
+
+## Log transforms — when and why
+
+The most common continuous-variable problem: **right-skewed distributions** with a long tail. Salary, revenue, transaction amount, page load time — they all have this shape. A linear model assumes equal relationship between each unit of a feature and the target. If you give it raw salary ranging from $20K to $20M, the model allocates its coefficient to the entire range — a $1 change near $20K means the same as near $20M, which is almost never true.
+
+**Log transform** compresses the tail and makes the relationship closer to linear on the log scale:
+
+\`\`\`python
+df["log_revenue"] = np.log1p(df["revenue"])   # log1p handles zeros safely
+\`\`\`
+
+When to use it: right-skewed features, ratio-scale quantities (anything that can be multiplied), where "twice as large" is more meaningful than "this many units larger."
+
+When *not* to: features with zeros and negatives (log undefined), features that are already symmetric, features used in tree models (trees split by threshold — they don't care about scale).
+
+## Binning — capturing non-linearity for linear models
+
+If the relationship between age and churn is non-monotonic (low churn in 20s, higher in 30s, lower again in 40s), a linear model cannot capture it with raw age. **Binning** converts a continuous variable into a categorical one:
+
+\`\`\`python
+df["age_bucket"] = pd.cut(df["age"],
+    bins=[0, 25, 35, 50, 65, 100],
+    labels=["<25", "25-35", "35-50", "50-65", "65+"])
+\`\`\`
+
+The non-linear pattern becomes representable because each bucket gets its own coefficient. The tradeoff: you lose the smooth progression between bins and must choose bin edges thoughtfully (prefer domain-informed cutoffs over uniform quantile binning when domain knowledge exists).
+
+## Interaction and polynomial features
+
+**Interaction term**: the product \`x1 * x2\` captures relationships that neither feature expresses alone. Classic: \`discount * is_weekend\` — the effect of a discount is larger on weekends.
+
+**Polynomial features**: add \`x², x³\` to let a linear model fit curves. Useful but dangerous — polynomial features multiply with each other and create exponentially many terms. Use sparingly, with regularization (L1 to auto-select relevant terms).
+
+\`\`\`python
+from sklearn.preprocessing import PolynomialFeatures
+poly = PolynomialFeatures(degree=2, interaction_only=False, include_bias=False)
+X_poly = poly.fit_transform(X[["age", "tenure"]])
+\`\`\`
+
+**Interview trap:** "Did you check whether your polynomial features cause multicollinearity?" — yes, x² is correlated with x by construction. Ridge regression handles this gracefully; standard linear regression does not.
+
+## Lag features and rolling statistics for time series
+
+Time-series models need the model to know about the *past* without leaking the future. **Lag features** shift a column back by k steps:
+
+\`\`\`python
+df["sales_lag_1"] = df["sales"].shift(1)   # yesterday's sales
+df["sales_lag_7"] = df["sales"].shift(7)   # same day last week
+\`\`\`
+
+**Rolling statistics** smooth noise and capture trends:
+
+\`\`\`python
+df["sales_rolling_mean_7"] = df["sales"].shift(1).rolling(7).mean()
+# IMPORTANT: shift(1) BEFORE rolling — otherwise today's value leaks into the window
+\`\`\`
+
+The shift-before-roll discipline is the most commonly missed rule in time-series feature engineering. If you compute \`rolling(7).mean()\` without first shifting by 1, today's actual value is included in the rolling average that was supposed to *predict* today — leakage.
+
+## High-cardinality categoricals: target encoding vs one-hot
+
+**One-hot encoding** works well for low-cardinality features (≤20 categories). For a feature with 10,000 unique values (e.g., \`product_sku\` or \`user_city\`), one-hot creates 10,000 binary columns — memory-intensive and sparse.
+
+**Target encoding** replaces each category with the mean of the target for that category:
+
+\`\`\`python
+city_mean = train.groupby("city")["churned"].mean()
+df["city_target_enc"] = df["city"].map(city_mean)
+\`\`\`
+
+**The leak risk:** if you compute target encoding on the full training set and then use it in cross-validation, validation folds see statistics computed from their own rows — a direct leak. The safe pattern is to compute target encoding only on the *training fold* and apply it to the validation fold:
+
+\`\`\`python
+# Inside each CV fold:
+city_mean = X_train_fold.groupby("city")["y_train"].mean()
+X_val_fold["city_enc"] = X_val_fold["city"].map(city_mean).fillna(city_mean.mean())
+\`\`\`
+
+**Smoothing / regularization for rare categories:** a city that appears once in training has an unstable mean. Add a shrinkage term blending the category mean toward the global mean:
+
+\`\`\`python
+smoothed = (count * category_mean + m * global_mean) / (count + m)  # m ≈ 20–50
+\`\`\`
+
+## Feature selection — when to cut features
+
+More features is not always better. **The curse of dimensionality**: in high-dimensional spaces, data becomes sparse and distance-based methods break down. Irrelevant features add noise and slow training.
+
+Two simple, fast filters before model training:
+
+1. **Variance threshold** — drop features with near-zero variance. A binary column that is 99.9% zeros carries almost no information.
+
+\`\`\`python
+from sklearn.feature_selection import VarianceThreshold
+selector = VarianceThreshold(threshold=0.01)
+X_filtered = selector.fit_transform(X)
+\`\`\`
+
+2. **Mutual information** — measures how much knowing a feature reduces uncertainty about the target, without assuming linearity. A good first-pass filter before expensive model training.
+
+\`\`\`python
+from sklearn.feature_selection import mutual_info_classif
+mi_scores = mutual_info_classif(X, y)
+top_features = X.columns[np.argsort(mi_scores)[-20:]]  # top 20
+\`\`\`
+
+**When selection hurts:** regularized models (L1/L2) and tree ensembles with subsampling can handle irrelevant features natively. Aggressive feature selection before a gradient boosted tree is often unnecessary and sometimes removes mildly-useful signal.
+
+## Interview question: what feature engineering for a churn model?
+
+A canonical interview prompt. Senior answer structure:
+
+1. **Behavioral features (lag + rolling):** recency, frequency, monetary (RFM) — days since last login, number of sessions in last 30 days, total spend in last 90 days. Shift before rolling.
+2. **Interaction features:** \`plan_type * tenure\` — a high-tier customer churning on month 2 is different from the same plan on month 24.
+3. **Log transforms:** raw monetary amounts are right-skewed; log-transform spend features.
+4. **Target encoding** for \`customer_segment\`, \`product_category\`, computed fold-by-fold in CV.
+5. **Calendar features:** \`day_of_week\`, \`month\`, \`is_contract_renewal_month\` — churn spikes at renewal dates.
+6. **Feature selection:** variance threshold to drop zero-activity columns, mutual info to rank the 50-feature candidates.
+
+## Interview question: high-cardinality categoricals
+
+The standard follow-up: "You have a \`user_id\` column with 500,000 unique values. What do you do?"
+
+- **Never one-hot** — 500K columns.
+- **Target encoding** (fold-level, with smoothing for rare users).
+- **Embedding** (for deep learning) — learn a dense vector per user.
+- **Aggregation features** — instead of encoding user_id directly, create \`user_lifetime_purchases\`, \`user_avg_order_value\`, etc. Transform the ID into behavior.
+- **Hash encoding** — bucket IDs into a fixed number of bins. Collisions are acceptable and beat 500K columns.
+
+The senior answer names all options and picks based on model type (embedding for neural nets, target encoding for GBMs, aggregation for linear models).`,
+    video: {
+      youtubeId: "68ABAU_V8qI",
+      title: "Feature Engineering for Machine Learning — Full Course (Soledad Galli)",
+      channel: "freeCodeCamp.org",
+      startSeconds: 0,
+    },
+    videoFallbackMarkdown: `## Deep dive — build a churn feature manifest
+
+Write a two-column table: **Feature** | **Engineering decision and why**.
+
+Include at least one example of each: lag feature, rolling statistic, log transform, interaction term, target-encoded categorical, and a feature you would *drop* (and the selection criterion for dropping it).
+
+For each target-encoded feature, write one sentence explaining *when* the encoding is computed in a CV workflow and *why* that timing matters.
+
+If you can fill that table from memory, you can answer the "walk me through your feature engineering for X" question cold.`,
+    tryGuidance: `In the lab, try each transformation on a skewed distribution and watch how it changes the feature's relationship with the target. Before each transform, predict whether a linear model or a tree model would benefit more — then check if your intuition was correct.`,
+    interviewGraph: {
+      initialStageId: "f4_lag_leak_click",
+      artifactDimensions: [
+        {
+          label: "Temporal Feature Discipline",
+          recoveryStageId: "f4_recovery_lag",
+        },
+        {
+          label: "Encoding Strategy",
+          recoveryStageId: "f4_recovery_encoding",
+        },
+        {
+          label: "Transform Selection",
+          recoveryStageId: "f4_recovery_transform",
+          passLabel: "Feature Engineering Mastery",
+        },
+      ],
+      stages: {
+        f4_lag_leak_click: {
+          id: "f4_lag_leak_click",
+          type: "click_target",
+          badge: "Stage 1",
+          title: "Stage 1 · Rolling feature temporal leak",
+          prompt: "A data scientist built rolling features for a sales forecasting model. One line introduces temporal leakage by including today's actual value in a statistic used to predict today. Click it.",
+          code_snippet: `import pandas as pd
+
+df = df.sort_values("date").reset_index(drop=True)
+
+df["sales_lag_1"]      = df["sales"].shift(1)           # ds-target:lag1
+df["sales_lag_7"]      = df["sales"].shift(7)           # ds-target:lag7
+df["rolling_mean_7"]   = df["sales"].rolling(7).mean()  # ds-target:rolling_no_shift
+df["safe_rolling_7"]   = df["sales"].shift(1).rolling(7).mean()  # ds-target:safe_rolling`,
+          validationCopy: {
+            lag1: "sales_lag_1 uses shift(1) — it accesses yesterday's value to predict today. This is safe. Try the rolling_mean_7 line.",
+            lag7: "sales_lag_7 uses shift(7) — it accesses last week's value to predict today. This is safe. Try the rolling_mean_7 line.",
+            rolling_no_shift: "Correct. df['sales'].rolling(7).mean() computes the 7-day average *including today's actual sales value*. When predicting today's sales, you cannot know today's actual value yet — it's the target. This leak inflates model performance in backtesting but fails in production. The fix: always shift(1) before rolling.",
+            safe_rolling: "safe_rolling_7 correctly calls shift(1) before rolling(7) — it computes the average of the 7 days *ending yesterday*, which is available at prediction time. This is the right pattern. Try the rolling_no_shift line.",
+          },
+          branches: {
+            lag1: "f4_recovery_lag",
+            lag7: "f4_recovery_lag",
+            rolling_no_shift: "f4_encoding_choice",
+            safe_rolling: "f4_recovery_lag",
+          },
+        },
+        f4_encoding_choice: {
+          id: "f4_encoding_choice",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · High-cardinality categorical encoding",
+          prompt: "A churn model has a feature `user_city` with 3,200 unique values. You are using gradient boosted trees. Which encoding strategy is most appropriate and why?",
+          code_snippet: `# Feature: user_city
+# Unique values: 3,200
+# Target: churned (binary, 7% positive rate)
+# Model: LightGBM
+# Training set size: 500,000 rows
+
+# Encoding options:
+# A) One-hot encoding
+# B) Ordinal/label encoding (city -> integer)
+# C) Target encoding (city -> mean churn rate), fold-safe
+# D) Drop the feature`,
+          choices: [
+            {
+              id: "a",
+              label: "Target encoding — replaces each city with its mean churn rate, computed fold-by-fold in CV",
+              description: "Correct. Target encoding is the standard approach for high-cardinality categoricals in GBM models. It compresses 3,200 categories into one informative float column. The fold-by-fold discipline prevents leakage.",
+            },
+            {
+              id: "b",
+              label: "One-hot encoding — creates a binary column for each city",
+              description: "3,200 binary columns is computationally expensive, sparse, and provides no intrinsic signal about the relationship between city and churn — each coefficient is estimated from a tiny number of observations. One-hot is appropriate for low-cardinality features (≤20 categories).",
+            },
+            {
+              id: "c",
+              label: "Ordinal encoding — map each city to an arbitrary integer",
+              description: "Ordinal encoding implies a meaningful numerical order between cities (city_id 1 < city_id 500) that does not exist. LightGBM would treat the arbitrary integers as meaningful numeric distances.",
+            },
+            {
+              id: "d",
+              label: "Drop the feature — high cardinality always means noise",
+              description: "City is a strong potential predictor of churn (urban vs rural markets, competitive dynamics). Dropping it without analysis discards potentially valuable signal.",
+            },
+          ],
+          branches: {
+            a: "f4_transform_choice",
+            b: "f4_recovery_encoding",
+            c: "f4_recovery_encoding",
+            d: "f4_recovery_encoding",
+          },
+          rationale: "Target encoding maps each category to a statistic of the target variable — the most signal-dense representation for high-cardinality features in GBM models. The critical constraint: encoding must be computed *only on the training fold* for each CV split, then applied to the validation fold. Computing it on the full dataset before splitting leaks the validation rows' churn rates into their own encoding.",
+        },
+        f4_transform_choice: {
+          id: "f4_transform_choice",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · Log transform decision",
+          prompt: "A loan default model has a feature `loan_amount` ranging from $500 to $2,000,000 with strong right skew. You are using logistic regression. Should you log-transform loan_amount, and why?",
+          code_snippet: `import numpy as np
+# loan_amount distribution:
+# p10: $2,000   p50: $12,000   p90: $85,000   p99: $400,000   max: $2,000,000
+# skewness: 8.4  (strongly right-skewed)
+
+# Option A:
+df["loan_feature"] = df["loan_amount"]                  # raw
+
+# Option B:
+df["loan_feature"] = np.log1p(df["loan_amount"])        # log transform
+
+# Option C:
+df["loan_feature"] = pd.qcut(df["loan_amount"], q=10)   # decile bins`,
+          choices: [
+            {
+              id: "a",
+              label: "Yes — log transform makes the relationship more linear and the coefficient more interpretable",
+              description: "Correct. With skewness of 8.4, the raw feature compresses most variation into a tiny numerical range and gives extreme values disproportionate influence. Log-transforming makes the feature approximately symmetric, gives each order of magnitude equal weight, and makes logistic regression's linear boundary more effective.",
+            },
+            {
+              id: "b",
+              label: "No — tree models handle skewed features natively, so no transform is needed",
+              description: "True for tree models, but the question specifies logistic regression. Linear models are sensitive to the scale and shape of continuous features. This answer would be correct if the model were a gradient boosted tree.",
+            },
+            {
+              id: "c",
+              label: "Yes — but use decile binning instead of log transform to capture non-linearity",
+              description: "Binning is a valid alternative that captures non-linearity, but it discards within-bin variation. A log transform is usually preferred for continuous monetary amounts because it preserves ordinality and makes the feature approximately Gaussian without losing continuous information.",
+            },
+            {
+              id: "d",
+              label: "No — transforming features changes the model's predictions and is therefore invalid",
+              description: "Monotonic transformations like log are entirely valid preprocessing steps. They change the *scale* of the feature but not the underlying information content. Logistic regression is not invariant to feature scale.",
+            },
+          ],
+          branches: {
+            a: "f4_terminal",
+            b: "f4_recovery_transform",
+            c: "f4_recovery_transform",
+            d: "f4_recovery_transform",
+          },
+          rationale: "Log transforms are one of the highest-leverage, simplest feature engineering steps for right-skewed monetary features in linear models. Log-transforming a skewed feature with range $500–$2M gives equal representational weight to each order of magnitude — a $1,000 loan is as far from $500 as a $1M loan is from $500K. For tree models, skew doesn't matter because trees split by threshold, not magnitude.",
+        },
+        f4_recovery_lag: {
+          id: "f4_recovery_lag",
+          type: "scenario_choice",
+          badge: "Recovery A",
+          title: "Recovery · Lag feature temporal discipline",
+          prompt: "You want to use a 7-day rolling average of daily sales as a feature to predict tomorrow's sales. Which code is correct?",
+          code_snippet: `# Goal: predict df["sales_tomorrow"] using a 7-day rolling average
+# df is sorted by date ascending
+
+# Option A:
+df["feat_A"] = df["sales"].rolling(7).mean()
+
+# Option B:
+df["feat_B"] = df["sales"].shift(1).rolling(7).mean()
+
+# Option C:
+df["feat_C"] = df["sales"].shift(-1).rolling(7).mean()`,
+          choices: [
+            {
+              id: "a",
+              label: "Option B — shift(1) before rolling(7)",
+              description: "Correct. shift(1) ensures today's actual value is excluded from the rolling window. The 7-day average is computed over the 7 days *ending yesterday* — information genuinely available when predicting tomorrow's sales.",
+            },
+            {
+              id: "b",
+              label: "Option A — rolling(7) with no shift",
+              description: "Without shift(1), the rolling(7) window includes today's actual sales value in the average. Since today's sales IS the value you want to predict, this leaks the target into the feature.",
+            },
+            {
+              id: "c",
+              label: "Option C — shift(-1) before rolling(7)",
+              description: "shift(-1) shifts values forward — it uses tomorrow's sales in the rolling window. This is even more severely leaking future information into the feature.",
+            },
+            {
+              id: "d",
+              label: "All options are equivalent for predicting tomorrow's sales",
+              description: "Options A and C include future or current information in the rolling window. Only Option B correctly excludes today's value from the window.",
+            },
+          ],
+          branches: {
+            a: "f4_encoding_choice",
+            b: "f4_recovery_lag",
+            c: "f4_recovery_lag",
+            d: "f4_recovery_lag",
+          },
+          rationale: "The rule for temporal features: a feature used to predict a value at time t must only use information from before time t. shift(1) shifts the series back one step, so the rolling window is always over t-1, t-2, ..., t-7. Without shift(1), the window includes t's own value — a direct leak.",
+        },
+        f4_recovery_encoding: {
+          id: "f4_recovery_encoding",
+          type: "scenario_choice",
+          badge: "Recovery B",
+          title: "Recovery · One-hot vs target encoding",
+          prompt: "When should you prefer one-hot encoding over target encoding for a categorical feature?",
+          code_snippet: `# Feature A: payment_method  (5 values: credit, debit, paypal, crypto, bank)
+# Feature B: product_category (8 values: electronics, clothing, books, ...)
+# Feature C: zip_code         (42,000 unique values)
+# Feature D: user_country     (195 values)
+
+# Model: logistic regression`,
+          choices: [
+            {
+              id: "a",
+              label: "One-hot for low-cardinality features (A and B) — few categories, no target signal leakage risk",
+              description: "Correct. One-hot encoding is appropriate when cardinality is low (≤20–30 categories). For logistic regression specifically, one-hot provides a separate coefficient per category without the leakage risk of target encoding, and the feature space is still manageable.",
+            },
+            {
+              id: "b",
+              label: "Target encoding for all features — it always outperforms one-hot",
+              description: "Target encoding requires careful fold-level computation to avoid leakage. For low-cardinality features with a simple model like logistic regression, one-hot is simpler, safer, and equally effective.",
+            },
+            {
+              id: "c",
+              label: "One-hot for all features including zip_code",
+              description: "One-hot encoding 42,000 unique zip codes creates 42,000 binary columns — computationally intractable and would be nearly all zeros for any given row. Target encoding, hashing, or aggregation features are appropriate for high-cardinality categoricals.",
+            },
+            {
+              id: "d",
+              label: "Ordinal encoding for all — converts any categorical to an integer efficiently",
+              description: "Ordinal encoding only makes sense when the categories have a genuine ordering (small/medium/large). For nominal categories like payment_method or country, ordinal encoding imposes a false order.",
+            },
+          ],
+          branches: {
+            a: "f4_transform_choice",
+            b: "f4_recovery_encoding",
+            c: "f4_recovery_encoding",
+            d: "f4_recovery_encoding",
+          },
+          rationale: "One-hot encoding: use when cardinality ≤ ~20–30, the model is linear, and leakage risk must be zero. Target encoding: use when cardinality is high (hundreds or more), always with fold-level computation in CV and smoothing for rare categories. Tree models can natively handle high-cardinality categoricals via their own splitting logic if the library supports categorical types (LightGBM, CatBoost).",
+        },
+        f4_recovery_transform: {
+          id: "f4_recovery_transform",
+          type: "scenario_choice",
+          badge: "Recovery C",
+          title: "Recovery · When to skip transforms",
+          prompt: "A gradient boosted tree model uses a feature `age` which has mild right skew (skewness = 1.2). Should you log-transform it?",
+          code_snippet: `# Feature: age
+# Range: 18 to 95  |  skewness: 1.2  |  no zeros or negatives
+# Model: LightGBM (gradient boosted trees)
+
+# Option A: df["age_feat"] = np.log1p(df["age"])
+# Option B: df["age_feat"] = df["age"]  (raw)
+# Option C: df["age_feat"] = pd.cut(df["age"], bins=[18,25,35,50,65,95])`,
+          choices: [
+            {
+              id: "a",
+              label: "Option B — tree models are invariant to monotonic transforms of continuous features",
+              description: "Correct. Gradient boosted trees split on thresholds. log(50) < log(60) just as 50 < 60 — the ranking is preserved, so the optimal split is found either way. Log-transforming for a tree model adds complexity without benefit. Only linear models and distance-based models (SVM, KNN, PCA) require scaling and distributional transforms.",
+            },
+            {
+              id: "b",
+              label: "Option A — always log-transform skewed continuous features",
+              description: "'Always' is too strong. Log transform helps linear models by making the feature-target relationship more linear. Tree models split by threshold and are indifferent to monotonic transforms.",
+            },
+            {
+              id: "c",
+              label: "Option C — binning is the safest approach for any continuous feature",
+              description: "Binning is useful for capturing non-monotonic relationships in linear models. For tree models, binning discards within-bin variation that the tree could have used to find a finer split. Raw continuous features are usually better for trees.",
+            },
+            {
+              id: "d",
+              label: "Log-transform is required whenever skewness > 1.0",
+              description: "There is no universal skewness threshold requiring a transform. The decision depends on the model family: linear models benefit from symmetric features; tree models do not.",
+            },
+          ],
+          branches: {
+            a: "f4_terminal",
+            b: "f4_recovery_transform",
+            c: "f4_recovery_transform",
+            d: "f4_recovery_transform",
+          },
+          rationale: "The most important principle of feature transforms: the benefit depends on the model family. Linear models, logistic regression, SVMs, KNNs, and PCA all benefit from scale normalization and distributional transforms. Tree-based models (decision trees, random forests, gradient boosting) are invariant to monotonic transforms of individual features — the tree's threshold-based splits are unaffected.",
+        },
+        f4_terminal: {
+          id: "f4_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · Feature Engineering mastered",
+          terminal: true,
+          prompt: "An interviewer asks: 'Walk me through the feature engineering you'd do for a B2B SaaS churn model. The raw data has user-level event logs (200M rows), a `plan_type` column (5 values), a `company_id` with 40,000 unique companies, and daily revenue figures.' What is your structured answer?",
+          code_snippet: `# Raw data summary:
+# - user_event_logs: 200M rows, cols: [user_id, company_id, event_type, timestamp]
+# - subscriptions: cols: [company_id, plan_type, mrr, start_date, churn_date]
+# - plan_type: 5 values (starter, growth, pro, enterprise, custom)
+# - company_id: 40,000 unique values
+# - mrr (monthly recurring revenue): right-skewed, range $49–$120,000`,
+          choices: [
+            {
+              id: "a",
+              label: "Aggregate events into behavioral features (RFM + rolling), log-transform MRR, one-hot plan_type, target-encode company_id fold-safe, add calendar features",
+              description: "Correct and complete. (1) Aggregate 200M rows into company-level RFM features with lag and rolling windows, shifted before rolling. (2) Log-transform MRR to handle right skew. (3) One-hot plan_type (5 values — low cardinality). (4) Target-encode company_id (40K values — high cardinality), computed fold-by-fold with smoothing. (5) Add renewal_month, days_since_last_activity, plan_tenure_days.",
+            },
+            {
+              id: "b",
+              label: "One-hot all categoricals, use raw MRR, skip event aggregation",
+              description: "One-hot encoding company_id creates 40,000 binary columns — computationally infeasible. Raw MRR has extreme right skew that harms linear models. Skipping event aggregation discards the richest behavioral signal in the dataset.",
+            },
+            {
+              id: "c",
+              label: "Drop company_id and plan_type to avoid encoding complexity",
+              description: "Dropping high-cardinality and domain-relevant features discards some of the strongest predictors of churn. Encoding complexity is solvable; discarding signal is not.",
+            },
+          ],
+          branches: {
+            a: "f4_terminal",
+            b: "f4_terminal",
+            c: "f4_terminal",
+          },
+          rationale: "The senior answer structures feature engineering by type: (1) behavioral aggregates from event logs (RFM + rolling stats, always shift-before-roll), (2) scale transforms for numeric features (log for skewed monetary amounts), (3) encoding strategy by cardinality (one-hot for low, target encoding for high — fold-safe), (4) temporal and calendar features (renewal cycles matter enormously for B2B SaaS churn). Naming the leakage risk for target encoding and the shift discipline for rolling features is what separates the answer from junior-level.",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "You compute a 7-day rolling mean of daily sales to use as a feature for predicting today's sales. What is the correct pandas pattern?",
+        options: [
+          "df['sales'].rolling(7).mean() — includes today's value in the window, which is available at prediction time",
+          "df['sales'].shift(1).rolling(7).mean() — shift(1) excludes today's value so the window only contains past data",
+          "df['sales'].shift(-7).rolling(7).mean() — shift(-7) advances the window to capture future context",
+        ],
+        correctIndex: 1,
+        explanation: "shift(1) moves the series back one step before computing the rolling window, ensuring today's actual sales are not included. Without shift(1), the rolling mean includes today's value — a direct target leak.",
+      },
+      {
+        question: "A GBM model uses a `transaction_amount` feature with skewness of 6.1 and values ranging from $1 to $500,000. Should you apply a log transform?",
+        options: [
+          "Yes — GBM models require symmetric features to split effectively",
+          "No — gradient boosted trees split on thresholds and are invariant to monotonic transforms of continuous features; the log transform adds complexity without benefit",
+          "Yes — high skewness always requires a log transform regardless of model type",
+        ],
+        correctIndex: 1,
+        explanation: "Tree models split by threshold (is x < 5000?). log(x) < log(y) whenever x < y — the ranking is identical. The optimal split threshold is found either way. Log transforms benefit linear models and distance-based models, not tree models.",
+      },
+      {
+        question: "You compute target encoding for `user_city` on the full training set, then run 5-fold CV. What is the problem?",
+        options: [
+          "Target encoding requires more than 5 folds to work correctly",
+          "The encoding was computed using target values from all rows including validation folds, leaking each fold's churn rate into its own encoding; the fix is to compute encoding only on each fold's training rows",
+          "Target encoding cannot be used with gradient boosted trees",
+        ],
+        correctIndex: 1,
+        explanation: "Computing target encoding before splitting means each validation row's city encoding was derived from statistics that included that row's own target value. This leaks the target into the feature and inflates CV scores. The fix: compute encoding inside each CV fold using only training-fold rows.",
+      },
+    ],
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // ml-f5 · Feature Scaling & Encoding
+  // ─────────────────────────────────────────────────────────────────────────────
+  "ml-f5": {
+    durationLabel: "15 min",
+    outcomes: [
+      "Choose between **StandardScaler, MinMaxScaler, and RobustScaler** based on the *algorithm* and the *outlier profile* of the data.",
+      "Explain *why* tree models don't need scaling but **SVMs, KNNs, logistic regression, and PCA** do — and the failure mode when you skip it.",
+      "Select the correct categorical encoding for each scenario: **one-hot, ordinal, target, label, or binary** — and explain when label encoding is semantically wrong.",
+      "Answer the canonical interview questions: 'Does XGBoost need feature scaling?' and 'What happens to PCA without scaling?'",
+    ],
+    learnMarkdown: `## Why scaling matters for some models and not others
+
+The answer comes down to how the algorithm uses feature values.
+
+**Algorithms that are sensitive to scale:**
+- **Linear regression / logistic regression** — the gradient update for each weight is proportional to the feature's magnitude. A feature ranging 0–10,000 produces gradients 10,000× larger than one ranging 0–1, making training unstable and making the regularization penalty (L1/L2) unfair — it penalizes large-magnitude weights more even when the underlying relationship is the same.
+- **SVM (Support Vector Machines)** — the margin between hyperplanes is computed as a Euclidean distance. A feature in the range [0, 10,000] dominates the distance calculation, making other features irrelevant.
+- **KNN** — nearest neighbors are found by distance. An unscaled feature with range [0, 10,000] would completely overrule a feature with range [0, 1].
+- **PCA** — principal components are variance-maximizing directions. An unscaled feature with high variance (due to its scale, not its information content) will be the dominant first component. PCA without scaling is PCA of the largest-range feature.
+- **Neural networks** — gradient descent converges faster and more stably with zero-mean, unit-variance inputs.
+
+**Algorithms that are invariant to monotonic feature transforms (no scaling needed):**
+- **Decision trees and all tree ensembles** (random forests, gradient boosting, XGBoost, LightGBM) — trees split on thresholds: "is x < 5000?" Scaling the feature changes 5000 to 0.5 (after MinMax), but the *best threshold* is still the same *split point* in the sorted order. The tree finds it either way.
+- **Rule-based systems** — same reasoning as trees.
+
+**The canonical interview question:** "Does XGBoost need feature scaling?" The correct answer is **no** — XGBoost is a gradient boosted tree model and is threshold-based. Scaling adds complexity with no benefit. However, if you add L1/L2 regularization to a *linear* model stacked on top of XGBoost predictions, the linear stage would need scaling.
+
+## The three scalers — which to use
+
+| Scaler | Formula | Best for | Sensitive to outliers? |
+|---|---|---|---|
+| **StandardScaler** | \`z = (x - μ) / σ\` | General purpose; most algorithms | Yes — outliers inflate σ, compressing most values near zero |
+| **MinMaxScaler** | \`z = (x - min) / (max - min)\` | Algorithms needing values in [0, 1] (image pixels, neural net inputs) | Extremely — a single outlier can compress all other values near 0 |
+| **RobustScaler** | \`z = (x - Q2) / (Q3 - Q1)\` | Data with significant outliers; robust statistics | No — uses median and IQR, not mean and std |
+
+**When to choose RobustScaler:** if you know (or suspect) your feature has significant outliers — transaction amounts, sensor readings, income data. StandardScaler's σ is inflated by outliers, compressing the bulk of the distribution near zero and reducing the effective range of variation the model sees.
+
+\`\`\`python
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
+
+# Typical choice for most tabular ML:
+scaler = StandardScaler()
+
+# Neural net with image or probability inputs [0, 1]:
+scaler = MinMaxScaler()
+
+# Data with outliers (income, transaction amounts):
+scaler = RobustScaler()
+\`\`\`
+
+**Always fit inside the CV loop.** This is repeated from ml-f3 because it is the most commonly violated rule: fit the scaler on the training fold, transform both train and val. Never fit on the full dataset.
+
+## The PCA failure mode without scaling
+
+PCA finds the directions of maximum variance. If your dataset has:
+
+- \`age\`: range 18–80, variance ≈ 200
+- \`annual_salary\`: range $20,000–$200,000, variance ≈ 3 billion
+
+The first principal component will be approximately "annual_salary" — not because it's the most informative feature, but because it has the largest *numerical variance due to units*. PCA without scaling is dominated by the highest-range feature.
+
+\`\`\`python
+# WRONG:
+pca = PCA(n_components=10)
+X_pca = pca.fit_transform(X)   # salary dominates all components
+
+# RIGHT:
+pipeline = Pipeline([("scaler", StandardScaler()), ("pca", PCA(n_components=10))])
+X_pca = pipeline.fit_transform(X)   # components reflect true information
+\`\`\`
+
+A related interview question: "You ran PCA and the first component explains 98% of the variance. Is that good?" Answer: only if the features were scaled first. If not, the 98% might just be salary units dominating everything else.
+
+## Categorical encoding — the full menu
+
+### One-hot encoding (nominal, low cardinality)
+Creates a binary column per category. Correct for nominal data (no inherent order) with ≤20–30 categories.
+
+\`\`\`python
+pd.get_dummies(df["color"])  # red → [1,0,0], blue → [0,1,0], green → [0,0,1]
+\`\`\`
+
+⚠️ **Drop one column** (drop_first=True) for linear models to avoid perfect multicollinearity (the dummy trap).
+
+### Ordinal encoding (ordered categories)
+Converts categories to integers preserving their semantic order. Only correct when order is real (small < medium < large; never for colors or cities).
+
+\`\`\`python
+from sklearn.preprocessing import OrdinalEncoder
+enc = OrdinalEncoder(categories=[["small", "medium", "large"]])
+\`\`\`
+
+### Label encoding — when it is wrong
+Label encoding assigns arbitrary integers to categories without respect to order. **It is correct for the target variable in classification.** It is *wrong* for nominal input features in models that treat feature values as numeric, because it implies a numerical distance between categories (city_1=0, city_2=1, city_3=2 implies city_1 and city_2 are "closer" than city_1 and city_3 — which is meaningless for cities).
+
+**For tree models**, label encoding of nominal features is technically acceptable because trees split on "is x == k?" style splits and do not assume numeric distances. For linear models and KNN, it is semantically wrong.
+
+### Target encoding (high cardinality)
+Covered in ml-f4 — replaces each category with the mean target value, computed fold-safe. Appropriate for high-cardinality nominals in tree and linear models alike.
+
+### Binary / hash encoding (very high cardinality)
+Encode the integer label in binary (ceiling(log2(K)) columns instead of K columns). Useful when K is very large and target encoding's leakage risk is hard to manage.
+
+## The SVM and KNN failure mode without scaling
+
+An SVM trained to classify customers using \`age\` (range 18–80) and \`annual_spend\` (range $0–$50,000):
+
+- The Euclidean distance between two customers is dominated almost entirely by spend difference.
+- The age feature contributes < 0.03% of any distance calculation.
+- The SVM's margin hyperplane is effectively fit only on spend — age is invisible to the model despite potentially being highly predictive.
+
+After StandardScaler:
+- Both features contribute equally to distance calculations.
+- The model can find margins that separate classes using both features.
+
+This is the failure mode interviewers probe: "What happens if you run KNN on unscaled features?" The answer is "the feature with the largest range dominates every nearest-neighbor computation, making all other features irrelevant."
+
+## Putting it together — the scaling decision matrix
+
+| Model | Scaling needed? | Best scaler | Encoding for nominals |
+|---|---|---|---|
+| Logistic regression | Yes | StandardScaler | One-hot (drop_first) |
+| SVM | Yes | StandardScaler or RobustScaler | One-hot |
+| KNN | Yes | StandardScaler or RobustScaler | One-hot |
+| PCA | Yes (critical) | StandardScaler | Encode first, then scale |
+| Neural network | Yes | StandardScaler or MinMaxScaler | Embedding or one-hot |
+| Decision tree | No | — | Label OK, one-hot OK |
+| Random forest | No | — | Label OK, one-hot OK |
+| XGBoost / LightGBM | No | — | Label, one-hot, or native categorical |
+| Linear regression | Yes | StandardScaler | One-hot (drop_first) |
+
+## Interview questions you should be able to answer cold
+
+- "Does XGBoost need feature scaling?" *No — it's threshold-based. Scaling adds complexity, no benefit.*
+- "What happens to PCA if you don't scale?" *The highest-variance feature (usually the one with the largest numerical range) dominates all principal components. The result is PCA of units, not information.*
+- "When is label encoding of input features wrong?" *For nominal features in linear models and KNN — it implies a numeric distance between categories that doesn't exist.*
+- "You have outlier-heavy sensor data. Which scaler?" *RobustScaler — uses median/IQR, unaffected by extreme values.*
+- "Why does L2 regularization need scaled features?" *The penalty λ·Σw² is proportional to the magnitude of weights. Without scaling, features with large ranges get larger weights not because the relationship is stronger, but because the units are bigger. The penalty is unfair across features.*`,
+    video: {
+      youtubeId: "0B5eIE_1vpU",
+      title: "StatQuest: Feature Scaling — Standardization and Normalization",
+      channel: "StatQuest with Josh Starmer",
+      startSeconds: 0,
+    },
+    videoFallbackMarkdown: `## Deep dive — build the decision table from memory
+
+Without notes, reproduce the scaling decision matrix: for each model family (logistic regression, SVM, KNN, PCA, neural net, decision tree, random forest, XGBoost), write: *scaling needed? Y/N*, *best scaler if yes*, *correct encoding for nominal categoricals*.
+
+Then write one sentence for each of the three scalers — Standard, MinMax, RobustScaler — stating the one scenario where it is the clear first choice.
+
+Finally, write the two-sentence answer to "What happens to PCA without scaling?" If you can reproduce all three without notes, you're ready for any scaling question in an interview.`,
+    tryGuidance: `In the visualization, toggle scaling on/off for a dataset with outliers and watch how the decision boundary shifts for an SVM and then for a decision tree. Before each toggle, predict whether the boundary will change — and why.`,
+    interviewGraph: {
+      initialStageId: "f5_svm_scale_click",
+      artifactDimensions: [
+        {
+          label: "Model-Specific Scaling",
+          recoveryStageId: "f5_recovery_model_scale",
+        },
+        {
+          label: "Scaler Selection",
+          recoveryStageId: "f5_recovery_scaler",
+        },
+        {
+          label: "Encoding Correctness",
+          recoveryStageId: "f5_recovery_encoding",
+          passLabel: "Scaling & Encoding Mastery",
+        },
+      ],
+      stages: {
+        f5_svm_scale_click: {
+          id: "f5_svm_scale_click",
+          type: "click_target",
+          badge: "Stage 1",
+          title: "Stage 1 · Missing scaling before SVM",
+          prompt: "A pipeline trains an SVM classifier on two features: `age` (range 18–80) and `annual_spend` (range $0–$120,000). Click the line that is responsible for the SVM ignoring the `age` feature almost entirely.",
+          code_snippet: `from sklearn.svm import SVC
+from sklearn.metrics import classification_report
+
+X = df[["age", "annual_spend"]]   # ds-target:unscaled_features
+y = df["churned"]
+
+# No preprocessing step applied
+model = SVC(kernel="rbf", C=1.0)   # ds-target:svm_no_scale
+model.fit(X, y)
+
+print(classification_report(y_test, model.predict(X_test)))`,
+          validationCopy: {
+            unscaled_features: "Good instinct — assembling features without scaling is the root cause. The SVM will compute distances using raw values where annual_spend dominates by a factor of ~1000x. This is the correct line to identify.",
+            svm_no_scale: "The SVC constructor itself isn't wrong — it's correctly configured for a non-linear kernel. The problem is the absence of scaling before fitting. The feature matrix construction on the line above is where the problem originates. Try clicking the features line.",
+          },
+          branches: {
+            unscaled_features: "f5_xgboost_choice",
+            svm_no_scale: "f5_recovery_model_scale",
+          },
+        },
+        f5_xgboost_choice: {
+          id: "f5_xgboost_choice",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Does XGBoost need scaling?",
+          prompt: "A new team member applies StandardScaler before training an XGBoost classifier. A senior engineer says this is unnecessary. Who is correct, and why?",
+          code_snippet: `import xgboost as xgb
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+
+# Team member's approach:
+pipeline = Pipeline([
+    ("scaler", StandardScaler()),
+    ("model",  xgb.XGBClassifier(n_estimators=200, max_depth=6))
+])
+pipeline.fit(X_train, y_train)`,
+          choices: [
+            {
+              id: "a",
+              label: "Senior is correct — XGBoost is threshold-based; scaling adds complexity with no accuracy benefit",
+              description: "Correct. Gradient boosted trees split on thresholds: 'is annual_spend < 45,000?' Whether annual_spend is 45,000 or 0.375 (after scaling), the optimal split point is the same ranked observation. Scaling does not change the learned model.",
+            },
+            {
+              id: "b",
+              label: "Team member is correct — all models should have scaled features for fairness",
+              description: "Tree models are invariant to monotonic transforms of features because they use threshold-based splits, not distance or magnitude. Scaling before XGBoost is harmless but also pointless.",
+            },
+            {
+              id: "c",
+              label: "Both are correct — scaling helps XGBoost when features have different units",
+              description: "Feature units do not affect XGBoost. The tree finds the best threshold in any scale. The only case where scaling might matter for XGBoost is if it is combined with a linear booster (booster='gblinear'), which is rarely used.",
+            },
+            {
+              id: "d",
+              label: "Team member is correct — XGBoost uses gradient descent, so scaled features converge faster",
+              description: "XGBoost's gradient descent optimizes the *weights of individual trees* (leaf values), not feature weights. The convergence is through additive tree construction, not feature-weight gradient steps. Scaling doesn't affect this.",
+            },
+          ],
+          branches: {
+            a: "f5_pca_choice",
+            b: "f5_recovery_model_scale",
+            c: "f5_recovery_model_scale",
+            d: "f5_recovery_model_scale",
+          },
+          rationale: "XGBoost and all gradient boosted tree models are invariant to monotonic feature transforms. They split by threshold — the best split is the same regardless of whether the feature is in original or scaled units. Scaling before tree models is a no-op in terms of model quality. It does make hyperparameter search for regularization terms less interpretable.",
+        },
+        f5_pca_choice: {
+          id: "f5_pca_choice",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · PCA without scaling",
+          prompt: "A data scientist runs PCA on a dataset with 20 features: 19 behavioral scores (range 0–1) and one `annual_revenue` feature (range $0–$5,000,000). The first component explains 97% of variance. What went wrong?",
+          code_snippet: `from sklearn.decomposition import PCA
+import numpy as np
+
+# 20 features: behavioral scores [0,1] and annual_revenue [$0–$5M]
+# No scaling applied
+
+pca = PCA(n_components=10)
+pca.fit(X)
+
+print("Explained variance ratio:", pca.explained_variance_ratio_)
+# [0.97, 0.01, 0.005, ...]  ← first component: 97%`,
+          choices: [
+            {
+              id: "a",
+              label: "PCA found the annual_revenue direction because it dominates variance by units — scaling is required before PCA",
+              description: "Correct. PCA maximizes variance. annual_revenue has variance ~$1 trillion (std ~$1M), while behavioral scores have variance ~0.08 (std ~0.3). The first component is approximately annual_revenue by construction. After StandardScaler, all 20 features contribute equally and PCA captures real co-variation.",
+            },
+            {
+              id: "b",
+              label: "97% explained variance is excellent — the dataset has high structure",
+              description: "The 97% is an artifact of scale, not genuine data structure. One feature's units are 5M× larger than the others. The 'structure' PCA found is the numerical dominance of annual_revenue, not meaningful shared variation across features.",
+            },
+            {
+              id: "c",
+              label: "Use 20 components instead of 10 to capture all variance",
+              description: "More components do not fix the root problem. The first component will still be annual_revenue regardless of how many total components you request.",
+            },
+            {
+              id: "d",
+              label: "Remove the annual_revenue feature and rerun PCA",
+              description: "Removing the feature is one fix, but StandardScaler is the better answer — it normalizes all features to zero mean and unit variance so each contributes equally to PCA's covariance matrix.",
+            },
+          ],
+          branches: {
+            a: "f5_terminal",
+            b: "f5_recovery_scaler",
+            c: "f5_recovery_scaler",
+            d: "f5_recovery_scaler",
+          },
+          rationale: "PCA is a variance-maximizing procedure. Without scaling, any feature with large numerical variance dominates the covariance matrix and therefore dominates the principal components — not because it is the most informative, but because its units are large. StandardScaler before PCA is mandatory to ensure components reflect shared information structure rather than measurement units.",
+        },
+        f5_recovery_model_scale: {
+          id: "f5_recovery_model_scale",
+          type: "scenario_choice",
+          badge: "Recovery A",
+          title: "Recovery · Which models need scaling?",
+          prompt: "You are building four models: KNN, Random Forest, Logistic Regression, and LightGBM. For which models is feature scaling essential?",
+          code_snippet: `# Features: age (18–80), income ($20k–$200k), num_purchases (0–500)
+# All on very different scales.
+
+# Models to build:
+# A) KNeighborsClassifier
+# B) RandomForestClassifier
+# C) LogisticRegression
+# D) LightGBMClassifier`,
+          choices: [
+            {
+              id: "a",
+              label: "KNN and Logistic Regression — distance-based and gradient-based models need scaling; tree models do not",
+              description: "Correct. KNN uses Euclidean distance — unscaled features make income dominate every distance calculation. Logistic regression uses gradient descent and L2 regularization — both are sensitive to feature magnitude. Random Forest and LightGBM are threshold-based trees and are invariant to scale.",
+            },
+            {
+              id: "b",
+              label: "All four models — it is best practice to always scale features",
+              description: "Tree-based models (Random Forest, LightGBM) are invariant to monotonic transforms. Scaling before these models adds pipeline complexity with no accuracy benefit.",
+            },
+            {
+              id: "c",
+              label: "None — modern implementations handle scale differences internally",
+              description: "KNN literally computes Euclidean distance using raw feature values — there is no internal rescaling. Logistic regression's gradient and regularization term are directly affected by feature magnitude.",
+            },
+            {
+              id: "d",
+              label: "Only LightGBM — it is the most sensitive to feature scale among tree methods",
+              description: "LightGBM, like all gradient boosted tree methods, is invariant to feature scaling. The models that need scaling are the distance-based and gradient-based ones.",
+            },
+          ],
+          branches: {
+            a: "f5_xgboost_choice",
+            b: "f5_recovery_model_scale",
+            c: "f5_recovery_model_scale",
+            d: "f5_recovery_model_scale",
+          },
+          rationale: "The rule: if the algorithm computes distances (KNN, SVM), uses gradient descent with weight penalties (linear models, neural nets), or computes variance (PCA), scaling is essential. If the algorithm splits on thresholds (decision trees, random forests, gradient boosting), scaling is irrelevant.",
+        },
+        f5_recovery_scaler: {
+          id: "f5_recovery_scaler",
+          type: "scenario_choice",
+          badge: "Recovery B",
+          title: "Recovery · Scaler selection with outliers",
+          prompt: "A logistic regression model uses `transaction_amount` which has most values between $1–$500, but occasionally reaches $50,000 due to bulk orders. Which scaler should you use?",
+          code_snippet: `# transaction_amount distribution:
+# median: $45   IQR: [$12, $180]
+# mean: $312    std: $2,100  (inflated by outliers)
+# max: $52,000  (bulk orders)
+
+# Scaler options:
+# StandardScaler: z = (x - mean) / std
+# MinMaxScaler:   z = (x - min) / (max - min)
+# RobustScaler:   z = (x - median) / IQR`,
+          choices: [
+            {
+              id: "a",
+              label: "RobustScaler — uses median and IQR, unaffected by the bulk-order outliers",
+              description: "Correct. StandardScaler's std is inflated by the $50K outliers, compressing the bulk of values ($1–$500) into a tiny range near zero. MinMaxScaler is even worse — the $52K maximum pushes all other values near 0. RobustScaler's median ($45) and IQR ($168) are stable despite outliers.",
+            },
+            {
+              id: "b",
+              label: "StandardScaler — always the default choice",
+              description: "StandardScaler is the default for well-behaved features. But when std is inflated by outliers, StandardScaler compresses most values near zero, reducing the effective range of variation the model can use. With a std of $2,100 driven by outliers, typical $1–$500 transactions would all fall within 0–0.24 standard deviations.",
+            },
+            {
+              id: "c",
+              label: "MinMaxScaler — neural networks require values in [0, 1]",
+              description: "MinMaxScaler is appropriate for [0, 1]-bounded inputs like neural nets with sigmoid outputs. But it is extremely sensitive to outliers — with a max of $52K, all typical transactions would be compressed into the range 0–0.01.",
+            },
+            {
+              id: "d",
+              label: "No scaling — logistic regression handles outliers natively",
+              description: "Logistic regression is sensitive to feature scale (its regularization penalizes weights proportional to their magnitude, which depends on scale) and to outliers (which inflate the feature's range and shift the model's decision boundary).",
+            },
+          ],
+          branches: {
+            a: "f5_pca_choice",
+            b: "f5_recovery_scaler",
+            c: "f5_recovery_scaler",
+            d: "f5_recovery_scaler",
+          },
+          rationale: "RobustScaler is the correct choice when a feature has significant outliers. It uses the median (resistant to outliers) and the IQR (the middle 50%, also resistant) rather than the mean and std. For the transaction_amount example: mean=$312, std=$2100 (outlier-inflated), but median=$45, IQR=$168 (stable). RobustScaler keeps typical transactions in a useful numeric range.",
+        },
+        f5_recovery_encoding: {
+          id: "f5_recovery_encoding",
+          type: "scenario_choice",
+          badge: "Recovery C",
+          title: "Recovery · Label encoding — when it is wrong",
+          prompt: "A logistic regression model has a feature `shirt_size` with values ['S', 'M', 'L', 'XL', 'XXL'] and a feature `city` with values ['New York', 'London', 'Tokyo', 'Paris']. For which feature is label encoding correct?",
+          code_snippet: `from sklearn.preprocessing import LabelEncoder, OrdinalEncoder
+
+le = LabelEncoder()
+
+# Feature A: shirt_size — ['S','M','L','XL','XXL']
+# Feature B: city — ['New York','London','Tokyo','Paris']
+
+# Option: apply label encoding to both features
+# S→0, M→1, L→2, XL→3, XXL→4  (shirt_size)
+# London→0, New York→1, Paris→2, Tokyo→3  (city)`,
+          choices: [
+            {
+              id: "a",
+              label: "shirt_size only — it has a genuine numerical order; city has no meaningful order and label encoding would imply 'London < New York'",
+              description: "Correct. Ordinal encoding (a form of label encoding with explicit category order) is correct for shirt_size because S < M < L < XL < XXL is a real ordering a linear model should exploit. City has no ordering — London=0 and Tokyo=3 implies Tokyo is 'more' than London in some numeric sense, which is meaningless and will mislead the model.",
+            },
+            {
+              id: "b",
+              label: "Both — label encoding is always valid for any categorical feature",
+              description: "Label encoding assigns arbitrary integers to categories. For nominal data (no order), this creates false numeric relationships between categories. Linear models and distance-based models treat encoded city_id=0 as numerically close to city_id=1 and far from city_id=3, which is meaningless.",
+            },
+            {
+              id: "c",
+              label: "Neither — both require one-hot encoding for logistic regression",
+              description: "shirt_size has a genuine ordinal relationship that a logistic regression should exploit via a single ordered numeric feature. One-hot encoding shirt_size would lose this ordering information. One-hot is correct for city (4 categories, no order).",
+            },
+            {
+              id: "d",
+              label: "city only — more categories means label encoding is more appropriate",
+              description: "The number of categories is irrelevant to whether label encoding is semantically correct. The key criterion is whether the categories have a genuine numeric order.",
+            },
+          ],
+          branches: {
+            a: "f5_terminal",
+            b: "f5_recovery_encoding",
+            c: "f5_recovery_encoding",
+            d: "f5_recovery_encoding",
+          },
+          rationale: "Label/ordinal encoding is correct only when the categories have a genuine order that the model should exploit (small < medium < large; none < mild < moderate < severe). For nominal features (colors, cities, payment methods), label encoding implies a numeric distance between categories that does not exist — use one-hot encoding for logistic regression and linear models. For tree models, label encoding of nominals is technically acceptable because trees split on equality, not distance.",
+        },
+        f5_terminal: {
+          id: "f5_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · Scaling & Encoding mastered",
+          terminal: true,
+          prompt: "An interviewer asks: 'You're building a customer lifetime value model with logistic regression. Features include `age` (18–80), `annual_income` ($0–$500K), `plan_tier` (bronze/silver/gold/platinum), and `signup_year` (2015–2024). Walk me through your scaling and encoding decisions.' What is the best answer?",
+          code_snippet: `# Features:
+# - age: continuous, range 18–80
+# - annual_income: continuous, right-skewed, range $0–$500K, some outliers
+# - plan_tier: ordinal — bronze < silver < gold < platinum
+# - signup_year: continuous (or could be treated as ordinal)
+
+# Model: LogisticRegression(penalty='l2')`,
+          choices: [
+            {
+              id: "a",
+              label: "StandardScaler for age and signup_year; RobustScaler or log-transform for annual_income; OrdinalEncoder for plan_tier; logistic regression needs all of these",
+              description: "Correct and complete. age and signup_year: StandardScaler (well-behaved, no outliers). annual_income: right-skewed with outliers — either RobustScaler or log-transform first then StandardScaler. plan_tier: OrdinalEncoder with explicit order [bronze, silver, gold, platinum] — the ordering is real and a linear model should use it as a single numeric feature. L2 regularization in logistic regression requires all features to be on comparable scales.",
+            },
+            {
+              id: "b",
+              label: "MinMaxScaler for all features; one-hot for plan_tier",
+              description: "MinMaxScaler is inappropriate for annual_income with outliers — a $500K outlier would compress most values near zero. One-hot for plan_tier discards the bronze < silver < gold < platinum ordering, which is meaningful for a linear model.",
+            },
+            {
+              id: "c",
+              label: "No scaling — logistic regression with L2 regularization handles different scales automatically",
+              description: "L2 regularization penalizes w² — a feature with a large range produces large weights and gets penalized more than a small-range feature, even if the underlying relationship is equally strong. This is exactly why scaling is needed before regularized models.",
+            },
+          ],
+          branches: {
+            a: "f5_terminal",
+            b: "f5_terminal",
+            c: "f5_terminal",
+          },
+          rationale: "The senior answer structures scaling and encoding decisions by feature type and model requirement. For regularized logistic regression: scale all numeric features (StandardScaler for well-behaved, RobustScaler or log-transform for skewed/outlier-heavy). For plan_tier: use OrdinalEncoder with explicit order — the semantic ordering bronze < silver < gold < platinum is real and valuable to a linear model. The penalty term λΣw² is the direct reason scaling matters: without it, regularization unfairly penalizes large-magnitude features.",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "Does XGBoost require feature scaling? What is the technical reason for your answer?",
+        options: [
+          "Yes — XGBoost uses gradient descent, so scaled features converge faster and achieve better accuracy",
+          "No — XGBoost is a tree ensemble that splits on thresholds; the optimal split is the same regardless of whether the feature is raw or scaled, so scaling adds complexity with no benefit",
+          "Yes — L2 regularization in XGBoost requires features on the same scale to penalize weights fairly",
+        ],
+        correctIndex: 1,
+        explanation: "Gradient boosted trees split on thresholds ('is x < 5000?'). Scaling changes 5000 to 0.5 but the same observation is still the best split point. The ranking of feature values is preserved by any monotonic transform. XGBoost's regularization applies to leaf weights, not feature weights, so scale is irrelevant there too.",
+      },
+      {
+        question: "A PCA run on unscaled data produces a first component explaining 95% of variance. A colleague says 'great, very low-dimensional structure.' What is the correct response?",
+        options: [
+          "Agree — high explained variance ratio in the first component always indicates genuine low-dimensional structure",
+          "Flag it — if features were not scaled first, the high variance in the first component likely reflects one feature's large numerical range (units), not genuine shared variation; rerun after StandardScaler",
+          "Agree — PCA is invariant to feature scaling",
+        ],
+        correctIndex: 1,
+        explanation: "PCA maximizes numerical variance. Without scaling, a feature with large range (e.g., salary in dollars) dominates the covariance matrix. The '95% explained' is an artifact of units, not information structure. After StandardScaler, all features contribute equally and PCA captures genuine co-variation.",
+      },
+      {
+        question: "A KNN model trained on customer data uses `num_purchases` (range 0–500) and `account_age_days` (range 0–3,650). Without scaling, what will happen?",
+        options: [
+          "Both features contribute equally — KNN normalizes distances internally",
+          "account_age_days dominates every nearest-neighbor distance calculation; num_purchases becomes nearly irrelevant, even if it is a stronger predictor",
+          "The model will fail to converge and throw an error",
+        ],
+        correctIndex: 1,
+        explanation: "KNN computes Euclidean distance directly from raw feature values. A 1-unit difference in account_age_days (3,650 range) contributes 7x more to the distance than a 1-unit difference in num_purchases (500 range). After StandardScaler, both features contribute equal variance to the distance calculation.",
+      },
+    ],
+  },
+// ml_supervised_lessons.js
+
+  "ml-s1": {
+    durationLabel: "25 min",
+    outcomes: [
+      "Derive the OLS cost function and explain why we minimize MSE",
+      "Interpret R² and regression coefficients in plain language",
+      "Identify when linear regression assumptions are violated",
+      "Apply Ridge and Lasso regularization to reduce overfitting",
+    ],
+    learnMarkdown: `## Linear Regression: From Scratch to Intuition
+
+Linear regression is the foundation of supervised learning. Despite its simplicity, mastering it deeply — including its assumptions, cost function, and regularization variants — separates junior from senior data scientists.
+
+### Ordinary Least Squares (OLS)
+
+Given features **X** and target **y**, we fit a line (or hyperplane) by finding coefficients **β** that minimize the sum of squared residuals:
+
+\`\`\`
+Cost = (1/n) Σ (yᵢ - ŷᵢ)²   ← Mean Squared Error
+\`\`\`
+
+We **square** residuals for two reasons: (1) it penalizes large errors disproportionately, and (2) the function is differentiable everywhere, enabling gradient-based optimization. Absolute errors would also work but produce a non-smooth surface.
+
+### Gradient Descent
+
+Rather than computing the OLS closed-form solution **(XᵀX)⁻¹Xᵀy** (expensive for large n), gradient descent iteratively updates:
+
+\`\`\`python
+β = β - α * (∂MSE/∂β)
+  = β - (α/n) * Xᵀ(Xβ - y)
+\`\`\`
+
+**Learning rate α** controls step size. Too large → overshoot; too small → slow convergence. Mini-batch SGD (subsets of data) is the practical sweet spot.
+
+### Interpreting Coefficients
+
+Each coefficient βⱼ means: *holding all other features constant, a one-unit increase in xⱼ is associated with a βⱼ change in y.* This is the **partial effect** interpretation.
+
+For example, if β_sqft = 150 in a house price model, each additional square foot adds $150, controlling for other features.
+
+### R² — The Coefficient of Determination
+
+\`\`\`
+R² = 1 - (SS_res / SS_tot)
+   = 1 - Σ(yᵢ - ŷᵢ)² / Σ(yᵢ - ȳ)²
+\`\`\`
+
+R² = 0.6 means your model explains **60% of the variance** in y. The remaining 40% is unexplained by your features. R² alone doesn't tell you if the model is appropriate — always check residual plots.
+
+**Adjusted R²** penalizes adding irrelevant features:
+
+\`\`\`
+Adj-R² = 1 - (1 - R²)(n - 1) / (n - p - 1)
+\`\`\`
+
+### The Five Key Assumptions (LINE)
+
+1. **Linearity**: relationship between X and y is linear
+2. **Independence**: residuals are uncorrelated (no autocorrelation)
+3. **Normality**: residuals are approximately normally distributed
+4. **Equal variance** (homoscedasticity): residual variance is constant across fitted values
+
+Violations:
+- **Non-linearity** → add polynomial features or use tree models
+- **Heteroscedasticity** → log-transform y, use weighted regression
+- **Multicollinearity** (correlated features) → high VIF, unstable coefficients; use Ridge
+
+### Ridge and Lasso Regularization
+
+When features are correlated or the model overfits, we add a penalty term:
+
+\`\`\`python
+# Ridge (L2): shrinks coefficients, never zeros them
+Cost_ridge = MSE + λ Σ βⱼ²
+
+# Lasso (L1): drives some coefficients to exactly zero
+Cost_lasso = MSE + λ Σ |βⱼ|
+\`\`\`
+
+**Ridge** is preferred when many small effects exist. **Lasso** performs implicit feature selection — useful when you believe only a few features matter. **ElasticNet** combines both penalties.
+
+The hyperparameter **λ (alpha in sklearn)** controls regularization strength. Tune via cross-validation.
+
+\`\`\`python
+from sklearn.linear_model import Ridge, Lasso
+ridge = Ridge(alpha=1.0).fit(X_train, y_train)
+lasso = Lasso(alpha=0.1).fit(X_train, y_train)
+\`\`\`
+
+### When Linear Regression Fails
+
+- Target has **non-linear** relationship with features
+- Target is **categorical** (use logistic regression)
+- Many **irrelevant / correlated** features without regularization
+- Strong **outliers** (MSE heavily penalizes them; consider Huber loss)`,
+    video: null,
+    videoFallbackMarkdown: `## Deep Dive: Linear Regression
+
+**StatQuest — Linear Regression**: https://www.youtube.com/watch?v=7ArmBVF2dCs
+
+**StatQuest — Gradient Descent**: https://www.youtube.com/watch?v=sDv4f4s2SB8
+
+**StatQuest — Ridge vs Lasso**: https://www.youtube.com/watch?v=Xm2C_gTAl8c
+
+### The Geometry of OLS
+
+The OLS solution **β = (XᵀX)⁻¹Xᵀy** projects y onto the column space of X. This geometric view explains why multicollinearity (near-linearly-dependent columns) makes XᵀX nearly singular and coefficients explode.
+
+### Gauss-Markov Theorem
+
+Under the LINE assumptions, OLS is the **Best Linear Unbiased Estimator (BLUE)** — no other linear unbiased estimator has lower variance. This theoretical guarantee is why OLS is the default starting point.
+
+### Regularization Path
+
+As λ increases from 0 to ∞:
+- **Ridge**: all coefficients shrink smoothly toward zero, none reach exactly zero
+- **Lasso**: coefficients hit zero one by one (sparse solution)
+
+The regularization path reveals which features your model relies on most heavily.`,
+    tryGuidance: "Use the Linear Regression visualizer to drag data points and watch how the regression line and R² update in real time. Try adding outliers to see their outsized effect on MSE. Switch between OLS, Ridge, and Lasso to observe coefficient shrinkage.",
+    interviewGraph: {
+      initialStageId: "s1_cost_function",
+      artifactDimensions: [
+        { label: "Cost Function Intuition", recoveryStageId: "s1_cost_recovery" },
+        { label: "R² Interpretation", recoveryStageId: "s1_r2_recovery" },
+        { label: "Regularization Choice", recoveryStageId: "s1_reg_recovery" },
+      ],
+      stages: {
+        s1_cost_function: {
+          id: "s1_cost_function",
+          type: "click_target",
+          badge: "Stage 1",
+          title: "Stage 1 · Identify the MSE cost function",
+          prompt: "Your interviewer asks you to walk through fitting a linear regression model. Click the line that computes the cost we minimize during training.",
+          code_snippet: `import numpy as np
+
+def fit_linear_regression(X, y, alpha=0.01, epochs=1000):
+    n, p = X.shape
+    beta = np.zeros(p)
+
+    for _ in range(epochs):
+        y_hat = X @ beta                          -- ds-target:predict
+        residuals = y - y_hat                     -- ds-target:residuals
+        cost = np.mean(residuals ** 2)            -- ds-target:mse
+        grad = -(2/n) * X.T @ residuals           -- ds-target:gradient
+        beta -= alpha * grad                      -- ds-target:update
+
+    return beta`,
+          validationCopy: {
+            mse: "Correct! MSE = mean(residuals²) is the cost function we minimize. Squaring residuals ensures large errors are penalized more and the surface is differentiable.",
+            predict: "This computes predictions, not the cost. We minimize cost with respect to the model parameters.",
+            residuals: "Residuals are the errors, but not yet the scalar cost. The cost is derived from the residuals.",
+            gradient: "The gradient tells us which direction to update beta, but is not itself the cost function.",
+            update: "This is the gradient descent parameter update step, not the cost.",
+          },
+          branches: {
+            mse: "s1_r2_interp",
+            predict: "s1_cost_recovery",
+            residuals: "s1_cost_recovery",
+            gradient: "s1_cost_recovery",
+            update: "s1_cost_recovery",
+          },
+          rationale: "MSE (mean squared error) is the cost because squaring residuals: (1) makes negatives positive without absolute value's non-differentiability, (2) heavily penalizes large errors via the quadratic term, and (3) produces a convex loss surface with a single global minimum.",
+        },
+        s1_cost_recovery: {
+          id: "s1_cost_recovery",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Why square the residuals?",
+          prompt: "Why do we square residuals in MSE rather than taking their absolute value?",
+          choices: [
+            { id: "a", label: "Squaring is differentiable everywhere; absolute value has a kink at zero", description: "This enables smooth gradient descent" },
+            { id: "b", label: "Squaring makes all residuals positive", description: "So does absolute value — this alone doesn't explain the choice" },
+            { id: "c", label: "Squaring is easier to compute", description: "Both are computationally trivial" },
+            { id: "d", label: "It is an arbitrary historical convention", description: "There is a mathematical reason" },
+          ],
+          branches: { a: "s1_r2_interp", b: "s1_cost_recovery", c: "s1_cost_recovery", d: "s1_cost_recovery" },
+          rationale: "Squaring residuals gives a smooth, differentiable cost surface everywhere, enabling gradient-based optimization. It also heavily penalizes large errors (quadratic growth vs linear for MAE), which is desirable when big mistakes are especially costly.",
+        },
+        s1_r2_interp: {
+          id: "s1_r2_interp",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Interpret R²",
+          prompt: "Your model scores R² = 0.6 on the test set. Your interviewer asks: 'What does this mean, and is it good enough to deploy?'",
+          choices: [
+            { id: "a", label: "The model is 60% accurate", description: "Accuracy is for classification; R² is about variance explained" },
+            { id: "b", label: "The model explains 60% of the variance in y; whether it's enough depends on the domain and baseline", description: "Correct framing with appropriate caveat" },
+            { id: "c", label: "The model has a 40% error rate", description: "Error rate is not how R² is interpreted" },
+            { id: "d", label: "60% of predictions are within the confidence interval", description: "That is a different statistic entirely" },
+          ],
+          branches: { a: "s1_r2_recovery", b: "s1_reg_choice", c: "s1_r2_recovery", d: "s1_r2_recovery" },
+          rationale: "R² measures the proportion of variance in y explained by the model. R²=0.6 means 60% of variance is explained. Whether that is sufficient is domain-dependent — in economics 0.6 may be excellent; in physics 0.99 might be required. Always compare to a baseline (e.g., predicting the mean gives R²=0).",
+        },
+        s1_r2_recovery: {
+          id: "s1_r2_recovery",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · R² formula",
+          prompt: "R² is defined as 1 − (SS_res / SS_tot). What does SS_tot represent?",
+          choices: [
+            { id: "a", label: "Total variance in y around its mean", description: "Σ(yᵢ − ȳ)²" },
+            { id: "b", label: "Total squared predictions", description: "That would be Σŷᵢ²" },
+            { id: "c", label: "Sum of residuals from the fitted model", description: "That is SS_res, not SS_tot" },
+            { id: "d", label: "Number of training samples", description: "n is used to normalize but is not SS_tot" },
+          ],
+          branches: { a: "s1_reg_choice", b: "s1_r2_recovery", c: "s1_r2_recovery", d: "s1_r2_recovery" },
+          rationale: "SS_tot = Σ(yᵢ − ȳ)² is the total variance in y. SS_res = Σ(yᵢ − ŷᵢ)² is unexplained variance. R² = 1 − SS_res/SS_tot tells you what fraction of total variance the model accounts for.",
+        },
+        s1_reg_choice: {
+          id: "s1_reg_choice",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · Choose regularization",
+          prompt: "You have 200 features but suspect only ~10 are truly predictive. Your model is overfitting. Which regularization method should you use and why?",
+          choices: [
+            { id: "a", label: "Ridge (L2) — shrinks all coefficients uniformly", description: "Does not perform feature selection" },
+            { id: "b", label: "Lasso (L1) — drives irrelevant coefficients to exactly zero", description: "Performs implicit feature selection" },
+            { id: "c", label: "No regularization — just add more data", description: "More data helps, but regularization addresses the sparse-signal problem directly" },
+            { id: "d", label: "ElasticNet with α=0 (pure L2)", description: "α=0 is Ridge, not ElasticNet; does not zero out features" },
+          ],
+          branches: { a: "s1_reg_recovery", b: "s1_terminal", c: "s1_reg_recovery", d: "s1_reg_recovery" },
+          rationale: "Lasso (L1) is the right tool when you believe the true signal is sparse. Its geometric property — diamond-shaped constraint region — causes coefficients to hit exactly zero at corners, performing automatic feature selection. Ridge shrinks all coefficients but never eliminates them.",
+        },
+        s1_reg_recovery: {
+          id: "s1_reg_recovery",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Ridge vs Lasso geometry",
+          prompt: "Geometrically, why does Lasso (L1) produce sparse solutions while Ridge (L2) does not?",
+          choices: [
+            { id: "a", label: "The L1 constraint region is a diamond with corners on the axes; solutions often land at corners where coefficients are zero", description: "Geometric intuition" },
+            { id: "b", label: "Lasso uses a smaller penalty, so fewer features survive", description: "Penalty magnitude is controlled by λ in both methods" },
+            { id: "c", label: "Ridge uses a quadratic penalty which is strictly convex", description: "Both are convex; this doesn't explain sparsity" },
+            { id: "d", label: "Lasso is only applied to large coefficients", description: "Lasso is applied to all coefficients equally" },
+          ],
+          branches: { a: "s1_terminal", b: "s1_reg_recovery", c: "s1_reg_recovery", d: "s1_reg_recovery" },
+          rationale: "The L1 constraint region (‖β‖₁ ≤ t) is a diamond (in 2D) or cross-polytope (in higher dims) with corners at the axes. The elliptical contours of the loss function are likely to first touch the constraint region at these corners, where one or more coefficients equal zero — producing sparsity.",
+        },
+        s1_terminal: {
+          id: "s1_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · Linear Regression mastered",
+          prompt: "Final check: Your interviewer asks — when would you NOT use linear regression even with regularization?",
+          terminal: true,
+          choices: [
+            { id: "a", label: "When the target is categorical or the relationship is highly non-linear", description: "Strong answer — use logistic regression or tree-based models instead" },
+            { id: "b", label: "When the dataset is too large", description: "Linear regression scales well; dataset size alone is not the issue" },
+            { id: "c", label: "When features are correlated", description: "Regularization handles multicollinearity" },
+            { id: "d", label: "When R² < 0.5 on training data", description: "Low R² on training might indicate non-linearity, but is not a categorical rule" },
+          ],
+          branches: { a: "s1_terminal", b: "s1_terminal", c: "s1_terminal", d: "s1_terminal" },
+          rationale: "Linear regression assumes a linear relationship and a continuous target. Categorical targets require logistic regression or classifiers. Highly non-linear relationships need polynomial features, splines, or non-parametric models. Regularization fixes overfitting but cannot fix a fundamentally wrong functional form.",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "Why do we use Mean Squared Error (MSE) instead of Mean Absolute Error (MAE) as the default cost function for linear regression?",
+        options: [
+          "MSE is differentiable everywhere, enabling smooth gradient descent, and penalizes large errors more heavily",
+          "MSE is always smaller than MAE, making it easier to minimize",
+          "MAE cannot be computed for negative residuals",
+          "MSE is a standard convention with no mathematical justification",
+        ],
+        correctIndex: 0,
+        explanation: "MSE's squared terms create a smooth, differentiable surface everywhere (MAE has a non-differentiable kink at zero). The quadratic growth also penalizes large outlier errors more than MAE's linear growth, which is often desirable. These properties make gradient-based optimization efficient.",
+      },
+      {
+        question: "A linear regression model has R² = 0.82 on training data and R² = 0.41 on test data. What is the most likely problem?",
+        options: [
+          "The model is overfitting — it memorizes training data but fails to generalize",
+          "The test set is from a different distribution than training",
+          "R² cannot be computed on test data",
+          "The model is underfitting — it needs more features",
+        ],
+        correctIndex: 0,
+        explanation: "A large gap between training R² (0.82) and test R² (0.41) is the classic signature of overfitting. The model has memorized noise in the training data. Solutions include Ridge/Lasso regularization, reducing model complexity, or gathering more training data.",
+      },
+      {
+        question: "You add 50 new features to a linear regression model. Training R² increases from 0.72 to 0.89, but adjusted R² drops from 0.71 to 0.68. What does this indicate?",
+        options: [
+          "The new features are mostly noise — they inflate R² without improving genuine explanatory power",
+          "Adjusted R² is always lower than R², so this is expected and desirable",
+          "The model needs more regularization to increase adjusted R²",
+          "You should use more training data before adding features",
+        ],
+        correctIndex: 0,
+        explanation: "Adjusted R² penalizes model complexity. When it decreases despite R² increasing, the new features are not contributing meaningful signal — they are fitting noise. This is a strong indicator to use Lasso for feature selection or to carefully evaluate which features to keep.",
+      },
+    ],
+  },
+
+  "ml-s2": {
+    durationLabel: "20 min",
+    outcomes: [
+      "Explain why the sigmoid function maps linear outputs to probabilities",
+      "Interpret logistic regression coefficients as log-odds",
+      "Describe how the decision boundary shifts with L1/L2 regularization",
+      "Explain why log-loss is used instead of MSE for classification",
+    ],
+    learnMarkdown: `## Logistic Regression & Decision Boundaries
+
+Logistic regression is the gateway to classification. Despite the name, it is a **classification** algorithm. It estimates the probability that an input belongs to class 1, then applies a threshold to decide.
+
+### Why Not Linear Regression for Classification?
+
+Linear regression predicts unbounded real values (−∞ to +∞). Probabilities must live in [0, 1]. Applying linear regression to a binary target produces:
+- Predicted probabilities outside [0, 1]
+- Non-constant error variance (heteroscedasticity by design)
+- Sensitivity to outliers that distorts the decision boundary
+
+### The Sigmoid Function
+
+The sigmoid (logistic) function squashes any real number to (0, 1):
+
+\`\`\`
+σ(z) = 1 / (1 + e^(−z))
+\`\`\`
+
+We apply it to the linear combination: **z = Xβ**
+
+\`\`\`python
+import numpy as np
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-z))
+
+# P(y=1 | x) = sigmoid(x @ beta)
+probs = sigmoid(X @ beta)
+\`\`\`
+
+### Log-Odds and Coefficients
+
+Taking the log of the odds ratio:
+
+\`\`\`
+log(P/(1−P)) = β₀ + β₁x₁ + β₂x₂ + ...
+\`\`\`
+
+This is the **log-odds** (logit). Each coefficient βⱼ represents the change in **log-odds** for a one-unit increase in xⱼ, holding other features constant.
+
+Exponentiating gives the **odds ratio**: **e^βⱼ**. If β_age = 0.3, then e^0.3 ≈ 1.35 means each year of age multiplies the odds of the outcome by 1.35.
+
+### Log-Loss (Binary Cross-Entropy)
+
+Instead of MSE, we minimize log-loss:
+
+\`\`\`
+L = −(1/n) Σ [yᵢ log(p̂ᵢ) + (1−yᵢ) log(1−p̂ᵢ)]
+\`\`\`
+
+When y=1: loss = −log(p̂). Higher predicted probability → lower loss.
+When y=0: loss = −log(1−p̂). Lower predicted probability → lower loss.
+
+MSE on probabilities creates a non-convex optimization surface for logistic regression. Log-loss is **convex**, guaranteeing a single global minimum with gradient descent.
+
+### The Decision Boundary
+
+The boundary where P(y=1) = 0.5 corresponds to z = 0, i.e., **Xβ = 0**. In 2D feature space with two features x₁, x₂:
+
+\`\`\`
+β₀ + β₁x₁ + β₂x₂ = 0   →   x₂ = −(β₀ + β₁x₁) / β₂
+\`\`\`
+
+This is a **linear** decision boundary. Logistic regression cannot model curved boundaries without feature engineering (polynomial features).
+
+### Multinomial Logistic Regression
+
+For K > 2 classes, we use the **softmax** function:
+
+\`\`\`python
+def softmax(z):
+    exp_z = np.exp(z - z.max(axis=1, keepdims=True))  # numerically stable
+    return exp_z / exp_z.sum(axis=1, keepdims=True)
+\`\`\`
+
+We fit K−1 independent binary classifiers (one class as reference) or directly optimize softmax with cross-entropy loss.
+
+### L1 vs L2 Regularization Effects
+
+\`\`\`python
+from sklearn.linear_model import LogisticRegression
+
+# L2 (default): all coefficients shrink, none zero out
+lr_l2 = LogisticRegression(penalty='l2', C=1.0)
+
+# L1: sparse — many coefficients become exactly zero
+lr_l1 = LogisticRegression(penalty='l1', solver='saga', C=1.0)
+\`\`\`
+
+Note: in sklearn, **C = 1/λ** — smaller C = stronger regularization.
+
+**Effect on boundary**: stronger regularization pulls the boundary toward the center, reducing confidence in predictions and widening the "uncertain" zone around the boundary.
+
+### When Logistic Regression Excels
+
+- **Interpretable coefficients** needed (healthcare, finance, legal)
+- **Baseline model** before trying complex methods
+- **Calibrated probabilities** out of the box (unlike SVMs, trees)
+- **High-dimensional sparse** features (text classification with L1)`,
+    video: null,
+    videoFallbackMarkdown: `## Deep Dive: Logistic Regression
+
+**StatQuest — Logistic Regression**: https://www.youtube.com/watch?v=yIYKR4sgzI8
+
+**StatQuest — Maximum Likelihood**: https://www.youtube.com/watch?v=BfKanl1aSG0
+
+### Maximum Likelihood Estimation (MLE)
+
+Minimizing log-loss is equivalent to **maximizing the likelihood** of the observed labels under the Bernoulli model:
+
+\`\`\`
+L(β) = Π P(yᵢ|xᵢ;β) = Π p̂ᵢ^yᵢ (1−p̂ᵢ)^(1−yᵢ)
+\`\`\`
+
+Taking the log (turning products to sums) and negating gives log-loss. MLE is why logistic regression produces calibrated probabilities — it is explicitly optimized to match the empirical distribution of labels.
+
+### Regularization as a Prior (Bayesian View)
+
+L2 regularization corresponds to placing a Gaussian prior N(0, 1/λ) on each coefficient. L1 corresponds to a Laplace prior. MAP estimation under these priors is equivalent to penalized MLE.`,
+    tryGuidance: "Use the Logistic Regression visualizer to move the decision boundary and observe how changing C (regularization strength) affects the width of the uncertain zone. Toggle between L1 and L2 to see which features are zeroed out.",
+    interviewGraph: {
+      initialStageId: "s2_why_not_linear",
+      artifactDimensions: [
+        { label: "Sigmoid & Log-Loss Reasoning", recoveryStageId: "s2_sigmoid_recovery" },
+        { label: "Coefficient Interpretation", recoveryStageId: "s2_coef_recovery" },
+        { label: "Regularization Effect", recoveryStageId: "s2_reg_recovery" },
+      ],
+      stages: {
+        s2_why_not_linear: {
+          id: "s2_why_not_linear",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · Why logistic over linear for classification?",
+          prompt: "An interviewer asks: 'You have a binary classification problem. Why not just use linear regression with a 0.5 threshold?' What is the most complete answer?",
+          choices: [
+            { id: "a", label: "Linear regression is slower to train for binary targets", description: "Speed is not the issue" },
+            { id: "b", label: "Linear regression predictions are unbounded and the MSE loss is non-convex for binary targets, producing poor probability estimates", description: "Core mathematical reason" },
+            { id: "c", label: "Linear regression cannot handle two classes", description: "It technically can threshold, but poorly" },
+            { id: "d", label: "Logistic regression always achieves higher accuracy", description: "Not universally true" },
+          ],
+          branches: { a: "s2_sigmoid_recovery", b: "s2_coef_interp", c: "s2_sigmoid_recovery", d: "s2_sigmoid_recovery" },
+          rationale: "Linear regression predicts real-valued outputs in (−∞, +∞), while probabilities must be in [0,1]. Additionally, applying MSE to binary labels creates a non-convex optimization landscape. The sigmoid + log-loss combination ensures predictions are valid probabilities and the optimization is convex.",
+        },
+        s2_sigmoid_recovery: {
+          id: "s2_sigmoid_recovery",
+          type: "click_target",
+          badge: "Recovery",
+          title: "Recovery · Identify the log-loss computation",
+          prompt: "Click the line that computes the binary cross-entropy (log-loss) for logistic regression.",
+          code_snippet: `import numpy as np
+
+def logistic_regression_loss(X, y, beta):
+    z = X @ beta                                        -- ds-target:linear
+    p_hat = 1 / (1 + np.exp(-z))                       -- ds-target:sigmoid
+    loss = -np.mean(                                    -- ds-target:logloss
+        y * np.log(p_hat) + (1 - y) * np.log(1 - p_hat)
+    )
+    grad = X.T @ (p_hat - y) / len(y)                  -- ds-target:gradient
+    return loss, grad`,
+          validationCopy: {
+            logloss: "Correct! Log-loss = −mean(y·log(p̂) + (1−y)·log(1−p̂)) penalizes confident wrong predictions most severely.",
+            linear: "This is the linear combination z = Xβ, not the loss. z is input to the sigmoid.",
+            sigmoid: "The sigmoid converts z to probability — it is not the loss function itself.",
+            gradient: "The gradient is used for the parameter update, not the loss value.",
+          },
+          branches: {
+            logloss: "s2_coef_interp",
+            linear: "s2_sigmoid_recovery",
+            sigmoid: "s2_sigmoid_recovery",
+            gradient: "s2_sigmoid_recovery",
+          },
+          rationale: "Log-loss (binary cross-entropy) is −mean(y·log(p̂) + (1−y)·log(1−p̂)). When y=1 and p̂ is close to 0, −log(p̂) → ∞. When y=0 and p̂ is close to 1, −log(1−p̂) → ∞. This heavily penalizes confident wrong predictions.",
+        },
+        s2_coef_interp: {
+          id: "s2_coef_interp",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Interpret a coefficient",
+          prompt: "A logistic regression model predicting loan default has β_income = −0.8. How do you interpret this to a non-technical stakeholder?",
+          choices: [
+            { id: "a", label: "Higher income decreases the log-odds of default by 0.8 per unit; equivalently, each unit increase multiplies the odds of default by e^(−0.8) ≈ 0.45", description: "Technically precise and translatable" },
+            { id: "b", label: "Higher income reduces the probability of default by 80%", description: "Coefficient is in log-odds space, not probability space" },
+            { id: "c", label: "Income is the 0.8th most important feature", description: "Feature importance is not what the coefficient magnitude means here" },
+            { id: "d", label: "The model is 80% confident about income's effect", description: "Confidence intervals are not the same as coefficient magnitude" },
+          ],
+          branches: { a: "s2_reg_effect", b: "s2_coef_recovery", c: "s2_coef_recovery", d: "s2_coef_recovery" },
+          rationale: "Logistic regression coefficients are in log-odds space. To communicate to stakeholders: exponentiating gives the odds ratio. e^(−0.8) ≈ 0.45 means each unit increase in income multiplies the odds of default by 0.45 — roughly halving them. The probability effect depends on the baseline probability.",
+        },
+        s2_coef_recovery: {
+          id: "s2_coef_recovery",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Log-odds definition",
+          prompt: "The logit function is defined as log(p / (1−p)). What does p/(1−p) represent?",
+          choices: [
+            { id: "a", label: "The odds: the ratio of probability of success to probability of failure", description: "Fundamental definition" },
+            { id: "b", label: "The probability of the positive class", description: "p alone is the probability; p/(1−p) is the odds" },
+            { id: "c", label: "The inverse of the sigmoid function", description: "Logit IS the inverse sigmoid, but p/(1−p) is specifically the odds" },
+            { id: "d", label: "The likelihood ratio between two models", description: "That is a different concept in hypothesis testing" },
+          ],
+          branches: { a: "s2_reg_effect", b: "s2_coef_recovery", c: "s2_coef_recovery", d: "s2_coef_recovery" },
+          rationale: "The odds ratio p/(1−p) expresses how much more likely success is than failure. If p=0.75, odds = 3 (3:1 in favor). The log-odds (logit) maps this to (−∞,+∞), which is what the linear part of logistic regression models. Exponentiate a coefficient to get its effect on the odds ratio.",
+        },
+        s2_reg_effect: {
+          id: "s2_reg_effect",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · Regularization in logistic regression",
+          prompt: "You are training a logistic regression spam classifier with 50,000 word features. Most words are irrelevant. Which configuration is best?",
+          choices: [
+            { id: "a", label: "LogisticRegression(penalty='l2', C=1.0) — standard Ridge", description: "Shrinks all word coefficients but keeps all 50,000 features" },
+            { id: "b", label: "LogisticRegression(penalty='l1', solver='saga', C=0.1) — sparse Lasso with strong regularization", description: "Zeros out irrelevant word features, producing a sparse model" },
+            { id: "c", label: "LogisticRegression(penalty=None) — no regularization", description: "Will overfit heavily with 50,000 features" },
+            { id: "d", label: "LogisticRegression(penalty='l2', C=1000) — very weak regularization", description: "C=1000 means λ=0.001, nearly no regularization — will overfit" },
+          ],
+          branches: { a: "s2_reg_recovery", b: "s2_terminal", c: "s2_reg_recovery", d: "s2_reg_recovery" },
+          rationale: "With 50,000 sparse word features (typical in NLP), L1 regularization is ideal: it drives irrelevant word coefficients to exactly zero, producing an interpretable, efficient model. C=0.1 (λ=10) applies strong regularization suitable for high-dimensional sparse data. This is the principle behind classic linear text classifiers.",
+        },
+        s2_reg_recovery: {
+          id: "s2_reg_recovery",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · sklearn C parameter",
+          prompt: "In sklearn's LogisticRegression, what does a smaller C value do?",
+          choices: [
+            { id: "a", label: "Increases regularization strength (C = 1/λ, so smaller C = larger λ = more penalization)", description: "Correct — counter-intuitive but important" },
+            { id: "b", label: "Reduces regularization strength", description: "Opposite — C is the inverse of regularization strength" },
+            { id: "c", label: "Sets the number of iterations", description: "That is the max_iter parameter" },
+            { id: "d", label: "Controls the decision threshold", description: "Threshold is set at prediction time, not via C" },
+          ],
+          branches: { a: "s2_terminal", b: "s2_reg_recovery", c: "s2_reg_recovery", d: "s2_reg_recovery" },
+          rationale: "sklearn uses C = 1/λ as the regularization parameter. Smaller C → larger λ → stronger regularization → coefficients shrink more. This is the opposite convention from most textbooks. Default C=1.0 is moderate regularization. Always tune C via cross-validation — it is one of the most impactful hyperparameters.",
+        },
+        s2_terminal: {
+          id: "s2_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · Logistic Regression mastered",
+          prompt: "You have built a logistic regression model with 95% training accuracy but 62% test accuracy. What would you try first?",
+          terminal: true,
+          choices: [
+            { id: "a", label: "Increase regularization (decrease C) to reduce overfitting", description: "Best first step — directly addresses the train/test gap" },
+            { id: "b", label: "Switch to a more complex model immediately", description: "Fix the overfitting first; complexity will make it worse" },
+            { id: "c", label: "Collect more features", description: "More features without regularization will worsen overfitting" },
+            { id: "d", label: "Lower the decision threshold", description: "Threshold affects precision/recall tradeoff, not overfitting" },
+          ],
+          branches: { a: "s2_terminal", b: "s2_terminal", c: "s2_terminal", d: "s2_terminal" },
+          rationale: "A 33-point gap between train (95%) and test (62%) accuracy is severe overfitting. Increasing regularization (smaller C) is the first intervention. If that fails, consider: reducing features, getting more training data, or using a simpler model. Only switch to a more complex model after addressing overfitting.",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "Why is log-loss (binary cross-entropy) preferred over MSE as the cost function for logistic regression?",
+        options: [
+          "Log-loss creates a convex optimization surface for the logistic model, while MSE would create local minima, and log-loss aligns with maximum likelihood estimation",
+          "Log-loss is always smaller than MSE, making it easier to minimize",
+          "MSE cannot handle binary (0/1) targets mathematically",
+          "Log-loss makes training faster due to simpler gradient computation",
+        ],
+        correctIndex: 0,
+        explanation: "When the sigmoid function is composed with MSE, the resulting optimization landscape is non-convex (has local minima). Log-loss combined with the sigmoid produces a convex surface with a guaranteed global minimum. Additionally, minimizing log-loss is equivalent to maximum likelihood estimation under a Bernoulli model, giving principled probability estimates.",
+      },
+      {
+        question: "A logistic regression coefficient for 'years_employed' is β = 1.2. Which interpretation is correct?",
+        options: [
+          "Each additional year of employment increases the log-odds of the outcome by 1.2, corresponding to multiplying the odds by e^1.2 ≈ 3.32",
+          "Each additional year increases the probability of the outcome by 1.2",
+          "Years of employment is the 1.2th most important feature",
+          "The model is 120% confident in the employment effect",
+        ],
+        correctIndex: 0,
+        explanation: "Logistic regression coefficients are on the log-odds scale. To interpret: exponentiate to get the odds ratio. e^1.2 ≈ 3.32 means each additional year of employment multiplies the odds of the outcome by 3.32. The effect on probability depends on the baseline probability and is not a simple linear relationship.",
+      },
+      {
+        question: "What is the decision boundary of a logistic regression model with two features x₁ and x₂ and coefficients β₀=−2, β₁=0.5, β₂=1.0?",
+        options: [
+          "A straight line where −2 + 0.5x₁ + 1.0x₂ = 0, i.e., x₂ = 2 − 0.5x₁",
+          "A curve where the sigmoid output equals 0.5",
+          "A circle centered at the origin",
+          "A parabola through the data points",
+        ],
+        correctIndex: 0,
+        explanation: "The decision boundary is where P(y=1) = 0.5, which means σ(z) = 0.5, which means z = 0. So the boundary is β₀ + β₁x₁ + β₂x₂ = 0 → −2 + 0.5x₁ + x₂ = 0 → x₂ = 2 − 0.5x₁. This is always a linear (hyperplane) boundary. Non-linear boundaries require polynomial feature engineering.",
+      },
+    ],
+  },
+
 };
 
 
