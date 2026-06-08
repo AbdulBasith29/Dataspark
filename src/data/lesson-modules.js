@@ -34032,718 +34032,1324 @@ GROUP BY platform`,
   },
 
 "ps-e1": {
-  durationLabel: "25 min",
-  outcomes: [
-    "Choose the correct randomization unit (user-level vs session-level) and explain why user-level is preferred",
-    "Calculate minimum sample size from MDE, baseline variance, power, and alpha",
-    "Detect Sample Ratio Mismatch (SRM) and understand why it invalidates an experiment",
-    "Run an AA test to validate the randomization infrastructure before running real experiments",
-  ],
-  learnMarkdown: `## A/B Test Design: End to End
-
-A/B testing is the gold standard for causal inference in product development. A poorly designed test gives wrong answers with high confidence — which is worse than no test at all.
-
----
-
-## Step 1: Randomization Unit
-
-The randomization unit determines what gets assigned to treatment vs control.
-
-**User-level randomization**: each user is assigned once and consistently sees the same variant. This is the standard choice.
-
-**Session-level randomization**: each session (page load, visit) is independently assigned. Problems:
-- The same user may see treatment in one session and control in another — double-dipping
-- Inflates effective sample size (N sessions >> N users)
-- Introduces variance from within-user variability
-- Violates SUTVA (one user's behavior in one session affects their next session)
-
-**When user-level fails**: for experiments that span multiple users (social features), you may need cluster randomization.
-
----
-
-## Step 2: Sample Size Calculation
-
-Four inputs:
-1. **MDE** (Minimum Detectable Effect): the smallest improvement worth detecting. Business decision: what change is practically significant?
-2. **Baseline metric** (mean and variance)
-3. **Power** (1 − β): typically 0.8. The probability of detecting an effect if it exists.
-4. **Significance level** (α): typically 0.05. The false positive rate.
-
-Rough formula: n ≈ 16σ²/Δ² for 80% power, 5% significance (one-sided).
-
-Example: baseline click rate 5%, MDE 0.5% absolute improvement, σ² ≈ p(1−p) ≈ 0.0475. n ≈ 16 × 0.0475 / (0.005)² ≈ 30,400 per arm.
-
----
-
-## Step 3: Sample Ratio Mismatch (SRM)
-
-SRM: the actual ratio of users assigned to treatment vs control doesn't match the intended ratio.
-
-Expected: 50/50. Observed: 48/52. Run a chi-squared test: if p < 0.05, SRM is present.
-
-SRM means randomization is broken. The experiment is invalid regardless of the primary metric result. Common causes: cache-busting errors, JavaScript errors blocking assignment, bot traffic. Never report results from an experiment with SRM.
-
----
-
-## Step 4: AA Test
-
-Before any real experiment, run a fake A/A test (same treatment in both arms). Expected result: no significant difference on any metric.
-
-If the AA test shows significant differences, your randomization or logging infrastructure has a bug. Fix it before running real experiments.
-
----
-
-## Assignment Mechanics
-
-Standard: \`hash(user_id + experiment_salt) mod 100 < threshold → treatment\`
-
-The salt ensures different experiments produce different assignments (orthogonality).
-`,
-  video: null,
-  videoFallbackMarkdown: `## Deep Dive: CUPED & Variance Reduction
-
-**CUPED** (Controlled-experiment Using Pre-Experiment Data): use pre-experiment metric values to reduce variance in the treatment effect estimate.
-
-CUPED-adjusted Y = Y − θ × (X − E[X]) where X is the pre-experiment covariate (e.g., pre-experiment revenue). θ is estimated by regressing Y on X.
-
-Effect: reduces the variance of the estimator, which reduces required sample size by 30–50% for typical product metrics where pre-experiment behavior is predictive. Netflix and Microsoft use CUPED standard in their experimentation platforms.
-`,
-  tryGuidance: "Use the A/B test simulator to set up an experiment, adjust sample size and MDE, and observe power vs significance tradeoffs interactively.",
-  interviewGraph: {
-    initialStageId: "ps_e1_stage1",
-    artifactDimensions: [
-      { label: "Randomization Unit", recoveryStageId: "ps_e1_rec1" },
-      { label: "Sample Size", recoveryStageId: "ps_e1_rec2" },
-      { label: "SRM Detection", recoveryStageId: "ps_e1_terminal", passLabel: "Experiment Validity" },
+    durationLabel: "25 min",
+    outcomes: [
+      "Formulate a null and alternative hypothesis, choose a primary metric, and commit to a decision rule before data collection starts",
+      "Apply the two-sample t-test sample size formula including variance, and explain why omitting σ² makes the estimate meaningless",
+      "Distinguish statistical significance from practical significance and explain minimum detectable effect as a business decision",
+      "Explain why peeking inflates the false positive rate and what sequential testing solves",
+      "Describe holdback tests, AA validation, and CUPED variance reduction in an experimentation system",
     ],
-    stages: {
-      ps_e1_stage1: {
-        id: "ps_e1_stage1",
-        type: "scenario_choice",
-        badge: "Stage 1",
-        title: "Stage 1 · Randomization unit",
-        prompt: "Your team wants to test a new checkout flow. A junior DS proposes session-level randomization 'to get results faster.' What's the problem?",
-        choices: [
-          { id: "a", label: "Session-level randomization is fine — more sessions means faster results", description: "More sessions isn't useful if the same users are counted multiple times inconsistently." },
-          { id: "b", label: "The same user may see treatment in one session and control in another, violating the independence assumption and inflating apparent sample size", description: "Double-dipping corrupts the causal estimate — the user-level effect is confounded." },
-          { id: "c", label: "Sessions are harder to track than users technically", description: "Technical difficulty isn't the main issue." },
-        ],
-        branches: { a: "ps_e1_rec1", b: "ps_e1_stage2", c: "ps_e1_rec1" },
-        rationale: "B is correct. Session-level randomization means the same user may experience both variants. Their behavior in session 2 is influenced by what they saw in session 1. The sessions are not independent units of observation. This violates SUTVA and inflates the effective N (sessions >> users), making the confidence intervals too narrow.",
-      },
-      ps_e1_rec1: {
-        id: "ps_e1_rec1",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · Randomization units",
-        prompt: "Why is user-level randomization the standard for most product experiments?",
-        choices: [
-          { id: "a", label: "Each user sees one consistent variant, preserving independence between units and making the experiment estimate reflect the true user-level treatment effect", description: "User-level consistency eliminates within-user contamination." },
-        ],
-        branches: { a: "ps_e1_stage2" },
-        rationale: "User-level randomization ensures each user has a single, consistent treatment assignment. This preserves the independence assumption required for valid causal inference.",
-      },
-      ps_e1_stage2: {
-        id: "ps_e1_stage2",
-        type: "scenario_choice",
-        badge: "Stage 2",
-        title: "Stage 2 · SRM check",
-        prompt: "Your experiment was designed 50/50. After 7 days, the assignment is 48,200 treatment vs 51,800 control. What do you do?",
-        choices: [
-          { id: "a", label: "Report the primary metric results — small imbalances happen by chance", description: "3,600 difference in 100,000 total assignments is unlikely by chance alone." },
-          { id: "b", label: "Run a chi-squared test. If p < 0.05, declare SRM, stop the experiment, and fix the randomization bug before continuing", description: "SRM means the randomization is broken. Results from a broken randomization are invalid." },
-          { id: "c", label: "Reweight the results post-hoc to correct for the imbalance", description: "Post-hoc reweighting doesn't fix the underlying randomization violation." },
-        ],
-        branches: { a: "ps_e1_rec2", b: "ps_e1_stage3", c: "ps_e1_rec2" },
-        rationale: "B is correct. A 48%/52% split in 100,000 samples is unlikely by chance (chi-squared would show p << 0.001). SRM indicates the randomization mechanism is broken — a JavaScript bug, caching issue, or bot traffic asymmetry. You cannot trust results from an experiment with SRM, regardless of what the primary metric shows.",
-      },
-      ps_e1_rec2: {
-        id: "ps_e1_rec2",
-        type: "scenario_choice",
-        badge: "Recovery 2",
-        title: "Recovery 2 · SRM implications",
-        prompt: "Why does Sample Ratio Mismatch invalidate an experiment?",
-        choices: [
-          { id: "a", label: "SRM means the randomization mechanism is broken — the groups are not comparable, so the primary metric difference may reflect selection bias, not treatment effect", description: "Broken randomization = broken causal inference." },
-        ],
-        branches: { a: "ps_e1_stage3" },
-        rationale: "A/B testing relies on random assignment creating comparable groups. SRM breaks this: the groups differ systematically. Any observed metric difference may be selection bias, not the treatment.",
-      },
-      ps_e1_stage3: {
-        id: "ps_e1_stage3",
-        type: "scenario_choice",
-        badge: "Stage 3",
-        title: "Stage 3 · Sample size components",
-        prompt: "You reduced the MDE from 2% to 1% absolute improvement (you want to detect smaller effects). How does this affect required sample size?",
-        choices: [
-          { id: "a", label: "Sample size doubles — halving the MDE requires twice as many observations", description: "Close — but the relationship is quadratic." },
-          { id: "b", label: "Sample size quadruples — n scales as 1/Δ², so halving Δ multiplies n by 4", description: "The sample size formula: n ≈ 16σ²/Δ². Halving Δ increases n by 4×." },
-          { id: "c", label: "Sample size is unchanged — MDE doesn't affect sample size calculation", description: "MDE is one of the key inputs to sample size calculation." },
-        ],
-        branches: { a: "ps_e1_stage3", b: "ps_e1_stage3", c: "ps_e1_stage3" },
-        terminal: true,
-        rationale: "B is correct. n ∝ 1/Δ². Detecting a smaller effect requires disproportionately more data. This is why MDE selection is critical: a business must decide whether an improvement smaller than X% is worth detecting. If X is too small, the experiment becomes infeasible given traffic constraints.",
+    learnMarkdown: `## A/B Test Design: The Controlled Experiment Mindset
+
+An A/B test is not a coin flip. It is a controlled experiment with a pre-specified hypothesis, a sample size calculated before you look at the data, and a decision rule you commit to before the test starts. Violating any of these three constraints does not merely reduce rigor — it destroys the statistical guarantees entirely.
+
+---
+
+## Step 1: Formulate the Hypothesis First
+
+Every experiment begins with a clearly stated null and alternative hypothesis, written before any data is collected.
+
+**H₀ (null hypothesis):** The new checkout button has no effect on conversion rate. δ = 0.
+
+**H₁ (alternative hypothesis):** The new button increases conversion rate. δ > 0.
+
+The primary metric must be chosen at this stage, not after looking at results. For a checkout flow change, conversion rate is the natural choice. Secondary and guardrail metrics (page load time, cart abandonment, revenue per session) are also registered now — not discovered post-hoc.
+
+Why this discipline matters: if you choose your metric after seeing which one moved, you are conducting an exploratory analysis, not a confirmatory test. The p-value is no longer interpretable.
+
+---
+
+## Step 2: Sample Size Before Data Collection
+
+The sample size formula for a two-sample t-test is:
+
+$$n = \\frac{(z_{\\alpha/2} + z_\\beta)^2 \\cdot 2\\sigma^2}{\\delta^2}$$
+
+Plugging in standard values (α = 0.05, power = 0.80):
+
+- z_{α/2} = 1.96, z_β = 0.84, so (z_{α/2} + z_β)² ≈ 7.85
+- The "16σ²/δ²" approximation comes from using the round numbers: 2 × 7.85 ≈ 16
+
+**The four required inputs:**
+
+1. **σ² (variance):** For a binary metric like conversion rate with baseline p, σ² = p(1−p). For a continuous metric (revenue per user), estimate from historical data. **This is the most commonly omitted term.**
+2. **δ (MDE):** Minimum Detectable Effect — the smallest improvement worth detecting. This is a business decision, not a statistical one.
+3. **α:** False positive rate, typically 0.05.
+4. **Power (1−β):** Probability of detecting a real effect, typically 0.80.
+
+**Example:** Baseline conversion 3.2%, MDE = +0.5pp absolute. σ² = 0.032 × (1 − 0.032) ≈ 0.031. n ≈ 16 × 0.031 / (0.005)² ≈ 19,840 per arm. At 10,000 daily users, you need roughly 4 days per arm — so an 8-day experiment.
+
+---
+
+## Step 3: MDE Is a Business Decision, Not a Statistical One
+
+The Minimum Detectable Effect answers: "What is the smallest improvement that would change our decision?"
+
+If a +0.1pp lift in conversion would not justify the engineering cost and risk, there is no point designing an experiment sensitive enough to detect it. Set the MDE at the threshold of practical significance, then calculate the sample size.
+
+**Statistical significance vs practical significance:** A test with n = 5 million users can detect a +0.001pp lift at p < 0.05. That lift is almost certainly not worth shipping. Always report effect size alongside the p-value.
+
+---
+
+## Step 4: Commit to a Stopping Rule — Peeking is Dangerous
+
+The stopping rule is the decision rule you commit to before the experiment starts. The most common form: "We will analyze results once, after reaching the pre-specified sample size."
+
+**Why peeking is dangerous:** Checking results every day and stopping when p < 0.05 inflates the actual false positive rate far above the nominal α. If you check at 20 equally-spaced timepoints with α = 0.05 each, the true false positive rate is approximately 1 − 0.95²⁰ ≈ 64%. You will "find" effects that do not exist.
+
+The correct response when a PM asks you to stop early: "We pre-committed to 14 days for the sample size. If we stop on day 3 at p = 0.03, our actual false positive rate is not 5% — it is much higher. We must reach the planned sample size."
+
+---
+
+## Step 5: Holdback Tests vs Feature Tests
+
+**Feature test (standard A/B test):** compares a new treatment to the current control. Used to evaluate a specific product change before full rollout.
+
+**Holdback test:** after a feature ships to 100% of users, a small holdback group (typically 5–10%) is kept on the old experience. This measures the long-run causal effect, removing novelty-effect bias that inflates short-term metrics.
+
+Holdback tests are how companies distinguish a durable improvement from a temporary novelty spike.
+
+---
+
+## Step 6: Segmentation at Launch
+
+At launch, examine results across pre-specified segments: platform (iOS/Android/web), user tenure (new vs returning), geography, and device type. Segmentation at launch is valid when the segments were pre-registered. Post-hoc segment fishing after a neutral overall result is a multiple-comparisons problem.
+
+If a segment shows a strong heterogeneous effect (treatment works well for iOS but not Android), that is a hypothesis for a new, pre-registered experiment — not a shippable finding from the current one.
+
+---
+
+## Interview-Ready Summary
+
+An A/B test is valid only if four things happen before data collection: (1) null and alternative hypotheses are written down, (2) the primary metric is chosen, (3) the sample size is calculated using the correct formula — n = (z_{α/2} + z_β)² × 2σ² / δ² — with all four inputs: variance, MDE, power, and alpha, and (4) the stopping rule is committed to. Statistical significance alone is not sufficient to ship: effect size, practical significance, and guardrail metrics must all be evaluated. Peeking is the single most common way an otherwise valid experiment produces a misleading result.
+`,
+    video: null,
+    videoFallbackMarkdown: `## Deep Dive: Sequential Testing, CUPED, and AA Tests
+
+### Sequential Testing: The Principled Solution to Peeking
+
+Standard A/B tests assume a single analysis at a fixed, pre-specified horizon. But product teams want real-time dashboards. The solution is not to peek with a classical test — it is to use a sequential testing method that is mathematically valid at any stopping time.
+
+**mSPRT (mixture Sequential Probability Ratio Test)**, used by Optimizely and Airbnb, pre-specifies a prior distribution over possible effect sizes. The resulting test statistic is an e-value that can be checked continuously. When it exceeds 1/α, you reject H₀ — at any point in time, without inflating the false positive rate. The cost: roughly 30% more data is required compared to a fixed-horizon test with the same α and power.
+
+**Always-Valid p-values** (Johari et al., 2022) convert sequential e-values into p-values that remain valid under optional stopping. These are now standard in modern experimentation platforms.
+
+Sequential testing does not eliminate the need for a pre-specified MDE — it still requires a prior over effect sizes. It solves the timing problem, not the effect size estimation problem.
+
+---
+
+### CUPED: Variance Reduction at Airbnb and Microsoft
+
+CUPED (Controlled-experiment Using Pre-Experiment Data) is a variance reduction technique that uses pre-experiment behavior to reduce noise in the treatment effect estimate.
+
+The adjustment is: Y_adjusted = Y − θ × (X − E[X])
+
+Where X is a pre-experiment covariate (e.g., revenue in the 2 weeks before the experiment) and θ is estimated by regressing Y on X. Because θ × (X − E[X]) has expectation zero, it does not bias the treatment effect — but it absorbs variance that was previously noise.
+
+In practice, CUPED reduces variance by 30–50% for metrics where pre-experiment behavior is predictive (revenue, engagement, retention). This allows you to reach the same power with 30–50% fewer users, or detect smaller effects with the same sample size.
+
+---
+
+### AA Tests: Validating the Experimentation Platform
+
+An AA test runs the assignment and logging infrastructure but assigns the same experience to both arms. The expected result: no statistically significant difference on any metric.
+
+If your AA test shows p < 0.05 on the primary metric, the experimentation platform has a bug — a logging artifact, a non-random assignment hash, or a data pipeline issue. Fix it before running any AB tests. Many companies run AA tests weekly as a continuous health check on their experimentation infrastructure.
+`,
+    tryGuidance: "Use the A/B Test Simulator to explore how sample size, MDE, and baseline conversion rate interact. Set a baseline conversion of 3.2% and an MDE of 0.5pp — observe the required sample size. Then halve the MDE to 0.25pp and notice that sample size quadruples (n scales as 1/δ²). Run the experiment multiple times with the same parameters to see p-value variance — this is why stopping at the first significant result is so misleading.",
+    interviewGraph: {
+      initialStageId: "ps_e1_stage1",
+      artifactDimensions: [
+        { label: "Sample Size Formula", recoveryStageId: "ps_e1_rec1" },
+        { label: "Peeking & Stopping Rules", recoveryStageId: "ps_e1_rec2" },
+        { label: "Statistical vs Practical Significance", recoveryStageId: "ps_e1_rec3", passLabel: "Experiment Design Ready" },
+      ],
+      stages: {
+        ps_e1_stage1: {
+          id: "ps_e1_stage1",
+          type: "click_target",
+          badge: "Stage 1",
+          title: "Stage 1 · Find the broken sample size formula",
+          prompt: "A junior analyst shares their sample size calculator. The formula produces an answer that is orders of magnitude too small. Click the line containing the bug.",
+          code_snippet: `# A/B Test Sample Size Calculator
+# Proposed by junior analyst
+
+from scipy import stats
+import math
+
+baseline_rate = 0.032        # 3.2% conversion
+mde = 0.002                  # detect +0.2pp lift
+alpha = 0.05
+power = 0.80
+
+# Sample size per arm
+z_alpha = stats.norm.ppf(1 - alpha/2)   # 1.96
+z_beta  = stats.norm.ppf(power)          # 0.84
+
+n = (z_alpha + z_beta)**2 / mde**2      -- ds-target:ps_e1_missing_variance
+print(f"Required n per arm: {int(n):,}")`,
+          validationCopy: {
+            ps_e1_missing_variance: "Correct. The formula is missing σ² (variance) in the numerator. The correct formula is n = (z_α + z_β)² × 2σ² / δ². For a binary metric with baseline rate p, σ² = p(1−p) ≈ 0.031. Without it, the estimate is ~1,550× too small — a catastrophically underpowered experiment.",
+          },
+          branches: {
+            ps_e1_missing_variance: "ps_e1_stage2",
+            default: "ps_e1_rec1",
+          },
+        },
+
+        ps_e1_rec1: {
+          id: "ps_e1_rec1",
+          type: "scenario_choice",
+          badge: "Recovery 1",
+          title: "Recovery · The correct sample size formula",
+          prompt: "The sample size formula n = (z_α + z_β)² / δ² produces a number far too small. What critical term is missing from the numerator?",
+          choices: [
+            { id: "a", label: "2σ² — the metric variance, scaled by 2 for two arms", description: "For a binary metric, σ² = p(1−p). Omitting it makes the estimate ~1,550× too small at a 3.2% baseline rate." },
+            { id: "b", label: "The sample should be divided by 2 since there are two arms", description: "Two arms means you need n per arm — the formula already accounts for this with the factor of 2 in the numerator." },
+            { id: "c", label: "The significance level α should appear in the numerator, not the z-score", description: "α appears through z_{α/2} — the z-score already encodes the false positive tolerance." },
+            { id: "d", label: "Nothing is missing — the formula is correct as written", description: "The formula produces a number far too small compared to validated sample size calculators." },
+          ],
+          branches: { a: "ps_e1_stage2", b: "ps_e1_rec1", c: "ps_e1_rec1", d: "ps_e1_rec1" },
+          rationale: "The two-sample t-test sample size formula is n = (z_{α/2} + z_β)² × 2σ² / δ². Variance σ² is not optional — it is the primary driver of required sample size. For binary metrics, σ² = p(1−p). At baseline p = 0.032, σ² ≈ 0.031. Omitting it produces n ≈ 308 instead of the correct ~19,840 per arm.",
+        },
+
+        ps_e1_stage2: {
+          id: "ps_e1_stage2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Early stopping pressure",
+          prompt: "Day 3 of a 14-day A/B test. Conversion in treatment is 3.7% vs 3.2% control. p = 0.03. Your PM says 'p < 0.05 — let's ship it.' What is the technically correct response?",
+          code_snippet: `Experiment plan: 14 days, n = 20,000 per arm
+Day 3 status:
+  Control:   3.2% conversion  (n = 4,280)
+  Treatment: 3.7% conversion  (n = 4,315)
+  p-value:   0.031
+  Sample reached: 21% of target`,
+          choices: [
+            { id: "a", label: "Agree — p < 0.05 is the decision threshold regardless of timing", description: "The pre-specified stopping rule exists precisely because early p-values are unreliable." },
+            { id: "b", label: "We pre-committed to 14 days for the sample size — stopping at day 3 means our actual false positive rate is far above 5%, not 5%", description: "Early stopping with repeated checking inflates the true Type I error rate dramatically." },
+            { id: "c", label: "Extend the experiment to 21 days to be safe", description: "The sample size calculation already determined the correct duration — 21 days adds unnecessary delay without improving validity." },
+            { id: "d", label: "Run a Bonferroni correction to account for the early look, then ship if still significant", description: "Bonferroni corrects for multiple tests on different metrics, not for optional stopping across time." },
+          ],
+          branches: { a: "ps_e1_rec2", b: "ps_e1_stage3", c: "ps_e1_rec2", d: "ps_e1_rec2" },
+          rationale: "B is correct. The 14-day duration was chosen to reach the pre-specified sample size — it is not arbitrary. Stopping at 21% of target sample means the test has 80% power only if the effect size is roughly 1/√0.21 ≈ 2.2× the MDE. p = 0.031 on day 3 has roughly a 20–30% chance of being a false positive in this scenario. The decision rule must be honored.",
+        },
+
+        ps_e1_rec2: {
+          id: "ps_e1_rec2",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery · Why peeking inflates false positive rate",
+          prompt: "You check your A/B test results at 5 equally spaced timepoints, stopping whenever p < 0.05. What is the approximate true false positive rate?",
+          choices: [
+            { id: "a", label: "~23% — each check at α = 0.05 is an independent opportunity for a false positive: 1 − 0.95⁵ ≈ 0.226", description: "The family-wise error rate accumulates across repeated tests." },
+            { id: "b", label: "5% — the p-value threshold controls the error rate regardless of how many times you check", description: "This is only true for a single pre-specified analysis." },
+            { id: "c", label: "1% — checking multiple times makes you more conservative because the bar is harder to clear", description: "Multiple checks do the opposite — they make it easier to find a false positive." },
+            { id: "d", label: "50% — every intermediate check halves your effective alpha", description: "The rate accumulates upward, not downward." },
+          ],
+          branches: { a: "ps_e1_stage3", b: "ps_e1_rec2", c: "ps_e1_rec2", d: "ps_e1_rec2" },
+          rationale: "With 5 checks at α = 0.05, FWER ≈ 1 − 0.95⁵ ≈ 22.6%. With 20 checks, it exceeds 64%. This is why peeking and optional stopping are so harmful — the nominal α is meaningless. Sequential testing methods (mSPRT, always-valid p-values) solve this by constructing test statistics that remain valid at any stopping time.",
+        },
+
+        ps_e1_stage3: {
+          id: "ps_e1_stage3",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · Statistical vs practical significance",
+          prompt: "Your A/B test completes with n = 4,000,000 per arm. Primary metric: conversion rate. Result: control 10.000%, treatment 10.003%, p = 0.008. What is the correct action?",
+          code_snippet: `n per arm:     4,000,000
+Control CVR:   10.000%
+Treatment CVR: 10.003%  (+0.003pp absolute)
+p-value:       0.008   (statistically significant)
+MDE committed: +0.5pp (business threshold)`,
+          choices: [
+            { id: "a", label: "Ship it — p < 0.05 means the effect is real", description: "The test is statistically significant, which is the standard criterion." },
+            { id: "b", label: "Do not ship — the +0.003pp lift is far below the pre-specified MDE of +0.5pp and has no practical business value", description: "Statistical significance at massive scale detects trivially small effects. The MDE was set at 0.5pp because that is the threshold of practical significance." },
+            { id: "c", label: "Run a larger experiment to confirm the result", description: "The experiment is already large enough to confirm the effect — confirming a trivially small effect with more data adds no value." },
+            { id: "d", label: "The result is inconclusive because the effect is less than the MDE", description: "The experiment detected an effect — it is just below the business threshold. The result is conclusive: the treatment does not meet the bar for shipping." },
+          ],
+          branches: { a: "ps_e1_rec3", b: "ps_e1_stage4", c: "ps_e1_rec3", d: "ps_e1_rec3" },
+          rationale: "B is correct. With 4 million users per arm, statistical power is effectively 100% — you can detect effects as small as 0.001pp. Statistical significance is trivially achieved. The meaningful question is whether the effect exceeds the MDE, which was defined as the threshold of practical business significance. A +0.003pp lift at 10% baseline is a 0.03% relative improvement — not worth the deployment risk and engineering cost.",
+        },
+
+        ps_e1_rec3: {
+          id: "ps_e1_rec3",
+          type: "scenario_choice",
+          badge: "Recovery 3",
+          title: "Recovery · Why effect size matters as much as p-value",
+          prompt: "An A/B test at massive scale shows p = 0.002 for a +0.002pp absolute lift in conversion. A teammate says 'p < 0.05, we should ship.' What is the correct reframe?",
+          choices: [
+            { id: "a", label: "Statistical significance says the effect is real; practical significance asks whether it is worth acting on — always evaluate both", description: "P-values test whether an effect is distinguishable from zero, not whether it is large enough to matter." },
+            { id: "b", label: "With p = 0.002, the effect is highly significant and definitely worth shipping", description: "Smaller p-values indicate more evidence against the null — they do not indicate larger effects." },
+            { id: "c", label: "The team should run a replication to see if the lift holds", description: "Replication addresses reliability. The primary issue here is magnitude — the lift is too small to be actionable regardless of replication." },
+            { id: "d", label: "Reject the result because large-sample tests are unreliable", description: "Large samples give more reliable estimates, not less. The problem is that large samples detect trivially small effects." },
+          ],
+          branches: { a: "ps_e1_stage4", b: "ps_e1_rec3", c: "ps_e1_rec3", d: "ps_e1_rec3" },
+          rationale: "Statistical significance (p < 0.05) answers 'is the effect non-zero?' Practical significance answers 'is the effect large enough to matter?' At large scale, almost everything is statistically significant. Senior data scientists always report both: the p-value and the effect size relative to the MDE.",
+        },
+
+        ps_e1_stage4: {
+          id: "ps_e1_stage4",
+          type: "scenario_choice",
+          badge: "Stage 4",
+          title: "Stage 4 · Segmentation and holdback design",
+          prompt: "Your A/B test for a new checkout flow shows a 0.4pp conversion lift overall (above MDE). Before full rollout, which combination of launch practices is most rigorous?",
+          choices: [
+            { id: "a", label: "Ship to 100% immediately — the experiment already validated the effect", description: "Immediate full rollout forfeits the ability to detect unexpected degradation post-launch." },
+            { id: "b", label: "Keep a 5% holdback group to measure long-run causal effect, and examine pre-specified segments (iOS/Android/web) to check for heterogeneous effects before rollout", description: "Holdbacks catch novelty effects decaying post-launch; pre-specified segment checks validate that the lift holds across platforms." },
+            { id: "c", label: "Run a post-hoc subgroup analysis across all available demographic dimensions to find where the effect is strongest", description: "Post-hoc subgroup analysis is a multiple-comparisons problem — any findings are hypotheses, not confirmed results." },
+            { id: "d", label: "Extend the experiment by 4 more weeks to check for novelty decay before any rollout", description: "A holdback test is more efficient for novelty detection post-launch — it does not delay shipping." },
+          ],
+          branches: { a: "ps_e1_rec_seg", b: "ps_e1_terminal", c: "ps_e1_rec_seg", d: "ps_e1_rec_seg" },
+          rationale: "B is correct. A holdback test is the rigorous way to measure long-run causal impact after shipping — it retains a small control group after launch to distinguish durable effects from novelty spikes. Pre-specified segment checks (platform, user tenure) are valid because they were registered before the experiment. Post-hoc fishing across 20 dimensions after a positive overall result is exactly the multiple-comparisons trap.",
+        },
+
+        ps_e1_rec_seg: {
+          id: "ps_e1_rec_seg",
+          type: "scenario_choice",
+          badge: "Recovery 4",
+          title: "Recovery · Holdback tests vs feature tests",
+          prompt: "What is the difference between a feature test (standard A/B test) and a holdback test, and when would you use a holdback?",
+          choices: [
+            { id: "a", label: "Feature tests measure the pre-launch effect; holdbacks measure the long-run effect post-launch by keeping a small group on the old experience after shipping to 100%", description: "Holdbacks disentangle novelty effects from durable improvements — they reveal whether the launch effect persists." },
+            { id: "b", label: "Holdbacks are just smaller A/B tests run with less traffic", description: "Holdbacks run after a feature ships to most users, not before. Their purpose is measuring long-run impact, not launch validation." },
+            { id: "c", label: "Feature tests are for UI changes; holdbacks are for algorithmic changes", description: "Both test types can be applied to any change — the distinction is timing relative to the launch decision, not the type of change." },
+            { id: "d", label: "Holdbacks are only needed when the pre-launch experiment was inconclusive", description: "Holdbacks add value even when the pre-launch test showed a clear positive effect — they confirm the effect persists after novelty decays." },
+          ],
+          branches: { a: "ps_e1_terminal", b: "ps_e1_rec_seg", c: "ps_e1_rec_seg", d: "ps_e1_rec_seg" },
+          rationale: "A holdback test keeps a small slice of users (typically 5–10%) on the old experience after the feature ships to everyone else. It is the only way to measure causal long-run impact post-launch. Without a holdback, you cannot distinguish a durable 10% lift from a novelty spike that decayed to 2% after 4 weeks.",
+        },
+
+        ps_e1_terminal: {
+          id: "ps_e1_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Simulation complete · End-to-end A/B test design",
+          terminal: true,
+          prompt: "You have navigated sample size calculation, stopping rules, practical significance, and launch strategy. Summarize the three non-negotiable commitments you make before an A/B test starts.",
+          code_snippet: `# Pre-experiment commitments (written before any data collected):
+#
+# 1. Hypothesis:    H0 and H1, primary metric, guardrail metrics
+# 2. Sample size:   n = (z_alpha + z_beta)^2 * 2*sigma^2 / delta^2
+#                   all four inputs: alpha, power, MDE, variance
+# 3. Stopping rule: fixed horizon, single analysis at planned n
+#                   (or pre-specified sequential test if continuous
+#                    monitoring is required)`,
+          choices: [
+            { id: "a", label: "Pre-register hypothesis + metric, calculate n with variance included, commit to a fixed stopping rule", description: "These three commitments are what make a p-value interpretable as a false positive rate. All must be written down before any data is collected." },
+            { id: "b", label: "Pick a large sample size, run for two weeks, then decide which metric matters most", description: "Deciding the primary metric after seeing the data is HARKing — Hypothesizing After Results are Known. It breaks the false positive rate guarantee." },
+            { id: "c", label: "Get PM sign-off on the hypothesis, then rely on the platform's automatic stopping rules", description: "Automatic stopping rules are only valid if you pre-specified using them — and understand their assumptions (e.g., mSPRT). Blind reliance without pre-specification is still peeking." },
+          ],
+          branches: { a: "ps_e1_terminal", b: "ps_e1_terminal", c: "ps_e1_terminal" },
+          rationale: "An A/B test is only valid when these three commitments are made before data collection: (1) hypothesis + primary metric — defines what you're measuring; (2) sample size with all four inputs including variance — determines when you have enough data; (3) stopping rule — ensures the p-value means what you say it means. Deviation from any of these, even with good intentions, breaks the statistical guarantee.",
+        },
       },
     },
+    knowledgeCheck: [
+      {
+        question: "A junior data scientist computes sample size as n = (z_α + z_β)² / δ². The result is 310 users per arm. The correct answer is ~19,800. What is missing?",
+        options: [
+          "The formula should divide by α instead of using z-scores",
+          "The variance term 2σ² is missing from the numerator — for a binary metric with baseline p = 0.032, σ² = p(1−p) ≈ 0.031, increasing required n by a factor of ~64",
+          "The formula should be divided by 2 since there are two arms",
+        ],
+        correctIndex: 1,
+        explanation: "The correct two-sample t-test formula is n = (z_{α/2} + z_β)² × 2σ² / δ². Variance is not optional — it scales the sample size to the actual noise level of the metric. At a 3.2% baseline conversion rate, σ² ≈ 0.031. Omitting it underestimates required n by a factor of 2σ²/1 ≈ 2×0.031/1 ≈ 0.062, meaning the incorrect formula underestimates by ~16×. The result is a catastrophically underpowered experiment.",
+      },
+      {
+        question: "After 3 days of a 14-day A/B test, p = 0.03. The PM wants to ship. What is the correct response and why?",
+        options: [
+          "Agree to ship — p < 0.05 is the decision threshold regardless of when the analysis occurs",
+          "Refuse — the experiment must reach the pre-specified sample size because stopping at day 3 means the actual false positive rate is far above 5%, and the effect size estimate is unstable",
+          "Run a Bonferroni correction on the early p-value, then ship if still significant",
+        ],
+        correctIndex: 1,
+        explanation: "Stopping at 21% of the planned sample because p < 0.05 is optional stopping — a classic form of p-hacking. The pre-specified 14-day horizon was chosen to reach the calculated sample size at 80% power. An early p = 0.03 under repeated checking has a true false positive rate of 20–30% in typical scenarios. The decision rule must be honored. If continuous monitoring is needed, sequential testing methods (mSPRT, always-valid p-values) must be pre-specified.",
+      },
+      {
+        question: "An A/B test with n = 5 million per arm shows p = 0.001 for a +0.001pp absolute conversion lift. The pre-specified MDE was +0.3pp. What is the correct conclusion?",
+        options: [
+          "Ship the feature — p = 0.001 is highly significant",
+          "Do not ship — the effect is statistically detectable but falls far short of the pre-specified MDE, meaning it has no practical business significance worth the deployment cost",
+          "Run a replication experiment to confirm the highly significant result",
+        ],
+        correctIndex: 1,
+        explanation: "With 5 million users per arm, statistical power is effectively 100% — even a 0.001pp effect is detectable. Statistical significance answers 'is the effect non-zero?' not 'is it worth acting on?' The MDE was set at +0.3pp because that is the threshold of practical business significance. A +0.001pp lift is a 0.001% relative improvement. No reasonable business case justifies shipping for that. Always evaluate effect size against the MDE, not just the p-value.",
+      },
+    ],
   },
-  knowledgeCheck: [
-    {
-      question: "What are the four inputs needed to calculate minimum sample size for an A/B test?",
-      options: [
-        "Number of variants, experiment duration, server capacity, and traffic volume",
-        "Minimum Detectable Effect (MDE), baseline metric variance, desired power, and significance level (alpha)",
-        "Conversion rate, revenue per user, DAU, and experiment budget",
-      ],
-      correctIndex: 1,
-      explanation: "The four standard inputs: MDE (smallest practically significant effect), baseline variance (σ²), power (1−β, typically 0.8), and α (false positive rate, typically 0.05). These feed into the formula n ≈ 16σ²/Δ² (for 80% power, 5% significance). Without all four, you cannot calculate a valid sample size.",
-    },
-    {
-      question: "What is an AA test and why should you run one before real experiments?",
-      options: [
-        "A test comparing variant A against another identical variant A, which should show no significant differences — validates that the randomization infrastructure is working correctly",
-        "A test of statistical significance at the 1% alpha level for higher confidence",
-        "An experiment comparing two existing product versions before testing a new variant",
-      ],
-      correctIndex: 0,
-      explanation: "An AA test assigns both groups to the same (unchanged) experience. The expected result: no significant differences on any metric. If you observe significant differences, your randomization logic, assignment hashing, or logging has a bug. Fix it before running real experiments — a broken infrastructure will produce false positives.",
-    },
-    {
-      question: "Your experiment has 50,000 users in treatment and 50,000 in control, designed 50/50. A chi-squared test gives p=0.41. What does this indicate?",
-      options: [
-        "SRM detected — the experiment is invalid",
-        "No SRM detected — the 50/50 split is consistent with random variation, randomization appears valid",
-        "The experiment is underpowered — more users are needed",
-      ],
-      correctIndex: 1,
-      explanation: "A chi-squared p-value of 0.41 means the observed split is very consistent with the expected 50/50 (p >> 0.05). No SRM. The randomization appears valid. SRM would be flagged at p < 0.05, indicating the split is too unlikely to be explained by chance.",
-    },
-  ],
-},
 
 "ps-e2": {
-  durationLabel: "18 min",
-  outcomes: [
-    "Identify p-hacking and explain why early stopping inflates false positive rates",
-    "Explain the novelty effect and how to distinguish it from a genuine improvement",
-    "Recognize carryover effects and when a washout period is required",
-    "Describe network interference and why SUTVA is violated in marketplace experiments",
-  ],
-  learnMarkdown: `## When A/B Tests Go Wrong
-
-A well-designed experiment can still produce wrong answers. These are the most common failure modes.
-
----
-
-## P-Hacking: Early Stopping
-
-**The problem**: you check results every day and stop the experiment when p < 0.05. This inflates your false positive rate dramatically.
-
-**Why**: each check is an independent opportunity to get a false positive by chance. If you check 20 times at α=0.05, the probability of at least one false positive is 1 − (0.95)²⁰ ≈ 64%.
-
-**Fix**: commit to a fixed sample size (or fixed duration) **before** starting. Only analyze results once at the predetermined endpoint. If you need continuous monitoring, use **sequential testing** methods (e-values, always-valid p-values) that explicitly account for optional stopping.
-
----
-
-## Novelty Effect
-
-New features get engagement boosts simply because they're new. Users explore anything different. This engagement decays back to the true level over 2–6 weeks.
-
-**How to distinguish**: run the experiment for at least 4 weeks. Plot week-over-week treatment effect size. If it decays, you're seeing a novelty effect. Look at **holdout cohort engagement** over time — users who have been in treatment for 4+ weeks vs. fresh entrants.
-
----
-
-## Carryover Effects
-
-**Problem**: the effect of one variant persists after the experiment ends. This contaminates follow-up experiments.
-
-**When it matters most**: recommendation systems that learned user preferences, personalization features that modified a user's internal state, experiments that sent emails (the email is already in the inbox).
-
-**Fix**: washout period (typically 1–2 weeks where no experiment runs in that allocation slot) between sequential experiments. Or use between-subjects designs (each user sees only one variant ever).
-
----
-
-## Instrumentation Bugs
-
-The most common A/B test failure: logging events incorrectly. Common symptoms:
-- SRM (covered in previous lesson)
-- Primary metric shows impossible values (click rate > 100%)
-- Control group shows unexpected changes (treatment code leaked to control)
-
-**Prevention**: always validate logging during a pilot with small traffic before scaling.
-
----
-
-## Network Interference (SUTVA Violation)
-
-SUTVA (Stable Unit Treatment Value Assumption): treating user A must not affect user B's outcomes.
-
-**Violations are common**:
-- Ridesharing: reducing driver prices for treatment users increases competition for supply, affecting control users' wait times
-- Social networks: recommending a post to treatment users changes its engagement signal, affecting control users' feeds
-- Marketplaces: treatment-side demand changes affect supply availability for control users
-
-**Fix**: cluster randomization (randomize by city, social community, or supply zone instead of individual user).
-`,
-  video: null,
-  videoFallbackMarkdown: `## Deep Dive: Sequential Testing
-
-**Sequential testing** methods allow you to look at data continuously without inflating the false positive rate. Key approaches:
-
-**Always-Valid Inference (Johari et al.)**: convert the p-value into an e-value that can be multiplied across sequential observations. The e-value is always valid — you can stop whenever it exceeds 1/α.
-
-**mSPRT (mixture Sequential Probability Ratio Test)**: used by platforms like Optimizely. Pre-specify a mixture distribution over effect sizes, get a test statistic that's valid at any stopping time.
-
-These approaches trade statistical power for continuous monitoring flexibility — they require ~30% more data to detect the same effect as a fixed-horizon test.
-`,
-  tryGuidance: "No interactive viz — work through the experiment failure mode scenarios in the interview simulation.",
-  interviewGraph: {
-    initialStageId: "ps_e2_stage1",
-    artifactDimensions: [
-      { label: "P-Hacking Detection", recoveryStageId: "ps_e2_rec1" },
-      { label: "Interference", recoveryStageId: "ps_e2_terminal", passLabel: "Experiment Validity" },
+    durationLabel: "22 min",
+    outcomes: [
+      "Identify and explain the 7 most common A/B test failure modes with concrete detection strategies",
+      "Diagnose sample ratio mismatch (SRM) using a chi-squared test and explain why it invalidates an entire experiment",
+      "Distinguish a novelty effect from a genuine improvement using cohort-based temporal analysis",
+      "Recognize SUTVA violations in marketplace and social-network experiments and prescribe cluster randomization as the fix",
     ],
-    stages: {
-      ps_e2_stage1: {
-        id: "ps_e2_stage1",
-        type: "scenario_choice",
-        badge: "Stage 1",
-        title: "Stage 1 · Early peek",
-        prompt: "Day 3 of your 14-day experiment: p=0.04. The PM wants to stop and call it a win. What do you say?",
-        choices: [
-          { id: "a", label: "Agree — p < 0.05 is p < 0.05 regardless of when you stop", description: "The number of checks inflates the false positive rate." },
-          { id: "b", label: "Push back — stopping early when p dips below 0.05 is p-hacking; the experiment was designed for 14 days and must run to completion", description: "Early stopping with α=0.05 on day 3 of 14 gives an actual false positive rate far above 5%." },
-        ],
-        branches: { a: "ps_e2_rec1", b: "ps_e2_stage2" },
-        rationale: "B is correct. P-hacking via early stopping is one of the most common and dangerous A/B test failures. The pre-registered duration exists precisely to prevent this. Every early check is a fresh opportunity for a false positive.",
-      },
-      ps_e2_rec1: {
-        id: "ps_e2_rec1",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · Fixed horizon",
-        prompt: "Why must you commit to experiment duration before starting?",
-        choices: [
-          { id: "a", label: "Each additional check at α=0.05 is another chance for a false positive; only one pre-specified analysis preserves the 5% false positive rate", description: "20 checks at 5% each → ~64% chance of at least one false positive." },
-        ],
-        branches: { a: "ps_e2_stage2" },
-        rationale: "Pre-commitment to a fixed horizon is the only way to maintain the stated alpha level in a standard fixed-horizon test.",
-      },
-      ps_e2_stage2: {
-        id: "ps_e2_stage2",
-        type: "scenario_choice",
-        badge: "Stage 2",
-        title: "Stage 2 · Novelty effect",
-        prompt: "Your experiment shows +8% engagement on day 1, +6% on day 7, +3% on day 14, +1% on day 21. What does this pattern suggest?",
-        choices: [
-          { id: "a", label: "The feature is working — any positive lift is a success", description: "A decaying lift may indicate novelty, not genuine value." },
-          { id: "b", label: "Novelty effect — the lift is decaying toward zero, suggesting users are exploring something new rather than getting lasting value", description: "True improvements maintain or grow their effect as users settle into new habits." },
-          { id: "c", label: "The experiment is underpowered — need more users", description: "Underpowering causes wide CIs, not a systematic decay pattern." },
-        ],
-        branches: { a: "ps_e2_rec1", b: "ps_e2_terminal" },
-        rationale: "B is correct. A decaying treatment effect is the signature of a novelty effect — users explore new UI elements, then revert to old habits as the novelty wears off. A genuine improvement either maintains its effect or grows as users adopt new behaviors. Run the experiment for at least 3-4 weeks to distinguish.",
-      },
-      ps_e2_terminal: {
-        id: "ps_e2_terminal",
-        type: "scenario_choice",
-        badge: "Stage 3",
-        title: "Stage 3 · Marketplace interference",
-        prompt: "You're testing a surge pricing reduction for Uber drivers in treatment cities. Control cities show unexpectedly worse metrics. Why?",
-        choices: [
-          { id: "a", label: "The control cities had different baseline behavior", description: "Baseline differences could be part of it, but there's a structural interference mechanism." },
-          { id: "b", label: "Network interference: treatment cities have more driver supply due to better pricing, pulling driver supply away from control cities and worsening control city metrics — SUTVA is violated", description: "Supply is a shared resource. Improving one side affects the other." },
-        ],
-        branches: { a: "ps_e2_terminal", b: "ps_e2_terminal" },
-        terminal: true,
-        rationale: "B is correct. This is a classic marketplace interference problem. Drivers are mobile — better pay in treatment cities attracts drivers from nearby control cities, reducing control city supply and increasing wait times. The control group is contaminated by the treatment. Fix: use non-adjacent city pairs or switchback experiments.",
+    learnMarkdown: `## When A/B Tests Go Wrong
+
+Most A/B test failures aren't statistical — they're **design failures**: the wrong metric, the wrong audience, the wrong duration, or the wrong stopping rule. The math was never the problem; the experiment was broken before the first user was assigned.
+
+---
+
+## 1. Peeking / Stopping Early
+
+The PM opens the dashboard on day 4 of a 14-day experiment, sees p = 0.04, and declares victory. The problem: every time you check results and reserve the right to stop, you're running an implicit hypothesis test. With α = 0.05, 20 uncorrected checks give a ~64% chance of at least one false positive (1 − 0.95²⁰). Stopping when *p* first crosses 0.05 inflates the actual false positive rate far above 5%.
+
+**Fix**: commit to duration *before* starting. If continuous monitoring is required, use **sequential testing** methods (e-values, mSPRT) that account for optional stopping — at the cost of ~30% more data.
+
+---
+
+## 2. Multiple Comparisons Without Correction
+
+Testing 5 metrics at α = 0.05 with no correction gives a ~23% family-wise false positive rate (1 − 0.95⁵). With 10 metrics, ~40%. The p-values are individually meaningless.
+
+**Fix**: pre-register exactly **one primary metric**. Apply **Bonferroni** (divide α by k) or **Benjamini-Hochberg** (controls false discovery rate) to secondary metrics. Any surviving secondary result is exploratory, not confirmatory.
+
+---
+
+## 3. Sample Ratio Mismatch (SRM)
+
+You randomized 50/50 but the treatment arm has 52,000 users and control has 48,000. Something went wrong during assignment or logging — and it was not random. One arm systematically lost users, so the remaining users are no longer representative. **The entire experiment is invalidated**, not just the metric where you noticed it.
+
+**Detect**: chi-squared goodness-of-fit test (use p < 0.01 as threshold). Also plot assignment counts over time — a day-1 spike often points to a launch bug.
+
+**Fix**: SRM cannot be corrected post-hoc. Diagnose the root cause (bot filtering on one arm, logging before authentication, mobile caching bugs) and re-run.
+
+---
+
+## 4. Novelty Effect
+
++12% lift on day 1, +8% on day 7, +3% on day 14, +0.5% on day 21. Users engage with new things because they're new. As novelty wears off (2–6 weeks), the effect decays toward zero. A genuine improvement maintains or grows its effect as users adopt new behaviors.
+
+**Detect**: run ≥ 3–4 weeks. Use **cohort-based analysis**: compare users in their first week of treatment vs. users in treatment for 4+ weeks. If long-tenured users look like control, the lift was novelty.
+
+**Fix**: report week-4 effect size, not week-1 peak. For major launches, use a **permanent holdout group** (1–5% of users) to measure true long-run impact.
+
+---
+
+## 5. Network Effects / SUTVA Violation
+
+Treatment cities in a ridesharing experiment improve — but control cities get *worse*. The **Stable Unit Treatment Value Assumption (SUTVA)** requires that treating user A does not affect user B. In networks, marketplaces, and shared-supply systems, this is routinely violated: drivers migrate toward treatment demand, boosted posts gain engagement signals that reach control feeds, treatment demand reduces supply for control users.
+
+**Detect**: look for control group degradation. Run a dilution check — does the treatment effect decay for units near many treated neighbors?
+
+**Fix**: **cluster randomization** at the level of the interference unit (city, social community, supply zone). Accept smaller effective sample size and longer runtime.
+
+---
+
+## 6. Carry-Over Effects
+
+Treatment A runs two weeks, then Treatment B occupies the same slot. B underperforms — but is it actually worse, or is A's state persisting? Recommendations trained on A's window, personalization profiles updated by A, emails sent during A — all contaminate B's window.
+
+**Detect**: check whether users from the prior arm show different baseline metrics before the new experiment starts. Cross-period correlation is the signal.
+
+**Fix**: **washout period** (1–2 weeks with no experiment in the slot). Prefer **between-subjects designs** (each user sees one variant, ever) for stateful treatments.
+
+---
+
+## 7. Instrumentation Bias
+
+CTR > 100%, control gains lift on an untouched metric, or logging volume drops 3x after day 1. The logging pipeline is broken: treatment code leaked to control, events fire before authentication (bots counted), or a caching bug double-counts sessions.
+
+**Detect**: validate with a low-traffic pilot first. Run an **A/A test** — any significant difference between two identical arms is a logging bug.
+
+**Fix**: defensive assertions in the logging layer, A/A test every new integration, treat event instrumentation as production code.
+
+---
+
+## Interview-Ready Summary
+
+When an A/B test result "doesn't feel right," check in this order:
+
+- **SRM first** — chi-squared on the traffic split. A significant result stops the analysis entirely.
+- **Peeking** — was the endpoint pre-specified? How many looks were taken?
+- **Multiple metrics** — was there a single pre-registered primary metric, or did the team cherry-pick?
+- **Duration** — ≥ 3–4 weeks for behavioral changes? Cohort analysis to check novelty decay?
+- **SUTVA** — does treating one unit affect others? Are clusters the right randomization unit?
+- **Carry-over** — prior experiment in this slot? What was the washout period?
+- **Instrumentation** — do event counts make sense? A/A test baseline available?
+
+If any of these fail, the p-value is not the problem — the experiment design is.
+`,
+    video: null,
+    videoFallbackMarkdown: `## Deep Dive: SRM, Carry-Over, and Novelty Detection
+
+### Sample Ratio Mismatch — Formal Detection
+
+SRM detection uses a chi-squared goodness-of-fit test. For a 50/50 experiment with 100,000 total users:
+
+- **Expected**: 50,000 per arm
+- **Observed**: 53,200 treatment, 46,800 control
+- **χ² statistic**: Σ (observed − expected)² / expected = (3200²/50000) + (3200²/50000) ≈ 410
+- **p-value**: essentially zero — clear SRM
+
+The standard threshold is p < 0.01 (more conservative than the experiment's own α). Even a 2–3% imbalance in a large experiment is worth investigating.
+
+**Why SRM invalidates the entire experiment, not just one metric**: if one arm is systematically losing users, the cause almost certainly introduces selection bias — the users who remain are different from the users who dropped. You cannot correct for this post-hoc because you don't know which users were lost or why. The correct action is always to diagnose and re-run.
+
+---
+
+### Carry-Over in Switchback / Geo Experiments
+
+Switchback experiments alternate between treatment and control in time windows (e.g., odd hours vs. even hours) or geographic units. Carry-over occurs when state from one window persists into the next.
+
+**Detection**: plot the baseline metric for control windows that immediately follow treatment windows vs. control windows that follow other control windows. A statistically significant difference between these two types of control windows confirms carry-over contamination.
+
+**Mitigation strategies**: (1) extend the window length (hourly → daily); (2) add a "washout sub-window" at the transition point where no data is collected; (3) use a mixed-effects model that explicitly estimates carry-over as a covariate.
+
+---
+
+### Novelty Effect — Cohort-Based Detection
+
+Standard analysis aggregates all treatment users regardless of exposure duration. This masks novelty decay.
+
+**Cohort-based approach**: segment treatment users by days-in-experiment at measurement time:
+- Days 1–7 (new to treatment)
+- Days 8–14
+- Days 15–21
+- Days 22–28
+
+If the treatment effect is largest in the first cohort and converges toward zero in the later cohorts, the lift is novelty, not value. A genuine improvement shows stable or growing effects across cohorts as users settle into new habits.
+
+This analysis requires experiments to run long enough to populate the later cohorts — typically 4+ weeks for behavioral features, longer for onboarding or recommendation system changes.
+`,
+    tryGuidance: "Work through the experiment failure mode scenarios in the interview simulation — diagnose which failure mode is active and prescribe the correct fix.",
+    interviewGraph: {
+      initialStageId: "ps_e2_click1",
+      artifactDimensions: [
+        { label: "Multiple Comparisons", recoveryStageId: "ps_e2_rec1" },
+        { label: "SRM Diagnosis", recoveryStageId: "ps_e2_rec2" },
+        { label: "Interference & Design", recoveryStageId: "ps_e2_rec3", passLabel: "Experiment Validity" },
+      ],
+      stages: {
+        ps_e2_click1: {
+          id: "ps_e2_click1",
+          type: "click_target",
+          badge: "Stage 1",
+          title: "Stage 1 · Spot the multiple comparisons problem",
+          prompt: "A PM shares the post-experiment analysis script below. Your team is about to report 'revenue' as the winning metric because it hit p = 0.03. What is the critical flaw in this analysis? Click the line that reveals the problem.",
+          code_snippet: `# Post-experiment analysis
+# "We track everything and decide after" — PM
+
+from scipy import stats
+
+metrics = {
+    'ctr':          stats.ttest_ind(ctrl_ctr, treat_ctr),
+    'conversion':   stats.ttest_ind(ctrl_conv, treat_conv),
+    'session_len':  stats.ttest_ind(ctrl_sess, treat_sess),
+    'bounce_rate':  stats.ttest_ind(ctrl_bounce, treat_bounce),
+    'revenue':      stats.ttest_ind(ctrl_rev, treat_rev),   -- ds-target:ps_e2_no_correction
+}
+
+significant = {k: v for k, v in metrics.items() if v.pvalue < 0.05}
+print(f"Significant metrics: {list(significant.keys())}")`,
+          validationCopy: {
+            ps_e2_no_correction: "Correct — testing 5 metrics at α = 0.05 with no correction gives a ~23% family-wise false positive rate (1 − 0.95⁵). Any one of these 'significant' results could easily be noise. The fix: pre-register exactly one primary metric before the experiment starts. Apply Bonferroni or Benjamini-Hochberg correction to any secondary metrics.",
+          },
+          branches: { ps_e2_no_correction: "ps_e2_scenario1" },
+        },
+
+        ps_e2_scenario1: {
+          id: "ps_e2_scenario1",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Early stopping under pressure",
+          prompt: "Day 5 of a pre-registered 21-day experiment. p = 0.03 on your primary metric. The PM says: 'We've crossed significance — ship it now and capture the win.' What is the correct response?",
+          choices: [
+            { id: "a", label: "Agree — p < 0.05 is the threshold, and we've hit it; stopping now is statistically valid", description: "p < 0.05 is only valid when it comes from a single, pre-specified analysis." },
+            { id: "b", label: "Push back — stopping on day 5 of a 21-day experiment is p-hacking via optional stopping; the pre-registered endpoint exists for exactly this reason", description: "Each early check is an implicit test. Stopping when p first crosses 0.05 inflates the actual false positive rate far above 5%." },
+            { id: "c", label: "Compromise — stop the experiment but report p = 0.03 with a caveat that it was early", description: "Adding a caveat does not undo the inflation of the false positive rate; the result still cannot be interpreted at face value." },
+            { id: "d", label: "Switch to a one-tailed test to strengthen the p-value and justify stopping", description: "Switching test type post-hoc to cross a significance threshold is a textbook form of p-hacking." },
+          ],
+          branches: { a: "ps_e2_rec1", b: "ps_e2_scenario2", c: "ps_e2_rec1", d: "ps_e2_rec1" },
+          rationale: "B is correct. P-hacking via early stopping is one of the most damaging experiment failures because it feels principled — after all, p < 0.05. But the pre-registered duration exists to ensure the alpha level is valid. Every day you check results and reserve the right to stop, you're running an implicit test. If you need flexibility, adopt sequential testing methods before the experiment starts — not as a post-hoc rationalization.",
+        },
+
+        ps_e2_rec1: {
+          id: "ps_e2_rec1",
+          type: "scenario_choice",
+          badge: "Recovery A",
+          title: "Recovery · Fixing the stopping rule",
+          prompt: "You need to give the PM a framework for monitoring experiments that doesn't inflate the false positive rate. Which approach is correct?",
+          choices: [
+            { id: "a", label: "Apply a Bonferroni correction to each daily check — divide α by 21 for a 21-day experiment", description: "Bonferroni corrects for multiple metrics, not multiple looks at the same metric over time." },
+            { id: "b", label: "Use sequential testing methods (e-values or mSPRT) that mathematically account for optional stopping — valid at any look but require ~30% more data", description: "This is the correct framework for continuous monitoring without alpha inflation." },
+            { id: "c", label: "Only look at results on odd-numbered days to reduce the number of peeks by half", description: "Halving the number of looks reduces (but does not eliminate) alpha inflation; it is not a principled solution." },
+            { id: "d", label: "Require p < 0.01 instead of p < 0.05 when stopping early to compensate for inflation", description: "This is an informal, unvalidated correction — it does not restore the formal false positive rate guarantee." },
+          ],
+          branches: { a: "ps_e2_scenario2", b: "ps_e2_scenario2", c: "ps_e2_scenario2", d: "ps_e2_scenario2" },
+          rationale: "B is correct. Sequential testing methods (always-valid inference, mSPRT, e-values) are designed for continuous monitoring. They provide valid p-values or confidence sequences at any stopping time — at the cost of needing roughly 30% more data to achieve the same power as a fixed-horizon test. This tradeoff is usually worth it for dashboards where PMs will inevitably look.",
+        },
+
+        ps_e2_scenario2: {
+          id: "ps_e2_scenario2",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · Sample ratio mismatch",
+          prompt: "Your experiment targeted a 50/50 split. After 10 days: treatment arm has 58,400 users, control has 41,600 users (100,000 total). A chi-squared test gives p < 0.0001. What do you do?",
+          choices: [
+            { id: "a", label: "Proceed — the imbalance is minor and the p-value on the primary metric is still valid", description: "A statistically significant SRM invalidates all metric p-values regardless of their individual significance." },
+            { id: "b", label: "Reweight the arms post-hoc using inverse probability weighting to correct for the imbalance", description: "IPW can reduce some bias but cannot correct for the unknown selection process that caused the SRM." },
+            { id: "c", label: "Halt the experiment — the SRM indicates something went wrong during assignment or logging, which introduces unknown selection bias; diagnose the root cause before re-running", description: "SRM cannot be corrected after the fact. The only valid path is diagnosis and re-run." },
+            { id: "d", label: "Report results from the treatment arm only, since it has more users and therefore more statistical power", description: "Reporting only one arm is not an experiment — and the arm itself may be non-representative." },
+          ],
+          branches: { a: "ps_e2_rec2", b: "ps_e2_rec2", c: "ps_e2_scenario3", d: "ps_e2_rec2" },
+          rationale: "C is correct. SRM means the randomization mechanism failed. Users in the misbalanced arms are not representative of the same population — one arm lost (or gained) users for a non-random reason. You cannot correct for this post-hoc because you don't know which users were affected or why. Common causes: bot filtering applied to only one arm, logging fires before authentication (bots inflate one arm), mobile app caching (some users get re-assigned). Diagnose first, then re-run.",
+        },
+
+        ps_e2_rec2: {
+          id: "ps_e2_rec2",
+          type: "scenario_choice",
+          badge: "Recovery B",
+          title: "Recovery · Why SRM invalidates everything",
+          prompt: "Why can't you simply reweight or statistically adjust for an SRM and proceed with the experiment?",
+          choices: [
+            { id: "a", label: "Because the reweighting calculation is too computationally expensive at scale", description: "Computation is not the issue." },
+            { id: "b", label: "Because the cause of the SRM is unknown — you don't know which users were lost or why, so any correction rests on untestable assumptions about the selection mechanism", description: "This is the core reason. Unknown selection bias cannot be corrected by methods that require knowing the selection mechanism." },
+            { id: "c", label: "Because regulators require a fresh experiment when SRM is detected", description: "There is no regulatory requirement — this is a statistical validity issue." },
+          ],
+          branches: { a: "ps_e2_scenario3", b: "ps_e2_scenario3", c: "ps_e2_scenario3" },
+          rationale: "B is correct. Statistical correction methods (IPW, regression adjustment) require you to model the selection mechanism — why certain users ended up in one arm. With SRM, you typically don't know: was it a bot filter? A caching bug? A logging race condition? Without knowing, any correction applies the wrong model. The experiment's internal validity is broken.",
+        },
+
+        ps_e2_scenario3: {
+          id: "ps_e2_scenario3",
+          type: "scenario_choice",
+          badge: "Stage 4",
+          title: "Stage 4 · Network interference in a marketplace",
+          prompt: "You run an Uber experiment: treatment drivers in 10 cities get a 15% pay boost. You randomize individual drivers 50/50 within each city. After 3 weeks, treatment drivers show +18% acceptance rate — but control drivers in the same cities show −12% acceptance rate. What is happening?",
+          choices: [
+            { id: "a", label: "The control group happened to have lower-quality drivers who were already disengaging before the experiment", description: "A pre-experiment baseline check would reveal this, but the pattern of treatment-adjacent control degradation suggests a structural mechanism." },
+            { id: "b", label: "SUTVA is violated — treatment drivers are claiming more rides, reducing supply available to control drivers in the same city, which worsens control drivers' efficiency metrics", description: "This is marketplace interference: supply is a shared resource within a city." },
+            { id: "c", label: "The experiment is underpowered — the control arm degradation is within the margin of error", description: "A −12% shift on acceptance rate is a large, directional effect — not noise. And the direction (control degrades when treatment improves) is the signature of interference." },
+            { id: "d", label: "Drivers in the control group learned about the pay boost and reduced effort out of resentment", description: "This is a real effect (resentful demoralization) but requires a different experiment design to distinguish from supply interference." },
+          ],
+          branches: { a: "ps_e2_rec3", b: "ps_e2_scenario4", c: "ps_e2_rec3", d: "ps_e2_rec3" },
+          rationale: "B is correct. When you randomize individual drivers within a city, treatment and control drivers compete for the same pool of rides. Treatment drivers, now earning more per accepted ride, accept more aggressively. This increases their share of completed trips and mechanically reduces the opportunity rate for control drivers in the same market. SUTVA is violated because the outcome for each driver depends on what other drivers are doing. Fix: randomize at the city level (treat or hold-out entire cities) so treatment and control supply pools do not interact.",
+        },
+
+        ps_e2_rec3: {
+          id: "ps_e2_rec3",
+          type: "scenario_choice",
+          badge: "Recovery C",
+          title: "Recovery · Fixing marketplace interference",
+          prompt: "How do you redesign the Uber driver incentive experiment to avoid SUTVA violations?",
+          choices: [
+            { id: "a", label: "Randomize by driver tenure (new vs. experienced) instead of randomly within city", description: "This reduces but does not eliminate interference — drivers of all tenures compete for the same rides within a city." },
+            { id: "b", label: "Use cluster randomization — randomly assign entire cities to treatment or control so supply pools do not overlap", description: "This is the correct fix. Entire cities become the unit of randomization, eliminating within-city supply interference." },
+            { id: "c", label: "Add a holdout period — run the treatment for two weeks, then remove it and measure recovery", description: "This tests for carry-over effects, not interference. It doesn't fix the concurrent contamination problem." },
+          ],
+          branches: { a: "ps_e2_terminal", b: "ps_e2_terminal", c: "ps_e2_terminal" },
+          rationale: "B is correct. Cluster randomization assigns the entire interference unit — the city, in this case — to a single condition. Treatment cities and control cities don't share supply, so SUTVA holds at the city level. The tradeoff: you now have far fewer independent units (cities vs. individual drivers), which dramatically reduces statistical power. This is why geographic/market-level experiments often require 20–50 city-pairs and months of runtime to detect modest effects.",
+        },
+
+        ps_e2_scenario4: {
+          id: "ps_e2_scenario4",
+          type: "scenario_choice",
+          badge: "Stage 5",
+          title: "Stage 5 · Novelty vs. genuine improvement",
+          prompt: "A new recommendation UI shows: Week 1 lift +14%, Week 2 lift +9%, Week 3 lift +4%, Week 4 lift +1%. The PM wants to ship it. What does this pattern tell you, and what do you recommend?",
+          choices: [
+            { id: "a", label: "Ship it — any positive lift at 4 weeks is a success, and statistical significance was maintained throughout", description: "A lift trending toward zero is a warning sign regardless of significance. The question is whether the long-run lift is meaningful." },
+            { id: "b", label: "This is a novelty effect — the decaying trajectory toward ~0% at week 4 suggests users are exploring a new UI element, not adopting a genuinely better experience. Extend the experiment to week 6–8 to see if it stabilizes or reaches zero.", description: "A genuine improvement maintains or grows its effect; novelty decays." },
+            { id: "c", label: "The experiment is losing power over time as users churn out of the study — extend runtime to recover power", description: "User churn creates noise but doesn't produce a clean monotonically decaying lift. The decay pattern here is the signature of novelty." },
+            { id: "d", label: "Run an A/A test to verify the experiment infrastructure before interpreting the results", description: "A/A tests validate logging but can't explain a real directional effect that's decaying over time." },
+          ],
+          branches: { a: "ps_e2_terminal", b: "ps_e2_terminal", c: "ps_e2_terminal", d: "ps_e2_terminal" },
+          rationale: "B is correct. The hallmark of a novelty effect is a monotonically decaying treatment effect over time. Users encounter a new UI, explore it out of curiosity, and then revert to their prior behavior patterns as the novelty dissipates. A genuine product improvement does the opposite: lift is modest initially (as users discover and learn the new experience) and grows or stabilizes as adoption deepens. Extending to 6–8 weeks — and using cohort analysis to compare long-tenured treatment users vs. fresh entrants — is the diagnostic tool. If long-tenured users look like control, the effect was novelty.",
+        },
+
+        ps_e2_terminal: {
+          id: "ps_e2_terminal",
+          type: "scenario_choice",
+          badge: "Stage 6",
+          title: "Stage 6 · The failed launch debrief",
+          prompt: "Post-mortem on a recent experiment: it was stopped early on day 6, reported 3 of 8 metrics as significant (no primary metric was pre-registered), had an SRM that 'wasn't that bad' (53/47 vs. 50/50 target), and showed a +11% lift in week 1 that was never followed up. Which failure mode was most likely responsible for a false positive being shipped?",
+          choices: [
+            { id: "a", label: "Multiple comparisons — 3/8 metrics hitting p < 0.05 with no pre-registered primary and no correction is the most structurally reliable path to a spurious result", description: "This is the most mechanistically robust failure path: with 8 metrics and α = 0.05, you'd expect roughly 0.4 false positives even if the treatment does nothing. Three hits strongly suggests cherry-picking." },
+            { id: "b", label: "SRM — a 53/47 split is severe enough to invalidate all results, making any other analysis moot", description: "53/47 is a meaningful deviation worth investigating, but it's secondary to the multiple comparisons issue as the proximate cause of a false positive report." },
+            { id: "c", label: "Novelty effect — the +11% week-1 lift was never validated long-term and almost certainly decayed", description: "This is a real concern for the long-run validity of the decision, but it doesn't explain how the experiment produced a statistically significant result in the first place." },
+            { id: "d", label: "All three contributed equally and cannot be disentangled", description: "While all three are present, multiple comparisons is the most direct mechanistic cause of a spurious p < 0.05." },
+          ],
+          branches: {
+            a: "ps_e2_terminal",
+            b: "ps_e2_terminal",
+            c: "ps_e2_terminal",
+            d: "ps_e2_terminal",
+          },
+          terminal: true,
+          rationale: "A is the best answer. Testing 8 metrics at α = 0.05 with no correction gives an expected false positive count of 0.4 under the null — so seeing 3 'significant' results when the treatment might be doing nothing is entirely plausible. The SRM and early stopping both compound the problem, but multiple comparisons is the most reliable generator of spurious p-values in this scenario. The interview-ready takeaway: always ask 'what was the pre-registered primary metric?' before interpreting any A/B test result.",
+        },
       },
     },
+    knowledgeCheck: [
+      {
+        question: "You test 5 independent metrics at α = 0.05 with no correction. What is the approximate probability that at least one of them is a false positive even if the treatment has zero effect?",
+        options: [
+          "5% — each individual test is still controlled at α = 0.05",
+          "~23% — the family-wise error rate is 1 − 0.95⁵, so roughly one in four such experiments will produce a false positive by chance",
+          "~50% — with 5 metrics you need to halve the alpha to maintain an overall 5% rate",
+        ],
+        correctIndex: 1,
+        explanation: "The family-wise error rate for k independent tests at α is 1 − (1 − α)^k. For k = 5 and α = 0.05: 1 − 0.95⁵ ≈ 0.226. This is why pre-registering a single primary metric is so important — it's the only way to keep the false positive rate at the nominal level without applying a correction. With Bonferroni correction you'd use α' = 0.05/5 = 0.01 per test, restoring the family-wise rate to 5%.",
+      },
+      {
+        question: "Your 50/50 experiment ends with 54,200 users in treatment and 45,800 in control. A chi-squared test gives p < 0.0001. What is the correct action?",
+        options: [
+          "Reweight the results using inverse probability weighting to adjust for the imbalance, then proceed with analysis",
+          "Halt the experiment, diagnose the root cause of the sample ratio mismatch (SRM), and re-run — the SRM indicates non-random selection bias that invalidates all metric results",
+          "Proceed with analysis but reduce the significance threshold to α = 0.01 to compensate for the imbalance",
+        ],
+        correctIndex: 1,
+        explanation: "SRM means the randomization mechanism failed — one arm systematically gained or lost users for an unknown non-random reason. Because the cause is unknown, you cannot model the selection process to correct for it. IPW and regression adjustment both require a correctly specified model of how units were selected. Without that, any correction is guesswork. The only valid path is to diagnose the root cause (common culprits: bot filtering applied to one arm, logging firing before authentication, mobile app caching bugs) and re-run.",
+      },
+      {
+        question: "A social network experiment recommends new posts to 50% of users. After 2 weeks, treatment users click more on recommended content, but control users show a surprising drop in overall feed engagement. What is the most likely explanation?",
+        options: [
+          "The control group had a higher proportion of disengaged users due to imperfect randomization",
+          "SUTVA is violated — posts recommended to treatment users gain engagement signals that change the ranking algorithm for all users including control, indirectly altering what control users see in their feeds",
+          "The novelty effect inflated treatment metrics and the control group represents the true steady-state baseline",
+        ],
+        correctIndex: 1,
+        explanation: "This is a network interference / SUTVA violation. When treatment users engage with newly recommended posts, those posts accumulate engagement signals (likes, shares, watch time) that feed back into the platform's ranking algorithm. Those same posts then appear in control users' feeds at higher positions than they otherwise would have — contaminating the control group. The treatment didn't just affect treatment users; it changed the information environment for everyone. Fix: cluster randomization (randomize by social community or geographic region so treatment and control users don't share a recommendation graph).",
+      },
+    ],
   },
-  knowledgeCheck: [
-    {
-      question: "An experiment is designed to run 14 days. You peek on day 5 and p=0.03. You peek on day 10 and p=0.07. You run to day 14 and p=0.04. Should you report this as significant?",
-      options: [
-        "Yes — the final p-value at the pre-specified endpoint is 0.04 < 0.05",
-        "No — you peeked twice before the endpoint, which inflated the family-wise error rate; the final p-value of 0.04 can no longer be interpreted at face value",
-        "Yes — intermediate peeks are irrelevant if you wait for the final result",
-      ],
-      correctIndex: 1,
-      explanation: "Once you peek at intermediate results, you may have already stopped (informally) if the result had looked better. Multiple looks inflate the effective alpha. The actual false positive rate for 'check on day 5, day 10, and day 14' at nominal α=0.05 is approximately 14%, not 5%. The pre-registration commitment to one final analysis is what makes the alpha valid.",
-    },
-    {
-      question: "What distinguishes a novelty effect from a genuine product improvement in an A/B test?",
-      options: [
-        "Novelty effects always show higher statistical significance than genuine improvements",
-        "A novelty effect decays over time toward zero; a genuine improvement maintains or grows its effect as users adopt new behaviors",
-        "Novelty effects only appear in consumer apps, not B2B products",
-      ],
-      correctIndex: 1,
-      explanation: "The distinguishing feature is the temporal trajectory. Novelty: users explore the new thing → engagement spikes → curiosity satisfied → reverts to baseline. Genuine improvement: users adopt new behavior → initial lift → maintains or grows as adoption deepens. Running experiments for 3-4+ weeks is the standard way to distinguish them.",
-    },
-    {
-      question: "Why does standard A/B randomization fail for a ridesharing marketplace experiment?",
-      options: [
-        "Ridesharing apps have too many users for standard A/B infrastructure",
-        "SUTVA is violated: changing driver incentives for treatment users affects supply availability for control users — treatment and control are not independent",
-        "Ridesharing requires sequential testing due to continuous user sessions",
-      ],
-      correctIndex: 1,
-      explanation: "SUTVA requires that treating user A doesn't affect user B's outcomes. In ridesharing, supply is a shared resource — give drivers in the treatment group better pay and they migrate toward treatment-side demand, reducing supply for control users. Fix: cluster randomization by geographic market (treat/hold-out entire cities), so treatment and control zones don't share supply.",
-    },
-  ],
-},
 
 "ps-e3": {
-  durationLabel: "12 min",
-  outcomes: [
-    "Define novelty effect and describe how it differs from a genuine feature improvement",
-    "Explain permanent holdout groups and their role in measuring true long-term impact",
-    "Identify cookie churn bias in long-term experiment analysis",
-    "Apply cohort analysis to separate novelty from sustained value",
-  ],
-  learnMarkdown: `## Novelty Effects & Long-Term Holdouts
-
-Short experiments lie. A feature that appears to win in a 7-day test may simply be benefiting from user curiosity. Long-term holdout groups exist to measure the true, novelty-adjusted impact.
-
----
-
-## The Novelty Effect Mechanism
-
-Users engage with new things simply because they're new. When you change a UI element, recommendation format, or onboarding flow:
-
-1. Users notice the change
-2. They explore it out of curiosity
-3. The novelty wears off over 2–6 weeks
-4. Engagement converges back toward baseline
-
-This makes short experiments systematically mislead toward positive results.
-
----
-
-## Distinguishing Novelty from Real Improvement
-
-| Novelty effect | Genuine improvement |
-|----------------|-------------------|
-| Effect decays over time | Effect maintains or grows |
-| New users show stronger response | New and old users respond similarly |
-| Reverting the feature is painless | Users notice and miss it when reverted |
-
-**Method**: plot weekly treatment effect size. Decay pattern = novelty. Stable or growing = genuine.
-
----
-
-## Permanent Holdout Groups
-
-A **permanent holdout** keeps 1–5% of users on the old experience indefinitely — even after the feature ships to everyone else.
-
-Purpose:
-- Measure cumulative feature impact over months (not just weeks)
-- Provide a long-run control for novelty-adjusted baseline
-- Detect slow-acting negative effects (e.g., filter bubbles from recommendation changes)
-
-Implementation: the holdout group is excluded from all feature launches in a particular product area. They're the "never-treated" control.
-
----
-
-## Cookie Churn Bias
-
-Long experiments suffer from **cookie churn**: users clear cookies or switch devices, and re-enter the experiment as if new. Depending on hash assignment, they may land in a different arm.
-
-Effect: contamination of both arms over time. Especially problematic for 30+ day experiments. Mitigation: use login-based ID (not cookie-based) for persistent assignment.
-
----
-
-## Survivor Bias
-
-Long-term experiment cohorts suffer from survivor bias: only active users remain after 30 days. Their behavior doesn't represent the full initial cohort (which included users who churned).
-
-Use **intent-to-treat analysis**: analyze all users who were randomized, including those who stopped using the product. This is the gold standard in clinical trials and applies directly to product experiments.
-`,
-  video: null,
-  videoFallbackMarkdown: `## Deep Dive: Holdout Group Governance
-
-Running permanent holdout groups creates organizational friction — users in holdout don't get improvements that ship to everyone else. This must be governed carefully:
-
-- Holdout users should not receive features in the specific product area under study
-- Rotate holdout membership periodically (every 6–12 months) to prevent perpetual deprivation of improvements
-- Multiple teams should not independently run holdouts on the same users — coordinate a global holdout
-- Holdout size tradeoff: larger holdout = better statistical power for long-term estimates; smaller holdout = less withholding of improvements from users
-`,
-  tryGuidance: "No interactive viz — work through the holdout group design and novelty effect detection scenarios in the interview simulation.",
-  interviewGraph: {
-    initialStageId: "ps_e3_stage1",
-    artifactDimensions: [
-      { label: "Novelty Detection", recoveryStageId: "ps_e3_rec1" },
-      { label: "Holdout Design", recoveryStageId: "ps_e3_terminal", passLabel: "Long-Term Measurement" },
+    durationLabel: "20 min",
+    outcomes: [
+      "Identify the novelty effect pattern and explain why it produces false positives in short experiments",
+      "Use cohort-split analysis to distinguish novelty lift from genuine sustained improvement",
+      "Design a long-term holdout group and articulate when holdouts are appropriate vs. costly",
+      "Explain survivor bias and intent-to-treat analysis in the context of long-run experiment measurement",
     ],
-    stages: {
-      ps_e3_stage1: {
-        id: "ps_e3_stage1",
-        type: "scenario_choice",
-        badge: "Stage 1",
-        title: "Stage 1 · Short test interpretation",
-        prompt: "A 7-day A/B test shows +12% engagement for a new content format. The PM wants to ship immediately. What concern do you raise?",
-        choices: [
-          { id: "a", label: "Ship — 7 days is sufficient to confirm a positive result", description: "7 days is typically too short to distinguish novelty from genuine improvement." },
-          { id: "b", label: "The lift may be a novelty effect — users exploring new content format; recommend extending to 3-4 weeks and monitoring whether the effect decays", description: "Novelty effects decay over 2-6 weeks." },
-          { id: "c", label: "The sample size is too small after 7 days", description: "Sample size depends on traffic volume, not calendar time." },
-        ],
-        branches: { a: "ps_e3_rec1", b: "ps_e3_stage2", c: "ps_e3_rec1" },
-        rationale: "B is correct. A 7-day test captures the novelty peak but not the decay. A 4-week test would show whether the +12% holds (genuine improvement) or shrinks toward 0% (novelty). The cost of a 3-week extension is far less than the cost of shipping a feature that only looks good due to novelty.",
-      },
-      ps_e3_rec1: {
-        id: "ps_e3_rec1",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · Novelty timeline",
-        prompt: "How long does a novelty effect typically take to decay?",
-        choices: [
-          { id: "a", label: "2-6 weeks — run experiments for at least 3-4 weeks for consumer features to distinguish novelty from genuine improvement", description: "Novelty fades as users settle into new habits." },
-        ],
-        branches: { a: "ps_e3_stage2" },
-        rationale: "Novelty effects typically decay over 2-6 weeks. Running tests for 3-4+ weeks is standard practice for features where sustained engagement is the goal.",
-      },
-      ps_e3_stage2: {
-        id: "ps_e3_stage2",
-        type: "scenario_choice",
-        badge: "Stage 2",
-        title: "Stage 2 · Permanent holdout value",
-        prompt: "Six months after shipping a recommendation system revamp, engagement looks great. How do you know the improvement is genuine vs. user habituation?",
-        choices: [
-          { id: "a", label: "Compare to the same period last year using seasonality adjustment", description: "Year-over-year comparison can't control for external factors." },
-          { id: "b", label: "If you maintained a permanent holdout group (1-5% of users on the old experience), compare their metrics to the shipped group — the gap is the true long-term impact", description: "Permanent holdout is the only clean measurement of long-term feature impact." },
-        ],
-        branches: { a: "ps_e3_rec1", b: "ps_e3_terminal" },
-        rationale: "B is correct. A permanent holdout group is the gold standard for measuring long-term feature impact. Without it, any post-ship analysis is confounded by seasonality, external events, and cumulative product changes. The holdout-to-treatment gap at 6 months is the best estimate of true feature value.",
-      },
-      ps_e3_terminal: {
-        id: "ps_e3_terminal",
-        type: "scenario_choice",
-        badge: "Complete",
-        title: "Complete · Holdout principle",
-        prompt: "What is the fundamental role of a permanent holdout group?",
-        choices: [
-          { id: "a", label: "It provides a clean, long-running control group for measuring true cumulative feature impact, free from novelty effects and external confounders", description: "The holdout is never treated — it stays on the baseline experience." },
-        ],
-        branches: { a: "ps_e3_terminal" },
-        terminal: true,
-        rationale: "The permanent holdout group is never exposed to shipped features in its product area. The long-term gap between holdout and shipped users gives an unconfounded estimate of cumulative feature value.",
+    learnMarkdown: `## Novelty Effects & Long-Term Holdouts
+
+The novelty effect is the oldest trap in experimentation: users engage with new features because they're new, not because they're good. A two-week test can't tell you what a two-month retention curve looks like. Ship on the strength of early-experiment enthusiasm and you may be optimizing for curiosity, not value.
+
+---
+
+## The Novelty Effect Pattern
+
+When a new feature launches, users notice it. They click, they explore, they spend more time in that area of the product. Engagement metrics spike. The experiment looks like a clear win.
+
+Then the novelty wears off. The spike decays over 2–6 weeks and the treatment group's behavior converges back toward baseline. If your experiment only ran for 7–10 days, you captured the spike and called it a feature effect. What you actually measured was curiosity.
+
+The pattern is distinctive: treatment lift starts high, decays toward zero over several weeks. A **genuine improvement** looks different: the effect is stable or grows as users integrate the feature into their workflow.
+
+The risk isn't just a wasted launch — the feature is now live for everyone, consuming maintenance cost and product surface area with no long-term value.
+
+---
+
+## How to Detect Novelty: Cohort-Split Analysis
+
+The cleanest novelty detection method compares lift across user cohorts defined by their tenure with the product:
+
+- **New users**: never experienced the old design. For them, the "new" feature is simply the product — there is no before/after. They cannot have a novelty response.
+- **Existing users**: experienced the old design. They notice the change and may engage with it out of curiosity.
+
+**Key insight**: if the treatment lift is driven by novelty, existing users will show a strong lift that decays over time, while new users show a flat or modest effect. If the lift is a genuine improvement, both cohorts should show similar sustained lift.
+
+Operationally: segment by user tenure (new = first 30 days, existing = 30+ days) and plot the week-by-week treatment effect for each cohort. A decaying pattern in existing users with no corresponding effect in new users is the novelty signal.
+
+---
+
+## The Opposite Problem: Primacy Effects
+
+Not every bias runs in the positive direction. Some features suffer from the **primacy effect**: existing users have learned the old interface and resist the change. They perform *worse* in the short term (cognitive adjustment cost) even if the feature is genuinely better.
+
+Instead of a spike followed by decay, you see a trough that recovers as users adapt. The cohort-split solution is the same: new users (no learned behavior) show the true long-run effect; existing users show the adjustment penalty.
+
+---
+
+## Long-Term Holdouts
+
+A **long-term holdout** is a small, permanently withheld slice of users (typically 1–5%) who never receive features shipped to the rest of the product. Their experience is frozen at the baseline. Six months after you ship a dozen features, the holdout group provides a clean comparison: the gap between holdout metrics and population metrics is the accumulated causal impact of everything shipped.
+
+This is the *only* way to measure long-run feature impact after shipping. Without a holdout, any post-launch analysis is confounded by:
+- Seasonality and external events
+- Cumulative effects of other concurrent launches
+- Regression to the mean
+
+**When holdouts are appropriate**: product areas where long-term retention and engagement are the primary business metric (content platforms, subscription products, recommendation systems). Features that change user behavior gradually (ranking algorithms, feed ordering, notifications) are especially suited to holdout validation.
+
+**When holdouts are costly or inappropriate**: features with a strong, immediate measurable benefit (checkout error fix, critical performance improvement) don't need long-run confirmation. Safety or compliance changes cannot be withheld from users.
+
+Governance: coordinate holdout assignment globally — multiple teams independently running holdouts on the same users creates contradictory deprivations. Rotate holdout membership periodically (every 6–12 months).
+
+---
+
+## Survivor Bias in Long-Term Measurement
+
+Long-running experiments have a structural problem: users who remain active at day 90 are a biased sample of those who started at day 1. Churned users — the most important signal for whether a feature hurt retention — are no longer in the analysis.
+
+The fix is **intent-to-treat (ITT) analysis**: analyze all users who were randomized, including those who stopped using the product. ITT preserves randomization's comparability between arms; churn itself becomes an outcome. This approach comes from clinical trial methodology and applies directly to product experiments.
+
+The alternative — **per-protocol analysis**, analyzing only users who "fully received" the treatment — excludes the users most harmed by the feature, producing an optimistic bias.
+
+---
+
+## Interview-Ready Summary
+
+- **Novelty effect**: users engage with new things because they're new, not because they're good. Lift spikes then decays over 2–6 weeks.
+- **Detection**: cohort-split analysis — existing users show a decaying novelty lift; new users (no prior exposure) are a novelty-free control.
+- **Primacy effect**: the opposite — existing users under-perform during adjustment; new users show the true long-run effect.
+- **Long-term holdout**: 1–5% of users permanently withheld from all launches in a product area. Measures cumulative causal impact months after shipping.
+- **When to use holdouts**: long-run retention-sensitive product areas; avoid for safety changes and competitive-cost launches.
+- **Survivor bias**: long experiments lose churned users from analysis. Intent-to-treat (analyze all randomized users) is the correct approach. Per-protocol (only engaged users) biases toward optimism.
+`,
+    video: null,
+    videoFallbackMarkdown: `## Deep Dive: Interleaving, ITT vs PP, and Dilution Bias
+
+### Interleaving Experiments
+
+For systems where users make sequential comparisons — search engines, recommendations, ranking algorithms — traditional A/B tests require enough traffic to measure lift despite user-level noise. **Interleaving** is an alternative: for each request, both the A and B rankings are interleaved into a single result set. The user chooses from this merged list, and clicks are attributed back to the model that originally ranked the clicked item.
+
+Because each user implicitly compares A and B on every query (rather than being assigned to one arm), interleaving is dramatically more sensitive. It detects ranking improvements 100× faster than A/B tests for the same traffic. Crucially, it is *novelty-free* by design: there is no "new" experience for one group and an "old" experience for another — every user sees the comparison simultaneously. Google, Netflix, and LinkedIn use interleaving for large-scale ranking experiments precisely to avoid novelty confounds.
+
+Limitation: interleaving only measures user preference (engagement proxy), not downstream business metrics like revenue or retention. It is a fast early-stage signal, not a final ship decision.
+
+---
+
+### Intent-to-Treat vs Per-Protocol Analysis
+
+**Intent-to-treat (ITT)**: analyze all users randomized into the experiment, regardless of whether they actually engaged with the feature. Preserves randomization's causal validity. If some treatment users never saw the new feature (low take-up), their outcomes dilute the measured effect — but the estimate remains unbiased for the *policy effect* of rolling out the feature.
+
+**Per-protocol (PP)**: analyze only users who fully received their assigned treatment (i.e., treatment users who actually engaged with the new feature, and control users who never crossed over). Answers "what is the effect conditional on engagement?" — but risks selection bias because users who engaged may differ systematically from those who didn't.
+
+In product experiments, ITT is the default. PP can be a secondary diagnostic, but is not the basis for ship decisions.
+
+---
+
+### Dilution Bias and Take-Up Rates
+
+When treatment take-up is low — say 30% of treatment-arm users actually trigger the new feature — the ITT estimate is diluted. The true per-user effect is approximately ITT_estimate / take-up_rate. This is the **dilution correction** (a simplified form of instrumental variables estimation). If ITT shows +2% lift and take-up is 30%, the per-engaged-user effect is approximately +6.7%. Understanding dilution is important when evaluating whether a feature's rollout mechanism (discoverability, placement) is limiting measured impact.
+`,
+    tryGuidance: "Work through the interview simulation below. Stage 1 asks you to spot a classic novelty trap in experiment code before it becomes a ship decision. Subsequent stages test your ability to design holdout groups and diagnose long-run measurement failures.",
+    interviewGraph: {
+      initialStageId: "ps_e3_click1",
+      artifactDimensions: [
+        { label: "Novelty Detection", recoveryStageId: "ps_e3_rec_novelty" },
+        { label: "Holdout Design", recoveryStageId: "ps_e3_rec_holdout" },
+        { label: "Long-Term Analysis", recoveryStageId: "ps_e3_terminal", passLabel: "Long-Run Measurement" },
+      ],
+      stages: {
+        ps_e3_click1: {
+          id: "ps_e3_click1",
+          type: "click_target",
+          badge: "Stage 1 target",
+          title: "Stage 1 · Early stop without novelty check",
+          prompt: "The PM is ready to ship on day 5. Before you agree, click the exact line in this monitoring script that represents the critical mistake that could cause a false positive ship decision.",
+          code_snippet: `# Experiment monitoring script
+# "It's clearly working, let's ship" — PM (Day 5)
+
+results = query_experiment_results(
+    experiment_id="new_onboarding_flow",
+    start_date="2024-03-01",
+    end_date="2024-03-05",          -- ds-target:ps_e3_early_stop
+)
+
+if results['p_value'] < 0.05 and results['lift'] > 0:
+    trigger_ship_decision(experiment_id="new_onboarding_flow")
+    # No novelty effect check
+    # No cohort-based analysis
+    # Planned duration was 21 days`,
+          validationCopy: {
+            ps_e3_early_stop: "Correct. The experiment is queried through day 5 of a planned 21-day test. A significant positive result at day 5 is meaningless without novelty validation — this is exactly the window where novelty-driven curiosity peaks. The ship decision is premature.",
+          },
+          branches: {
+            ps_e3_early_stop: "ps_e3_choice1",
+          },
+        },
+        ps_e3_rec_novelty: {
+          id: "ps_e3_rec_novelty",
+          type: "scenario_choice",
+          badge: "Recovery 1",
+          title: "Recovery · Novelty detection",
+          prompt: "What is the most reliable way to determine whether a positive experiment result is driven by novelty rather than genuine improvement?",
+          choices: [
+            { id: "a", label: "Run the experiment longer and check if the lift decays toward zero over 3–4 weeks", description: "Time-based decay is one signal, but it doesn't isolate the mechanism." },
+            { id: "b", label: "Cohort-split analysis: compare lift in existing users (novelty-susceptible) vs new users (no prior exposure, novelty-free) — divergence confirms novelty", description: "New users can't have a novelty response to a feature they've never seen replaced. If only existing users show lift, novelty is the explanation." },
+            { id: "c", label: "Increase the experiment's statistical power by running on more traffic", description: "Power affects detection of real effects; it doesn't distinguish novelty from genuine improvement." },
+            { id: "d", label: "Check whether the p-value is below 0.01 instead of 0.05", description: "A stricter significance threshold doesn't change the source of the lift." },
+          ],
+          branches: {
+            a: "ps_e3_choice1",
+            b: "ps_e3_choice1",
+            c: "ps_e3_rec_novelty",
+            d: "ps_e3_rec_novelty",
+          },
+          rationale: "The cohort split is the cleanest novelty diagnostic. New users have no memory of the old feature, so any lift they show is likely genuine. Existing users have a baseline and can be novelty-affected. If existing users show a large decaying lift and new users show a flat or modest stable lift, you have strong evidence the effect is novelty-driven.",
+        },
+        ps_e3_choice1: {
+          id: "ps_e3_choice1",
+          type: "scenario_choice",
+          badge: "Stage 1 choice",
+          title: "Stage 1 · Interpreting the decay signal",
+          prompt: "You extend the experiment to 4 weeks. Week-by-week treatment effect on DAU engagement: W1: +11%, W2: +7%, W3: +4%, W4: +1.5%. New-user cohort shows a flat +2% across all four weeks. What is your recommendation?",
+          choices: [
+            { id: "a", label: "Ship — there's still a positive lift at week 4", description: "A decaying lift that is nearly zero at week 4 extrapolates to zero or negative at week 6. Shipping this feature delivers no long-term value." },
+            { id: "b", label: "Do not ship — the decaying existing-user lift with flat new-user lift is the classic novelty pattern; the true long-run effect is near zero", description: "The new-user cohort is your novelty-free signal. They show only +2%, stable. The existing-user spike is curiosity, not value." },
+            { id: "c", label: "Extend to 8 weeks before deciding", description: "The pattern is already clear. More time confirms what the cohort split has already revealed." },
+            { id: "d", label: "Segment by device type to investigate further", description: "Device segmentation doesn't address the novelty vs genuine question, which is already answered by the cohort pattern." },
+          ],
+          branches: {
+            a: "ps_e3_rec_novelty",
+            b: "ps_e3_choice2",
+            c: "ps_e3_choice2",
+            d: "ps_e3_rec_novelty",
+          },
+          rationale: "B is the correct call. The new-user cohort — your novelty-free control — shows a flat +2% lift. That is the true long-run feature effect. The existing-user lift is entirely explained by novelty (curiosity about the changed onboarding flow). Shipping this feature adds maintenance cost with no long-term engagement benefit.",
+        },
+        ps_e3_choice2: {
+          id: "ps_e3_choice2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Holdout group design",
+          prompt: "Your team ships a major recommendation algorithm overhaul after a successful 4-week experiment. The Head of Data asks how you'll measure its true long-term impact over the next 6 months. What is the correct answer?",
+          choices: [
+            { id: "a", label: "Compare 6-month engagement to the same period last year, adjusted for seasonality", description: "Year-over-year comparison can't control for every concurrent product change, external event, or user composition shift." },
+            { id: "b", label: "Use the 4-week experiment results to project the 6-month impact", description: "Short-run experiment extrapolation assumes no decay, no habituation, and no competitive dynamics. This projection is typically wrong." },
+            { id: "c", label: "Maintain a 2% long-term holdout that never receives the algorithm change; compare their 6-month metrics to the general population — the gap is the causal impact", description: "The holdout is the only clean long-run measurement. Everything else is confounded." },
+            { id: "d", label: "Run another experiment at 6 months comparing a new variant against the shipped version", description: "This measures marginal gains from a second change, not the accumulated impact of the first change." },
+          ],
+          branches: {
+            a: "ps_e3_rec_holdout",
+            b: "ps_e3_rec_holdout",
+            c: "ps_e3_choice3",
+            d: "ps_e3_rec_holdout",
+          },
+          rationale: "C is the gold standard. A permanent holdout group is never exposed to the shipped feature. At 6 months, the gap between holdout and general population is the causal estimate of the recommendation overhaul's long-term impact, free from seasonality, concurrent launches, and external confounders.",
+        },
+        ps_e3_rec_holdout: {
+          id: "ps_e3_rec_holdout",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery · Holdout group fundamentals",
+          prompt: "Which of the following correctly describes the role of a long-term holdout group?",
+          choices: [
+            { id: "a", label: "A randomly withheld 1–5% of users who never receive features in a product area, providing a clean long-run control that isolates cumulative causal impact from external confounders", description: "The holdout's value comes from never being treated — it's a permanent baseline." },
+            { id: "b", label: "A staging environment that receives features one week before the general population", description: "An early-access group is the opposite of a holdout — it receives features first, not never." },
+            { id: "c", label: "A power calculation tool that determines how long an experiment needs to run", description: "Power calculations are pre-experiment design tools, not holdout groups." },
+            { id: "d", label: "A resampling method that bootstraps confidence intervals for long-run metrics", description: "Bootstrapping is a statistical technique unrelated to holdout group design." },
+          ],
+          branches: {
+            a: "ps_e3_choice3",
+            b: "ps_e3_rec_holdout",
+            c: "ps_e3_rec_holdout",
+            d: "ps_e3_rec_holdout",
+          },
+          rationale: "The holdout is valuable precisely because it is never treated. After any number of product changes, the holdout provides a frozen baseline. The gap between holdout and treated population reflects everything that was shipped — an unconfounded causal estimate unavailable through any other method.",
+        },
+        ps_e3_choice3: {
+          id: "ps_e3_choice3",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · Survivor bias in long-term analysis",
+          prompt: "You analyze 90-day experiment results and find treatment engagement is +8%. A colleague notices you excluded users who churned within the 90 days, arguing 'they didn't really experience the feature.' What is the problem with this approach and what is the correct fix?",
+          choices: [
+            { id: "a", label: "The churned users must be excluded because their short tenure makes their data low-quality", description: "Churned users are precisely the signal for whether the feature hurt retention. Excluding them removes the most important outcome." },
+            { id: "b", label: "Excluding churned users creates survivor bias — the remaining 90-day actives are positively selected. Intent-to-treat (ITT) analysis includes all originally randomized users to preserve randomization comparability", description: "ITT is the clinical trial gold standard applied to product experiments." },
+            { id: "c", label: "Use per-protocol analysis (engaged users only) as the primary metric and ITT as a secondary check", description: "PP as the primary metric risks selection bias. ITT should be primary; PP is a diagnostic secondary." },
+            { id: "d", label: "Increase the experiment duration to 180 days so more users complete the full experience", description: "Longer duration doesn't fix the bias from excluding churned users." },
+          ],
+          branches: {
+            a: "ps_e3_rec_survivor",
+            b: "ps_e3_terminal",
+            c: "ps_e3_rec_survivor",
+            d: "ps_e3_rec_survivor",
+          },
+          rationale: "B is correct. Intent-to-treat analysis includes every user randomized into the experiment, regardless of subsequent engagement. The churned users are not noise — if treatment users churned more than control users, the feature hurt retention. Excluding them creates a biased, over-optimistic estimate. ITT preserves the random assignment's comparability between arms.",
+        },
+        ps_e3_rec_survivor: {
+          id: "ps_e3_rec_survivor",
+          type: "scenario_choice",
+          badge: "Recovery 3",
+          title: "Recovery · ITT vs PP",
+          prompt: "Your product experiment had 30% of treatment users who never triggered the new feature (low discoverability). The ITT estimate shows +1.5% lift. What is the correct interpretation and the approximate per-engaged-user effect?",
+          choices: [
+            { id: "a", label: "The ITT estimate of +1.5% is the valid policy effect; the per-engaged-user effect is approximately +5% (+1.5% / 0.30 take-up rate) — the feature has real impact but is under-discovered", description: "ITT gives the policy effect. Dividing by take-up rate gives the dilution-corrected per-user effect." },
+            { id: "b", label: "The experiment failed because take-up was too low to measure anything meaningful", description: "A significant ITT result is valid even with low take-up. It answers 'what happens if I roll this out?' including the low discovery rate." },
+            { id: "c", label: "Re-run the experiment only on users who discovered the feature to get a clean result", description: "This is per-protocol analysis and introduces selection bias — discoverers differ from non-discoverers." },
+            { id: "d", label: "The ITT estimate is wrong; per-protocol analysis on the 30% is the correct primary metric", description: "PP as primary risks selection bias. ITT is the valid causal estimate for the policy decision." },
+          ],
+          branches: {
+            a: "ps_e3_terminal",
+            b: "ps_e3_rec_survivor",
+            c: "ps_e3_rec_survivor",
+            d: "ps_e3_rec_survivor",
+          },
+          rationale: "ITT + dilution correction is the principled path. ITT measures what actually happens when you roll a feature out to everyone (including those who never find it). Dividing by take-up approximates the per-engaged-user causal effect. The key signal from a low-take-up ITT is that improving discoverability is where the remaining value lies.",
+        },
+        ps_e3_terminal: {
+          id: "ps_e3_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · The core principle",
+          prompt: "A PM summarizes: 'Our 2-week test was significant, users loved the new feature, we should ship and never look back.' What is the single most important counter-argument a data scientist should make?",
+          choices: [
+            { id: "a", label: "Two weeks captures the novelty peak, not the long-run effect. Without a cohort-split check and a long-term holdout, you cannot know whether users love the feature or are simply curious about the change — and whether that curiosity will sustain into the business metrics that matter at 90 days", description: "This is the complete, interview-ready answer: novelty detection + holdout measurement + long-run business metric focus." },
+            { id: "b", label: "The p-value may be inflated due to multiple testing corrections not being applied", description: "Multiple testing is a different concern. The core issue here is the duration and novelty check." },
+            { id: "c", label: "We need to check for SRM before interpreting any results", description: "SRM validation is important but is a prerequisite check, not the central argument about novelty and long-term measurement." },
+            { id: "d", label: "User surveys and qualitative feedback are needed to confirm the quantitative result", description: "Qualitative research is complementary, but the quantitative novelty and holdout argument is the core data science concern." },
+          ],
+          branches: {
+            a: "ps_e3_terminal",
+            b: "ps_e3_terminal",
+            c: "ps_e3_terminal",
+            d: "ps_e3_terminal",
+          },
+          terminal: true,
+          rationale: "A is the complete answer. The novelty effect, cohort-split detection, and long-term holdout design are the three interconnected concepts this lesson covers. A data scientist who can articulate all three — why short tests mislead, how to detect novelty, and how to measure long-run impact — demonstrates senior-level experimentation thinking.",
+        },
       },
     },
+    knowledgeCheck: [
+      {
+        question: "You run a 4-week experiment. Existing users show weekly lift of +10%, +7%, +4%, +2%. New users show a stable +2% across all four weeks. What is your conclusion?",
+        options: [
+          "Ship — there is a positive lift in both cohorts",
+          "The existing-user lift is a novelty effect decaying toward zero; the new-user cohort is novelty-free and shows the true long-run effect of +2%, which may not justify shipping",
+          "Extend the experiment to 8 weeks to be sure before deciding",
+        ],
+        correctIndex: 1,
+        explanation: "The new-user cohort is the novelty-free control: they have no memory of the old design, so any lift they show is genuine. They show +2%, stable. The existing-user spike is curiosity about the change and is decaying toward that same +2% baseline. The experiment has done its job: the true long-run effect is approximately +2%, and you can now have an informed business conversation about whether that level of improvement justifies shipping and maintaining the feature.",
+      },
+      {
+        question: "What is the primary purpose of a long-term holdout group?",
+        options: [
+          "To beta-test features with a small audience before full rollout",
+          "To maintain a permanently untreated control group so cumulative feature impact can be measured months after shipping, free from seasonal confounds",
+          "To run statistical power calculations for long-duration experiments",
+        ],
+        correctIndex: 1,
+        explanation: "A long-term holdout is never exposed to features in its product area. At any point months or years later, comparing holdout metrics to the general population gives an unconfounded estimate of cumulative product impact. Beta-testing groups receive features early — the opposite of a holdout. The holdout's value comes entirely from never being treated.",
+      },
+      {
+        question: "A 90-day experiment analysis excluded users who churned during the test period. Why is this a problem, and what is the correct approach?",
+        options: [
+          "Excluding churned users is fine because they didn't fully experience the feature; per-protocol analysis on active users is the gold standard",
+          "Excluding churned users creates survivor bias — only positively selected users remain. Intent-to-treat analysis (all originally randomized users) is correct because churn itself is an outcome the experiment should measure",
+          "The issue is that churned users inflate variance; use median instead of mean to reduce their influence",
+        ],
+        correctIndex: 1,
+        explanation: "Churned users are not noise — they are among the most important outcomes. If the treatment caused higher churn, excluding churned users produces an inflated, biased estimate of the feature's benefit. Intent-to-treat analysis includes every randomized user, with churn as an explicit outcome. This preserves the randomization's causal validity and prevents the experiment from appearing more positive than it truly is.",
+      },
+    ],
   },
-  knowledgeCheck: [
-    {
-      question: "What is the main purpose of a permanent holdout group?",
-      options: [
-        "To test features on a small audience before wider rollout",
-        "To maintain a long-term control group that measures true cumulative feature impact, separated from novelty effects",
-        "To identify users who are resistant to product changes",
-      ],
-      correctIndex: 1,
-      explanation: "A permanent holdout group stays on the baseline experience indefinitely. After months or years, comparing holdout metrics to the general population (who received all shipped features) gives an unconfounded estimate of cumulative product impact. This can't be measured any other way — you can't un-ship features to create an after-the-fact control.",
-    },
-    {
-      question: "What is cookie churn bias in long-term experiments?",
-      options: [
-        "Users who prefer the control experience systematically clear their cookies",
-        "Users who clear cookies or switch devices re-enter the experiment and may be assigned to a different variant, contaminating both arms over time",
-        "The experiment cookie expires after 30 days, ending the experiment prematurely",
-      ],
-      correctIndex: 1,
-      explanation: "When users clear cookies or use new devices, they re-enter the experiment with a fresh assignment. If they land in a different arm, their exposure history is mixed — they've seen both variants. This contaminates both arms and inflates variance in long-run estimates. Fix: use login-based persistent IDs rather than cookie-based assignment.",
-    },
-    {
-      question: "You run a 4-week experiment. Week 1: +10% lift. Week 2: +7%. Week 3: +4%. Week 4: +2%. What is your recommendation?",
-      options: [
-        "Ship — any positive lift at week 4 means the feature is net positive",
-        "Do not ship — the decaying lift pattern strongly suggests a novelty effect; the true long-term impact is near zero",
-        "Extend the experiment to 8 weeks to confirm",
-      ],
-      correctIndex: 1,
-      explanation: "The decay from +10% to +2% over 4 weeks is the signature novelty effect trajectory. Extrapolating the decay, the feature likely reaches near-zero lift by week 5-6. Shipping a feature whose value is entirely novelty-driven means users will have a worse long-term experience than if they hadn't gotten the feature at all — the novelty high is followed by a reversion.",
-    },
-  ],
-},
 
 "ps-e4": {
   durationLabel: "15 min",
   outcomes: [
-    "Explain SUTVA and why it's violated in networked systems",
-    "Describe cluster randomization and why it controls network interference",
-    "Design a geo experiment for a marketplace product",
-    "Explain switchback experiments and their tradeoffs vs. geo experiments",
+    "Explain SUTVA and identify exactly when it's violated in networked systems",
+    "Diagnose interference bias direction in marketplace and social experiments",
+    "Design cluster randomization strategies: geo experiments, switchback experiments, and graph-based clustering",
+    "Describe the LinkedIn Lindström et al. ego-network randomization approach and what it revealed",
   ],
   learnMarkdown: `## Network Effects & Interference
 
-Standard A/B testing assumes treating user A doesn't affect user B. In networked products and marketplaces, this assumption is almost always wrong.
+Standard A/B testing assumes that user A's experience doesn't affect user B's outcome. In social networks, marketplaces, and two-sided platforms, this assumption is wrong — and when it's wrong, your A/B test is lying to you.
 
 ---
 
-## SUTVA: The Core Assumption
+## SUTVA: The Assumption You're Violating
 
-**SUTVA** (Stable Unit Treatment Value Assumption): each unit's (user's) outcome depends only on their own assignment, not on others' assignments.
+**SUTVA** — the Stable Unit Treatment Value Assumption — is the foundation of causal inference from experiments. It states: each unit's outcome depends only on its own treatment assignment, not on what anyone else is assigned to.
 
-Violations occur when:
-- Users interact with each other (social networks, messaging)
-- Users compete for shared resources (marketplace supply, ride availability)
-- User behavior affects others through an algorithm (engagement signals feed recommendations)
+SUTVA has two components:
+1. **No interference**: user A's treatment doesn't change user B's outcome
+2. **No hidden versions of treatment**: all treated users receive the same treatment (not a trivially violated assumption, but less often the culprit)
 
----
+In real product experiments, interference is almost the norm:
 
-## Marketplace Interference Example
-
-Uber runs an experiment: treatment drivers get a 10% pay increase. Control drivers get the usual rate.
-
-Interference mechanism:
-1. Treatment drivers work more hours (better pay)
-2. They serve more trips in treatment-area demand
-3. Less supply remains for control-area demand
-4. Control users experience longer wait times
-
-The control group's outcome was affected by the treatment — SUTVA violated. The estimated treatment effect is biased.
+| Product type | Interference mechanism |
+|---|---|
+| Social network | User in treatment posts Stories → friends in control see Stories in feed |
+| Rideshare | Treatment drivers earn more, work more hours → less supply for control riders |
+| Marketplace | Discount brings buyers → inventory/capacity depletes for non-discount buyers |
+| Email platform | Spam detection model trained on treatment data → changes deliverability for control users |
 
 ---
 
-## Cluster Randomization
+## The Bias Direction: Usually Underestimation
 
-Instead of randomizing individuals, randomize **clusters** that are roughly isolated:
-- **Geo experiments**: randomize by city, DMA (Designated Market Area), or region. Treat all users in some cities, hold all users in others.
-- **Social cluster randomization**: identify social communities and randomize whole communities.
-- **Time-based randomization** (switchback): alternate treatment/control periods in the same market.
+When treatment "spills" into control, the control group gets some of the benefit. The gap between treatment and control shrinks. Result: you **underestimate** the true effect size.
 
----
+The rideshare case makes this concrete. Uber tests a new surge algorithm. Treatment drivers see the new logic; control drivers see the old logic. But both groups of drivers compete for the same pool of rider requests in the same city.
 
-## Geo Experiments
+What happens:
+1. Treatment drivers, responding to better surge incentives, are online more and in higher-demand areas
+2. They capture a larger share of trips
+3. Control drivers are left competing for the remainder — a depleted pool
+4. Control drivers' earnings look worse *because* of the treatment, not because the old algorithm is bad
 
-Design:
-1. Match cities into comparable pairs (similar size, demographics, traffic mix)
-2. Randomly assign one city per pair to treatment, one to control
-3. Run for 4–8 weeks
-4. Use a difference-in-differences estimator
-
-Key requirement: cities must be geographically separated enough that supply/demand doesn't spill across borders.
+The measured lift (treatment minus control) is smaller than the true lift (treatment vs. no-treatment world). The experiment underestimates the benefit of the new surge logic.
 
 ---
 
-## Switchback Experiments
+## Cluster Randomization: The Fix
 
-Alternate treatment and control periods in the same market (e.g., even hours = treatment, odd hours = control).
+Instead of randomizing individual users, randomize **clusters** that are internally connected but externally isolated from other clusters.
 
-Advantages:
-- Controls for geographic heterogeneity — same market, different times
-- No spillover between markets
+**Geo experiments**: Assign whole cities or DMAs (Designated Market Areas) to treatment or control. All supply and demand within a city is in the same arm — no cross-arm interference within a market. Estimate with difference-in-differences.
 
-Disadvantages:
-- Assumes the treatment effect is immediate (no carryover between time periods)
-- Users may experience both variants, creating carryover
+**Graph cluster randomization**: For social networks, partition the social graph into communities using Louvain or spectral clustering. Assign whole communities to treatment or control. A treated user's friends are also in treatment, so there's no cross-contamination.
+
+**Switchback experiments**: Alternate treatment and control time windows in the same market. Even hours = treatment; odd hours = control. The same city (same supply pool) is measured across time. Key assumption: no temporal carryover — the treatment effect must kick in and dissipate within the time window.
 
 ---
 
-## CUPED for Variance Reduction
+## The LinkedIn Experiment: A Famous Real-World Case
 
-Geo experiments have fewer randomization units (cities vs. millions of users). This inflates variance. **CUPED** (using pre-experiment metrics as covariates) can reduce variance by 30–50%, enabling smaller geo experiments to have adequate power.
+In a landmark 2022 paper (Lindström, Li, et al., *LinkedIn Engineering*), LinkedIn ran an ego-network randomization experiment on the "People You May Know" feature.
+
+Standard user-level A/B testing would assign individual users to treatment/control. But LinkedIn is a social network — a treated user who connects with more people directly changes the network neighborhood of those people, who might be in control.
+
+LinkedIn's solution: **ego-network randomization**. For each user, look at their entire local network neighborhood (ego network). Assign the *neighborhood* to treatment or control, not the individual. This dramatically reduced interference compared to user-level randomization.
+
+The finding: the standard user-level A/B test *underestimated* the true effect of the recommendation improvement by approximately **2–5×**. Network interference had been masking most of the actual value.
+
+This is the most important result in the interference literature: naive experiments can tell you a feature has near-zero effect when in fact it has a substantial one.
+
+---
+
+## Empirical Interference Detection
+
+Before redesigning an experiment, you can test whether interference exists:
+
+1. **Dose-response analysis**: Compare outcomes in control users by what fraction of their neighbors are in treatment. If control users with more treated neighbors perform better, interference is present.
+2. **Boundary analysis**: For geo experiments, compare users near city borders (where spillover is most likely) vs. users in city centers. Border users should show smaller treatment-control gaps.
+3. **Network density correlation**: If interference is present, treatment effects should be larger in high-density clusters where network effects propagate faster.
+
+---
+
+## Interview-Ready Summary
+
+- **SUTVA violation** = treatment of user A changes outcome of user B, usually through shared resources or social connections
+- **Bias direction**: network interference almost always causes underestimation of the true effect
+- **Geo experiments** = cluster randomization by geography; fewer randomization units → lower power, but eliminates supply interference
+- **Switchback experiments** = cluster randomization by time window; controls for geographic heterogeneity but requires no temporal carryover
+- **Graph cluster randomization** = assigns social communities together; harder to implement but required for truly social features
+- **Lindström et al. (LinkedIn, 2022)**: canonical proof that naive A/B estimates can be off by 2–5× in social networks due to interference
+- When asked to design an experiment on any social, marketplace, or supply-constrained product: ask "could treatment users affect control users?" before proposing user-level randomization
 `,
   video: null,
-  videoFallbackMarkdown: `## Deep Dive: Graph Cluster Randomization
+  videoFallbackMarkdown: `## Deep Dive: Two-Sided Marketplace Experiments & Graph Algorithms
 
-For social networks, geo randomization is often impossible. Graph cluster randomization partitions the social graph into communities (using spectral clustering or Louvain algorithm) and randomizes at the community level.
+### Two-Sided Marketplace Interference
 
-The challenge: social communities overlap. Perfect isolation is impossible. Bias-variance tradeoff: larger clusters have less spillover but fewer randomization units (less power).
+On Airbnb, Uber, and DoorDash, the experiment population has two sides: supply (hosts, drivers, restaurants) and demand (guests, riders, customers). Treating the supply side affects outcomes for demand-side users in the control group, and vice versa.
 
-Recent work at LinkedIn and Facebook uses **ego-network randomization**: for each user, randomize based on their network neighborhood, not individual assignment. This reduces spillover at the cost of some assignment imbalance.
+Airbnb's Smart Pricing experiment illustrates this: hosts in treatment used algorithmic pricing and filled more of their available nights. This removed those listings from the available inventory pool. Demand-side users (in both treatment and control) competed for the remaining inventory — but the composition of what remained was now different. The experiment contaminated its own control group through inventory depletion.
+
+The fix: assign whole local markets (city × listing-tier buckets) to treatment or control, so supply and demand are matched within the same arm.
+
+### Ego Network Randomization
+
+The LinkedIn approach works as follows: for user u, define ego(u) as all users within 2 hops. Assign ego(u) as a cluster. This means a treated user's direct connections are also treated, eliminating the most common interference pathway (friend-to-friend).
+
+Trade-off: ego networks overlap heavily. User A's ego network includes user B, and user B's ego network includes user A. This creates assignment conflicts. LinkedIn resolves this with a priority rule: the largest ego network that includes a user "wins" that user's assignment. This introduces some assignment imbalance but is far less biased than user-level randomization.
+
+### Graph Cluster Algorithms
+
+For global graph clustering (as opposed to ego-network local approach):
+- **Louvain algorithm**: greedily maximizes modularity — the tendency of edges to fall within clusters vs. between clusters. Runs in O(n log n), practical for billion-node graphs.
+- **Spectral clustering**: uses graph Laplacian eigenvectors to embed nodes in geometric space, then k-means. More principled but quadratic in nodes — used on subgraphs.
+
+The goal: minimize the number of cross-cluster edges (edges that would connect treatment to control users) as a fraction of total edges. This is the **interference leakage rate** — a direct measure of expected SUTVA violation under a given randomization.
+
+### Empirical Detection Protocol
+
+To measure interference empirically before redesigning: run the standard user-level experiment, then regress control-user outcomes on the fraction of their neighbors in treatment (the "exposure" variable). A positive and significant coefficient is direct evidence of interference, and its magnitude estimates the bias in your original point estimate.
 `,
   tryGuidance: "No interactive viz — work through the interference design scenarios in the interview simulation.",
   interviewGraph: {
-    initialStageId: "ps_e4_stage1",
+    initialStageId: "ps_e4_click1",
     artifactDimensions: [
       { label: "Interference Recognition", recoveryStageId: "ps_e4_rec1" },
-      { label: "Cluster Design", recoveryStageId: "ps_e4_terminal", passLabel: "Interference Mitigation" },
+      { label: "Cluster Design", recoveryStageId: "ps_e4_rec2", passLabel: "Interference Mitigation" },
     ],
     stages: {
-      ps_e4_stage1: {
-        id: "ps_e4_stage1",
-        type: "scenario_choice",
+      ps_e4_click1: {
+        id: "ps_e4_click1",
+        type: "click_target",
         badge: "Stage 1",
-        title: "Stage 1 · Marketplace experiment",
-        prompt: "You're A/B testing a 5% discount for DoorDash customers. Treatment users get the discount, control users get full price. Your primary metric is orders placed. Why might standard user-level randomization give biased results?",
-        choices: [
-          { id: "a", label: "Sample size is too small for a 5% discount effect", description: "Sample size is a power issue, not an interference issue." },
-          { id: "b", label: "Treatment users order more, increasing demand; restaurants and delivery capacity are finite, so control users may experience slower delivery or unavailability — SUTVA violated", description: "Shared supply creates interference: treatment demand competes with control demand." },
-          { id: "c", label: "Control users will find out about the discount and demand it, confounding results", description: "This is a contamination problem, not an interference problem." },
-        ],
-        branches: { a: "ps_e4_rec1", b: "ps_e4_stage2", c: "ps_e4_rec1" },
-        rationale: "B is correct. Delivery capacity (restaurants, drivers) is a shared resource. Treatment users ordering more creates congestion that affects control users' experience. This is supply-side interference — the treatment affects control outcomes through a shared supply pool.",
-      },
-      ps_e4_rec1: {
-        id: "ps_e4_rec1",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · SUTVA violation",
-        prompt: "What condition causes SUTVA to be violated in a marketplace A/B test?",
-        choices: [
-          { id: "a", label: "When treatment and control users compete for the same finite resource — supply, capacity, inventory — so treating one group changes outcomes for the other", description: "Shared resources create interference pathways." },
-        ],
-        branches: { a: "ps_e4_stage2" },
-        rationale: "SUTVA requires independence between units. Shared resources create dependencies: treating one user changes available supply for another.",
+        title: "Stage 1 · Social network randomization",
+        prompt: "You're designing an experiment for a new 'Stories' feature on a social network. Your engineer has written the standard user-level assignment code below. Click the line where a critical experimental design assumption breaks down.",
+        code_snippet: `# Experiment: New "Stories" feature for social network
+# Standard user-level A/B split
+
+import hashlib
+
+def assign_experiment(user_id: str) -> str:
+    hash_val = int(hashlib.md5(user_id.encode()).hexdigest(), 16)
+    return "treatment" if hash_val % 2 == 0 else "control"  -- ds-target:ps_e4_sutva
+
+# Assign each user independently
+for user_id in all_users:
+    user_experiments[user_id] = assign_experiment(user_id)`,
+        validationCopy: {
+          ps_e4_sutva: "Correct. User-level randomization violates SUTVA on a social network. A control user whose friends are all in treatment will see Stories appearing in their feed — because their friends are posting them. The control user's experience has been contaminated by the treatment. The measured control-group behavior is no longer a clean counterfactual.",
+        },
+        branches: { ps_e4_sutva: "ps_e4_stage2" },
       },
       ps_e4_stage2: {
         id: "ps_e4_stage2",
         type: "scenario_choice",
         badge: "Stage 2",
-        title: "Stage 2 · Geo experiment design",
-        prompt: "How do you redesign the DoorDash discount experiment to avoid interference?",
+        title: "Stage 2 · Uber surge pricing bias",
+        prompt: "Uber tests a new surge pricing algorithm. Treatment drivers see the new logic; control drivers see the old logic. Both groups compete for the same rider requests in San Francisco. What kind of bias does this introduce, and in which direction?",
         choices: [
-          { id: "a", label: "Use session-level randomization instead of user-level", description: "Session-level randomization has the same interference problem and adds others." },
-          { id: "b", label: "Geo experiment: randomize by city — all users in treatment cities get the discount, all users in control cities don't; this eliminates cross-group supply interference within a market", description: "Geographic isolation prevents supply spillover." },
-          { id: "c", label: "Increase sample size to overcome the interference bias", description: "More observations of a biased estimator doesn't remove the bias." },
+          { id: "a", label: "Upward bias — the new surge logic looks better than it really is because treatment drivers take trips from control drivers, making the old algorithm look artificially bad", description: "Think carefully about the direction of interference." },
+          { id: "b", label: "No bias — supply and demand balance out across both groups over time", description: "Supply and demand do not balance out when the groups are competing in the same physical market." },
+          { id: "c", label: "Downward bias — treatment helps treatment drivers but also depletes supply for control drivers, making control look worse than it would be in a full rollout; the estimated treatment effect is smaller than the true effect", description: "Interference causes underestimation: control is artificially harmed, shrinking the measured gap." },
+          { id: "d", label: "The experiment is entirely invalid and produces no usable signal", description: "Interference biases the estimate but doesn't make it completely uninformative." },
         ],
-        branches: { a: "ps_e4_rec1", b: "ps_e4_terminal" },
-        rationale: "B is correct. Geo randomization assigns whole markets to treatment or control. Within a market, all users are in the same group, so there's no cross-group competition for supply. The treatment effect is measured by comparing treated cities vs. control cities using difference-in-differences.",
+        branches: { a: "ps_e4_rec1", b: "ps_e4_rec1", c: "ps_e4_stage3", d: "ps_e4_rec1" },
+        rationale: "C is correct. Treatment drivers, responding to better incentives, capture a larger share of trips. Control drivers compete for a depleted pool — they look worse than they would if the old algorithm were applied everywhere. The measured gap (treatment minus control) is smaller than the true effect of the new algorithm. Network interference almost always causes underestimation.",
+      },
+      ps_e4_rec1: {
+        id: "ps_e4_rec1",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Interference bias direction",
+        prompt: "When treatment users and control users compete for the same finite resource (driver supply, ride capacity, marketplace inventory), which direction does interference bias the estimated treatment effect?",
+        choices: [
+          { id: "a", label: "Upward bias — the treatment group looks better than it really is", description: "Treatment may look good, but consider what happens to the control group." },
+          { id: "b", label: "Downward bias — treatment spills into control, raising the control group's baseline, which shrinks the measured treatment-control gap; the true effect is larger than estimated", description: "Interference causes underestimation by contaminating the control baseline upward." },
+          { id: "c", label: "The bias direction is random and unpredictable", description: "In supply-constrained interference, the direction is predictable." },
+          { id: "d", label: "No bias — interference only adds noise, not systematic error", description: "Interference is a systematic bias, not random noise." },
+        ],
+        branches: { a: "ps_e4_stage3", b: "ps_e4_stage3", c: "ps_e4_stage3", d: "ps_e4_stage3" },
+        rationale: "B is correct. Treatment spilling into control brings control users' outcomes closer to treatment-level outcomes. The control baseline rises. The measured gap shrinks. You underestimate the true effect. The LinkedIn Lindström et al. study found naive user-level experiments underestimated true effects by 2–5×.",
+      },
+      ps_e4_stage3: {
+        id: "ps_e4_stage3",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Cluster randomization design",
+        prompt: "You need to re-design the Uber surge experiment to get an unbiased estimate. Which approach correctly eliminates supply-side interference?",
+        choices: [
+          { id: "a", label: "Session-level randomization — randomly assign each trip request to treatment or control pricing logic", description: "Same-city sessions still compete for the same driver supply." },
+          { id: "b", label: "Geo experiment — assign whole cities to treatment or control; San Francisco gets one algorithm, Los Angeles gets the other; supply and demand within each city are in the same arm", description: "Geographic isolation eliminates the cross-arm competition for driver supply." },
+          { id: "c", label: "Increase sample size — with enough data, the interference bias averages out", description: "More samples of a biased estimator don't remove the bias." },
+          { id: "d", label: "Run treatment on weekdays and control on weekends in the same city", description: "This is a switchback experiment — valid for this case, but option B is more precise for supply-side interference." },
+        ],
+        branches: { a: "ps_e4_rec2", b: "ps_e4_stage4", c: "ps_e4_rec2", d: "ps_e4_stage4" },
+        rationale: "B is correct (D is also partially correct). Geo experiments assign whole markets to a single arm, so all supply and demand within San Francisco is either all-treatment or all-control — there's no cross-arm competition for drivers. Geo experiments are the standard approach for supply-side marketplace interference. Switchback (D) is a valid alternative but introduces temporal carryover risk.",
+      },
+      ps_e4_rec2: {
+        id: "ps_e4_rec2",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · Geo experiment principle",
+        prompt: "Why does a geo experiment eliminate supply-side interference that user-level randomization cannot?",
+        choices: [
+          { id: "a", label: "Because geographic data is more accurate than user-level data", description: "Data accuracy is not the issue." },
+          { id: "b", label: "Because within each assigned city, all supply and demand is in the same experimental arm — there is no cross-arm competition for shared resources within any single market", description: "Geographic isolation ensures that drivers in treatment cities only compete with other treatment riders, and vice versa." },
+          { id: "c", label: "Because city-level effects are larger and easier to detect statistically", description: "Geo experiments actually have lower statistical power due to fewer randomization units." },
+          { id: "d", label: "Because geo experiments use a longer time horizon which reduces noise", description: "Duration is not the key differentiator." },
+        ],
+        branches: { a: "ps_e4_stage4", b: "ps_e4_stage4", c: "ps_e4_stage4", d: "ps_e4_stage4" },
+        rationale: "B is correct. The key insight: geo experiments put all supply and all demand in a single city into the same experimental arm. No treatment driver competes with a control rider. The interference pathway is severed. This is the fundamental logic of cluster randomization — assign entire interaction units together.",
+      },
+      ps_e4_stage4: {
+        id: "ps_e4_stage4",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · LinkedIn ego-network experiment",
+        prompt: "LinkedIn ran an ego-network randomization experiment instead of standard user-level A/B testing for their 'People You May Know' recommendations. What did they find about their previous user-level estimates?",
+        choices: [
+          { id: "a", label: "User-level estimates were accurate — ego-network randomization confirmed the same effect size", description: "The paper found a significant discrepancy." },
+          { id: "b", label: "User-level estimates had overestimated the effect — the feature was actually less valuable than standard A/B testing suggested", description: "The direction is reversed from what the interference literature predicts." },
+          { id: "c", label: "User-level estimates had underestimated the true effect by approximately 2–5× — network interference had been masking most of the feature's actual value by contaminating the control group", description: "Standard experiments underestimate social feature value." },
+          { id: "d", label: "The experiment was inconclusive — ego-network randomization produced too much variance to draw conclusions", description: "The paper drew clear conclusions about the underestimation bias." },
+        ],
+        branches: { a: "ps_e4_rec3", b: "ps_e4_rec3", c: "ps_e4_stage5", d: "ps_e4_rec3" },
+        rationale: "C is correct. Lindström et al. (2022) found that standard user-level A/B testing underestimated the value of LinkedIn's recommendation improvements by roughly 2–5×. When a treated user connects with more people, those new connections benefit too — but they may be in the control group, raising the control baseline. The naive estimate dramatically understated the true network effect.",
+      },
+      ps_e4_rec3: {
+        id: "ps_e4_rec3",
+        type: "scenario_choice",
+        badge: "Recovery 3",
+        title: "Recovery · LinkedIn finding",
+        prompt: "According to the Lindström et al. LinkedIn study, what is the typical consequence of using standard user-level randomization for social network feature experiments?",
+        choices: [
+          { id: "a", label: "The standard estimate is unbiased but high variance", description: "Network interference introduces systematic bias, not just noise." },
+          { id: "b", label: "The standard estimate underestimates the true feature value, because treated users' new behaviors (more connections, more activity) spill into the control group and inflate the control baseline", description: "Interference compresses the treatment-control gap by raising the control group's outcomes." },
+          { id: "c", label: "The standard estimate overestimates the true feature value", description: "The direction is underestimation in network interference scenarios." },
+          { id: "d", label: "There is no systematic bias — it depends entirely on the feature type", description: "For social features with network propagation, underestimation is the expected direction." },
+        ],
+        branches: { a: "ps_e4_stage5", b: "ps_e4_stage5", c: "ps_e4_stage5", d: "ps_e4_stage5" },
+        rationale: "B is correct. In social networks, treated users generate activity (connections, posts, reactions) that reaches control-group users through the social graph. Control users' outcomes rise — partially capturing treatment benefits — and the measured treatment-control gap shrinks. Standard A/B estimates understate true feature value by as much as 2–5×.",
+      },
+      ps_e4_stage5: {
+        id: "ps_e4_stage5",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Switchback experiments",
+        prompt: "You're testing a new matching algorithm for a food delivery marketplace in a single city. You can't geo-split (one city, one supply pool). Your colleague proposes a switchback experiment: even hours use the new algorithm, odd hours use the old one. What is the key assumption that must hold for this to be valid?",
+        choices: [
+          { id: "a", label: "Supply and demand must be equal across all hours of the day", description: "Supply and demand don't need to be equal — they just need to be balanced in expectation." },
+          { id: "b", label: "No temporal carryover: the algorithm's effects must activate and dissipate fully within each time window, so a treatment hour doesn't change driver or customer behavior that persists into the next control hour", description: "Switchback validity depends entirely on the absence of carryover between windows." },
+          { id: "c", label: "The experiment must run for at least 30 days to capture weekly seasonality", description: "Duration is a power concern but not the validity assumption for switchback." },
+          { id: "d", label: "Customers must not order food in consecutive hours", description: "Consecutive ordering is not the problem — carryover effects on drivers' locations and states are." },
+        ],
+        branches: { a: "ps_e4_rec2", b: "ps_e4_terminal", c: "ps_e4_rec2", d: "ps_e4_rec2" },
+        rationale: "B is correct. Switchback experiments are biased if there's carryover. For example: if treatment hours produce more driver repositioning to high-demand zones, those drivers are already in good positions at the start of the next (control) hour. The control-hour measurement is contaminated by the treatment-hour state. The carryover assumption is switchback's Achilles heel — always ask whether the treatment can leave a residual state.",
       },
       ps_e4_terminal: {
         id: "ps_e4_terminal",
         type: "scenario_choice",
         badge: "Complete",
-        title: "Complete · Interference principle",
-        prompt: "When should you use cluster randomization instead of user-level randomization?",
+        title: "Complete · Interference design principle",
+        prompt: "An interviewer asks: 'You're launching an experiment on a two-sided marketplace feature. Walk me through your experimental design.' What is the first question you must answer before choosing a randomization strategy?",
         choices: [
-          { id: "a", label: "Whenever SUTVA is violated — users interact, share resources, or influence each other through shared algorithms — requiring whole clusters to be assigned together", description: "Cluster randomization prevents cross-group interference by keeping all interactions within one arm." },
+          { id: "a", label: "What is the minimum detectable effect size for this experiment?", description: "MDE matters for power calculations, but comes after the design question." },
+          { id: "b", label: "Could treatment units affect control units? — identify the interference mechanism (shared supply, social graph, algorithmic feedback) before committing to user-level randomization", description: "SUTVA check is always the first design question on networked or supply-constrained products." },
+          { id: "c", label: "How many users are active in the relevant product surface?", description: "Sample size matters for power but doesn't drive the randomization strategy choice." },
+          { id: "d", label: "What statistical test will be used to analyze results?", description: "Test selection follows from the design, not the other way around." },
         ],
-        branches: { a: "ps_e4_terminal" },
+        branches: { a: "ps_e4_terminal", b: "ps_e4_terminal", c: "ps_e4_terminal", d: "ps_e4_terminal" },
         terminal: true,
-        rationale: "Cluster randomization is the standard fix for SUTVA violations. By assigning whole clusters (cities, social communities, time periods) to treatment or control, you eliminate the mechanism through which treatment and control units interact.",
+        rationale: "B is correct. On any networked, social, or supply-constrained product, the first design question is always: 'Can treatment and control units interact?' If yes, user-level randomization is invalid. Identify the interference mechanism (shared supply pool, social graph propagation, algorithmic feedback loop), then choose the appropriate cluster strategy — geo, switchback, or graph-cluster randomization.",
       },
     },
   },
   knowledgeCheck: [
     {
-      question: "What is SUTVA and when is it violated in product experiments?",
+      question: "Uber tests a new surge algorithm: treatment drivers see new logic, control drivers see old logic, both competing in San Francisco. What bias does this introduce?",
       options: [
-        "Stable Unit Treatment Value Assumption: each user's outcome depends only on their own treatment assignment — violated when users interact or compete for shared resources",
-        "Sequential Unit Testing and Variance Analysis: a method for detecting SRM in experiments",
-        "A statistical assumption that sample sizes must be equal between arms",
+        "Upward bias — treatment drivers unfairly take trips, making the new algorithm look better than it is in a full rollout",
+        "Downward bias — treatment helps treatment drivers but depletes supply for control drivers, making control perform worse than it would in a full rollout; the true effect is larger than measured",
+        "No bias — supply and demand balance out across both groups over a sufficiently long experiment",
+      ],
+      correctIndex: 1,
+      explanation: "This is supply-side interference causing underestimation. Treatment drivers, responding to better incentives, capture more trips from the shared supply pool. Control drivers are left competing for a depleted pool and perform worse than they would if the old algorithm were applied everywhere. The measured treatment-control gap is smaller than the true effect. Network interference almost always causes underestimation of the true effect.",
+    },
+    {
+      question: "What did the Lindström et al. LinkedIn ego-network randomization study find about standard user-level A/B test estimates for social features?",
+      options: [
+        "Standard user-level estimates were accurate and ego-network randomization confirmed the same effect sizes",
+        "Standard user-level estimates overestimated the true effect because treated users drew engagement away from control users",
+        "Standard user-level estimates underestimated the true effect by approximately 2–5×, because network interference contaminated the control group and inflated its baseline",
+      ],
+      correctIndex: 2,
+      explanation: "The LinkedIn paper (Lindström et al., 2022) is the canonical demonstration of interference underestimation in social networks. Treated users' new connections and activities reached control-group users through the social graph, raising the control baseline. The naive treatment-control gap was far smaller than the true causal effect. Ego-network randomization — assigning whole local network neighborhoods to the same arm — greatly reduced this contamination and revealed the true, much larger effect size.",
+    },
+    {
+      question: "A switchback experiment alternates treatment and control time windows in the same market. What assumption must hold for the estimate to be unbiased?",
+      options: [
+        "No temporal carryover: treatment effects must activate and dissipate fully within each time window, so a treatment window doesn't alter driver or customer state that persists into the next control window",
+        "The experiment must run for at least 4 weeks to average out day-of-week variation across windows",
+        "Supply and demand must be equal in magnitude across treatment and control windows",
       ],
       correctIndex: 0,
-      explanation: "SUTVA requires that treating user A doesn't affect user B's outcome. It's violated in social networks (user interactions), marketplaces (shared supply), and recommendation systems (engagement signals feed algorithms that affect other users). When SUTVA is violated, standard A/B estimates are biased.",
-    },
-    {
-      question: "What is a switchback experiment and what assumption must hold for it to be valid?",
-      options: [
-        "An experiment where users switch between variants randomly each session",
-        "An experiment that alternates treatment and control periods in the same market — valid only if the treatment effect is immediate and doesn't carry over across time periods",
-        "An experiment that tests the reverse of the original hypothesis",
-      ],
-      correctIndex: 1,
-      explanation: "Switchback experiments (e.g., even hours = treatment, odd hours = control in the same city) control for geographic heterogeneity. The key assumption: the treatment effect kicks in and dissipates immediately within each period. If there's carryover — e.g., a treatment hour changes driver behavior that persists into the next control hour — the estimate is biased.",
-    },
-    {
-      question: "Why does geo randomization in a marketplace experiment have lower statistical power than user-level randomization?",
-      options: [
-        "Geo experiments require more complex statistical models that are less efficient",
-        "Geo experiments have fewer randomization units (cities vs. millions of users), dramatically increasing the variance of the treatment effect estimate",
-        "Geographic markets are harder to instrument than user-level tracking",
-      ],
-      correctIndex: 1,
-      explanation: "Statistical power depends on the number of randomization units. User-level: millions of units, tight confidence intervals. Geo experiments: dozens or hundreds of cities — far fewer units, much wider confidence intervals. This is the fundamental power tradeoff of cluster randomization. CUPED (using pre-experiment city metrics as covariates) can partially compensate by reducing per-unit variance.",
+      explanation: "Switchback validity depends entirely on the no-carryover assumption. If a treatment hour repositions drivers, changes customer behavior, or shifts fulfillment state in a way that persists into the next control hour, the control measurement is contaminated. For example, drivers positioned in high-demand zones due to a treatment-hour incentive are still there at the start of the control hour. The carryover assumption is the critical validity question for any switchback design.",
     },
   ],
 },
