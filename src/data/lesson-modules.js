@@ -29584,6 +29584,8729 @@ embed_c = TSNE(n_components=2,
     ],
   },
 
+"ml-e1": {
+  durationLabel: "18 min",
+  outcomes: [
+    "Read a confusion matrix and derive precision, recall, and F1 from TP/FP/FN/TN without looking them up.",
+    "Choose precision vs recall vs F1 from the cost structure of the problem, not from habit.",
+    "Explain why the decision threshold turns one ranking model into a whole family of operating points.",
+    "Avoid the senior-level traps: accuracy paradox under imbalance, macro vs micro averaging, F-beta.",
+  ],
+  learnMarkdown: `## The Four Cells
+
+Every classifier you ship outputs a **score**, not a hard label. The hard label appears only when you compare that score to a **threshold**. The confusion matrix photographs one operating point of that family.
+
+| | Predicted Negative | Predicted Positive |
+|---|---|---|
+| **Actual Negative** | TN | FP (type I) |
+| **Actual Positive** | FN (type II) | TP |
+
+Four numbers. Every scalar metric is a ratio of these four. If you can rebuild the table on a whiteboard and point at each cell, you can derive any metric live under interview pressure.
+
+## The Three Workhorse Metrics
+
+- **Precision** = TP / (TP + FP). Of the things I flagged positive, how many were right? Punishes false alarms.
+- **Recall** (sensitivity, TPR) = TP / (TP + FN). Of the truly positive things, how many did I catch? Punishes misses.
+- **F1** = 2·P·R / (P + R), the **harmonic mean** of precision and recall. Harmonic, not arithmetic — a model with P=1.0 and R=0.01 has arithmetic mean ~0.5 but F1 ~0.02. F1 collapses toward the worse of the two, refusing to be gamed by sacrificing one metric.
+
+Note what is absent: every one of these ignores TN. That is deliberate — in fraud and medical screening the negatives vastly outnumber positives, and a metric that rewards "correctly ignoring the boring majority" rewards doing nothing.
+
+## Accuracy Is a Trap
+
+Accuracy = (TP + TN) / total. On a dataset that is 99% negative (1% fraud), a model that predicts "never fraud" scores **99% accuracy** and catches zero fraud. Recall is 0, precision is undefined, the business loses every dollar — and the dashboard glows green. The fix: never quote accuracy alone on imbalanced data; quote precision/recall at a stated threshold.
+
+## Choosing the Metric from the Cost of Being Wrong
+
+| Scenario | Costly error | Optimize for |
+|---|---|---|
+| Cancer screening | Missing a sick patient (FN) | Recall |
+| Spam filter | Flagging a real email (FP) | Precision |
+| Fraud (analyst-reviewed) | Both, bounded by review capacity | Precision@k |
+| Legal e-discovery | Missing a responsive doc | Recall |
+
+The senior move: state the trade in business units — dollars, lives, analyst-hours — and *then* pick the metric.
+
+## The Threshold Is the Real Knob
+
+Raising the threshold demands more confidence before predicting positive: fewer positives, so FP and TP both fall → precision up, recall down. Lowering it floods predictions positive → recall up, precision down.
+
+Two consequences: (1) F1 is **threshold-dependent** — "our F1 is 0.82" is meaningless without "at threshold X". (2) You tune the threshold, not the model, for many launches. Moving the operating point along an existing PR curve is free and instant; retraining is expensive.
+
+## Multiclass: Macro vs Micro vs Weighted
+
+- **Macro** — unweighted mean across classes. Treats a 5-sample class and 5000-sample class equally; surfaces failure on rare classes.
+- **Micro** — pool all TP/FP/FN globally, compute once. Dominated by frequent classes; equals accuracy in single-label settings.
+- **Weighted** — macro weighted by class support. Can still hide a tanking rare class.
+
+Quoting "F1 = 0.9" without saying which average is a red flag in a senior review.
+
+## F-Beta
+
+F1 weights P and R equally. When a miss costs 10× a false alarm, use **F-beta** with β > 1 (weights recall more). F2 gives recall twice the weight of precision. The formula: F_β = (1 + β²) · P · R / (β² · P + R).
+
+## Interview Questions
+
+- "Your fraud model has 99.5% accuracy. Should you ship it?" — Ask for the base rate and confusion matrix first.
+- "Precision 0.9, recall 0.3. Business wants more fraud caught. What do you change first?" — Lower the threshold (free), re-quote precision at the new recall, only retrain if the PR curve itself is too low.
+- "When is F1 the wrong objective?" — When error costs are asymmetric (use F-beta or cost matrix) or when you only care about top-k results.`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Worked Threshold Sweep
+
+Draw the 2×2 matrix from memory. Run a thought experiment on a 1%-positive dataset of 1,000 rows (10 positives, 990 negatives):
+
+1. Model A predicts all-negative: TP=0, FN=10, FP=0, TN=990. Accuracy 99%, recall 0. Dashboard glows green, model is useless.
+2. Model B catches 8 of 10 but raises 40 false alarms: TP=8, FN=2, FP=40, TN=950. Precision=8/48≈0.17, recall=0.8. Lower accuracy, vastly more useful.
+3. Write one sentence: "I would pick the threshold to hit recall ≥ ___ because a miss costs ___." Filling that blank with a business unit is the muscle interviewers probe.`,
+  tryGuidance: "Use the Confusion Matrix visualization. Drag the threshold from low to high and narrate out loud: as the threshold rises, which cells shrink, and which of precision/recall climbs while the other falls? Find the threshold where F1 peaks — then ask whether the business would actually want that point.",
+  interviewGraph: {
+    initialStageId: "e1_stage1",
+    artifactDimensions: [
+      { label: "Metric Selection", recoveryStageId: "e1_recovery1" },
+      { label: "Precision-Recall Tradeoff", recoveryStageId: "e1_recovery2" },
+      { label: "F-Scores & Averaging", recoveryStageId: "e1_recovery3", passLabel: "Classification Metrics Mastery" },
+    ],
+    stages: {
+      e1_stage1: {
+        id: "e1_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Accuracy paradox",
+        prompt: "A fraud detection model achieves 99.2% accuracy on a dataset where 99% of transactions are legitimate. The team celebrates. What should you ask immediately?",
+        choices: [
+          { id: "a", label: "What is the recall on the fraud class?", description: "Accuracy on an imbalanced dataset is dominated by the majority class. A model predicting 'all legitimate' also hits 99%. Recall on the minority class (fraud) is what actually matters." },
+          { id: "b", label: "Is the test set large enough for statistical significance?", description: "Sample size is a valid concern but not the first question — the deeper issue is that 99.2% accuracy on a 99% negative dataset is nearly meaningless." },
+          { id: "c", label: "What optimizer was used during training?", description: "The training algorithm is not the issue here — the evaluation metric is misleading regardless of how the model was trained." },
+        ],
+        branches: { a: "e1_stage2", b: "e1_recovery1", c: "e1_recovery1" },
+        rationale: "Accuracy on an imbalanced dataset is dominated by the majority class. A model that predicts 'legitimate' for every single transaction achieves 99% accuracy while catching zero fraud. The first question is always: what does the confusion matrix look like, specifically the recall on the positive (fraud) class?",
+      },
+      e1_recovery1: {
+        id: "e1_recovery1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Imbalance and accuracy",
+        prompt: "A dataset is 99% class 0, 1% class 1. A model predicts class 0 for everything. What is its accuracy, and what is its recall on class 1?",
+        choices: [
+          { id: "a", label: "Accuracy 99%, recall on class 1 = 0%", description: "Correct. The all-negative model is correct on all 990 negatives (accuracy = 99%) but catches none of the 10 positives (recall = 0). This is the accuracy paradox." },
+          { id: "b", label: "Accuracy 50%, recall 50%", description: "Accuracy is not 50% — the model is correct on every majority-class sample." },
+          { id: "c", label: "Accuracy 99%, recall 99%", description: "Recall on class 1 measures how many true positives are caught. Predicting all-negative catches none — recall is 0, not 99%." },
+        ],
+        branches: { a: "e1_stage2", b: "e1_stage2", c: "e1_stage2" },
+        rationale: "Accuracy 99% + recall 0% is the accuracy paradox. The model is useless for its actual purpose (catching fraud) while looking excellent on the headline metric. Always report precision and recall on the positive class alongside accuracy.",
+      },
+      e1_stage2: {
+        id: "e1_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Threshold vs retraining",
+        prompt: "Your fraud model has precision=0.90 and recall=0.30. The business needs recall ≥ 0.70. What is the first thing you try?",
+        choices: [
+          { id: "a", label: "Lower the classification threshold — free, immediate, no retraining needed", description: "Lowering the threshold flags more transactions as fraud, increasing recall at the cost of some precision. This costs nothing and takes seconds." },
+          { id: "b", label: "Retrain the model with more data", description: "Retraining is expensive and slow. It is the right move if the PR curve is already poor, but exhausting the threshold lever first is always step one." },
+          { id: "c", label: "Switch to a more complex model architecture", description: "Architectural changes require retraining, validation, and deployment. Try the threshold first." },
+        ],
+        branches: { a: "e1_stage3", b: "e1_recovery2", c: "e1_recovery2" },
+        rationale: "The threshold is a free dial. A single trained model is a whole family of classifiers — one per threshold. Lower the threshold first, read the new precision at recall=0.70 off the PR curve, and only retrain if the curve itself is too low to reach the business target.",
+      },
+      e1_recovery2: {
+        id: "e1_recovery2",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery 2 · Threshold direction",
+        prompt: "You lower the decision threshold from 0.5 to 0.2. What happens to precision and recall?",
+        choices: [
+          { id: "a", label: "Recall increases, precision decreases — more positives flagged, including more false positives", description: "Correct. A lower threshold flags more transactions as fraud. This catches more true fraud (recall up) but also flags more legitimate transactions (precision down)." },
+          { id: "b", label: "Both increase — a more sensitive model is better on both metrics", description: "Increasing recall by lowering the threshold necessarily admits more false positives, which decreases precision. You cannot simultaneously increase both by threshold adjustment alone." },
+          { id: "c", label: "Precision increases, recall decreases", description: "This is backwards. A lower threshold means more liberal positive predictions — more flags, higher recall, lower precision." },
+        ],
+        branches: { a: "e1_stage3", b: "e1_stage3", c: "e1_stage3" },
+        rationale: "Lower threshold → more positive predictions → higher recall, lower precision. Higher threshold → fewer positive predictions → higher precision, lower recall. The optimal threshold depends on the relative cost of false positives vs false negatives in the domain.",
+      },
+      e1_stage3: {
+        id: "e1_stage3",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · F-beta and averaging",
+        prompt: "In a medical screening context, missing a cancer case costs far more than a false alarm. Which metric and averaging strategy are most appropriate for a 5-class multi-label diagnosis model?",
+        choices: [
+          { id: "a", label: "F2 score with macro averaging — weights recall more than precision, treats all classes equally", description: "F2 (β=2) penalizes missed cases more than false alarms. Macro averaging treats each diagnostic class equally regardless of frequency, surfacing failure on rare diseases." },
+          { id: "b", label: "F1 score with micro averaging — balanced metric, counts by support", description: "Micro averaging is dominated by frequent classes. A rare but deadly disease class with poor recall will be hidden by good performance on common classes." },
+          { id: "c", label: "Accuracy with weighted averaging — accounts for class frequency", description: "Accuracy fails on imbalanced classes. Weighted averaging hides rare-class failure." },
+        ],
+        branches: { a: "e1_terminal", b: "e1_recovery3", c: "e1_recovery3" },
+        rationale: "F-beta with β>1 penalizes missed cases (low recall) more than false alarms (low precision). Macro averaging treats all diagnostic classes equally, ensuring a rare disease with poor recall is not hidden by aggregate performance. This combination surfaces the failures that matter most in a medical context.",
+      },
+      e1_recovery3: {
+        id: "e1_recovery3",
+        type: "scenario_choice",
+        badge: "Recovery 3",
+        title: "Recovery 3 · Macro vs micro",
+        prompt: "A 3-class model has per-class F1 scores: class A=0.95, class B=0.93, class C=0.10. Class C has 5 samples; A and B have 5000 each. Which average reveals the class C failure?",
+        choices: [
+          { id: "a", label: "Macro F1 — unweighted mean across classes, treats all classes equally", description: "Correct. Macro F1 = (0.95 + 0.93 + 0.10) / 3 = 0.66. The poor class C performance is visible. Micro or weighted F1 would produce a number near 0.94, hiding the failure." },
+          { id: "b", label: "Micro F1 — pools all TP/FP/FN globally", description: "Micro F1 is dominated by the 10,000 samples in classes A and B. Class C's 5 samples barely move the aggregate metric." },
+          { id: "c", label: "Weighted F1 — weights by class support", description: "Weighted F1 also down-weights class C since it has only 5 samples. The rare-class failure remains hidden." },
+        ],
+        branches: { a: "e1_terminal", b: "e1_terminal", c: "e1_terminal" },
+        rationale: "Macro averaging gives equal weight to each class regardless of sample count. Use it when every class matters, especially when rare classes represent important failure modes. Micro and weighted averaging are dominated by frequent classes and can hide a tanking rare class.",
+      },
+      e1_terminal: {
+        id: "e1_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · Classification metrics mastered",
+        prompt: "Final reflection: a colleague says 'our model has F1=0.88 so we're good to ship.' What is the one follow-up question you always ask?",
+        choices: [
+          { id: "a", label: "At what threshold, and what is the PR curve shape — F1 at 0.5 may not reflect the optimal operating point", description: "F1 is threshold-dependent. The default threshold of 0.5 is arbitrary. The PR curve shows what is achievable; the threshold is chosen from the business cost structure, not by default." },
+        ],
+        branches: { a: "e1_terminal" },
+        terminal: true,
+        rationale: "F1 without a stated threshold is incomplete. The default threshold of 0.5 is rarely optimal. Senior engineers ask: what is the PR curve shape, what operating point did you pick, and why does that threshold match the business cost of false positives vs false negatives?",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "A fraud dataset is 99% negative. A model predicts 'legitimate' for every transaction. What is its accuracy and recall on the fraud class?",
+      options: [
+        "Accuracy 99%, recall 0% — high accuracy, zero fraud detected",
+        "Accuracy 50%, recall 50% — random baseline performance",
+        "Accuracy 99%, recall 99% — high accuracy reflects high recall",
+      ],
+      correctIndex: 0,
+      explanation: "The all-negative model is correct on 99% of samples (majority class) so accuracy is 99%. But it catches none of the fraud cases, so recall on the positive class is 0. This is the accuracy paradox — a useless model with an impressive headline metric.",
+    },
+    {
+      question: "Why is F1 computed as the harmonic mean of precision and recall rather than the arithmetic mean?",
+      options: [
+        "The harmonic mean is computationally faster to calculate",
+        "The harmonic mean is pulled toward the smaller of the two values, penalizing lopsided models that sacrifice one metric entirely",
+        "The harmonic mean gives more weight to precision, which is usually the more important metric",
+      ],
+      correctIndex: 1,
+      explanation: "The harmonic mean is always ≤ the arithmetic mean and is dominated by the smaller value. P=0.9, R=0.1 → arithmetic mean 0.5 but F1≈0.18. This prevents gaming F1 by maximizing one metric while abandoning the other — the design goal is to require both to be reasonably good.",
+    },
+    {
+      question: "Your multiclass model reports 'macro F1=0.55' and 'weighted F1=0.91'. What does this discrepancy most likely indicate?",
+      options: [
+        "A bug in the evaluation code — the two metrics should always be close",
+        "The model performs well on frequent classes but poorly on rare classes, which macro F1 surfaces but weighted F1 hides",
+        "Weighted F1 is always higher than macro F1 by design",
+      ],
+      correctIndex: 1,
+      explanation: "Macro F1 gives equal weight to each class. Weighted F1 weights by support. A large gap (macro much lower than weighted) means rare classes are failing badly. The model learned to predict the frequent classes well but is poor on the tail — a critical finding for any domain where rare classes matter.",
+    },
+  ],
+},
+
+"ml-e2": {
+  durationLabel: "20 min",
+  outcomes: [
+    "Explain the ROC curve as TPR vs FPR at every classification threshold",
+    "Interpret AUC as a threshold-independent classifier quality measure",
+    "Choose the right operating threshold for a given precision/recall tradeoff",
+    "Compare classifiers using ROC-AUC vs PR-AUC and know when each is appropriate",
+    "Recognize why AUC can mislead on severely imbalanced datasets",
+  ],
+  learnMarkdown: `## ROC Curve & AUC
+
+A classifier doesn't output a single prediction — it outputs a **score** (a probability or logit). The decision threshold converts that score into a binary label. The ROC curve shows how classifier performance changes as you sweep the threshold from 0 to 1.
+
+---
+
+## The ROC Curve
+
+Each point on the ROC curve corresponds to one threshold:
+
+- **True Positive Rate (TPR / Recall)** = TP / (TP + FN) — of all actual positives, what fraction did we catch?
+- **False Positive Rate (FPR)** = FP / (FP + TN) — of all actual negatives, what fraction did we wrongly flag?
+
+A random classifier lies on the diagonal (TPR = FPR at every threshold). A perfect classifier reaches the top-left corner (TPR=1, FPR=0). Better classifiers bow toward the top-left.
+
+---
+
+## AUC: Area Under the Curve
+
+**AUC** (Area Under the ROC Curve) collapses the full curve into a single number between 0 and 1.
+
+Probabilistic interpretation: **AUC = probability that a randomly chosen positive is scored higher than a randomly chosen negative.** AUC 0.9 means 90% of random (positive, negative) pairs are correctly ranked.
+
+| AUC | Interpretation |
+|-----|----------------|
+| 1.0 | Perfect ranking |
+| 0.9–0.99 | Excellent |
+| 0.7–0.9 | Good |
+| 0.5 | Random (useless) |
+| < 0.5 | Worse than random |
+
+AUC is **threshold-independent** — it measures ranking quality, not calibration quality.
+
+---
+
+## Choosing a Threshold
+
+After training, choose the operating threshold based on the cost tradeoff:
+
+- **High recall (low threshold)**: catch more positives, accept more false alarms — appropriate when missing a positive is costly (cancer screening, fraud detection)
+- **High precision (high threshold)**: fewer false alarms, more misses — appropriate when acting on a false alarm is costly (spam filtering → false positives hide real emails)
+
+Tools: Youden's J (maximize TPR − FPR), F1 threshold search, or explicit cost-benefit analysis.
+
+---
+
+## ROC-AUC vs PR-AUC
+
+**ROC-AUC** looks good even on imbalanced datasets because it normalizes by FP + TN (which is large when negatives dominate). A classifier that barely improves on the majority class can still have high ROC-AUC.
+
+**PR-AUC** (Precision-Recall AUC) is more informative for imbalanced problems. The baseline PR-AUC equals the positive class prevalence, so any improvement is visible. Use PR-AUC when:
+- Positive class prevalence < 5%
+- False positives are cheap but you care deeply about recall
+- You're reporting to stakeholders who care about precision
+
+---
+
+## Common Mistake: Comparing Classifiers by a Single Threshold
+
+AUC compares the full operating range. Two classifiers can have the same AUC but cross each other's ROC curves — one is better at high recall, the other at high precision. Always look at the region of the curve relevant to your operational threshold.
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Multi-Class AUC & Calibration
+
+### Multi-Class Extension
+For K classes, extend ROC to **one-vs-rest**: compute AUC(class k vs all others) for each class, then average. **Macro AUC** weights classes equally; **weighted AUC** weights by support. A micro-average pools all one-vs-rest predictions.
+
+### Calibration vs Discrimination
+AUC measures **discrimination** (ranking). A perfectly discriminating model (AUC=1) can still be poorly calibrated — the scores 0.99 and 0.51 may not correspond to actual probabilities of 99% and 51%.
+
+**Calibration**: the predicted probability p should match the observed positive rate when you group predictions near p. A calibration plot (reliability diagram) shows predicted vs observed. A well-calibrated model follows the diagonal.
+
+Calibration matters when you use the score itself (not just the ranking) — e.g., to set a threshold at "p > 0.3 means flag", the 0.3 should represent 30% real-world positive rate.
+`,
+  tryGuidance: "Use the ROC Curve interactive to sweep the threshold and watch TPR/FPR change. Compare two classifiers by overlaying their curves and observe which has higher AUC. Try identifying the optimal operating point for a recall-focused vs precision-focused use case.",
+  interviewGraph: {
+    initialStageId: "ml_e2_stage1",
+    artifactDimensions: [
+      { label: "ROC Interpretation", recoveryStageId: "ml_e2_rec1" },
+      { label: "AUC Meaning", recoveryStageId: "ml_e2_rec2" },
+      { label: "PR vs ROC", recoveryStageId: "ml_e2_stage3", passLabel: "Curve Selection" },
+    ],
+    stages: {
+      ml_e2_stage1: {
+        id: "ml_e2_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Threshold sweep",
+        prompt: "Your fraud classifier has AUC 0.94. The fraud team says they can review 100 alerts/day. You need to select the operating threshold. Which approach is correct?",
+        choices: [
+          { id: "a", label: "Set threshold = 0.5 (the default probability midpoint)", description: "The standard default divides scores symmetrically." },
+          { id: "b", label: "Find the threshold that produces exactly 100 positives at the predicted volume", description: "Calibrate to operational capacity: sort scores descending, flag the top-N." },
+          { id: "c", label: "Use the threshold that maximizes AUC", description: "AUC is already maximized — it's a property of the full curve, not a single threshold." },
+          { id: "d", label: "Use the threshold that maximizes F1 score", description: "F1-optimal is one defensible choice but doesn't account for the volume constraint." },
+        ],
+        branches: { a: "ml_e2_rec1", b: "ml_e2_stage2", c: "ml_e2_rec1", d: "ml_e2_stage2" },
+        rationale: "B is correct. AUC is threshold-independent — it measures ranking quality. Choosing a threshold is a separate, operational decision. Given a volume constraint (100 reviews/day), rank by score and flag the top-100. AUC doesn't have a threshold to maximize — that's a category error. F1-optimal is reasonable but ignores the capacity constraint.",
+      },
+      ml_e2_rec1: {
+        id: "ml_e2_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · AUC vs threshold",
+        prompt: "AUC measures the full ROC curve. When does it make sense to select a threshold?",
+        choices: [
+          { id: "a", label: "After training, when deploying — based on operational cost tradeoffs and capacity", description: "Threshold selection is a deployment decision, not a training metric." },
+        ],
+        branches: { a: "ml_e2_stage2" },
+        rationale: "AUC measures classifier quality across all thresholds. Threshold selection happens at deployment time, informed by business costs and operational constraints.",
+      },
+      ml_e2_stage2: {
+        id: "ml_e2_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Imbalanced dataset",
+        prompt: "You're building a rare disease detector (1% prevalence). Classifier A has ROC-AUC 0.96. Classifier B has PR-AUC 0.41. A colleague says 'A is clearly better — look at that AUC.' What do you say?",
+        choices: [
+          { id: "a", label: "Agree — ROC-AUC 0.96 means the classifier is excellent regardless of prevalence", description: "ROC-AUC at 0.96 shows excellent ranking quality universally." },
+          { id: "b", label: "On a 1% prevalence problem, ROC-AUC can look great even for a mediocre precision — PR-AUC is more informative here", description: "With 99% negatives, a classifier only needs to rank positives above most negatives to get high ROC-AUC, but precision may still be very low." },
+          { id: "c", label: "Reject both — only use accuracy for medical classifiers", description: "Accuracy is the worst metric for imbalanced medical problems." },
+        ],
+        branches: { a: "ml_e2_rec2", b: "ml_e2_stage3", c: "ml_e2_rec2" },
+        rationale: "B is correct. On rare-event problems, ROC-AUC inflates because the FPR denominator (FP + TN) is dominated by the large negative class. A classifier can have ROC-AUC 0.9+ while still having very low precision (many false positives for every true positive). PR-AUC is more informative here because the baseline is the prevalence rate (1%), making improvements visible.",
+      },
+      ml_e2_rec2: {
+        id: "ml_e2_rec2",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery 2 · PR-AUC context",
+        prompt: "When should you prefer PR-AUC over ROC-AUC?",
+        choices: [
+          { id: "a", label: "When the positive class is rare (<5–10%) and precision on positives is what matters operationally", description: "PR-AUC surfaces how well the model identifies rare positives." },
+        ],
+        branches: { a: "ml_e2_stage3" },
+        rationale: "PR-AUC is preferred for rare-event classification because it directly captures precision/recall tradeoffs without inflating from the large negative class.",
+      },
+      ml_e2_stage3: {
+        id: "ml_e2_stage3",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · AUC probabilistic interpretation",
+        prompt: "What does AUC 0.85 mean in plain English?",
+        choices: [
+          { id: "a", label: "The model is correct 85% of the time", description: "That's accuracy, not AUC." },
+          { id: "b", label: "If you pick one random positive and one random negative, the model ranks the positive higher 85% of the time", description: "This is the formal probabilistic interpretation of AUC." },
+          { id: "c", label: "The model achieves precision of 85% and recall of 85% simultaneously", description: "That's the F1 relationship, not AUC." },
+        ],
+        branches: { a: "ml_e2_stage3", b: "ml_e2_stage3", c: "ml_e2_stage3" },
+        terminal: true,
+        rationale: "B is the correct interpretation. AUC = P(score(positive) > score(negative)) over all random (positive, negative) pairs. It's a ranking metric, not an accuracy metric. This interpretation explains why AUC is threshold-independent — it measures discriminative power across the entire score distribution.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "What does the X-axis of the ROC curve represent?",
+      options: [
+        "False Positive Rate: FP / (FP + TN) — fraction of negatives wrongly classified as positive",
+        "False Negative Rate: FN / (FN + TP) — fraction of positives wrongly classified as negative",
+        "Precision: TP / (TP + FP) — fraction of positive predictions that are correct",
+      ],
+      correctIndex: 0,
+      explanation: "The X-axis is False Positive Rate = FP / (FP + TN). It increases as you lower the threshold (more items classified as positive, including negatives). The Y-axis is True Positive Rate = TP / (TP + FN). A random classifier follows the diagonal (TPR = FPR).",
+    },
+    {
+      question: "AUC = 0.72 on dataset A and AUC = 0.72 on dataset B. Can you conclude the classifiers are equally good?",
+      options: [
+        "Yes — AUC is the same, so the classifiers have identical discrimination power",
+        "No — the same AUC can result from ROC curves with different shapes; one may be better at low FPR and the other at high FPR",
+        "No — AUC is not a reliable metric and should always be replaced with F1",
+      ],
+      correctIndex: 1,
+      explanation: "Two ROC curves with the same area can cross each other. Classifier A may dominate at low FPR (better for high-precision regime) while Classifier B dominates at high FPR. Always visualize the curve in the operating region you care about, not just compare summary AUC values.",
+    },
+    {
+      question: "Why is PR-AUC preferred over ROC-AUC for a churn prediction model where churners are 2% of users?",
+      options: [
+        "PR-AUC is always more accurate than ROC-AUC regardless of class balance",
+        "ROC-AUC's FPR denominator is dominated by the large non-churner class, making a mediocre model look impressive; PR-AUC directly measures how well the model identifies the rare churners",
+        "PR-AUC is faster to compute on large datasets",
+      ],
+      correctIndex: 1,
+      explanation: "With 98% non-churners, FPR = FP / (FP + TN) is small even for many false positives because TN is huge. A classifier generating many false positives can still have low FPR and high ROC-AUC. PR-AUC uses precision = TP / (TP + FP), which directly penalizes false positives relative to true positives — making it sensitive to model quality on the rare class.",
+    },
+  ],
+},
+
+"ml-e3": {
+  durationLabel: "18 min",
+  outcomes: [
+    "Explain k-fold cross-validation and why it gives a better generalization estimate than a single train/test split",
+    "Apply stratified k-fold to preserve class proportions across folds",
+    "Implement time-series cross-validation that prevents data leakage from the future",
+    "Distinguish between cross-validation for model selection and for estimating test error",
+    "Recognize nested cross-validation and when it's needed",
+  ],
+  learnMarkdown: `## Cross-Validation
+
+A single train/test split is a noisy estimate of model performance — the result depends heavily on which examples happen to end up in the test set. **Cross-validation** reduces this variance by averaging performance across multiple splits.
+
+---
+
+## K-Fold Cross-Validation
+
+Divide the dataset into k equal folds. For each fold i:
+1. Train on all folds except i
+2. Evaluate on fold i
+3. Record the metric
+
+Average the k scores. This uses every example for both training and evaluation across folds.
+
+**Typical k values:**
+- k=5: fast, reasonable variance — default choice
+- k=10: lower variance, more computation — preferred for smaller datasets
+- k=N (leave-one-out): maximum data use, maximum compute, low bias, high variance
+
+---
+
+## Stratified K-Fold
+
+Standard k-fold may produce folds with very different class ratios by chance. **Stratified k-fold** ensures each fold preserves the original class proportion.
+
+Use stratified k-fold for:
+- Classification problems (especially imbalanced)
+- Whenever you need class ratios to be representative in each fold
+
+---
+
+## Cross-Validation for Time Series
+
+**Never use standard k-fold on time-series data.** It leaks future information into training. Example: fold 3 uses data from week 8 to predict week 2 — this is impossible in deployment.
+
+**Time-series CV (walk-forward validation)**:
+- Split 1: train weeks 1-4, test week 5
+- Split 2: train weeks 1-5, test week 6
+- Split 3: train weeks 1-6, test week 7
+
+Each test set is always in the future relative to its training set. The training window can grow (expanding window) or slide (sliding window).
+
+---
+
+## CV for Model Selection vs Error Estimation
+
+**Scenario A — Model selection only:** use CV on the full training set to compare hyperparameters. After selecting the best hyperparameter, retrain on all training data. The CV score is an estimate of the best configuration but is **optimistic** if used as the final reported test error (you peeked at it to make decisions).
+
+**Scenario B — Unbiased error estimation:** use **nested cross-validation**:
+- Outer loop: k-fold for error estimation (each fold is held entirely out)
+- Inner loop: k-fold within each training split for model/hyperparameter selection
+
+Nested CV is computationally expensive (k² fold evaluations) but gives an unbiased estimate of the generalization error, accounting for the variance introduced by hyperparameter selection.
+
+---
+
+## Common Mistakes
+
+- **Preprocessing before CV**: scaling on the full dataset before splitting means test fold statistics leak into training. Always fit the scaler (or any preprocessing) on the training fold only, then apply to the test fold.
+- **Group leakage**: if samples from the same user/patient/entity appear in both train and test folds, CV overestimates performance. Use **GroupKFold** to keep all samples from one group in the same fold.
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Variance in CV Estimates
+
+### How Many Folds?
+More folds = lower bias (more training data per fold) but higher variance between fold scores. With small datasets, 10-fold or LOOCV is standard. With large datasets (>100K), even 3-fold is fine since each fold still has ample data.
+
+### Repeated K-Fold
+Run k-fold with different random seeds and average across repetitions. Reduces variance further at the cost of more computation. 5×2 CV (2-fold repeated 5 times) is popular in statistical comparison tests.
+
+### Statistical Comparison of Models
+A single CV score is a point estimate. Use a **paired t-test** (or McNemar's test for classification) on the per-fold differences between two models to determine if the difference is statistically significant, not just due to fold variance.
+`,
+  tryGuidance: "Use the Cross-Validation interactive to see how fold assignment works, visualize train/test splits for time-series CV, and compare single split vs k-fold variance estimates on the same dataset.",
+  interviewGraph: {
+    initialStageId: "ml_e3_stage1",
+    artifactDimensions: [
+      { label: "K-Fold Mechanics", recoveryStageId: "ml_e3_rec1" },
+      { label: "Time-Series CV", recoveryStageId: "ml_e3_rec2" },
+      { label: "Preprocessing Leakage", recoveryStageId: "ml_e3_stage3", passLabel: "Leak-Free CV" },
+    ],
+    stages: {
+      ml_e3_stage1: {
+        id: "ml_e3_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Why k-fold?",
+        prompt: "You train a model on 80% of data, test on 20%, and get AUC 0.84. Your manager asks how confident you are in that number. What is the main weakness of this approach?",
+        choices: [
+          { id: "a", label: "The 80/20 split is too large — you need at least 90% for training", description: "Split ratio isn't the core issue." },
+          { id: "b", label: "A single split gives a noisy estimate — the score depends heavily on which examples land in the test set by chance", description: "Different random seeds can yield AUC 0.79–0.89 on the same model and dataset." },
+          { id: "c", label: "The model wasn't trained long enough — more epochs would give a stable estimate", description: "Training duration doesn't affect the reliability of the evaluation estimate." },
+        ],
+        branches: { a: "ml_e3_rec1", b: "ml_e3_stage2", c: "ml_e3_rec1" },
+        rationale: "B is correct. With a single split, you're rolling the dice on which examples end up in the test set. On small-to-medium datasets, this variance can be ±5–10 AUC points. K-fold averages over k different test sets, giving a much more stable estimate of true generalization performance.",
+      },
+      ml_e3_rec1: {
+        id: "ml_e3_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · CV purpose",
+        prompt: "What problem does k-fold cross-validation solve vs a single train/test split?",
+        choices: [
+          { id: "a", label: "It reduces the variance of the generalization estimate by averaging over multiple test splits", description: "Each fold gives a different view of model performance; averaging reduces noise." },
+        ],
+        branches: { a: "ml_e3_stage2" },
+        rationale: "K-fold CV averages performance over k different held-out sets, dramatically reducing the variance of the evaluation estimate compared to a single split.",
+      },
+      ml_e3_stage2: {
+        id: "ml_e3_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Time-series splits",
+        prompt: "You're building a weekly sales forecast model. A junior DS runs 5-fold cross-validation and reports AUC 0.92. What's wrong?",
+        choices: [
+          { id: "a", label: "5-fold is too few folds for time-series data — should use at least 10-fold", description: "The number of folds isn't the issue." },
+          { id: "b", label: "Standard k-fold randomly shuffles data, so some folds use future weeks to predict past weeks — this is data leakage", description: "In fold 3, training data may include week 52 while the test set is week 3. This is impossible in deployment." },
+          { id: "c", label: "For time series, you should use leave-one-out, not k-fold", description: "LOOCV has the same temporal leakage problem." },
+        ],
+        branches: { a: "ml_e3_rec2", b: "ml_e3_stage3", c: "ml_e3_rec2" },
+        rationale: "B is correct. Standard k-fold shuffles examples randomly without respecting time order. This causes future data to appear in the training fold, inflating the CV score. The model appears to 'know' future information it couldn't have in production. Time-series CV (walk-forward validation) always trains on the past and tests on the future.",
+      },
+      ml_e3_rec2: {
+        id: "ml_e3_rec2",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery 2 · Walk-forward CV",
+        prompt: "How does walk-forward validation fix the time-series CV problem?",
+        choices: [
+          { id: "a", label: "Each test set is always temporally after its training set — no future information can leak into training", description: "Split 1: train weeks 1-4, test week 5. Split 2: train weeks 1-5, test week 6." },
+        ],
+        branches: { a: "ml_e3_stage3" },
+        rationale: "Walk-forward validation preserves temporal order: training always precedes testing in time. This mimics real deployment where the model only has access to historical data.",
+      },
+      ml_e3_stage3: {
+        id: "ml_e3_stage3",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Preprocessing leakage",
+        prompt: "You normalize features using StandardScaler before running 5-fold CV. Is this correct?",
+        choices: [
+          { id: "a", label: "Yes — scaling before CV is fine since we're not looking at labels", description: "Scaling uses feature statistics, not labels — but those statistics still come from test-fold data." },
+          { id: "b", label: "No — the scaler's mean/std is computed on the full dataset including test fold data, leaking test statistics into training", description: "Correct procedure: fit scaler inside each fold on training data only, transform test fold using those statistics." },
+          { id: "c", label: "It depends on whether the features are continuous or categorical", description: "Leakage risk applies regardless of feature type." },
+        ],
+        branches: { a: "ml_e3_stage3", b: "ml_e3_stage3", c: "ml_e3_stage3" },
+        terminal: true,
+        rationale: "B is correct. Fitting StandardScaler on the full dataset before CV means the scaler's mean and standard deviation are computed using test-fold examples. This is subtle data leakage — the model's preprocessing 'knows' the scale of the test data. The fix: use sklearn Pipeline to chain scaler and model, then pass the Pipeline to cross_val_score. The Pipeline refits the scaler on each fold's training data automatically.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "Why use stratified k-fold instead of standard k-fold for a classification problem with 5% positive class?",
+      options: [
+        "Stratified k-fold is faster because it uses fewer samples per fold",
+        "Standard k-fold may create folds with very few or zero positive examples by chance; stratified k-fold preserves the 5% positive rate in each fold",
+        "Stratified k-fold automatically handles class imbalance by oversampling positives in each fold",
+      ],
+      correctIndex: 1,
+      explanation: "With only 5% positives, random k-fold can accidentally put all positives in one fold, leaving others with zero positive examples. Stratified k-fold ensures each fold contains approximately the same proportion of positives as the full dataset, making each fold's evaluation representative.",
+    },
+    {
+      question: "What is the correct way to include feature scaling in a k-fold cross-validation loop?",
+      options: [
+        "Fit the scaler on the full dataset, then transform all data before the CV loop begins",
+        "Inside each fold: fit the scaler on the training fold, then transform both training and test folds using those statistics",
+        "Skip scaling for cross-validation and only scale when training the final model",
+      ],
+      correctIndex: 1,
+      explanation: "Fitting the scaler before the CV loop leaks test-fold statistics (mean and std) into training, making evaluation optimistic. The correct approach: fit preprocessing on each fold's training data only, then apply it to the test fold. Using sklearn Pipeline automates this correctly.",
+    },
+    {
+      question: "What is nested cross-validation and when is it necessary?",
+      options: [
+        "Running k-fold within another k-fold: the outer loop estimates generalization error, the inner loop selects hyperparameters — needed to get an unbiased error estimate when hyperparameter tuning is part of the model building process",
+        "Running k-fold twice on the same data to verify results are consistent",
+        "Cross-validating on a subset of data and nesting the full dataset evaluation inside",
+      ],
+      correctIndex: 0,
+      explanation: "When you tune hyperparameters using CV and then report that CV score as your test error, you've used the test folds to make decisions — so the reported score is optimistic. Nested CV uses a separate outer loop for error estimation, keeping those outer test folds truly held-out from all decisions including hyperparameter selection.",
+    },
+  ],
+},
+
+"ml-e4": {
+  durationLabel: "22 min",
+  outcomes: [
+    "Identify why accuracy is a misleading metric for imbalanced classification",
+    "Apply class weighting and threshold adjustment to handle imbalance without resampling",
+    "Explain SMOTE and contrast it with random oversampling and random undersampling",
+    "Choose the right evaluation metric for imbalanced problems (F1, PR-AUC, Matthews CC)",
+    "Recognize when to resample vs when to adjust decision threshold vs when to change the loss function",
+  ],
+  learnMarkdown: `## Imbalanced Classes
+
+Most real classification problems are imbalanced. Fraud (0.1% of transactions), rare disease detection (1% prevalence), equipment failure prediction (0.5% of machines). A naive model that predicts "all negative" achieves 99%+ accuracy while being completely useless.
+
+---
+
+## The Accuracy Paradox
+
+On a dataset with 99% negatives:
+- **All-negative classifier**: accuracy = 99%, recall on positives = 0%, useless
+- **A real model**: accuracy might be 97%, recall = 70%, much more useful
+
+This is why **accuracy is the wrong metric for imbalanced problems**. Use instead:
+- **Recall (sensitivity)**: fraction of actual positives correctly caught
+- **Precision**: fraction of positive predictions that are correct
+- **F1**: harmonic mean of precision and recall
+- **PR-AUC**: area under the precision-recall curve
+- **Matthews Correlation Coefficient (MCC)**: balanced metric for binary classification, robust to class imbalance, ranges from -1 to 1
+
+---
+
+## Strategy 1: Class Weights
+
+The simplest fix: tell the model to penalize errors on the minority class more heavily. In sklearn: \`class_weight='balanced'\` automatically sets weights proportional to inverse class frequency.
+
+Effect: the model is penalized more for missing a positive than for a false alarm. No data is created or deleted — the same data is used with weighted loss.
+
+**Use when**: the dataset isn't extremely small, and you want a fast baseline fix.
+
+---
+
+## Strategy 2: Threshold Adjustment
+
+A model trained with default threshold 0.5 may classify very few examples as positive when positives are rare. After training, lower the threshold (e.g., 0.2) to catch more positives at the cost of more false alarms.
+
+This is operationally equivalent to class weighting in many cases but more flexible: you can tune the exact operating point post-training using the ROC or PR curve.
+
+---
+
+## Strategy 3: Resampling
+
+### Random Undersampling
+Delete majority-class examples to balance the dataset. Fast, but wastes data — may remove informative majority examples.
+
+### Random Oversampling
+Duplicate minority examples. Creates exact copies — model memorizes rather than generalizes on rare class.
+
+### SMOTE (Synthetic Minority Oversampling Technique)
+Create **synthetic** minority examples by interpolating between real ones:
+1. For each minority sample, find k nearest minority neighbors
+2. Randomly select one neighbor
+3. Generate a new point on the line segment between them
+
+SMOTE creates diverse synthetic positives rather than duplicates, reducing overfitting on the minority class. Variants: ADASYN (adaptive weighting near decision boundary), BorderlineSMOTE (focus on hard examples near boundary).
+
+**Important**: apply resampling only to the **training set**. Never resample the validation or test set — you need to evaluate on the real distribution.
+
+---
+
+## Decision Framework
+
+| Situation | Strategy |
+|-----------|---------|
+| Imbalance is moderate (10:1 to 30:1) | Class weights, then threshold tuning |
+| Severe imbalance (>100:1), adequate data | SMOTE + class weights |
+| Very small minority class (<50 examples) | Class weights only (SMOTE unreliable with too few neighbors) |
+| Model is already calibrated, just need better recall | Lower threshold |
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: SMOTE Pitfalls & Calibration
+
+### SMOTE Pitfalls
+SMOTE can create noisy synthetic samples in high-dimensional spaces. It interpolates between points that may span class boundaries in sparse regions. Variants like SVM-SMOTE or Borderline-SMOTE focus synthesis on the decision boundary where it matters most.
+
+### Calibration After Resampling
+If you oversample training data, the model's predicted probabilities will be calibrated for the resampled distribution, not the real distribution. A model trained on 50/50 synthetic balance will output probabilities near 0.5 for many examples that should be near 0.01 in reality.
+
+To get calibrated probabilities for the real distribution: use Platt scaling (sigmoid calibration) or isotonic regression after fitting on the original unsampled validation data. Alternatively, skip oversampling and use class weights (which don't distort probability calibration).
+
+### Ensemble Approaches
+BalancedRandomForest and EasyEnsemble (from imbalanced-learn) combine resampling with ensemble methods. Each tree in BalancedRandomForest undersamples the majority class to match the minority class for that tree, then aggregates predictions.
+`,
+  tryGuidance: "Use the Imbalanced Classes interactive to see how different strategies (class weights, SMOTE, threshold tuning) shift the decision boundary and change the confusion matrix. Try adjusting the imbalance ratio to see when each strategy breaks down.",
+  interviewGraph: {
+    initialStageId: "ml_e4_stage1",
+    artifactDimensions: [
+      { label: "Metric Choice", recoveryStageId: "ml_e4_rec1" },
+      { label: "Resampling", recoveryStageId: "ml_e4_rec2" },
+      { label: "Strategy Selection", recoveryStageId: "ml_e4_stage3", passLabel: "Imbalance Design" },
+    ],
+    stages: {
+      ml_e4_stage1: {
+        id: "ml_e4_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Metric selection",
+        prompt: "Your fraud classifier achieves 99.2% accuracy. The data has 99% non-fraud. How should you evaluate this model?",
+        choices: [
+          { id: "a", label: "Report accuracy — 99.2% is very high", description: "A model that predicts all-non-fraud gets 99% accuracy too." },
+          { id: "b", label: "Report fraud recall and precision — catching fraud (recall) and not wasting investigators' time (precision) are what matter", description: "Recall = what fraction of real fraud was caught. Precision = what fraction of fraud flags were real." },
+          { id: "c", label: "Report the loss on the training set", description: "Training loss doesn't measure deployment quality." },
+          { id: "d", label: "Report F1 or PR-AUC on the fraud class", description: "These directly measure performance on the minority class we care about." },
+        ],
+        branches: { a: "ml_e4_rec1", b: "ml_e4_stage2", c: "ml_e4_rec1", d: "ml_e4_stage2" },
+        rationale: "B and D are both correct. Accuracy is useless here — the all-negative baseline achieves 99%. Fraud recall tells you what fraction of real fraud the model caught; precision tells you what fraction of flagged transactions are real fraud (affects investigator workload). F1 and PR-AUC are appropriate summary metrics for the minority class.",
+      },
+      ml_e4_rec1: {
+        id: "ml_e4_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Better metrics",
+        prompt: "Which metric is appropriate for evaluating a model on a 99:1 imbalanced dataset?",
+        choices: [
+          { id: "a", label: "Recall and precision on the minority class, F1 or PR-AUC as summary metrics", description: "These focus evaluation on the rare class performance." },
+        ],
+        branches: { a: "ml_e4_stage2" },
+        rationale: "For imbalanced problems, accuracy is dominated by the majority class. Recall and precision on the minority class, plus F1 or PR-AUC, directly measure model utility on what matters.",
+      },
+      ml_e4_stage2: {
+        id: "ml_e4_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · SMOTE timing",
+        prompt: "You decide to use SMOTE to handle class imbalance. Where in your pipeline should you apply it?",
+        choices: [
+          { id: "a", label: "Apply SMOTE to the full dataset before train/test split", description: "Synthetic copies of training examples would end up in the test set — data leakage." },
+          { id: "b", label: "Apply SMOTE to the training set only — never to the validation or test set", description: "Test/validation set must reflect the real-world distribution to give honest evaluation." },
+          { id: "c", label: "Apply SMOTE to both training and test sets for consistent distribution", description: "The test set must use the real distribution; SMOTE would distort evaluation." },
+        ],
+        branches: { a: "ml_e4_rec2", b: "ml_e4_stage3", c: "ml_e4_rec2" },
+        rationale: "B is correct. SMOTE creates synthetic training examples to help the model learn. But evaluation must reflect the real-world distribution (imbalanced). Applying SMOTE to the test set would make evaluation misleadingly optimistic — you'd be testing on artificial easy examples. Always apply resampling inside the training fold only.",
+      },
+      ml_e4_rec2: {
+        id: "ml_e4_rec2",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery 2 · SMOTE scope",
+        prompt: "Why must resampling be applied only to training data, not test data?",
+        choices: [
+          { id: "a", label: "The test set must reflect the true class distribution to give an unbiased estimate of real-world performance", description: "SMOTE would make the test set artificially balanced, inflating minority-class metrics." },
+        ],
+        branches: { a: "ml_e4_stage3" },
+        rationale: "Evaluation must simulate deployment conditions. The test set represents real-world data, which is imbalanced. Resampling the test set changes the distribution being evaluated, giving a false picture of real performance.",
+      },
+      ml_e4_stage3: {
+        id: "ml_e4_stage3",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Strategy selection",
+        prompt: "You have 1,000,000 transactions with only 50 fraud cases (0.005%). Which strategy is most appropriate?",
+        choices: [
+          { id: "a", label: "SMOTE — it creates synthetic minority examples to balance the classes", description: "SMOTE requires enough real minority examples as seeds; 50 cases may produce noisy interpolations." },
+          { id: "b", label: "Class weighting — penalize fraud misses heavily in the loss function, keep original data", description: "Class weights work on any sample size and don't create noisy synthetic data." },
+          { id: "c", label: "Random undersampling — remove 999,950 non-fraud transactions to balance", description: "You'd discard almost all your data and lose signal from legitimate transaction patterns." },
+        ],
+        branches: { a: "ml_e4_stage3", b: "ml_e4_stage3", c: "ml_e4_stage3" },
+        terminal: true,
+        rationale: "B is most appropriate. With only 50 minority examples, SMOTE produces low-quality synthetic samples (each point's k nearest neighbors may be far away in a small cluster). Class weighting directly adjusts the loss function without modifying data, making it the safest choice when the minority class is very small. Random undersampling discards 99.995% of data — wasteful and harmful to majority-class pattern learning.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "A classifier achieves 99.5% accuracy on a fraud dataset where 0.5% of transactions are fraudulent. Why is this not impressive?",
+      options: [
+        "The accuracy threshold for fraud models should be 99.9% — 99.5% is below industry standard",
+        "A model that predicts 'not fraud' for every transaction achieves the same 99.5% accuracy — it has zero actual fraud detection ability",
+        "The model needs to be tested on more data before the accuracy is reliable",
+      ],
+      correctIndex: 1,
+      explanation: "The accuracy paradox: a trivial all-negative classifier matches the majority class rate. On a 99.5% non-fraud dataset, predicting 'not fraud' always gives 99.5% accuracy while catching zero fraud cases. Accuracy on imbalanced data reflects the majority class distribution, not model usefulness. Use recall, precision, F1, or PR-AUC on the fraud class.",
+    },
+    {
+      question: "What does SMOTE do differently from random oversampling to address the minority class?",
+      options: [
+        "SMOTE randomly duplicates existing minority samples until classes are balanced",
+        "SMOTE creates synthetic minority samples by interpolating between existing minority examples and their nearest minority neighbors, generating diverse new points",
+        "SMOTE removes majority class samples that are far from the decision boundary",
+      ],
+      correctIndex: 1,
+      explanation: "Random oversampling duplicates existing minority samples, causing the model to overfit to the same points. SMOTE generates new synthetic points by interpolating between each minority sample and its k nearest minority neighbors, creating diverse examples that help the model generalize. This reduces overfitting on the minority class while increasing its representation.",
+    },
+    {
+      question: "When should you adjust the classification threshold rather than resampling the data?",
+      options: [
+        "When you want to increase model accuracy on the majority class",
+        "When the model is already trained and you want to tune the precision/recall tradeoff for a specific operational requirement without retraining",
+        "When SMOTE has already been applied and you need a second layer of adjustment",
+      ],
+      correctIndex: 1,
+      explanation: "Threshold adjustment is a post-training technique: after training a calibrated model, lower the threshold to increase recall (catch more positives) at the cost of more false positives. This is operationally flexible — you can target a specific recall or precision level without retraining. Resampling changes training data and requires retraining; threshold adjustment doesn't.",
+    },
+  ],
+},
+
+"sd-p1": {
+    durationLabel: "20 min",
+    outcomes: [
+      "Explain batch vs streaming trade-offs including latency, throughput, and operational complexity",
+      "Describe lambda and kappa architectures and when each makes sense",
+      "Identify the right processing model given a latency SLA and reprocessing requirement",
+    ],
+    learnMarkdown: `## Batch vs Streaming: When & Why
+
+Every data pipeline must answer one foundational question: **can we afford to wait?** Batch processing accumulates data over a window—minutes, hours, or a day—then processes it all at once. Streaming processes each event (or micro-batch) as it arrives, targeting sub-second latency.
+
+### Batch Processing
+
+Batch jobs run on a schedule. Tools like **Apache Spark** excel here: you can read petabytes from S3, apply complex transformations, and write results to a warehouse. Advantages:
+
+- **High throughput** — process large volumes with simple horizontal scaling
+- **Easy debugging** — re-run the same job on the same static dataset
+- **Simple reprocessing** — backfill historical data by re-running jobs over a date range
+- **Mature tooling** — Spark, Hadoop, dbt all work well
+
+Latency ranges from minutes (micro-batch) to hours (nightly jobs). Acceptable for: daily reports, offline model training, historical feature backfills.
+
+### Streaming Processing
+
+Streaming pipelines process events as they arrive. **Apache Kafka** acts as the durable event log (not a queue—messages are retained for hours/days, consumer groups read at their own pace). **Apache Flink** or **Spark Structured Streaming** process those events.
+
+- **Sub-second latency** — fraud detection, live dashboards, real-time personalization
+- **Stateful operators** — count events in a 5-minute sliding window, join streams
+- **Harder to debug** — distributed state, late-arriving events, exactly-once semantics add complexity
+- **Kafka guarantees** — exactly-once via idempotent producers + transactions
+
+### Lambda Architecture
+
+Coined by Nathan Marz: run **both** a batch layer (accurate, slow) and a speed layer (approximate, fast). A serving layer merges results. The batch layer periodically overwrites the speed layer's approximations. Problem: you maintain two codebases that must produce the same logical output. Complexity overhead is significant.
+
+### Kappa Architecture
+
+Jay Kreps' response: eliminate the batch layer. Use streaming only. If you need to reprocess historical data, replay from Kafka (with its long retention). Simpler to operate, but correctness guarantees are harder—you must handle late data, schema evolution, and exactly-once carefully.
+
+### Decision Criteria
+
+| Factor | Choose Batch | Choose Streaming |
+|---|---|---|
+| Latency SLA | Minutes–hours OK | Sub-second required |
+| Event ordering | Not critical | Critical (watermarks) |
+| Reprocessing | Simple date-range backfill | Replay from Kafka |
+| Team expertise | Spark-fluent team | Flink/Kafka experts |
+| Operational budget | Minimal infra | Dedicated streaming cluster |
+
+**Rule of thumb**: start with batch unless you have a concrete latency requirement that batch cannot meet.`,
+    video: null,
+    videoFallbackMarkdown: `## Deep Dive: Streaming Internals
+
+### Kafka Partitions and Consumer Groups
+
+Each Kafka topic is split into partitions—the unit of parallelism. A consumer group assigns each partition to exactly one consumer, so adding consumers scales throughput up to the number of partitions. Increasing partition count after creation is possible but requires careful rebalancing.
+
+### Watermarks and Late Data
+
+Flink uses **event-time watermarks** to know when a time window is complete. A watermark of W(t) says "I believe all events with timestamp ≤ t have arrived." Late events (arriving after the watermark) are either dropped or handled by a side output. Configuring the right watermark delay is a key tuning decision.
+
+### Exactly-Once Semantics
+
+Achieving exactly-once requires coordination between the source (Kafka offset commits), the processing engine (Flink checkpoints), and the sink (idempotent writes or transactional sinks). "At-least-once + idempotent sink" is often a practical substitute.`,
+    tryGuidance: "Use the interactive diagram to compare batch and streaming architectures side-by-side.",
+    interviewGraph: {
+      initialStageId: "sd_p1_s1",
+      artifactDimensions: [
+        { label: "Architecture Selection", recoveryStageId: "sd_p1_r1" },
+        { label: "Trade-off Reasoning", recoveryStageId: "sd_p1_r2" },
+      ],
+      stages: {
+        sd_p1_s1: {
+          id: "sd_p1_s1",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · Architecture Selection",
+          prompt: "You're designing a pipeline for a ride-sharing app. The product team wants drivers to see surge pricing update within 30 seconds of demand spikes. Your current pipeline runs Spark jobs every 15 minutes. How do you approach this?",
+          choices: [
+            { id: "a", label: "Switch to streaming", description: "Migrate to Kafka + Flink to process demand events in real time and update surge prices within seconds." },
+            { id: "b", label: "Reduce batch interval", description: "Shorten the Spark job schedule from 15 minutes to 1 minute to get closer to real time." },
+            { id: "c", label: "Cache last result", description: "Cache the last batch result in Redis and return it for all requests until the next batch runs." },
+          ],
+          branches: { a: "sd_p1_s2", b: "sd_p1_r1", c: "sd_p1_r1" },
+          rationale: "30-second latency is a streaming problem. Reducing batch interval to 1 minute still misses the SLA and creates operational overhead of many small jobs. Streaming with Kafka + Flink directly addresses the latency requirement.",
+        },
+        sd_p1_r1: {
+          id: "sd_p1_r1",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Latency SLA",
+          prompt: "Sub-minute latency requirements are the primary driver for streaming. Batch jobs—even at 1-minute intervals—add job startup, shuffle, and write overhead that typically pushes end-to-end latency to 3–5 minutes. Which statement correctly identifies when streaming is justified?",
+          choices: [
+            { id: "a", label: "When latency SLA < ~1 minute", description: "Streaming is justified when batch's inherent overhead can't meet the latency requirement." },
+            { id: "b", label: "Whenever data arrives continuously", description: "Continuous data arrival alone doesn't require streaming—batch can consume continuous data on a schedule." },
+          ],
+          branches: { a: "sd_p1_s2", b: "sd_p1_s2" },
+          rationale: "Continuous data arrival is necessary but not sufficient. The decision turns on the latency SLA: if batch's startup and shuffle overhead can meet it, batch is simpler.",
+        },
+        sd_p1_s2: {
+          id: "sd_p1_s2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Lambda vs Kappa",
+          prompt: "Your team decides on streaming for real-time surge pricing. However, the analytics team also needs accurate daily surge reports for accounting. A colleague suggests a lambda architecture. Another suggests kappa. Which do you recommend?",
+          choices: [
+            { id: "a", label: "Kappa — streaming only", description: "Use Kafka with long retention. The same streaming job handles both real-time pricing and historical replay for reports." },
+            { id: "b", label: "Lambda — batch + stream", description: "Run a nightly Spark batch job for accurate reports and a Flink job for real-time pricing. Merge at serving time." },
+            { id: "c", label: "Keep batch for both", description: "The analytics team's daily reports don't need streaming. Keep everything in batch and accept 15-minute pricing lag." },
+          ],
+          branches: { a: "sd_p1_t", b: "sd_p1_r2", c: "sd_p1_r2" },
+          rationale: "Kappa is preferred when you can replay from Kafka. You avoid maintaining two separate codebases (batch + stream) that must produce identical results. Lambda is justified only when the streaming path genuinely can't achieve batch-level accuracy.",
+        },
+        sd_p1_r2: {
+          id: "sd_p1_r2",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery 2 · Lambda Complexity",
+          prompt: "Lambda architecture's core problem is that you must maintain two codebases producing the same logical output. When teams update the business logic (say, a new surge formula), they must update both the batch and streaming jobs and keep them synchronized. What's the kappa solution to this?",
+          choices: [
+            { id: "a", label: "Replay from Kafka for historical accuracy", description: "Kafka retains events for days/weeks. For accurate historical reports, replay the stream with the updated logic." },
+            { id: "b", label: "Use a separate database for each layer", description: "Store batch and stream results in different databases and query both at serve time." },
+          ],
+          branches: { a: "sd_p1_t", b: "sd_p1_t" },
+          rationale: "Kafka's retention is the key that makes kappa work. You can reprocess any historical window by replaying from the beginning of the topic, eliminating the need for a separate batch layer.",
+        },
+        sd_p1_t: {
+          id: "sd_p1_t",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · Architecture Decision",
+          prompt: "You've walked through batch vs streaming and lambda vs kappa. What's the single most important question to ask before choosing streaming?",
+          choices: [
+            { id: "a", label: "What is the latency SLA?", description: "If batch can meet it, streaming's operational complexity isn't worth it. Only stream when you must." },
+          ],
+          branches: { a: "sd_p1_t" },
+          terminal: true,
+          rationale: "Streaming solves real problems but adds real complexity: stateful operators, watermarks, exactly-once semantics, and distributed debugging. Reserve it for genuine latency requirements.",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "A data team needs to generate monthly financial reports from 3 TB of transaction data. Which processing model is most appropriate?",
+        options: ["Kafka + Flink streaming pipeline", "Scheduled Spark batch job", "Lambda architecture with both batch and stream"],
+        correctIndex: 1,
+        explanation: "Monthly reports have no real-time latency requirement. A scheduled Spark batch job is simpler, cheaper, and easier to debug than streaming. Lambda adds unnecessary complexity.",
+      },
+      {
+        question: "What is the primary operational disadvantage of the lambda architecture?",
+        options: ["It cannot handle high-throughput data", "Two codebases (batch + stream) must produce identical results and stay synchronized", "It requires Kafka, which is expensive to operate"],
+        correctIndex: 1,
+        explanation: "Lambda runs parallel batch and speed layers. Any business logic change must be applied to both. Keeping them in sync is the main pain point that led to the kappa architecture.",
+      },
+      {
+        question: "In Kafka, what is the unit of parallelism for consumer groups?",
+        options: ["Topic", "Partition", "Consumer group"],
+        correctIndex: 1,
+        explanation: "Each partition is assigned to exactly one consumer within a consumer group. You can scale consumers up to the number of partitions—adding more consumers than partitions results in idle consumers.",
+      },
+    ],
+  },
+
+  "sd-p2": {
+    durationLabel: "18 min",
+    outcomes: [
+      "Distinguish ETL from ELT and articulate when each pattern is appropriate",
+      "Explain how dbt fits into the modern data stack as a transformation layer",
+      "Describe the data mesh philosophy and its trade-offs versus centralized architectures",
+    ],
+    learnMarkdown: `## ETL vs ELT & the Modern Data Stack
+
+How data moves from source systems to analytics is one of the most consequential architectural decisions a data team makes. The shift from ETL to ELT reflects a fundamental change in where compute lives.
+
+### ETL (Extract → Transform → Load)
+
+The classic pattern: extract raw data, transform it in a dedicated ETL tool (Informatica, Talend, custom Python), then load clean, structured data into the destination. This was necessary when warehouses (Oracle, Teradata) charged heavily per compute hour.
+
+**ETL is appropriate when:**
+- Loading into a legacy on-premise warehouse with limited compute
+- Data must be masked, encrypted, or anonymized before it ever enters the warehouse
+- The destination system cannot store raw/unstructured data
+- Transformation errors should block loading (fail fast before persisting bad data)
+
+### ELT (Extract → Load → Transform)
+
+Load raw data first, then transform it inside the warehouse using SQL. Cloud warehouses like **Snowflake**, **BigQuery**, and **Databricks** offer near-infinite compute at low marginal cost, making it economical to store raw data and transform it on demand.
+
+**ELT advantages:**
+- **Raw data always available** — re-transform with updated logic without re-extracting from source
+- **Cheaper at scale** — warehouse compute is cheaper than ETL tool licensing
+- **SQL-first** — most analysts already know SQL; no Scala/Java required
+- **Audit trail** — raw layer enables debugging what the source actually sent
+
+### dbt: The Transformation Layer
+
+**dbt (data build tool)** is the standard ELT transformation layer. It lets analysts write SELECT statements; dbt handles the CREATE TABLE / INSERT / REPLACE logic.
+
+Key features:
+- **Version-controlled SQL** — transformations live in Git, reviewed in PRs
+- **Tests** — \`not_null\`, \`unique\`, \`accepted_values\`, \`relationships\` tests run against every model
+- **Documentation** — auto-generated from \`description:\` fields in YAML
+- **Lineage graph** — visual DAG of how every table depends on others
+- **Ref function** — \`{{ ref('stg_orders') }}\` creates compile-time dependencies so dbt runs in the right order
+
+### The Modern Data Stack
+
+A typical 2024 stack:
+
+\`\`\`
+Sources → Fivetran/Airbyte → Snowflake/BigQuery (raw) → dbt → Looker/Tableau
+\`\`\`
+
+- **Fivetran/Airbyte**: managed connectors that sync source data (Salesforce, Postgres, Stripe) into the warehouse on a schedule
+- **Snowflake/BigQuery**: cloud warehouse — separation of storage and compute, pay-per-query
+- **dbt**: SQL transformations with testing and documentation
+- **Looker/Tableau**: BI layer — semantic models or drag-and-drop dashboards
+
+### Data Mesh
+
+Data mesh (Zhamak Dehghani) reacts to the bottleneck of centralized data teams owning all pipelines. Core principles:
+1. **Domain ownership** — the team that owns the Orders microservice owns the orders data product
+2. **Data as a product** — each domain produces SLA-backed, documented datasets for other teams
+3. **Self-serve infrastructure** — central platform team provides tooling; domain teams use it autonomously
+4. **Federated governance** — global policies (PII handling, access control) enforced centrally; domain-specific decisions made locally
+
+Trade-off: decentralized ownership reduces the central team bottleneck but creates consistency challenges across domains.`,
+    video: null,
+    videoFallbackMarkdown: `## Deep Dive: dbt Project Structure
+
+### Folder Conventions
+
+\`\`\`
+models/
+  staging/       # 1:1 with source tables, light renaming + casting
+  intermediate/  # joins, business logic
+  marts/         # final analytics-ready tables (dim_, fct_ prefix)
+\`\`\`
+
+### Testing Example
+
+\`\`\`yaml
+models:
+  - name: fct_orders
+    columns:
+      - name: order_id
+        tests:
+          - unique
+          - not_null
+      - name: status
+        tests:
+          - accepted_values:
+              values: ['placed', 'shipped', 'delivered', 'cancelled']
+\`\`\`
+
+### Incremental Models
+
+For large tables, dbt incremental models only process new/changed rows:
+
+\`\`\`sql
+{{ config(materialized='incremental', unique_key='order_id') }}
+
+SELECT * FROM {{ ref('stg_orders') }}
+{% if is_incremental() %}
+  WHERE updated_at > (SELECT MAX(updated_at) FROM {{ this }})
+{% endif %}
+\`\`\``,
+    tryGuidance: "Walk through the ETL and ELT pipeline diagrams to see where transformation happens.",
+    interviewGraph: {
+      initialStageId: "sd_p2_s1",
+      artifactDimensions: [
+        { label: "ETL vs ELT Selection", recoveryStageId: "sd_p2_r1" },
+        { label: "dbt Knowledge", recoveryStageId: "sd_p2_r2" },
+      ],
+      stages: {
+        sd_p2_s1: {
+          id: "sd_p2_s1",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · Pattern Selection",
+          prompt: "A healthcare company wants to move patient records from 10 source databases into a Snowflake warehouse. PII must be de-identified before any storage in the cloud. Which pattern is required?",
+          choices: [
+            { id: "a", label: "ETL — transform before loading", description: "De-identify PII in the ETL tool before the data reaches Snowflake, ensuring raw PII never touches the cloud." },
+            { id: "b", label: "ELT — load raw then transform", description: "Load raw records including PII into Snowflake, then run dbt models to de-identify." },
+            { id: "c", label: "Either works equally", description: "Both patterns can handle PII de-identification, so choose based on team preference." },
+          ],
+          branches: { a: "sd_p2_s2", b: "sd_p2_r1", c: "sd_p2_r1" },
+          rationale: "When PII must never enter the destination system, ETL is required. ELT loads raw data first—PII would exist in Snowflake during that window, violating HIPAA/GDPR requirements. ETL transforms (and masks) before loading.",
+        },
+        sd_p2_r1: {
+          id: "sd_p2_r1",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · When ETL is Required",
+          prompt: "The key distinction: ETL transforms data BEFORE it reaches the destination. ELT stores raw data first. For regulated data (PII, PHI, PCI), which step must happen before cloud storage?",
+          choices: [
+            { id: "a", label: "Masking/de-identification must happen before load", description: "Regulated fields must be anonymized or tokenized in the extraction/transform phase, before the data is persisted anywhere in the cloud." },
+            { id: "b", label: "Encryption at rest satisfies PII requirements", description: "Storing encrypted PII in Snowflake and de-identifying in dbt is sufficient for HIPAA." },
+          ],
+          branches: { a: "sd_p2_s2", b: "sd_p2_s2" },
+          rationale: "Encryption at rest is necessary but not sufficient. HIPAA requires that PHI be de-identified (Safe Harbor or Expert Determination method) before use in analytics contexts. Storing encrypted PII and 'de-identifying later' still means raw PHI sits in your warehouse.",
+        },
+        sd_p2_s2: {
+          id: "sd_p2_s2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · dbt Role",
+          prompt: "Your team has adopted ELT for a SaaS analytics product using BigQuery. A data analyst wants to join orders and customers tables, add a derived 'days_to_ship' column, and expose the result as a table for the BI team. What is the correct dbt approach?",
+          choices: [
+            { id: "a", label: "Write a dbt model with {{ ref() }} and materialize as table", description: "Create a SQL file in models/marts/, reference staging models with {{ ref() }}, configure materialized='table'." },
+            { id: "b", label: "Write a Python script that runs the join and writes back to BigQuery", description: "A scheduled Python script handles the join and INSERT INTO the result table." },
+            { id: "c", label: "Build a view directly in BigQuery UI", description: "Create a saved view in the BigQuery console that the BI team can query." },
+          ],
+          branches: { a: "sd_p2_t", b: "sd_p2_r2", c: "sd_p2_r2" },
+          rationale: "dbt is purpose-built for this: version-controlled SQL, automatic lineage via {{ ref() }}, built-in tests, and documentation. Python scripts and manual views lack testability, lineage, and version control.",
+        },
+        sd_p2_r2: {
+          id: "sd_p2_r2",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery 2 · dbt Value Proposition",
+          prompt: "The core value of dbt over ad-hoc SQL scripts or manual views is: version control + testing + lineage. If a colleague asks why dbt is worth adopting, which benefit is most unique to dbt?",
+          choices: [
+            { id: "a", label: "Automatic dependency ordering via {{ ref() }}", description: "dbt builds a DAG from ref() calls and runs models in the correct order, with lineage visible in the docs site." },
+            { id: "b", label: "It runs SQL faster than direct BigQuery queries", description: "dbt doesn't change query execution speed—it's a transformation framework, not a query optimizer." },
+          ],
+          branches: { a: "sd_p2_t", b: "sd_p2_t" },
+          rationale: "dbt's ref() function is what makes it powerful: it creates compile-time dependencies, enabling automatic ordering, impact analysis ('what breaks if I change this model?'), and auto-generated lineage docs.",
+        },
+        sd_p2_t: {
+          id: "sd_p2_t",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · Modern Stack Summary",
+          prompt: "Summarize the modern data stack. Where does each tool sit in the pipeline?",
+          choices: [
+            { id: "a", label: "Fivetran → Warehouse → dbt → BI", description: "Fivetran extracts/loads; the warehouse stores raw + transformed data; dbt transforms; BI queries marts." },
+          ],
+          branches: { a: "sd_p2_t" },
+          terminal: true,
+          rationale: "The modern data stack separates ingestion (Fivetran/Airbyte), storage (Snowflake/BigQuery), transformation (dbt), and consumption (Looker/Tableau) into best-of-breed tools connected by SQL and APIs.",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "Which scenario strictly requires ETL (transform before load) rather than ELT?",
+        options: ["A startup loading Stripe payments into BigQuery for revenue analytics", "A hospital de-identifying patient records before storing in a cloud warehouse", "A retailer loading clickstream data for funnel analysis"],
+        correctIndex: 1,
+        explanation: "When regulated data (PHI/PII) must never enter the cloud system in raw form, ETL is required. The other scenarios involve non-regulated data where ELT's raw-first approach is fine.",
+      },
+      {
+        question: "In dbt, what does the {{ ref('model_name') }} function do?",
+        options: ["Executes a SQL query and returns the result as a Python dataframe", "Creates a compile-time dependency between models, enabling correct ordering and lineage tracking", "Generates documentation for the referenced model"],
+        correctIndex: 1,
+        explanation: "ref() tells dbt that the current model depends on another model. dbt builds a DAG from all ref() calls and runs models in topological order. It also powers the lineage graph in dbt docs.",
+      },
+      {
+        question: "What is the core philosophy of the data mesh architecture?",
+        options: ["Centralize all data pipelines into a single platform team for consistency", "Domain teams own their data as products, with a central platform providing self-serve tooling", "Replace all batch pipelines with real-time streaming"],
+        correctIndex: 1,
+        explanation: "Data mesh decentralizes ownership: the team that builds the Orders service also owns the orders data product, with SLAs and documentation. A central platform team provides infrastructure, but domains make their own data decisions.",
+      },
+    ],
+  },
+
+  "sd-p3": {
+    durationLabel: "22 min",
+    outcomes: [
+      "Explain Kafka's log-based architecture and why it differs from traditional message queues",
+      "Compare Spark Structured Streaming and Flink on latency, state management, and use cases",
+      "Design a streaming pipeline using Kafka as the backbone with an appropriate processing engine",
+    ],
+    learnMarkdown: `## Kafka, Spark, and Flink: The Streaming Trinity
+
+Modern streaming architectures almost universally combine these three technologies. Understanding each layer's role—and why they're separated—is essential for system design interviews.
+
+### Kafka: The Durable Event Log
+
+Kafka is commonly described as a message queue, but this framing is misleading. A traditional queue (RabbitMQ, SQS) **deletes messages after consumption**. Kafka is a **distributed commit log**—messages are retained for hours or days regardless of whether they've been read.
+
+**Why this matters:**
+- Multiple consumer groups can read the same topic independently at their own pace
+- A broken consumer can restart from its last committed offset without data loss
+- Historical data can be replayed for backfills, new consumers, or debugging
+- Kafka is the "source of truth" for the event stream
+
+**Key concepts:**
+- **Topic**: a named stream of records (e.g., \`user-clicks\`, \`order-events\`)
+- **Partition**: the unit of parallelism. A topic with 12 partitions can be consumed by up to 12 consumers in parallel
+- **Consumer group**: a set of consumers sharing a group ID. Each partition is assigned to exactly one consumer in the group
+- **Offset**: each message has a sequential integer offset within its partition. Consumers commit offsets to track progress
+- **Exactly-once**: achieved via idempotent producers (dedup by sequence number) + transactional APIs
+
+**Retention**: configure per-topic (e.g., \`retention.ms=604800000\` for 7 days) or by size.
+
+### Spark Structured Streaming
+
+Spark Structured Streaming uses a **micro-batch** model: internally, it runs many small batch jobs, typically every 100–500ms. The DataFrame/Dataset API is identical to batch Spark, so teams with Spark expertise can adopt it quickly.
+
+**Strengths:**
+- Familiar API for Spark shops
+- Excellent integration with Delta Lake, Hive, S3
+- Good for medium-latency use cases (seconds to minutes)
+- Stateful aggregations with checkpointing to S3/HDFS
+
+**Limitations:**
+- Micro-batch latency floor ~100ms even with trigger(continuous=True) experimental mode
+- State store performance degrades at very large state sizes
+- Less sophisticated watermarking than Flink
+
+### Apache Flink
+
+Flink is a **true event-time streaming engine**—it processes each event as it arrives without batching. End-to-end latency can be under 10ms.
+
+**Strengths:**
+- Lowest latency in the ecosystem
+- Rich stateful operators (keyed state, operator state, broadcast state)
+- Sophisticated **watermark** handling for out-of-order and late events
+- Session windows, tumbling windows, sliding windows with event-time semantics
+- Exactly-once end-to-end with Kafka source + stateful processing + transactional sinks
+
+**When to choose Flink over Spark Streaming:**
+- Latency < 100ms required
+- Complex stateful logic (e.g., user session tracking across irregular events)
+- Late data must be handled precisely (not approximated)
+- You can justify the steeper learning curve
+
+### The Architecture: Kafka as Backbone
+
+\`\`\`
+Source Systems
+     ↓
+ Kafka Topics  ← durable, replayable, decoupled
+     ↓
+Flink / Spark  ← stateful processing, windowing
+     ↓
+Kafka Topics (results) or Direct Sink
+     ↓
+Redis / Postgres / Warehouse / Dashboard
+\`\`\`
+
+Kafka decouples producers from consumers. Even if the Flink cluster goes down for 2 hours, messages accumulate in Kafka—no data is lost. When Flink restarts, it resumes from its last checkpoint offset.
+
+### Interview Positioning
+
+When asked "why use Kafka instead of a traditional queue?":
+1. **Replayability** — you can re-read from offset 0
+2. **Multiple independent consumers** — analytics, fraud detection, and notification services all consume the same topic
+3. **Retention** — messages exist beyond consumption
+4. **High throughput** — millions of messages/second with horizontal scaling`,
+    video: null,
+    videoFallbackMarkdown: `## Deep Dive: Flink Windowing
+
+### Window Types
+
+- **Tumbling**: fixed, non-overlapping windows. Count events per 5-minute window.
+- **Sliding**: overlapping. A 10-min window sliding every 2 min gives 5× more windows, each overlapping.
+- **Session**: windows that close after a gap of inactivity (e.g., close a user session after 30 min of no clicks).
+
+### State Backends
+
+Flink stores window state in a **state backend**:
+- \`HashMapStateBackend\`: in-memory, fastest, lost on restart without checkpointing
+- \`EmbeddedRocksDBStateBackend\`: persisted to local RocksDB, checkpointed to S3. Supports state larger than RAM.
+
+For production, always use RocksDB + S3 checkpointing with exactly-once semantics.`,
+    tryGuidance: "Explore the streaming pipeline diagram to understand how Kafka, Spark, and Flink fit together.",
+    interviewGraph: {
+      initialStageId: "sd_p3_s1",
+      artifactDimensions: [
+        { label: "Kafka Architecture", recoveryStageId: "sd_p3_r1" },
+        { label: "Engine Selection", recoveryStageId: "sd_p3_r2" },
+      ],
+      stages: {
+        sd_p3_s1: {
+          id: "sd_p3_s1",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · Kafka vs Queue",
+          prompt: "A payment processing company currently uses RabbitMQ to route transaction events to a fraud detection service. They want to add a second consumer: a real-time analytics dashboard. The RabbitMQ queue deletes messages after the fraud service consumes them. How do you solve this?",
+          choices: [
+            { id: "a", label: "Migrate to Kafka", description: "Kafka retains messages regardless of consumption. Both fraud detection and analytics can consume the same topic independently via separate consumer groups." },
+            { id: "b", label: "Add a second RabbitMQ queue", description: "Fan out transactions to two separate queues—one for fraud, one for analytics—using RabbitMQ exchange routing." },
+            { id: "c", label: "Have fraud service re-publish to analytics queue", description: "Fraud service consumes from RabbitMQ, then publishes a copy to a second queue for analytics." },
+          ],
+          branches: { a: "sd_p3_s2", b: "sd_p3_r1", c: "sd_p3_r1" },
+          rationale: "Kafka consumer groups are the clean solution: each service maintains its own offset and reads at its own pace. Duplicating queues or chaining consumers couples services and creates operational complexity.",
+        },
+        sd_p3_r1: {
+          id: "sd_p3_r1",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Consumer Groups",
+          prompt: "In Kafka, a consumer group allows multiple services to read the same topic independently. Each group tracks its own offsets. If the analytics service is down for 2 hours, what happens to its messages?",
+          choices: [
+            { id: "a", label: "Messages are retained in Kafka; analytics catches up when it restarts", description: "Kafka's retention period (e.g., 7 days) means messages accumulate. The consumer resumes from its last committed offset." },
+            { id: "b", label: "Messages are lost after the retention window expires", description: "Messages older than the retention period are deleted, but recent messages within the retention window are safe." },
+          ],
+          branches: { a: "sd_p3_s2", b: "sd_p3_s2" },
+          rationale: "Both are partially correct: messages within the retention window are safe. The key insight is that Kafka's log retention—not consumption—determines data availability. A 2-hour outage within a 7-day retention window results in zero data loss.",
+        },
+        sd_p3_s2: {
+          id: "sd_p3_s2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Engine Selection",
+          prompt: "The fraud detection team needs to detect suspicious patterns across a user's last 10 transactions within a 5-minute sliding window. Latency must be under 50ms. The analytics team needs hourly aggregates with 30-second freshness. Which engine fits each use case?",
+          choices: [
+            { id: "a", label: "Flink for fraud (sub-50ms, stateful windows); Spark Streaming for analytics (hourly aggs, 30s freshness)", description: "Flink's true streaming handles sub-50ms with sophisticated stateful windows. Spark's micro-batch is fine for 30-second freshness." },
+            { id: "b", label: "Spark Streaming for both — same API, simpler ops", description: "Use Spark Structured Streaming for both. The micro-batch model can handle both use cases." },
+            { id: "c", label: "Flink for both — always choose the lower latency tool", description: "Flink handles both requirements; no need for two engines." },
+          ],
+          branches: { a: "sd_p3_t", b: "sd_p3_r2", c: "sd_p3_r2" },
+          rationale: "Match tools to requirements. Fraud detection's 50ms SLA and complex stateful windows justify Flink's complexity. Analytics at 30-second freshness fits Spark's micro-batch perfectly—no need for Flink's operational overhead.",
+        },
+        sd_p3_r2: {
+          id: "sd_p3_r2",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery 2 · Flink vs Spark Tradeoff",
+          prompt: "Flink's true event-time streaming achieves sub-10ms latency but requires managing RocksDB state backends, watermark strategies, and more complex operators. When is this complexity justified?",
+          choices: [
+            { id: "a", label: "When latency SLA < ~100ms or state logic is highly complex", description: "Flink is warranted for genuine low-latency requirements or sophisticated stateful patterns that Spark's micro-batch can't handle cleanly." },
+            { id: "b", label: "Always use Flink for any streaming workload", description: "Flink is strictly better than Spark Streaming, so always choose it." },
+          ],
+          branches: { a: "sd_p3_t", b: "sd_p3_t" },
+          rationale: "Operational complexity has a cost. Spark Streaming's familiarity and simpler state model make it the right default for latency > 100ms. Reserve Flink for when you genuinely need its capabilities.",
+        },
+        sd_p3_t: {
+          id: "sd_p3_t",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · Streaming Architecture",
+          prompt: "In a canonical streaming architecture, what role does Kafka play relative to the processing engine (Flink/Spark)?",
+          choices: [
+            { id: "a", label: "Kafka is the durable backbone; processing engines are stateful compute layers", description: "Kafka persists and distributes events; Flink/Spark process, aggregate, and enrich them. They're complementary, not competing." },
+          ],
+          branches: { a: "sd_p3_t" },
+          terminal: true,
+          rationale: "The separation of concerns is key: Kafka handles durable storage, replay, and fan-out. Processing engines focus on stateful computation. This decoupling means you can swap processing engines without changing the event backbone.",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "What is the fundamental architectural difference between Kafka and a traditional message queue like RabbitMQ?",
+        options: ["Kafka is faster and supports more connections", "Kafka retains messages after consumption (log-based); queues delete messages after delivery", "Kafka supports exactly-once semantics; queues do not"],
+        correctIndex: 1,
+        explanation: "Kafka's log retention is what enables replayability, multiple independent consumers, and crash recovery. Traditional queues are designed to delete messages once delivered—they're task dispatchers, not event logs.",
+      },
+      {
+        question: "What processing model does Spark Structured Streaming use internally?",
+        options: ["True event-time streaming (process each event individually)", "Micro-batch (runs small batch jobs at ~100ms intervals)", "Pull-based polling from Kafka at configurable intervals"],
+        correctIndex: 1,
+        explanation: "Spark Structured Streaming is a micro-batch engine. It achieves low latency by running very frequent small batch jobs. This gives it a latency floor of ~100ms, which is fine for most use cases but insufficient for sub-50ms requirements.",
+      },
+      {
+        question: "A Flink job processing user session events needs to handle late-arriving events (events that arrive up to 2 minutes after their event timestamp). What mechanism handles this?",
+        options: ["Consumer group offset management", "Watermarks with a 2-minute allowed lateness", "RocksDB state backend with TTL"],
+        correctIndex: 1,
+        explanation: "Watermarks define Flink's notion of event-time progress. A watermark W(t) means 'all events with timestamp ≤ t have arrived.' Configuring a 2-minute watermark delay tells Flink to wait 2 minutes past a window's end before closing it, accommodating late-arriving events.",
+      },
+    ],
+  },
+
+  "sd-p4": {
+    durationLabel: "20 min",
+    outcomes: [
+      "Design a star schema with appropriate fact and dimension tables for a given analytics use case",
+      "Explain SCD Type 1, 2, and 3 and choose the right type based on history requirements",
+      "Select appropriate partitioning and clustering strategies for a cloud warehouse",
+    ],
+    learnMarkdown: `## Data Warehouse Design Patterns
+
+Warehouse design decisions made early persist for years. Star schemas, SCD types, and partition strategies affect query performance, storage costs, and analytical correctness for the lifetime of the system.
+
+### Star Schema
+
+The star schema places a **fact table** at the center, surrounded by **dimension tables**. The fact table stores measurable events (orders, pageviews, transactions) with foreign keys to dimensions. Dimensions store descriptive attributes (customer name, product category, store location).
+
+\`\`\`
+        dim_customer
+             |
+dim_product — fct_orders — dim_date
+             |
+          dim_store
+\`\`\`
+
+**Fact table** columns:
+- Foreign keys to all dimension tables
+- Additive measures: \`order_amount\`, \`quantity\`, \`shipping_cost\`
+- Non-additive measures: \`discount_rate\` (average meaningfully only with COUNT)
+- Degenerate dimensions: \`order_id\` (identifying, not a dimension table)
+
+**Dimension table** properties:
+- Wide and flat — denormalized attributes (no joins needed from the dim)
+- Slowly changing — customer addresses, product categories
+- Surrogate keys — integer \`customer_sk\` rather than natural key \`customer_email\`
+
+**Why star over snowflake?** Fewer joins = faster queries. Storage cost of denormalization is trivial compared to query compute savings in cloud warehouses.
+
+### Snowflake Schema
+
+Normalizes dimension tables into sub-dimensions. A \`dim_product\` might reference \`dim_category\` and \`dim_brand\` tables. This reduces storage redundancy but requires additional joins. Preferred only when dimension data is very large and changes frequently.
+
+### One Big Table (OBT)
+
+Fully denormalize everything into a single wide table. Fastest reads (no joins), but:
+- Difficult to update (change a customer's city → update millions of order rows)
+- Storage inefficient for high-cardinality dimensions
+- Often used in specific high-performance dashboards alongside a proper warehouse
+
+### Slowly Changing Dimensions (SCD)
+
+Customer data changes over time. How do you handle history?
+
+**SCD Type 1 — Overwrite:**
+Simply update the current row. No history preserved. If a customer moves, their old address is gone. Use when history is irrelevant.
+
+**SCD Type 2 — Add a Row (most common):**
+Insert a new row for each change with effective date tracking:
+\`\`\`
+customer_sk | customer_id | city      | effective_from | effective_to | is_current
+1001        | C-42        | New York  | 2022-01-01    | 2023-06-15   | false
+1002        | C-42        | Chicago   | 2023-06-15    | 9999-12-31   | true
+\`\`\`
+Enables **point-in-time queries**: join orders to the dim using the order date between effective_from and effective_to to get the city the customer lived in when they ordered.
+
+**SCD Type 3 — Add a Column:**
+Add a \`previous_city\` column to the current row. Retains only one version of history. Simple but limited.
+
+### Partition and Cluster Strategy
+
+**Partitioning** (eliminates full table scans):
+- Partition \`fct_orders\` by \`order_date\` (DATE type, daily or monthly granularity)
+- Queries filtering by date range skip irrelevant partitions entirely
+- BigQuery: \`PARTITION BY DATE(created_at)\`; Snowflake: \`CLUSTER BY (order_date)\`
+
+**Clustering** (sorts rows within partitions):
+- Cluster by dimensions frequently in WHERE/JOIN clauses (e.g., \`region\`, \`product_category\`)
+- Reduces bytes scanned within a partition
+- In BigQuery, \`CLUSTER BY\` on up to 4 columns
+
+**Rule of thumb**: partition by the time column almost always; cluster by the most selective filter columns.`,
+    video: null,
+    videoFallbackMarkdown: `## Deep Dive: Point-in-Time Correctness
+
+### Why SCD Type 2 Matters for ML
+
+When training ML models on historical warehouse data, you must join to the dimension value that was correct at the time of the event, not the current value. Using current dimension values is a form of **data leakage**.
+
+Example: predicting customer churn. If a customer was in the "free tier" when they churned but you join to their current "paid tier" status, the model sees incorrect features. SCD Type 2 with effective date filtering solves this.
+
+### The Point-in-Time Join
+
+\`\`\`sql
+SELECT
+  o.order_id,
+  o.order_amount,
+  c.city,          -- city at time of order
+  c.customer_tier  -- tier at time of order
+FROM fct_orders o
+JOIN dim_customer c
+  ON o.customer_id = c.customer_id
+ AND o.order_date BETWEEN c.effective_from AND c.effective_to
+\`\`\`
+
+This is the canonical SCD Type 2 join pattern. Feature stores automate this for ML training pipelines.`,
+    tryGuidance: "Compare the star and snowflake schema designs in the interactive diagram.",
+    interviewGraph: {
+      initialStageId: "sd_p4_s1",
+      artifactDimensions: [
+        { label: "Schema Design", recoveryStageId: "sd_p4_r1" },
+        { label: "SCD Knowledge", recoveryStageId: "sd_p4_r2" },
+      ],
+      stages: {
+        sd_p4_s1: {
+          id: "sd_p4_s1",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · Schema Choice",
+          prompt: "You're designing a warehouse for an e-commerce company. The analytics team runs thousands of queries daily filtering by date, product category, and customer region. The schema will be queried in BigQuery. Which schema design do you recommend?",
+          choices: [
+            { id: "a", label: "Star schema — flat dimension tables, partitioned fact table", description: "Central fct_orders table with dim_customer, dim_product, dim_date. Partition fct_orders by order_date. Cluster by product_category and region." },
+            { id: "b", label: "Snowflake schema — normalized dimensions for storage savings", description: "Normalize dim_product into dim_product, dim_category, dim_brand to reduce redundancy." },
+            { id: "c", label: "One Big Table — fully denormalize for query speed", description: "Join everything into one wide table. Fastest reads, no joins needed." },
+          ],
+          branches: { a: "sd_p4_s2", b: "sd_p4_r1", c: "sd_p4_r1" },
+          rationale: "Star schema is the standard for analytics warehouses. In BigQuery, compute is cheap, storage is cheap, but query latency matters. Flat dimension tables eliminate joins. Partitioning by date and clustering by filter columns minimizes bytes scanned.",
+        },
+        sd_p4_r1: {
+          id: "sd_p4_r1",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Star vs Snowflake",
+          prompt: "In a cloud warehouse like BigQuery or Snowflake, storage is ~$20/TB/month and compute is billed per bytes scanned. Snowflake schema reduces storage via normalization but adds joins. Which factor dominates the cost model?",
+          choices: [
+            { id: "a", label: "Compute (bytes scanned per query) dominates — minimize joins", description: "Storage costs are negligible at modern cloud pricing. Extra joins in snowflake schema increase bytes scanned on every analytical query." },
+            { id: "b", label: "Storage dominates — normalize to reduce redundancy", description: "Storage savings from normalization justify the additional join overhead." },
+          ],
+          branches: { a: "sd_p4_s2", b: "sd_p4_s2" },
+          rationale: "Cloud warehouse economics favor star schema. Storage for denormalized dimensions is a one-time cost; query compute is charged for every analytical run. Fewer joins = less compute = lower cost and better performance.",
+        },
+        sd_p4_s2: {
+          id: "sd_p4_s2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · SCD Type Selection",
+          prompt: "The marketing team wants to analyze customer behavior by the geographic region they were in when they made each purchase—not where they live today. Some customers have moved regions over the past 3 years. Which SCD type handles this requirement?",
+          choices: [
+            { id: "a", label: "SCD Type 2 with effective date range", description: "Insert a new dimension row on each address change with effective_from/effective_to dates. Join orders using point-in-time logic to get the region at order time." },
+            { id: "b", label: "SCD Type 1 — overwrite with current region", description: "Keep only the current region. It's always up to date for current customers." },
+            { id: "c", label: "SCD Type 3 — add a previous_region column", description: "Store current and previous region as columns. Simple to implement." },
+          ],
+          branches: { a: "sd_p4_t", b: "sd_p4_r2", c: "sd_p4_r2" },
+          rationale: "Type 2 is the only option that supports arbitrary point-in-time queries. Type 1 overwrites history (you lose where customers used to live). Type 3 stores only one version of history (can't track more than one move).",
+        },
+        sd_p4_r2: {
+          id: "sd_p4_r2",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery 2 · SCD Type 2",
+          prompt: "SCD Type 2 stores a new row for every change, with effective_from and effective_to dates. The is_current flag marks the active row. To join an order to the customer's region AT ORDER TIME, which join condition is correct?",
+          choices: [
+            { id: "a", label: "JOIN ON customer_id AND order_date BETWEEN effective_from AND effective_to", description: "This selects the dimension row that was active when the order was placed." },
+            { id: "b", label: "JOIN ON customer_id AND is_current = true", description: "This always returns the current region, not the region at order time." },
+          ],
+          branches: { a: "sd_p4_t", b: "sd_p4_t" },
+          rationale: "The point-in-time join is the core SCD Type 2 pattern. Joining on is_current=true gives the current state, not historical state—this introduces leakage in ML training and incorrect analysis in reporting.",
+        },
+        sd_p4_t: {
+          id: "sd_p4_t",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · Warehouse Design",
+          prompt: "You've designed a star schema with SCD Type 2. What partition column would you choose for a 10-billion-row fact table, and why?",
+          choices: [
+            { id: "a", label: "Partition by event/order date — nearly all analytical queries filter by date range", description: "Date partitioning eliminates full table scans for time-range queries, which is the dominant analytical access pattern." },
+          ],
+          branches: { a: "sd_p4_t" },
+          terminal: true,
+          rationale: "Date partitioning is almost always the right primary partition for fact tables. It aligns with analytical access patterns (last 30 days, Q3 2023), enables partition pruning, and supports efficient data lifecycle management (delete partitions older than 2 years).",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "What is the primary advantage of a star schema over a snowflake schema in a cloud analytical warehouse?",
+        options: ["Star schema uses less storage because dimensions are deduplicated", "Star schema requires fewer joins, reducing bytes scanned per query in compute-billed environments", "Star schema enforces referential integrity more strictly"],
+        correctIndex: 1,
+        explanation: "Cloud warehouses bill by bytes scanned. Snowflake schema's normalized dimensions require additional joins that scan more data. Star schema's denormalized flat dimensions eliminate these joins, reducing cost and improving query speed.",
+      },
+      {
+        question: "An e-commerce company wants to analyze refund rates by the product category that existed when the order was placed (categories are reorganized every 6 months). Which SCD type is required?",
+        options: ["SCD Type 1 — overwrite current category", "SCD Type 2 — new row per change with effective dates", "SCD Type 3 — add previous_category column"],
+        correctIndex: 1,
+        explanation: "SCD Type 2 is the only type that preserves full history with point-in-time query capability. Type 1 overwrites history. Type 3 stores only one previous value, which is insufficient for multi-year history with multiple reorganizations.",
+      },
+      {
+        question: "A fact table in BigQuery has 5 billion rows. Queries almost always filter by a date range and often filter by customer_region. What is the optimal storage strategy?",
+        options: ["Partition by customer_region, cluster by date", "Partition by date, cluster by customer_region", "No partitioning — BigQuery handles this automatically"],
+        correctIndex: 1,
+        explanation: "Partition by the primary filter dimension (date) to enable partition pruning on time-range queries. Cluster by the secondary filter (customer_region) to sort rows within partitions, further reducing bytes scanned. Date is the dominant analytical access pattern.",
+      },
+    ],
+  },
+
+  "sd-m1": {
+    durationLabel: "25 min",
+    outcomes: [
+      "Apply a structured 5-step framework to scope an ML system design problem in an interview",
+      "Define appropriate online metrics aligned to business goals for common ML applications",
+      "Design a complete ML pipeline from problem framing through monitoring for a realistic scenario",
+    ],
+    learnMarkdown: `## ML System Design Framework
+
+ML system design interviews test whether you can translate a vague product requirement ("detect spam") into a complete, deployable system. The best candidates follow a structured framework rather than jumping straight to model architecture.
+
+### The 5-Step Framework
+
+**Step 1: Problem Framing**
+
+Before writing any code, clarify:
+- Is ML necessary, or will rules/heuristics suffice? (Content moderation may start with regex keyword lists)
+- What is the **north star metric**? The business goal (revenue, engagement, safety) must map to an ML metric (precision/recall trade-off, AUC, NDCG)
+- What is the prediction target? Binary classification, multi-class, regression, ranking?
+- What are the latency requirements? Real-time inference vs batch precomputation?
+
+**Step 2: Data Strategy**
+
+- What data is available? Historical logs, human labels, implicit signals (clicks, purchases)?
+- How are labels generated? Human annotation, programmatic labeling, user feedback?
+- What's the class imbalance? (Fraud: 0.1% positive rate — requires stratified sampling, precision/recall focus)
+- What's the data volume and freshness requirement?
+
+**Step 3: Feature Engineering**
+
+- **Offline features**: computed in batch and stored in the feature store for training
+- **Online features**: must be available at inference time with sub-10ms lookup (user's last 5 actions, account age)
+- **Point-in-time correctness**: when creating training data by joining event tables, only use feature values available at the time of the event — prevents future data leakage
+- Feature transformations: normalization, encoding, embeddings for high-cardinality categoricals
+
+**Step 4: Model Selection**
+
+Trade-offs to discuss:
+| Consideration | Simpler | More Complex |
+|---|---|---|
+| Interpretability | Logistic regression, decision tree | Neural networks |
+| Latency budget | Logistic regression (<1ms) | Large deep model (>100ms) |
+| Data volume | Any | Deep learning needs 100K+ |
+| Maintenance | Simple models are easier to debug | Complex models degrade silently |
+
+**Step 5: Serving + Monitoring**
+
+- **Real-time serving**: REST endpoint, model loaded in memory, <100ms SLA
+- **Batch serving**: precompute predictions, store in Redis/DynamoDB, serve via lookup
+- **Drift monitoring**: data drift (features shift) and concept drift (relationship changes)
+- **Feedback loop**: how do predictions influence future training data?
+
+### Template Scenarios
+
+**Spam detection (social network, 100M posts/day):**
+- Framing: binary classification, optimize recall (miss less spam) with acceptable precision
+- Data: labeled spam reports from users, content moderation team labels, previous model decisions
+- Features: text (TF-IDF or embedding), account age, posting frequency, network graph features
+- Model: LightGBM for structured features, then fine-tune BERT for text
+- Serving: batch score every post within 10 seconds of creation, flag score > 0.8
+
+**Ride surge pricing:**
+- Framing: regression on demand/supply ratio, real-time update every 30 seconds
+- Features: real-time driver location density, weather, events, historical demand at this location/time
+- Model: gradient boosting, updated daily, features served from Redis
+- Monitor: compare actual wait times vs predicted surge (business proxy for model quality)
+
+### Interview Tips
+
+- Always ask clarifying questions before designing (show structured thinking)
+- Explicitly state what success looks like with a metric before proposing architecture
+- Call out trade-offs rather than claiming one design is always best
+- End with monitoring: interviewers want to know you think about post-deployment health`,
+    video: null,
+    videoFallbackMarkdown: `## Deep Dive: Feedback Loops in ML Systems
+
+### The Feedback Loop Problem
+
+When a model influences what data is collected, training on that data amplifies the model's existing biases. Example: a content recommendation model promotes certain creators. Those creators get more engagement data. The next training cycle sees them as even more engaging, increasing their promotion further.
+
+### Breaking the Loop
+
+1. **Exploration**: randomly surface 10% of recommendations from outside the top-K to collect unbiased signal
+2. **Counterfactual logging**: log what was NOT shown alongside what was shown
+3. **Inverse propensity scoring**: weight training examples by the inverse probability they were shown
+4. **Human evaluation**: periodic human labels independent of the model's decisions
+
+### Bandit Algorithms
+
+Treat the feedback loop as an exploration/exploitation problem:
+- **Epsilon-greedy**: 90% exploit (best predicted), 10% explore (random)
+- **Thompson sampling**: sample from posterior over expected rewards — naturally balances exploration
+- **UCB (Upper Confidence Bound)**: exploit items with high upper bound on expected reward, forcing exploration of uncertain items`,
+    tryGuidance: "Walk through the full ML system pipeline — from problem framing to monitoring.",
+    interviewGraph: {
+      initialStageId: "sd_m1_s1",
+      artifactDimensions: [
+        { label: "Problem Framing", recoveryStageId: "sd_m1_r1" },
+        { label: "System Architecture", recoveryStageId: "sd_m1_r2" },
+      ],
+      stages: {
+        sd_m1_s1: {
+          id: "sd_m1_s1",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · Problem Framing",
+          prompt: "You're asked to design an ML system to detect fraudulent transactions at a fintech company processing 1 million transactions per day (0.1% fraud rate). What do you clarify FIRST before discussing architecture?",
+          choices: [
+            { id: "a", label: "Define the success metric and latency requirement", description: "Ask: should we optimize precision (fewer false alarms) or recall (catch more fraud)? Do we need real-time decisions or can we review flagged transactions within hours?" },
+            { id: "b", label: "Pick the model architecture", description: "Start with XGBoost — it's the standard for fraud detection and handles class imbalance well." },
+            { id: "c", label: "Discuss feature engineering", description: "Ask about available transaction features: merchant category, amount, location, device fingerprint." },
+          ],
+          branches: { a: "sd_m1_s2", b: "sd_m1_r1", c: "sd_m1_r1" },
+          rationale: "Metric and latency requirements constrain every subsequent decision. If the answer is 'block the transaction in real time' (< 200ms), the architecture is completely different from 'flag for human review within 24 hours.' Never skip Step 1.",
+        },
+        sd_m1_r1: {
+          id: "sd_m1_r1",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Clarify First",
+          prompt: "In ML system design, the biggest mistake is diving into model architecture before understanding the business requirement. The latency SLA alone changes the entire system design. If fraud decisions must happen in real time (<200ms) vs within 24 hours, what changes?",
+          choices: [
+            { id: "a", label: "Real-time: low-latency REST endpoint, simple features. Batch review: complex model with more features", description: "Real-time constraints force simpler models and pre-computed features. Batch review allows richer models and more feature computation time." },
+            { id: "b", label: "The model architecture doesn't change; only infrastructure differs", description: "You can use the same model for both; just deploy it differently." },
+          ],
+          branches: { a: "sd_m1_s2", b: "sd_m1_s2" },
+          rationale: "Architecture changes fundamentally: real-time demands sub-200ms with pre-computed features from Redis; batch allows running an expensive gradient-boosted model on all transaction features. Model choice follows from latency constraints.",
+        },
+        sd_m1_s2: {
+          id: "sd_m1_s2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Training Data Strategy",
+          prompt: "The fraud model needs to be retrained weekly. However, true fraud labels arrive 2 weeks after the transaction (after customer disputes are resolved). How do you handle this in the training pipeline?",
+          choices: [
+            { id: "a", label: "Use a rolling 90-day window of confirmed labeled data, retrain weekly", description: "Accept the 2-week label delay. Train on confirmed labels from 14–104 days ago. Use proxy metrics (dispute rate) for near-real-time monitoring." },
+            { id: "b", label: "Use model predictions as pseudo-labels for recent transactions", description: "Label recent transactions using the current model's predictions to avoid the 2-week gap." },
+            { id: "c", label: "Retrain only when 90 days of new labels have accumulated", description: "Wait for a full 90-day window of fresh confirmed labels before retraining." },
+          ],
+          branches: { a: "sd_m1_t", b: "sd_m1_r2", c: "sd_m1_r2" },
+          rationale: "Using model predictions as pseudo-labels is circular — it reinforces existing model biases. Waiting 90 days is too slow. Rolling window with confirmed labels is the standard approach; proxy metrics bridge the monitoring gap.",
+        },
+        sd_m1_r2: {
+          id: "sd_m1_r2",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery 2 · Label Delay",
+          prompt: "Using model predictions as training labels (pseudo-labels) creates a feedback loop: the model trains on its own past decisions, amplifying existing biases. What's the correct approach for delayed-label settings?",
+          choices: [
+            { id: "a", label: "Train on confirmed labels only; use proxy metrics for near-real-time monitoring", description: "Accept the delay. Train on true labels. Monitor using business proxies (dispute rate, chargeback rate) as leading indicators of model degradation." },
+            { id: "b", label: "Use semi-supervised learning to incorporate pseudo-labels safely", description: "Weight pseudo-labels lower than true labels to reduce the amplification effect." },
+          ],
+          branches: { a: "sd_m1_t", b: "sd_m1_t" },
+          rationale: "True labels are the ground truth. Proxy metrics are the monitoring solution for the delay gap. Semi-supervised approaches can work but add complexity; confirmed-labels-only is the safer default for high-stakes systems.",
+        },
+        sd_m1_t: {
+          id: "sd_m1_t",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · System Design",
+          prompt: "You've framed the problem, defined the metric, designed the training pipeline. What is the last critical component to discuss in any ML system design?",
+          choices: [
+            { id: "a", label: "Post-deployment monitoring: data drift, performance degradation, feedback loops", description: "Models degrade silently. Monitoring for input distribution shift, prediction distribution shift, and business metric degradation is non-negotiable." },
+          ],
+          branches: { a: "sd_m1_t" },
+          terminal: true,
+          rationale: "The 5-step framework ends with monitoring because ML systems degrade in ways software doesn't. Fraud patterns evolve, user behavior shifts, data pipelines break silently. A model without monitoring is a liability, not an asset.",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "In an ML system design interview, you're asked to design a recommendation system. What should you clarify BEFORE proposing any model architecture?",
+        options: ["Whether to use collaborative filtering or content-based filtering", "The success metric (CTR, watch time, conversion) and latency requirement (real-time vs batch)", "Whether the team has GPU infrastructure available"],
+        correctIndex: 1,
+        explanation: "Metric and latency constraints shape every architectural decision. A watch-time metric favors different models than a click-through metric. Real-time (<100ms) vs batch (precomputed) determines feature availability and model complexity.",
+      },
+      {
+        question: "What is 'point-in-time correctness' in ML feature engineering?",
+        options: ["Ensuring features are computed using only data available at the time of the training event, preventing future data leakage", "Caching feature values in a time-series database for fast lookup", "Running feature computation jobs at fixed time intervals"],
+        correctIndex: 0,
+        explanation: "Point-in-time correctness means: when creating a training example for an event at time T, only use features computed from data available before T. Using features computed after T (e.g., a user's total 2024 purchases when predicting a 2022 churn event) is data leakage.",
+      },
+      {
+        question: "A fraud model has 0.1% positive rate (fraud). The team evaluates it using accuracy and reports 99.9%. Is this a good model?",
+        options: ["Yes — 99.9% accuracy is excellent performance", "No — a model that always predicts 'not fraud' achieves 99.9% accuracy; use precision/recall or AUC instead", "It depends on the training data size"],
+        correctIndex: 1,
+        explanation: "With extreme class imbalance, accuracy is a misleading metric. A null model (always predicts negative) achieves 99.9% accuracy. Precision, recall, F1, and AUC-PR (area under precision-recall curve) are the appropriate metrics for imbalanced classification.",
+      },
+    ],
+  },
+
+  "sd-m2": {
+    durationLabel: "18 min",
+    outcomes: [
+      "Explain training-serving skew and describe how a feature store prevents it",
+      "Distinguish the offline store from the online store and explain when each is used",
+      "Articulate point-in-time correctness and why it prevents data leakage in ML training",
+    ],
+    learnMarkdown: `## Feature Stores & Feature Engineering at Scale
+
+Training-serving skew is the silent killer of production ML systems. It's the #1 cause of models that perform well in offline evaluation but fail in production. Feature stores exist specifically to solve this problem.
+
+### Training-Serving Skew
+
+Skew occurs when the feature computation logic differs between training time and serving time. Common causes:
+
+1. **Different code paths**: training computes \`age_days = (today - signup_date).days\` in Python; serving computes it in Java — off-by-one or timezone bugs
+2. **Aggregation window misalignment**: training uses a 30-day window from historical data; serving accidentally uses a 7-day window
+3. **Missing data handling**: training drops nulls; serving returns 0 for null features
+4. **Schema drift**: a source system adds a new column; training code uses it; serving code doesn't yet
+
+**Impact**: model degrades silently. Offline metrics show 0.85 AUC; production AUC is 0.71. Debugging requires feature-level comparison between training and serving distributions.
+
+### What a Feature Store Solves
+
+A feature store provides a **single computation definition** that serves both training and serving:
+
+\`\`\`
+Feature Definition (Python/SQL) — written ONCE
+         |
+    ┌────┴────┐
+    ↓         ↓
+Offline Store   Online Store
+(S3/BigQuery)   (Redis/DynamoDB)
+    ↓               ↓
+Training        Inference
+(batch join)    (real-time lookup)
+\`\`\`
+
+Same code, same output. No skew.
+
+### Offline Store
+
+- **Purpose**: training data generation
+- **Storage**: S3, BigQuery, Hive — cheap, scalable, batch-optimized
+- **Access pattern**: full table scans, joins, time-range filters
+- **Latency**: seconds to minutes — acceptable for batch training jobs
+- **Content**: historical feature values with timestamps
+
+### Online Store
+
+- **Purpose**: real-time inference
+- **Storage**: Redis, DynamoDB, Cassandra — low-latency key-value lookup
+- **Access pattern**: get features for entity_id (user_id, item_id) — single row
+- **Latency**: sub-10ms — required for real-time inference SLAs
+- **Content**: current (or near-current) feature values only
+
+### Point-in-Time Correctness
+
+When generating training data from a feature store, you must use the feature value that was current **at the time of the training event**, not the current value.
+
+Example: predicting whether a user will click on a recommendation made at 2pm on Jan 15.
+- Correct: use the user's 30-day session count as of Jan 15, 2pm
+- Wrong: use the user's current 30-day session count (future data)
+
+Feature stores with point-in-time query support automatically handle this via:
+\`\`\`
+feature_store.get_historical_features(
+    entity_df=training_events,  # contains entity_id + event_timestamp
+    features=["user_30d_session_count", "user_avg_session_duration"]
+)
+\`\`\`
+
+### Feature Reuse
+
+Without a feature store, every team recomputes the same features independently. A feature store enables:
+- Team A publishes \`user_30d_purchase_amount\` → Team B's churn model reuses it
+- Prevents duplicated compute costs
+- Ensures consistent feature definitions across models
+
+### Popular Feature Stores
+
+| Platform | Type | Key Characteristic |
+|---|---|---|
+| Feast | Open source | Lightweight, Kubernetes-native, offline+online |
+| Tecton | Managed SaaS | Production-grade, streaming features, expensive |
+| Hopsworks | Open source/managed | Data-science focused, model registry included |
+| Vertex AI Feature Store | GCP managed | Native BigQuery integration |
+| SageMaker Feature Store | AWS managed | Native SageMaker integration |`,
+    video: null,
+    videoFallbackMarkdown: `## Deep Dive: Streaming Features
+
+### Real-Time Feature Computation
+
+Some features must reflect events that just happened:
+- User's last action (3 seconds ago)
+- Transaction amount relative to user's 24-hour rolling average
+
+These cannot be precomputed on a batch schedule. **Streaming feature pipelines** compute them in real time:
+
+\`\`\`
+Kafka Event → Flink Feature Computation → Redis (online store)
+                                        → S3 (offline store, for training consistency)
+\`\`\`
+
+The same Flink job writes to both stores, guaranteeing consistency between online serving and offline training.
+
+### Backfilling Features
+
+When a new feature is defined, historical values must be backfilled into the offline store so models can be trained on it. Feast and Tecton support point-in-time backfill jobs that replay historical events through the feature computation logic.`,
+    tryGuidance: "Use the feature store diagram to trace how features flow from offline training to online serving.",
+    interviewGraph: {
+      initialStageId: "sd_m2_s1",
+      artifactDimensions: [
+        { label: "Training-Serving Skew", recoveryStageId: "sd_m2_r1" },
+        { label: "Point-in-Time Correctness", recoveryStageId: "sd_m2_r2" },
+      ],
+      stages: {
+        sd_m2_s1: {
+          id: "sd_m2_s1",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · Diagnosing Skew",
+          prompt: "Your team trains a churn prediction model and achieves AUC 0.87 on the holdout set. After deploying, the model performs at AUC 0.69 in production. Business impact is significant. What's your first hypothesis?",
+          choices: [
+            { id: "a", label: "Training-serving skew — feature computation differs between training and production", description: "Compare feature distributions between training pipeline output and serving pipeline output for the same users on the same day." },
+            { id: "b", label: "The model overfit to the training set", description: "The 0.87 holdout AUC should have caught overfitting. Check train vs holdout gap." },
+            { id: "c", label: "The production data distribution has shifted since training", description: "Compare the distribution of input features in production vs the training period." },
+          ],
+          branches: { a: "sd_m2_s2", b: "sd_m2_r1", c: "sd_m2_r1" },
+          rationale: "When offline-to-online performance gap is large and sudden (right after deployment), training-serving skew is the primary hypothesis. Data drift is also plausible but would typically cause gradual degradation, not an immediate gap on day 1.",
+        },
+        sd_m2_r1: {
+          id: "sd_m2_r1",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Skew Diagnosis",
+          prompt: "To diagnose training-serving skew, you compare the feature distributions from the training pipeline against the serving pipeline for the same 1000 users on the same day. You find user_30d_session_count is 40% higher in serving than in training. What likely happened?",
+          choices: [
+            { id: "a", label: "Different window calculations — training used a different time range than serving", description: "Training code computed a 30-day window differently (e.g., UTC vs local time, off-by-one on window boundary) compared to the serving code." },
+            { id: "b", label: "The model needs more training data to learn the correct distribution", description: "More data will reduce the gap between training and serving feature distributions." },
+          ],
+          branches: { a: "sd_m2_s2", b: "sd_m2_s2" },
+          rationale: "A 40% systematic difference in a feature value between training and serving is a classic skew symptom. The fix is a feature store: define the computation once, use it in both training and serving pipelines.",
+        },
+        sd_m2_s2: {
+          id: "sd_m2_s2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Online vs Offline Store",
+          prompt: "Your recommendation model needs two types of features: (1) user's account age and historical purchase count (changes daily), (2) user's last click (changes every few seconds). Which storage solution handles each correctly?",
+          choices: [
+            { id: "a", label: "Daily features → offline store (batch); last click → online store (Redis, streaming update)", description: "Daily features are computed in batch and served from the online store (Redis) refreshed daily. Last click requires a streaming pipeline updating Redis in near-real-time." },
+            { id: "b", label: "Both in Redis — Redis handles all feature types", description: "Put everything in Redis for consistent sub-10ms serving latency." },
+            { id: "c", label: "Both in S3 — online store adds unnecessary complexity", description: "Read all features from S3 at inference time." },
+          ],
+          branches: { a: "sd_m2_t", b: "sd_m2_r2", c: "sd_m2_r2" },
+          rationale: "The split is correct: batch features are refreshed periodically and served from Redis. Streaming features require a Kafka → Flink → Redis pipeline to stay current. S3 has seconds of read latency — unacceptable for real-time serving.",
+        },
+        sd_m2_r2: {
+          id: "sd_m2_r2",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery 2 · Latency Requirements",
+          prompt: "The online store (Redis/DynamoDB) serves features at sub-10ms. The offline store (S3/BigQuery) serves at seconds-to-minutes. Why can't we use S3 directly for real-time inference?",
+          choices: [
+            { id: "a", label: "S3 read latency (50-200ms+ per request) violates typical inference SLAs", description: "S3 GET requests take 50-200ms. A model needing 20 features would require 20 sequential reads — 1-4 seconds total. Far too slow for <100ms inference SLAs." },
+            { id: "b", label: "S3 doesn't support key-value lookups", description: "S3 supports object reads by key, but it's not optimized for sub-millisecond point lookups." },
+          ],
+          branches: { a: "sd_m2_t", b: "sd_m2_t" },
+          rationale: "Both are valid points. S3 latency is the primary blocker: 50-200ms per object read is incompatible with real-time inference SLAs. Redis achieves sub-millisecond reads via in-memory storage, which is why it's the standard online store backend.",
+        },
+        sd_m2_t: {
+          id: "sd_m2_t",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · Feature Store Value",
+          prompt: "In one sentence, what is the single most important problem a feature store solves?",
+          choices: [
+            { id: "a", label: "Training-serving skew — by providing a single feature computation definition used in both training and inference", description: "One definition, two stores (offline for training, online for serving), guaranteed consistency." },
+          ],
+          branches: { a: "sd_m2_t" },
+          terminal: true,
+          rationale: "Feature reuse, discoverability, and monitoring are valuable secondary benefits. But the primary value proposition is eliminating the risk of computing features differently at training vs serving time — the root cause of the most common silent model failures.",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "A team trains a fraud model using Python code that computes features, then deploys a Java service that recomputes the same features for inference. Six months later, the model underperforms. What is the likely root cause?",
+        options: ["The model overfit during training", "Training-serving skew: Python and Java implementations diverged over time", "The fraud patterns changed (concept drift)"],
+        correctIndex: 1,
+        explanation: "Maintaining the same feature logic in two languages (Python for training, Java for serving) almost inevitably leads to divergence — different handling of nulls, timezone differences, floating point rounding. A feature store eliminates this by having one definition.",
+      },
+      {
+        question: "When generating training data from a feature store, what does 'point-in-time correctness' prevent?",
+        options: ["Model overfitting by limiting feature count", "Data leakage by ensuring training examples only use features available at the time of the event", "Feature store cache invalidation bugs"],
+        correctIndex: 1,
+        explanation: "Point-in-time correctness means: for a training event at time T, only use feature values computed from data available before T. Using feature values computed after T (e.g., a feature updated the next day) constitutes data leakage and inflates offline metrics.",
+      },
+      {
+        question: "What is the key architectural difference between the online store and offline store in a feature store system?",
+        options: ["Online store is encrypted; offline store is not", "Online store (Redis/DynamoDB) provides sub-10ms lookups for real-time inference; offline store (S3/BigQuery) provides historical values for batch training", "Online store is the primary store; offline is a backup"],
+        correctIndex: 1,
+        explanation: "They serve different consumers: the offline store is optimized for training (batch scans, historical queries, point-in-time joins); the online store is optimized for serving (sub-10ms single-entity lookups). Both are populated from the same feature computation definitions.",
+      },
+    ],
+  },
+
+  "sd-m3": {
+    durationLabel: "15 min",
+    outcomes: [
+      "Choose between batch inference and online serving based on latency, staleness, and cost requirements",
+      "Explain shadow mode, canary, and champion-challenger deployment strategies",
+      "Design a model deployment workflow using a model registry with staging and rollback capability",
+    ],
+    learnMarkdown: `## Model Serving: Batch vs Real-Time
+
+Deploying a trained model is not the end of the ML lifecycle—it's the beginning of the hardest part. Choosing the right serving pattern and deployment strategy determines whether your model actually creates value.
+
+### Batch Inference
+
+Precompute predictions on a schedule, store in a database, serve via lookup.
+
+**Architecture:**
+\`\`\`
+Nightly Spark job → Score all users → Write to Redis/DynamoDB
+         ↓
+User requests → Lookup prediction (< 1ms)
+\`\`\`
+
+**Advantages:**
+- Extremely fast serving (pure database lookup, no compute at request time)
+- Cheap at scale (one batch job vs millions of individual inference calls)
+- Simple infrastructure (no real-time model serving endpoint)
+
+**Disadvantages:**
+- Predictions always stale (as old as the last batch run)
+- Cannot incorporate real-time context (user's current session, live inventory)
+- Wasted compute for users who never request predictions
+
+**Best for**: recommendations precomputed overnight, daily churn scores, offline risk assessments.
+
+### Online Serving (Real-Time Inference)
+
+Predict on-demand when a request arrives.
+
+**Architecture:**
+\`\`\`
+User request → Feature lookup (Redis, < 5ms)
+            → Model inference (ONNX/TensorRT, < 20ms)
+            → Return prediction
+\`\`\`
+
+**Optimization techniques:**
+- **ONNX Runtime**: framework-agnostic model format. Export PyTorch/sklearn model to ONNX, run with OnnxRuntime for 2–5× speedup
+- **TensorRT**: NVIDIA's inference optimizer for GPU serving — quantization, layer fusion
+- **Model warm-up**: send dummy requests on startup to pre-load model into memory before serving real traffic
+- **Connection pooling**: reuse connections to Redis/DynamoDB for feature lookups
+
+**Best for**: fraud detection, dynamic pricing, real-time content ranking.
+
+### Deployment Strategies
+
+**Shadow Mode (Safest):**
+New model receives a copy of production traffic but its predictions are NOT served to users. Predictions are logged and compared offline against production model.
+- Zero user impact
+- Reveals discrepancies in feature availability, latency, and prediction distributions
+- Required for any high-risk model change
+
+**Canary Release:**
+Route 5% of traffic to the new model; serve its predictions to real users.
+- Catches issues with small user exposure
+- Monitor latency, error rate, and business metric (CTR, conversion) on the 5% slice
+- Roll back in minutes if metrics degrade
+
+**Champion-Challenger A/B Test:**
+Two model versions serving live traffic simultaneously. Statistical test determines winner after sufficient traffic.
+- Requires experimental design (minimum sample size, p-value threshold)
+- Measure business impact, not just model metrics
+
+**Blue-Green Deployment:**
+Two identical production environments. Switch 100% of traffic from Blue (current) to Green (new) instantly. Rollback = switch back to Blue.
+
+### Model Registry
+
+The model registry tracks every trained model through its lifecycle:
+
+\`\`\`
+Training → [STAGING] → human review → [PRODUCTION] → retire → [ARCHIVED]
+\`\`\`
+
+Capabilities:
+- Version every model artifact with metadata: training run ID, dataset version, metrics
+- Approval gate: a human must approve promotion from Staging to Production
+- Rollback: promote previous version back to Production with one command
+- Lineage: which training data + code produced this model?
+
+MLflow Model Registry is the open-source standard. SageMaker Model Registry and Vertex AI Model Registry are managed alternatives.`,
+    video: null,
+    videoFallbackMarkdown: `## Deep Dive: Model Latency Optimization
+
+### The Latency Budget
+
+For a <100ms end-to-end SLA, budget each component:
+\`\`\`
+Network + load balancer: 10ms
+Feature lookup (Redis): 5ms
+Model inference: 20ms
+Response serialization: 5ms
+Total: 40ms (60ms headroom)
+\`\`\`
+
+If inference alone takes 80ms, you need to optimize the model.
+
+### Quantization
+
+Reduce model weights from float32 to int8. Typical effect: 3–4× speedup, <1% accuracy loss for most models. Apply with:
+\`\`\`python
+# PyTorch dynamic quantization
+quantized_model = torch.quantization.quantize_dynamic(
+    model, {torch.nn.Linear}, dtype=torch.qint8
+)
+\`\`\`
+
+### Model Distillation
+
+Train a smaller "student" model to mimic a larger "teacher" model's outputs. The student achieves 90%+ of teacher accuracy at 10–20% of the latency. Standard technique for deploying large NLP models to production.`,
+    tryGuidance: "Use the diagram to compare when each serving pattern is appropriate.",
+    interviewGraph: {
+      initialStageId: "sd_m3_s1",
+      artifactDimensions: [
+        { label: "Serving Pattern Selection", recoveryStageId: "sd_m3_r1" },
+        { label: "Deployment Strategy", recoveryStageId: "sd_m3_r2" },
+      ],
+      stages: {
+        sd_m3_s1: {
+          id: "sd_m3_s1",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · Serving Pattern",
+          prompt: "A Netflix-like streaming service wants to show personalized movie recommendations on the homepage. The recommendations should reflect a user's viewing from the last 24 hours but don't need to update during the current session. 10M users will visit the homepage daily. Which serving pattern is best?",
+          choices: [
+            { id: "a", label: "Batch inference: score all users nightly, store in Redis, serve via lookup", description: "Run recommendations for all 10M users once per night after their daily viewing is captured. Homepage lookup hits Redis in <1ms." },
+            { id: "b", label: "Real-time inference: compute recommendations on every homepage load", description: "Invoke the recommendation model for each of the 10M daily requests as the page loads." },
+            { id: "c", label: "Hybrid: real-time model, but cache results in browser for 1 hour", description: "Compute recommendations in real time on first visit, cache in browser." },
+          ],
+          branches: { a: "sd_m3_s2", b: "sd_m3_r1", c: "sd_m3_r1" },
+          rationale: "24-hour staleness is acceptable, so batch inference is ideal. Real-time inference on 10M requests/day requires significant GPU infrastructure. Batch scoring overnight is cheaper, faster at serving time, and meets the stated requirement.",
+        },
+        sd_m3_r1: {
+          id: "sd_m3_r1",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Staleness Tradeoff",
+          prompt: "Batch inference is simpler and cheaper, but predictions are always stale. What types of use cases REQUIRE real-time inference and cannot tolerate batch's staleness?",
+          choices: [
+            { id: "a", label: "Fraud detection at transaction time and dynamic pricing based on live inventory", description: "These require current context (the transaction happening now, today's inventory level) that batch cannot capture." },
+            { id: "b", label: "Monthly churn prediction and daily sales forecasting", description: "These can be computed in batch and stored—no real-time context needed." },
+          ],
+          branches: { a: "sd_m3_s2", b: "sd_m3_s2" },
+          rationale: "Real-time inference is required when the prediction depends on context that cannot be precomputed (current transaction details, live event happening now). For predictions that only depend on slowly-changing features, batch is almost always preferable.",
+        },
+        sd_m3_s2: {
+          id: "sd_m3_s2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Deployment Strategy",
+          prompt: "Your team has retrained a fraud detection model that shows a 15% improvement in AUC on the offline holdout set. The model is being promoted to production and will affect real user transactions. What deployment strategy do you recommend?",
+          choices: [
+            { id: "a", label: "Shadow mode first, then canary to 5%, then full rollout", description: "Shadow mode verifies no infrastructure issues and compares prediction distributions. Canary catches production issues with minimal user exposure before full rollout." },
+            { id: "b", label: "Full rollout immediately — offline improvement is significant", description: "A 15% AUC improvement justifies immediate full deployment to capture business value." },
+            { id: "c", label: "Champion-challenger A/B test at 50/50 split", description: "A/B test the new and old model on equal traffic to confirm the offline improvement translates online." },
+          ],
+          branches: { a: "sd_m3_t", b: "sd_m3_r2", c: "sd_m3_r2" },
+          rationale: "For high-stakes systems (fraud detection affecting real transactions), shadow → canary → full is the responsible path. Offline metrics frequently don't translate to online improvements; shadow mode catches infrastructure issues before any user impact.",
+        },
+        sd_m3_r2: {
+          id: "sd_m3_r2",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery 2 · Shadow vs Canary",
+          prompt: "What is the key difference between shadow mode and canary deployment?",
+          choices: [
+            { id: "a", label: "Shadow: predictions logged but not served (zero user impact). Canary: predictions served to a small % of users (real user impact).", description: "Shadow is pure observation. Canary is a limited real-world experiment." },
+            { id: "b", label: "Shadow uses 1% of traffic; canary uses 5% of traffic", description: "The traffic percentage is just a configuration choice; the key distinction is whether predictions are actually served." },
+          ],
+          branches: { a: "sd_m3_t", b: "sd_m3_t" },
+          rationale: "The served vs not-served distinction is the critical difference. Shadow mode is completely safe—users never see the new model's output. Canary introduces real user impact, enabling measurement of business metrics but creating potential for harm if the model is wrong.",
+        },
+        sd_m3_t: {
+          id: "sd_m3_t",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · Deployment Lifecycle",
+          prompt: "A deployed model's precision drops from 0.82 to 0.65 over 3 weeks. What actions do you take, in order?",
+          choices: [
+            { id: "a", label: "1) Trigger rollback to previous champion. 2) Investigate drift. 3) Retrain with recent data.", description: "Protect users first (rollback), then diagnose and fix." },
+          ],
+          branches: { a: "sd_m3_t" },
+          terminal: true,
+          rationale: "The model registry enables instant rollback. This is why maintaining the previous champion version in an 'archived but ready' state is essential. Diagnose after you've stopped the bleeding—don't debug with degraded models serving production traffic.",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "A model precomputes daily credit risk scores for 50M customers and stores them in a database for loan officers to query. What serving pattern is this?",
+        options: ["Real-time inference", "Batch inference", "Shadow mode deployment"],
+        correctIndex: 1,
+        explanation: "Batch inference: predictions are precomputed on a schedule (daily) and stored in a database. Loan officers query the database for a lookup, not the model directly. This is appropriate because daily staleness is acceptable for credit risk scoring.",
+      },
+      {
+        question: "What is the primary purpose of shadow mode deployment?",
+        options: ["To A/B test two models against each other to determine statistical significance", "To route production traffic to a new model for logging without serving its predictions to users", "To reduce inference latency by running models in parallel"],
+        correctIndex: 1,
+        explanation: "Shadow mode receives real production traffic, runs the new model, and logs its predictions—but users always receive the current production model's predictions. It's a zero-risk way to verify infrastructure, check prediction distributions, and catch bugs before any user impact.",
+      },
+      {
+        question: "Why is ONNX used for production model serving?",
+        options: ["ONNX provides automatic model retraining when performance degrades", "ONNX is a framework-agnostic model format that enables optimized inference engines (OnnxRuntime) independent of the training framework (PyTorch, scikit-learn)", "ONNX compresses model files to reduce storage costs"],
+        correctIndex: 1,
+        explanation: "ONNX separates training frameworks from inference runtimes. You train in PyTorch, export to ONNX, run with OnnxRuntime which applies graph optimizations. This achieves 2–5× speedup over native framework inference and enables deployment on any platform.",
+      },
+    ],
+  },
+
+  "sd-m4": {
+    durationLabel: "25 min",
+    outcomes: [
+      "Explain the multi-stage recommendation pipeline and why candidate generation is necessary at scale",
+      "Describe two-tower models and approximate nearest neighbor search for efficient candidate retrieval",
+      "Address cold start for new users and new items using appropriate strategies",
+    ],
+    learnMarkdown: `## Recommendation Systems at Scale
+
+Building a recommendation system is one of the most common ML system design interview topics. The core challenge is a **scale problem**: you cannot score every item for every user in real time. The multi-stage pipeline is the industry-standard solution.
+
+### The Scale Problem
+
+Netflix has 200M users and 15,000+ titles. Scoring every title for every user at page load time = 3 trillion model evaluations per day. Even at 1ms per evaluation, that's 3 billion seconds of compute. Clearly infeasible.
+
+Solution: **progressively narrow the candidate set** with increasingly expensive models.
+
+### Multi-Stage Pipeline
+
+\`\`\`
+All Items (200K)
+    ↓ Candidate Generation (ANN search, two-tower)
+Top 1000 Candidates
+    ↓ Coarse Ranking (fast model, limited features)
+Top 100 Candidates
+    ↓ Fine Ranking (full-featured model, expensive)
+Top 20 Candidates
+    ↓ Business Re-ranking (diversity, freshness, sponsored)
+Final 20 Shown to User
+\`\`\`
+
+### Stage 1: Candidate Generation
+
+Goal: retrieve the 1,000 most relevant items from 200K in < 10ms.
+
+**Two-Tower Model:**
+\`\`\`
+User Features → User Encoder → User Embedding (128-dim)
+Item Features → Item Encoder → Item Embedding (128-dim)
+\`\`\`
+Relevance score = dot product of user and item embeddings.
+
+**Approximate Nearest Neighbor (ANN) Search:**
+Pre-compute all item embeddings. At query time, find the top-K items closest to the user embedding using ANN search (FAISS, ScaNN, HNSW). ANN returns approximate results in O(log N) time instead of exact O(N).
+
+FAISS (Facebook AI Similarity Search) and Google's ScaNN are the standard libraries.
+
+### Stage 2: Coarse Ranking
+
+Scores top-1000 candidates with a fast model. Uses features readily available in memory: item popularity, category match, recency. Goal: prune to top-100. Must run in < 20ms for the full candidate set.
+
+### Stage 3: Fine Ranking
+
+The most expensive model. Applied to top-100 candidates only. Uses full feature set: user-item interaction features, contextual features (time of day, device, session context), cross-feature interactions. Typically a deep neural network or gradient-boosted tree.
+
+**Learning-to-Rank losses**: pairwise (RankNet) or listwise (LambdaRank/LambdaMart) losses that directly optimize ranking metrics (NDCG, MAP) rather than pointwise classification loss.
+
+### Stage 4: Business Re-Ranking
+
+Even after fine ranking, pure relevance optimization leads to problems:
+- **Over-promotion of popular items**: rich-get-richer effect
+- **Filter bubbles**: users see only one type of content
+- **Freshness**: new items deserve exposure even if engagement history is sparse
+- **Diversity**: the top-20 shouldn't be 20 similar action movies
+- **Business constraints**: sponsored content, legal restrictions, inventory constraints
+
+Rules and lightweight models handle these constraints after ranking.
+
+### Explore vs Exploit
+
+Pure exploitation (always show highest predicted relevance) leads to stagnation. The system needs exploration:
+
+- **Epsilon-greedy**: 10% of recommendations drawn randomly to collect unbiased signal
+- **Thompson Sampling**: sample reward probability from posterior; naturally explores uncertain items
+- **UCB (Upper Confidence Bound)**: recommend items whose upper confidence bound on expected reward is highest; forces exploration of items with few impressions
+
+### Cold Start
+
+**New User (no history):**
+1. Surface popular items in their selected genres (onboarding screen)
+2. Use demographics if available (age, country)
+3. Explore aggressively in early sessions to build a preference profile
+
+**New Item (no interaction history):**
+1. Use **content features** (genre, cast, duration, language) to build a cold-start embedding
+2. Content-based similarity to items with known engagement
+3. Promote in a small exploration slot to collect initial interaction signal
+4. Once sufficient interactions exist, transition to collaborative filtering embedding`,
+    video: null,
+    videoFallbackMarkdown: `## Deep Dive: Collaborative Filtering vs Content-Based
+
+### Matrix Factorization (Collaborative Filtering)
+
+Decompose the user-item interaction matrix into user and item latent factor matrices:
+\`\`\`
+R (users × items) ≈ U (users × k) × V^T (k × items)
+\`\`\`
+
+Training: minimize reconstruction error on observed ratings. Prediction: dot product of user and item latent vectors. Problem: cannot handle new users or new items (no row/column in the matrix).
+
+### Content-Based Filtering
+
+Represent items by their attributes (genre, cast, description embedding) and users by the aggregate of items they've interacted with. Predict relevance as similarity between user and item content vectors.
+
+Handles cold start naturally. Suffers from filter bubbles (only recommends more of what the user already likes).
+
+### Hybrid Systems
+
+Production systems combine both: content features initialize embeddings (cold start), collaborative signal refines them as interactions accumulate. Two-tower models naturally support this by accepting both content features and ID embeddings as inputs.`,
+    tryGuidance: "Explore the multi-stage recommendation pipeline in the interactive diagram.",
+    interviewGraph: {
+      initialStageId: "sd_m4_s1",
+      artifactDimensions: [
+        { label: "Pipeline Architecture", recoveryStageId: "sd_m4_r1" },
+        { label: "Cold Start Strategy", recoveryStageId: "sd_m4_r2" },
+      ],
+      stages: {
+        sd_m4_s1: {
+          id: "sd_m4_s1",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · Scale Problem",
+          prompt: "You're designing a recommendation system for a marketplace with 50M users and 500K products. The product page must load in <200ms. An interviewer asks: 'Can you just run your ranking model against all 500K products for each user?' How do you respond?",
+          choices: [
+            { id: "a", label: "No — multi-stage pipeline: candidate generation retrieves ~1000 candidates via ANN, then rankers narrow to final recommendations", description: "Running a full ranker on 500K items per request is computationally infeasible. ANN search retrieves a manageable candidate set in milliseconds." },
+            { id: "b", label: "Yes — with enough GPU infrastructure you can rank all products in real time", description: "Scale out the inference infrastructure to handle the compute load." },
+            { id: "c", label: "Precompute rankings for all user-product pairs nightly", description: "Batch precompute every user's ranked list. Store in Redis for fast lookup." },
+          ],
+          branches: { a: "sd_m4_s2", b: "sd_m4_r1", c: "sd_m4_r1" },
+          rationale: "Even with massive GPU clusters, scoring 500K items per user per request is prohibitively expensive and slow. The multi-stage pipeline is the universal solution: cheap retrieval narrows the candidate set, expensive rankers run only on that subset.",
+        },
+        sd_m4_r1: {
+          id: "sd_m4_r1",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Pipeline Stages",
+          prompt: "The multi-stage pipeline uses progressively more expensive models on progressively smaller candidate sets. What is the purpose of the candidate generation stage specifically?",
+          choices: [
+            { id: "a", label: "Retrieve the top ~1000 most relevant items from 500K using fast approximate nearest neighbor search", description: "ANN search on pre-computed embeddings retrieves candidates in milliseconds, making the subsequent expensive ranker feasible." },
+            { id: "b", label: "Filter out items the user has already purchased or seen", description: "Exclusion filtering is a post-processing step, not the purpose of candidate generation." },
+          ],
+          branches: { a: "sd_m4_s2", b: "sd_m4_s2" },
+          rationale: "Candidate generation is purely about scale: go from 500K to ~1000 candidates that are plausibly relevant. ANN search on two-tower embeddings is the standard approach — it runs in O(log N) vs the O(N) full scan that would be infeasible at serving time.",
+        },
+        sd_m4_s2: {
+          id: "sd_m4_s2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Cold Start",
+          prompt: "Your marketplace launches in a new country. Thousands of new users sign up daily and dozens of new products are listed per hour. Neither has any interaction history. How do you handle recommendations?",
+          choices: [
+            { id: "a", label: "New users: popular items + onboarding questions. New items: content-based cold embedding + exploration slot", description: "New users see popular/trending items and declare preferences. New items are described by content features and surfaced in a small exploration allocation to collect initial interactions." },
+            { id: "b", label: "Don't recommend to new users until they have 10 interactions", description: "Gate recommendations behind a minimum interaction threshold to ensure quality." },
+            { id: "c", label: "Recommend the globally most popular items to everyone", description: "Use one global top-K list for all new users and items until enough history is collected." },
+          ],
+          branches: { a: "sd_m4_t", b: "sd_m4_r2", c: "sd_m4_r2" },
+          rationale: "Waiting for interactions creates a poor onboarding experience. Popularity + preference declarations (onboarding) quickly personalizes new user experience. Content features solve new item cold start by enabling similarity to known items before any interactions exist.",
+        },
+        sd_m4_r2: {
+          id: "sd_m4_r2",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery 2 · Cold Start Detail",
+          prompt: "For new items with no interaction history, collaborative filtering cannot generate embeddings (no user interactions to factor in). What alternative allows the system to still recommend new items?",
+          choices: [
+            { id: "a", label: "Content-based features: use item attributes (category, description embedding, price range) to generate a cold-start embedding", description: "Content features enable similarity computation against known items. As interactions accumulate, the collaborative signal takes over." },
+            { id: "b", label: "Wait until the item has 100 interactions before including it in recommendations", description: "This creates a chicken-and-egg problem: items need exposure to get interactions, but they can't get recommended without interactions." },
+          ],
+          branches: { a: "sd_m4_t", b: "sd_m4_t" },
+          rationale: "Content-based cold start is the solution to the chicken-and-egg problem. A new laptop can be embedded based on its specs, brand, and price range — similar to laptops users have interacted with. The exploration slot (epsilon-greedy or similar) ensures new items get the initial interactions needed to build a collaborative embedding.",
+        },
+        sd_m4_t: {
+          id: "sd_m4_t",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · RecSys Architecture",
+          prompt: "A fine-ranker ranks purely by predicted CTR. After 3 months, users complain the feed is repetitive and full of similar items. What pipeline component addresses this?",
+          choices: [
+            { id: "a", label: "Business re-ranking with diversity constraints — limit items from same category, inject fresh content", description: "The re-ranking stage applies diversity rules, freshness boosts, and business constraints after relevance ranking to create a balanced recommendation list." },
+          ],
+          branches: { a: "sd_m4_t" },
+          terminal: true,
+          rationale: "Pure relevance optimization is a local optimum. Users report satisfaction declining when feeds are too homogeneous — the 'filter bubble' effect. Business re-ranking is the architectural solution: enforce diversity, freshness, and category limits as constraints applied post-ranking.",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "Why can't a single ranking model score all items for all users at request time in a large-scale recommendation system?",
+        options: ["Machine learning models can only handle a fixed number of inputs", "Scoring millions of items per user per request would exceed latency budgets and compute budgets by orders of magnitude", "Ranking models require items to be sorted alphabetically first"],
+        correctIndex: 1,
+        explanation: "At 50M users × 500K items, even 1ms per inference = 25 billion seconds of compute per day. The multi-stage pipeline solves this: fast ANN retrieval narrows candidates to ~1000, then expensive rankers run only on that subset.",
+      },
+      {
+        question: "In a two-tower model for recommendation, what does each tower encode?",
+        options: ["One tower encodes training data, the other encodes test data", "One tower encodes the user (user features → user embedding), the other encodes the item (item features → item embedding)", "One tower handles content features, the other handles collaborative filtering signals"],
+        correctIndex: 1,
+        explanation: "Two-tower models have separate encoder networks for users and items, each producing a dense embedding. Relevance is computed as the dot product (or cosine similarity) of these embeddings. Pre-computing item embeddings enables efficient ANN search at serving time.",
+      },
+      {
+        question: "What is the 'explore vs exploit' problem in recommendations, and how does epsilon-greedy address it?",
+        options: ["Epsilon-greedy randomly removes 10% of recommended items to reduce server load", "Pure exploitation (always show highest predicted relevance) leads to filter bubbles; epsilon-greedy recommends 10% of items randomly to collect unbiased signal from unexplored items", "Epsilon-greedy is a regularization technique that prevents overfitting in ranking models"],
+        correctIndex: 1,
+        explanation: "Exploitation shows what the model currently believes is best. But without exploration, the model never learns about items it's uncertain about, creating filter bubbles and missing opportunities. Epsilon-greedy allocates ~10% of recommendations to random items, collecting the interaction data needed to improve future recommendations.",
+      },
+    ],
+  },
+
+"ps-m1": {
+  durationLabel: "18 min",
+  outcomes: [
+    "Define a North Star metric and explain why it must be user-centric, not business-centric",
+    "Evaluate candidate metrics against the four criteria: leading indicator, actionable, measurable, value-predictive",
+    "Cite canonical examples: Airbnb nights booked, Spotify time listening, Slack messages sent",
+    "Identify vanity metrics that look good but don't predict long-term value",
+  ],
+  learnMarkdown: `## North Star Metrics
+
+A North Star metric is the **single number** that best captures the core value your product delivers to users — and predicts long-term business success. It is not the same as a business KPI. Revenue is a lagging outcome; a North Star metric is a leading signal of whether users are getting value.
+
+---
+
+## The Four Criteria
+
+A good North Star metric must be:
+
+1. **User-centric** — measures value delivered to users, not business extraction from users
+2. **Leading indicator** — predicts future retention and revenue, weeks or months ahead
+3. **Actionable** — teams can actually move it with product decisions
+4. **Measurable** — can be tracked reliably with available instrumentation
+
+---
+
+## Canonical Examples
+
+| Company | North Star Metric | Why it works |
+|---------|------------------|--------------|
+| Airbnb | Nights booked | Captures value for both hosts and guests; predicts revenue |
+| Spotify | Time spent listening | Direct measure of music value delivery |
+| Slack | Messages sent in first 30 days | Early engagement predicts retention |
+| Facebook | 10 friends in 10 days | Social graph density predicts long-term retention |
+| Medium | Total reading time | Captures content value, not just clicks |
+
+---
+
+## Common Vanity Metrics to Avoid
+
+- **Sign-ups**: anyone can sign up; tells you nothing about value delivered
+- **Page views**: doesn't distinguish useful visits from accidental clicks
+- **App installs**: install ≠ use
+- **Revenue** (as North Star): lags reality by weeks; you can't steer by it in real time
+
+---
+
+## Metric Tree Structure
+
+The North Star metric sits at the top of a tree. Below it are **leading indicators** — components that feed into it. Below those are **lever metrics** — things individual teams can directly influence.
+
+\`\`\`
+North Star: Nights Booked
+├── Supply: Active listings
+├── Demand: Search-to-book conversion
+│   ├── Search quality score
+│   └── Listing photo quality
+└── Repeat bookings per guest
+\`\`\`
+
+Teams own specific nodes in the tree. When the North Star drops, you trace the tree to find which node is responsible.
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Pitfalls in North Star Selection
+
+**Optimizing the metric vs. the underlying value**: once a metric becomes a target, it ceases to be a good measure. Teams find ways to inflate messages sent (automated bots), time on site (autoplay loops), or nights booked (fake listings). A good North Star should be hard to game because gaming it would require actually delivering value.
+
+**Single metric vs. metric tree**: a North Star is a communication and alignment tool — one number everyone rallies around. But operational decisions use the full metric tree. Never mistake simplicity at the top for simplicity in measurement.
+`,
+  tryGuidance: "No interactive viz for this lesson — focus on the learn content and the interview simulation below.",
+  interviewGraph: {
+    initialStageId: "ps_m1_stage1",
+    artifactDimensions: [
+      { label: "Metric Criteria", recoveryStageId: "ps_m1_rec1" },
+      { label: "North Star Design", recoveryStageId: "ps_m1_rec2", passLabel: "Metric Framing" },
+    ],
+    stages: {
+      ps_m1_stage1: {
+        id: "ps_m1_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · New streaming feature",
+        prompt: "You're the DS on a new video streaming feature. The PM proposes 'number of new sign-ups' as the North Star metric. What's your response?",
+        choices: [
+          { id: "a", label: "Agree — sign-ups measure top-of-funnel growth", description: "Sign-ups are a vanity metric — they don't measure value delivered." },
+          { id: "b", label: "Push back — sign-ups don't measure if users got value; propose hours of content watched per active user instead", description: "Hours watched captures actual value delivery and predicts retention." },
+          { id: "c", label: "Accept but add revenue as a secondary North Star", description: "Revenue is lagging and business-centric, not user-centric." },
+        ],
+        branches: { a: "ps_m1_rec1", b: "ps_m1_stage2", c: "ps_m1_rec1" },
+        rationale: "B is correct. Sign-ups measure acquisition, not value. A user who signs up and never watches anything has the same sign-up count as a daily user. Hours of content watched per active user is user-centric (captures value delivered), leading (predicts retention), and actionable.",
+      },
+      ps_m1_rec1: {
+        id: "ps_m1_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · What makes a bad North Star?",
+        prompt: "Why is 'number of sign-ups' a bad North Star metric?",
+        choices: [
+          { id: "a", label: "It's a vanity metric — it doesn't measure whether users got value from the product", description: "Sign-ups measure acquisition volume, not engagement or retention." },
+        ],
+        branches: { a: "ps_m1_stage2" },
+        rationale: "Sign-ups are easy to drive with paid acquisition and don't predict whether users stay or get value. A North Star must reflect actual value delivered.",
+      },
+      ps_m1_stage2: {
+        id: "ps_m1_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · North Star vs revenue",
+        prompt: "A VP argues that revenue should be the North Star because 'it's what the business cares about.' How do you respond?",
+        choices: [
+          { id: "a", label: "Agree — revenue is the most important metric for any business", description: "Revenue is a lagging outcome, not a leading signal." },
+          { id: "b", label: "Revenue lags user behavior by weeks or months — it tells you what happened, not what will happen; a user-value metric is a leading indicator that lets you course-correct faster", description: "If engagement drops now, revenue drops in 30 days. You want to catch that early." },
+          { id: "c", label: "Use both revenue and user value as co-equal North Stars", description: "Two North Stars cause alignment conflicts — teams optimize for different things." },
+        ],
+        branches: { a: "ps_m1_rec2", b: "ps_m1_terminal", c: "ps_m1_rec2" },
+        rationale: "B is correct. Revenue reflects decisions made weeks or months ago — by the time revenue drops, the problem is severe and recovery is slow. A user-value North Star (watch time, active nights booked) is a leading indicator: when it drops, you can intervene before revenue is affected.",
+      },
+      ps_m1_rec2: {
+        id: "ps_m1_rec2",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery 2 · Leading vs lagging",
+        prompt: "What is the key distinction between a North Star metric and revenue?",
+        choices: [
+          { id: "a", label: "A North Star is a leading indicator of user value delivered; revenue is a lagging outcome that reflects past decisions", description: "Leading indicators let you steer proactively." },
+        ],
+        branches: { a: "ps_m1_terminal" },
+        rationale: "North Star metrics are leading — they move before revenue does, giving you time to react. Revenue is lagging — useful for accountability but not for steering.",
+      },
+      ps_m1_terminal: {
+        id: "ps_m1_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · North Star mastered",
+        prompt: "You've worked through North Star metric selection. What's the core principle?",
+        choices: [
+          { id: "a", label: "A North Star captures user value delivered and predicts long-term retention — it leads revenue, not lags it", description: "User-centric, leading, actionable, measurable." },
+        ],
+        branches: { a: "ps_m1_terminal" },
+        terminal: true,
+        rationale: "The best North Star metrics align user success with business success — when users get more value, the business wins. Revenue is a consequence, not a North Star.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "Which of the following best qualifies as a North Star metric for a B2B project management tool?",
+      options: [
+        "Monthly recurring revenue",
+        "Number of projects created per active team in the first 30 days",
+        "Number of new account sign-ups per month",
+      ],
+      correctIndex: 1,
+      explanation: "Projects created per active team measures actual product usage and value delivery (teams are using the tool for real work). MRR is a lagging business metric. Sign-ups are a vanity metric that don't reflect engagement or value.",
+    },
+    {
+      question: "Facebook's early North Star was '10 friends in 10 days.' Why is this an effective North Star?",
+      options: [
+        "It's easy to measure and doesn't require any user surveys",
+        "Having 10 friends in 10 days strongly predicts long-term retention — users who reach this threshold are far more likely to stay active because the social graph delivers continuous value",
+        "It measures acquisition cost efficiency",
+      ],
+      correctIndex: 1,
+      explanation: "Facebook discovered empirically that users who connected with 10+ friends in their first 10 days had dramatically higher retention. This makes it a leading indicator of the core value proposition (social connection). It's user-centric and predictive — exactly what a North Star should be.",
+    },
+    {
+      question: "What is the relationship between a North Star metric and a metric tree?",
+      options: [
+        "They are the same thing — a North Star metric is just another name for a metric tree",
+        "The North Star sits at the top of the metric tree; below it are leading indicators and lever metrics that teams can directly influence",
+        "A metric tree is used for SQL queries; a North Star is used for stakeholder reporting",
+      ],
+      correctIndex: 1,
+      explanation: "The North Star provides a single alignment point for the whole company. The metric tree decomposes it into actionable components — sub-metrics owned by different teams. When the North Star drops, the tree tells you which component is responsible and which team should act.",
+    },
+  ],
+},
+
+"ps-m2": {
+  durationLabel: "12 min",
+  outcomes: [
+    "Distinguish leading indicators (predict future outcomes) from lagging indicators (confirm past outcomes)",
+    "Give concrete examples for B2B and B2C products",
+    "Explain the feedback loop delay and why lagging metrics can't steer real-time decisions",
+    "Build a balanced dashboard: lagging for accountability, leading for decision-making",
+  ],
+  learnMarkdown: `## Leading vs Lagging Indicators
+
+**Lagging indicators** confirm what happened. **Leading indicators** predict what will happen. The distinction is critical for building dashboards and making real-time product decisions.
+
+---
+
+## Definitions
+
+| Type | Definition | Characteristic |
+|------|-----------|----------------|
+| **Lagging** | Measures outcomes after they occur | High confidence, low actionability |
+| **Leading** | Predicts future outcomes before they crystallize | Lower confidence, high actionability |
+
+---
+
+## Examples
+
+**For a B2B SaaS product:**
+- Lagging: Monthly Recurring Revenue (MRR), customer churn rate, Net Promoter Score
+- Leading: Daily active users per seat, feature adoption rate, support ticket volume trend, login frequency in first 30 days
+
+**For a consumer app:**
+- Lagging: Revenue, 30-day retention rate, annual churn
+- Leading: D1/D7 retention, session length, notification open rate, social share rate
+
+---
+
+## The Feedback Loop Delay
+
+Lagging metrics reflect decisions made **weeks or months ago**. Revenue this month reflects acquisition and engagement decisions from last quarter. By the time revenue drops, the product problem is already severe.
+
+\`\`\`
+Engagement drops today
+    → D7 retention drops in 7 days  (leading signal)
+    → D30 retention drops in 30 days  (leading signal)
+    → Revenue drops in 60-90 days  (lagging signal)
+\`\`\`
+
+If you only watch revenue, you're steering by looking in the rearview mirror.
+
+---
+
+## Balanced Dashboard Design
+
+A good dashboard layer:
+1. **Hero KPIs** — lagging metrics for accountability (revenue, active users, NPS). These tell stakeholders how the business is doing.
+2. **Leading indicators** — predict next month's hero KPIs. These tell the team what to act on now.
+3. **Lever metrics** — the specific actions teams take that move the leading indicators.
+
+Never replace lagging metrics with leading ones — you need both. Revenue is the ultimate accountability metric. But day-to-day, you steer by leading indicators.
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Compound Leading Metrics
+
+Some leading indicators are **compound**: they combine two signals into one. Daily Active Users × Average Session Length = total engagement minutes. This compound metric can drop even when DAU is stable (if sessions shorten) or when session length is stable (if fewer users engage daily).
+
+Decomposing compound metrics on drop is essential: a 10% drop in engagement minutes could be a 10% DAU drop (top-of-funnel problem) or a 10% session length drop (in-product value problem). These require completely different interventions.
+`,
+  tryGuidance: "Use the interactive leading/lagging indicator visualization to trace how leading indicator changes propagate to lagging outcomes over time.",
+  interviewGraph: {
+    initialStageId: "ps_m2_stage1",
+    artifactDimensions: [
+      { label: "Lead/Lag Distinction", recoveryStageId: "ps_m2_rec1" },
+      { label: "Dashboard Balance", recoveryStageId: "ps_m2_terminal", passLabel: "Indicator Design" },
+    ],
+    stages: {
+      ps_m2_stage1: {
+        id: "ps_m2_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · B2B SaaS indicators",
+        prompt: "Give two leading and two lagging indicators for a B2B project management SaaS. Which set would you use to detect a churn risk three months early?",
+        choices: [
+          { id: "a", label: "Leading: daily active seats, feature adoption rate. Lagging: MRR, churn rate. Use leading indicators for early warning.", description: "Seat activity and feature adoption drop before churn. MRR and churn confirm it after." },
+          { id: "b", label: "Use MRR as both leading and lagging — it's the most important metric", description: "MRR is always lagging — it reflects past decisions." },
+          { id: "c", label: "Leading: NPS, revenue. Lagging: login frequency, feature usage.", description: "NPS and revenue are lagging; login frequency and feature usage are leading." },
+        ],
+        branches: { a: "ps_m2_stage2", b: "ps_m2_rec1", c: "ps_m2_rec1" },
+        rationale: "A is correct. Login frequency and feature adoption are observable before churn happens. A customer who stops using features but is still paying is a churn risk — you can intervene now. MRR and churn rate only confirm the problem after it's happened.",
+      },
+      ps_m2_rec1: {
+        id: "ps_m2_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Which direction?",
+        prompt: "A customer's login frequency dropped 70% last week. Is this a leading or lagging signal of churn?",
+        choices: [
+          { id: "a", label: "Leading — it predicts future churn before it appears in revenue or contract renewal metrics", description: "Behavioral signals precede business outcomes by weeks or months." },
+        ],
+        branches: { a: "ps_m2_stage2" },
+        rationale: "Login frequency is a leading indicator. The customer is disengaging before they cancel. This is exactly the signal to act on.",
+      },
+      ps_m2_stage2: {
+        id: "ps_m2_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Lagging drop response",
+        prompt: "Revenue dropped 8% this month. What does this tell you about the timing of intervention?",
+        choices: [
+          { id: "a", label: "Intervene now — the revenue drop is the signal to act", description: "The revenue drop is already the lagging outcome. You're weeks behind." },
+          { id: "b", label: "The revenue drop reflects decisions and user behavior from 1-3 months ago — the best intervention was earlier; now check leading indicators to see if further decline is coming", description: "Revenue lags behavior. If leading indicators are also declining, more drops are coming." },
+        ],
+        branches: { a: "ps_m2_rec1", b: "ps_m2_terminal" },
+        rationale: "B is correct. Revenue this month reflects engagement from 1-3 months ago. The best response: (1) check leading indicators now to see if more decline is in the pipeline, (2) diagnose what caused the engagement drop months ago, (3) intervene in the leading indicators to stop further deterioration.",
+      },
+      ps_m2_terminal: {
+        id: "ps_m2_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · Dashboard balance",
+        prompt: "How should a product dashboard balance leading and lagging metrics?",
+        choices: [
+          { id: "a", label: "Lagging metrics for accountability (revenue, churn), leading indicators for daily decision-making (engagement, feature adoption)", description: "You need both — lagging for outcome accountability, leading for proactive steering." },
+        ],
+        branches: { a: "ps_m2_terminal" },
+        terminal: true,
+        rationale: "A balanced dashboard shows both: lagging metrics anchor accountability to business outcomes, leading indicators give teams actionable signals for real-time steering.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "Which of the following is a leading indicator for a consumer subscription app?",
+      options: [
+        "Monthly churn rate",
+        "Annual recurring revenue",
+        "Day-7 retention rate",
+      ],
+      correctIndex: 2,
+      explanation: "D7 retention predicts whether new users will become long-term active users — it's observable 7 days after acquisition and predicts 30/60/90-day retention. Monthly churn and ARR are lagging: they confirm outcomes that are already baked in from decisions made weeks earlier.",
+    },
+    {
+      question: "If you only monitor lagging metrics, what is the key operational risk?",
+      options: [
+        "Lagging metrics are too expensive to compute at scale",
+        "By the time a lagging metric drops, the root cause is weeks or months old — intervention is late and recovery is slow",
+        "Lagging metrics aren't auditable",
+      ],
+      correctIndex: 1,
+      explanation: "Lagging metrics (revenue, churn) reflect past decisions. When they drop, the underlying cause — engagement, satisfaction, acquisition quality — already deteriorated long before. Without leading indicators, you're steering by looking in the rearview mirror.",
+    },
+    {
+      question: "DAU dropped 10% and average session length dropped 10%. Total engagement minutes dropped how much — and why does this distinction matter?",
+      options: [
+        "Dropped 10% — only one factor caused the decline",
+        "Dropped approximately 19% — both factors compound multiplicatively, and diagnosing which component dropped guides which team acts",
+        "Dropped 20% — the two effects simply add together",
+      ],
+      correctIndex: 1,
+      explanation: "Engagement minutes = DAU × session length. With both down 10%: 0.9 × 0.9 = 0.81, so total is down ~19%. The diagnostic matters: a DAU drop is a top-of-funnel (acquisition/notification) problem; a session length drop is an in-product value problem. Same outcome metric, different root causes, different teams to engage.",
+    },
+  ],
+},
+
+"ps-m3": {
+  durationLabel: "10 min",
+  outcomes: [
+    "Define guardrail metrics as constraints that must not degrade, even when primary metrics improve",
+    "Give examples across latency, error rate, revenue cannibalization, and safety dimensions",
+    "Set thresholds using baseline ± acceptable degradation",
+    "Apply the multi-metric decision tree to ship/no-ship decisions",
+  ],
+  learnMarkdown: `## Guardrail Metrics
+
+A guardrail metric is a **constraint**, not an objective. While your experiment tries to improve the primary metric, guardrail metrics define what must not get worse. Shipping a feature that improves engagement but breaks something else is worse than not shipping at all.
+
+---
+
+## Why Guardrails Exist
+
+Optimization is adversarial with respect to unmonitored dimensions. If you optimize only for click-through rate, you may inadvertently increase page load time, error rate, or user complaints. Guardrails prevent this.
+
+---
+
+## Common Guardrail Metrics
+
+| Category | Example |
+|----------|---------|
+| Performance | p99 latency < 500ms; error rate < 0.1% |
+| Revenue | Revenue per user ≥ baseline (no cannibalization) |
+| Safety | Content moderation incident rate |
+| Accessibility | Screen reader compatibility score |
+| User health | Report-as-spam rate; unsubscribe rate |
+
+---
+
+## Setting Thresholds
+
+Thresholds are set as: **baseline ± maximum acceptable degradation**.
+
+Baseline = the pre-experiment metric value. The maximum degradation is determined by business impact: "What does a 1% increase in error rate cost us?" For a $10M/year business, 1% error rate increase might represent $100K in support costs — define whether that's acceptable.
+
+Set thresholds **before** the experiment starts. Do not adjust thresholds after seeing results.
+
+---
+
+## The Multi-Metric Decision Tree
+
+\`\`\`
+Primary metric ↑ AND all guardrails OK → Ship
+Primary metric ↑ BUT guardrail violated → Investigate trade-off → Stakeholder decision
+Primary metric flat or ↓ → Don't ship (unless reducing tech debt)
+\`\`\`
+
+The "investigate" case is the hardest. A 15% engagement improvement with a 30% support ticket increase is not obviously worth it — that's a business judgment call, not a data call.
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Defining Guardrail Thresholds
+
+**Relative vs absolute thresholds**: a relative threshold ("latency doesn't increase by more than 10%") is independent of baseline. An absolute threshold ("latency stays below 500ms") is appropriate when there's a known SLA or user-experience cliff.
+
+**Statistical power for guardrails**: to detect a guardrail violation, your experiment must be powered to detect the minimum violation you care about, not just the primary metric effect size. Run a separate power analysis for each guardrail metric.
+`,
+  tryGuidance: "No interactive viz for this lesson — work through the decision tree scenarios in the interview simulation.",
+  interviewGraph: {
+    initialStageId: "ps_m3_stage1",
+    artifactDimensions: [
+      { label: "Guardrail Definition", recoveryStageId: "ps_m3_rec1" },
+      { label: "Trade-off Decision", recoveryStageId: "ps_m3_terminal", passLabel: "Ship Decision" },
+    ],
+    stages: {
+      ps_m3_stage1: {
+        id: "ps_m3_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Guardrail violation",
+        prompt: "Your experiment shows +15% engagement but support ticket volume increased +30%. The PM says 'the engagement win is too big to ignore — ship it.' What do you say?",
+        choices: [
+          { id: "a", label: "Agree — engagement is the primary metric and it improved", description: "Ignoring a 30% support ticket increase is expensive and harmful to users." },
+          { id: "b", label: "Support tickets are a guardrail metric — a 30% increase may cost more in support than the engagement gain is worth; need a cost-benefit analysis before deciding", description: "Quantify the cost: 30% more tickets × cost per ticket vs. revenue value of 15% engagement improvement." },
+          { id: "c", label: "Do nothing — ship the control, neither version is clearly better", description: "The primary metric clearly improved. The question is whether the guardrail violation is acceptable." },
+        ],
+        branches: { a: "ps_m3_rec1", b: "ps_m3_stage2", c: "ps_m3_rec1" },
+        rationale: "B is correct. This is a classic trade-off decision. The engagement improvement might generate $200K/year in revenue. The support ticket increase might cost $300K/year in ops. That's a net loss. Guardrail violations require stakeholder-level cost-benefit analysis — it's not just a data question.",
+      },
+      ps_m3_rec1: {
+        id: "ps_m3_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Guardrail purpose",
+        prompt: "What is the purpose of a guardrail metric, and how is it different from a primary metric?",
+        choices: [
+          { id: "a", label: "A guardrail is a constraint that must not degrade — it doesn't need to improve, but it must not get worse by more than an agreed threshold", description: "Primary metrics are objectives to maximize; guardrails are constraints to satisfy." },
+        ],
+        branches: { a: "ps_m3_stage2" },
+        rationale: "Primary metrics are objectives; guardrails are constraints. You ship when the objective improves AND constraints are satisfied.",
+      },
+      ps_m3_stage2: {
+        id: "ps_m3_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Threshold timing",
+        prompt: "After running an experiment, you see the latency guardrail is borderline. Can you raise the threshold to allow the result through?",
+        choices: [
+          { id: "a", label: "Yes — you should use the data to set appropriate thresholds", description: "Changing thresholds after seeing results is post-hoc rationalization." },
+          { id: "b", label: "No — guardrail thresholds must be set before the experiment; changing them after seeing results is HARKing (Hypothesizing After Results are Known)", description: "Pre-registration of thresholds prevents rationalization of bad results." },
+        ],
+        branches: { a: "ps_m3_rec1", b: "ps_m3_terminal" },
+        rationale: "B is correct. Setting thresholds after seeing data introduces bias — you're retroactively justifying a ship decision. All guardrail thresholds must be pre-registered before experiment launch. This is a discipline issue, not a data issue.",
+      },
+      ps_m3_terminal: {
+        id: "ps_m3_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · Decision framework",
+        prompt: "Primary metric up, all guardrails OK. What's the decision?",
+        choices: [
+          { id: "a", label: "Ship — this is the clear case in the decision tree", description: "Both objective (primary metric improved) and constraints (guardrails satisfied) are met." },
+        ],
+        branches: { a: "ps_m3_terminal" },
+        terminal: true,
+        rationale: "The multi-metric decision tree is straightforward in this case: primary metric improved AND guardrails satisfied → ship.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "A new recommendation algorithm increases clicks by 12% but decreases average revenue per click by 15%. Is this a success?",
+      options: [
+        "Yes — clicks improved, which is the primary metric",
+        "No — revenue per click is a guardrail metric; the net effect is negative revenue, making this a guardrail violation",
+        "It depends on whether the click increase compensates for the revenue drop",
+      ],
+      correctIndex: 1,
+      explanation: "Revenue per click is a guardrail (no cannibalization). If clicks × revenue/click = total revenue, and revenue/click dropped 15% while clicks increased 12%, total revenue is approximately 0.85 × 1.12 ≈ 0.95 — a net revenue decline. The primary metric won but the guardrail failed. This requires a cost-benefit discussion, not an automatic ship.",
+    },
+    {
+      question: "When should guardrail thresholds be set?",
+      options: [
+        "Before the experiment starts, based on pre-agreed acceptable degradation levels",
+        "After seeing results, calibrated to the actual observed metrics",
+        "At the end of each quarter during business review",
+      ],
+      correctIndex: 0,
+      explanation: "Pre-registration is essential. Setting thresholds after seeing results is HARKing (Hypothesizing After Results are Known) — you'll unconsciously set thresholds that justify the decision you wanted to make. Thresholds must be agreed upon before launch.",
+    },
+    {
+      question: "Primary metric improved but a guardrail metric degraded. What is the correct process?",
+      options: [
+        "Ship — primary metric improvement outweighs any guardrail concerns",
+        "Do not ship — any guardrail violation is an automatic rejection",
+        "Investigate the cost-benefit tradeoff and escalate to stakeholders for a business judgment decision",
+      ],
+      correctIndex: 2,
+      explanation: "A guardrail violation doesn't automatically block shipping — it escalates the decision. Quantify the cost of the guardrail degradation vs. the revenue value of the primary metric improvement. Some tradeoffs are worth it (small latency increase for massive engagement gain); others aren't (engagement gain but massive support cost increase). This is a stakeholder call.",
+    },
+  ],
+},
+
+"ps-m4": {
+  durationLabel: "15 min",
+  outcomes: [
+    "Decompose a metric multiplicatively and additively into component drivers",
+    "Apply segmentation to isolate which component caused a change",
+    "Walk through a revenue drop investigation using the decomposition framework",
+    "Recognize limiting cases where one component dominates",
+  ],
+  learnMarkdown: `## Metric Decomposition Trees
+
+When a metric moves, your first question should be: **which component caused this?** Metric decomposition gives you a structured way to answer.
+
+---
+
+## Multiplicative Decomposition
+
+Revenue = Users × Conversion Rate × Average Revenue Per User (ARPU)
+
+If revenue dropped 10%, exactly one (or more) of these components dropped. Segment each:
+
+\`\`\`
+Revenue dropped 10%
+├── Users: -2% (slight, not the main driver)
+├── Conversion Rate: -8% (significant — investigate this)
+└── ARPU: flat
+→ Root cause: conversion rate decline
+\`\`\`
+
+---
+
+## Additive Decomposition
+
+Total Latency = Server Processing Time + Client Rendering Time + Network Round-Trip
+
+A 200ms latency increase: if server time is flat, client time is flat, but network time increased 200ms → the root cause is network.
+
+---
+
+## Recursive Decomposition
+
+Components can themselves be decomposed:
+
+\`\`\`
+Conversion Rate = (Mobile Conversion × Mobile Traffic Share) + (Desktop Conversion × Desktop Traffic Share)
+\`\`\`
+
+If mobile traffic share increased (more users on mobile) but mobile conversion is lower than desktop, overall conversion drops even if both per-platform rates are stable. This is Simpson's paradox — a mix shift masquerading as a performance drop.
+
+---
+
+## Diagnostic Process
+
+1. State the multiplicative formula for the metric
+2. Measure each component before and after
+3. Identify which component(s) changed materially
+4. Recursively decompose the changed component
+5. Identify the leaf-level driver
+
+---
+
+## Limiting Cases
+
+When one component is 90%+ of the total, it dominates the decomposition. For a product with 95% mobile traffic, desktop conversion changes are almost irrelevant to overall conversion. Focus your decomposition energy on the largest component first — you'll find the driver faster.
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Mix Shifts and Simpson's Paradox
+
+**Mix shifts** are a common source of confusion. If a new marketing campaign drives lower-quality traffic (lower intent, higher bounce rate), overall conversion drops even if conversion rate within each segment is stable. The denominator composition changed.
+
+**Simpson's Paradox**: a metric can improve in every segment while appearing to decline in aggregate, if segment sizes shift. Example: desktop conversion 5% → 6% (improved), mobile conversion 3% → 4% (improved), but mobile traffic share grew from 40% to 70%. Aggregate conversion: before = 0.4×5% + 0.6×3% = 3.8%, after = 0.7×4% + 0.3×6% = 4.6%. Wait — it actually improved here. Reverse the mix shift to demonstrate the paradox.
+
+Always decompose by segment before concluding a metric declined.
+`,
+  tryGuidance: "Use the funnel analysis interactive to decompose a revenue metric into multiplicative components and identify which one is driving a simulated change.",
+  interviewGraph: {
+    initialStageId: "ps_m4_stage1",
+    artifactDimensions: [
+      { label: "Decomposition Framework", recoveryStageId: "ps_m4_rec1" },
+      { label: "Root Cause Isolation", recoveryStageId: "ps_m4_terminal", passLabel: "Diagnostic Skill" },
+    ],
+    stages: {
+      ps_m4_stage1: {
+        id: "ps_m4_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Revenue drop",
+        prompt: "Revenue dropped 10% last week. Walk me through your first diagnostic steps.",
+        choices: [
+          { id: "a", label: "Check if any engineers deployed something last week that could cause bugs", description: "Deployments are one possible cause, but you need a structured approach first." },
+          { id: "b", label: "Decompose: Revenue = Users × Conversion × ARPU. Measure each. Identify which component dropped. Then recursively decompose the one that changed.", description: "Structured multiplicative decomposition isolates the driver before you search for root causes." },
+          { id: "c", label: "Ask the PM what changed in the product", description: "PM context is useful later, but first you need to quantify which component of revenue changed." },
+        ],
+        branches: { a: "ps_m4_rec1", b: "ps_m4_stage2", c: "ps_m4_rec1" },
+        rationale: "B is correct. Before investigating causes, decompose the metric. Revenue = Users × Conversion × ARPU. If users are flat, conversion flat, ARPU down — the problem is pricing or product mix. If users down, conversion flat — the problem is acquisition or notification. The decomposition tells you which team to engage and which hypothesis to investigate.",
+      },
+      ps_m4_rec1: {
+        id: "ps_m4_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Decomposition first",
+        prompt: "Why decompose the metric before investigating causes?",
+        choices: [
+          { id: "a", label: "Decomposition narrows the problem space — instead of investigating everything, you identify which one or two components changed and focus investigation there", description: "Structured decomposition is more efficient than hypothesis fishing." },
+        ],
+        branches: { a: "ps_m4_stage2" },
+        rationale: "Without decomposition, you're investigating all possible causes simultaneously. With decomposition, you know which component(s) changed and can focus hypothesis generation on that component.",
+      },
+      ps_m4_stage2: {
+        id: "ps_m4_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Mix shift",
+        prompt: "Conversion rate dropped from 4% to 3.2%. Per-platform rates are stable: desktop still 5%, mobile still 3%. What happened?",
+        choices: [
+          { id: "a", label: "A bug is causing the conversion drop despite stable per-platform rates", description: "If per-platform rates are stable, there's no bug in the conversion path." },
+          { id: "b", label: "A mix shift occurred — mobile traffic share grew, pulling down the blended rate since mobile conversion is lower", description: "Blended = desktop_share×5% + mobile_share×3%. If mobile share grew from 40% to 70%, blended drops even with no change in either rate." },
+        ],
+        branches: { a: "ps_m4_rec1", b: "ps_m4_terminal" },
+        rationale: "B is correct. This is a classic mix shift. If mobile traffic grew from 40% to 60% share, blended conversion: before = 0.4×5% + 0.6×3% = 3.8%, after = 0.4×5% + 0.6×3% = same... wait, if mobile grew from 40% to 70%: after = 0.3×5% + 0.7×3% = 3.6%. The conversion drop is driven by composition change, not performance degradation.",
+      },
+      ps_m4_terminal: {
+        id: "ps_m4_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · Decomposition principle",
+        prompt: "What is the core value of metric decomposition in diagnostics?",
+        choices: [
+          { id: "a", label: "It isolates which component of a metric changed, focusing investigation and ruling out unchanged components as causes", description: "Decomposition is diagnostic triage — eliminate what didn't change first." },
+        ],
+        branches: { a: "ps_m4_terminal" },
+        terminal: true,
+        rationale: "Metric decomposition is structured elimination — it tells you where to look and, equally importantly, where not to look. This dramatically reduces investigation time on complex metric movements.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "Revenue = Users × Conversion Rate × ARPU. Revenue dropped 10%, users flat, ARPU flat. What dropped?",
+      options: [
+        "ARPU must have dropped since revenue dropped",
+        "Conversion rate — it's the only remaining component in the decomposition",
+        "Users must have declined — the other components can't explain a revenue drop",
+      ],
+      correctIndex: 1,
+      explanation: "In a multiplicative decomposition, if two of three components are flat, the third must account for the full change. Revenue = Users × CVR × ARPU. If Users and ARPU are flat, CVR must have dropped ~10% to produce a 10% revenue decline.",
+    },
+    {
+      question: "Conversion rate dropped from 4.0% to 3.5%, but desktop conversion (5.2% → 5.2%) and mobile conversion (2.8% → 2.8%) are both stable. What is the most likely explanation?",
+      options: [
+        "A tracking bug is causing conversion events to go unmeasured",
+        "A mix shift: the proportion of lower-converting mobile users increased",
+        "ARPU changed, affecting the conversion calculation",
+      ],
+      correctIndex: 1,
+      explanation: "If per-segment conversion rates are both stable but the blended rate dropped, the composition of traffic changed. More users are coming from mobile (lower conversion) relative to desktop. Blended rate = weighted average of per-segment rates — if lower-converting segments grow in share, the blend drops even with no degradation in performance.",
+    },
+    {
+      question: "What does 'limiting case' mean in metric decomposition, and why does it matter?",
+      options: [
+        "The maximum possible value of the metric under perfect conditions",
+        "When one component is 90%+ of the total, small changes in that component dominate — focus decomposition effort there first",
+        "The minimum threshold below which the metric is considered broken",
+      ],
+      correctIndex: 1,
+      explanation: "In decomposition, a 10% change in a component that's 90% of the total drives ~9% of the metric. A 10% change in a 5% component drives ~0.5%. Focusing on the dominant component first gets you to the root cause fastest — this is the limiting-case shortcut for large metrics like revenue.",
+    },
+  ],
+},
+
+"ps-e1": {
+  durationLabel: "25 min",
+  outcomes: [
+    "Choose the correct randomization unit (user-level vs session-level) and explain why user-level is preferred",
+    "Calculate minimum sample size from MDE, baseline variance, power, and alpha",
+    "Detect Sample Ratio Mismatch (SRM) and understand why it invalidates an experiment",
+    "Run an AA test to validate the randomization infrastructure before running real experiments",
+  ],
+  learnMarkdown: `## A/B Test Design: End to End
+
+A/B testing is the gold standard for causal inference in product development. A poorly designed test gives wrong answers with high confidence — which is worse than no test at all.
+
+---
+
+## Step 1: Randomization Unit
+
+The randomization unit determines what gets assigned to treatment vs control.
+
+**User-level randomization**: each user is assigned once and consistently sees the same variant. This is the standard choice.
+
+**Session-level randomization**: each session (page load, visit) is independently assigned. Problems:
+- The same user may see treatment in one session and control in another — double-dipping
+- Inflates effective sample size (N sessions >> N users)
+- Introduces variance from within-user variability
+- Violates SUTVA (one user's behavior in one session affects their next session)
+
+**When user-level fails**: for experiments that span multiple users (social features), you may need cluster randomization.
+
+---
+
+## Step 2: Sample Size Calculation
+
+Four inputs:
+1. **MDE** (Minimum Detectable Effect): the smallest improvement worth detecting. Business decision: what change is practically significant?
+2. **Baseline metric** (mean and variance)
+3. **Power** (1 − β): typically 0.8. The probability of detecting an effect if it exists.
+4. **Significance level** (α): typically 0.05. The false positive rate.
+
+Rough formula: n ≈ 16σ²/Δ² for 80% power, 5% significance (one-sided).
+
+Example: baseline click rate 5%, MDE 0.5% absolute improvement, σ² ≈ p(1−p) ≈ 0.0475. n ≈ 16 × 0.0475 / (0.005)² ≈ 30,400 per arm.
+
+---
+
+## Step 3: Sample Ratio Mismatch (SRM)
+
+SRM: the actual ratio of users assigned to treatment vs control doesn't match the intended ratio.
+
+Expected: 50/50. Observed: 48/52. Run a chi-squared test: if p < 0.05, SRM is present.
+
+SRM means randomization is broken. The experiment is invalid regardless of the primary metric result. Common causes: cache-busting errors, JavaScript errors blocking assignment, bot traffic. Never report results from an experiment with SRM.
+
+---
+
+## Step 4: AA Test
+
+Before any real experiment, run a fake A/A test (same treatment in both arms). Expected result: no significant difference on any metric.
+
+If the AA test shows significant differences, your randomization or logging infrastructure has a bug. Fix it before running real experiments.
+
+---
+
+## Assignment Mechanics
+
+Standard: \`hash(user_id + experiment_salt) mod 100 < threshold → treatment\`
+
+The salt ensures different experiments produce different assignments (orthogonality).
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: CUPED & Variance Reduction
+
+**CUPED** (Controlled-experiment Using Pre-Experiment Data): use pre-experiment metric values to reduce variance in the treatment effect estimate.
+
+CUPED-adjusted Y = Y − θ × (X − E[X]) where X is the pre-experiment covariate (e.g., pre-experiment revenue). θ is estimated by regressing Y on X.
+
+Effect: reduces the variance of the estimator, which reduces required sample size by 30–50% for typical product metrics where pre-experiment behavior is predictive. Netflix and Microsoft use CUPED standard in their experimentation platforms.
+`,
+  tryGuidance: "Use the A/B test simulator to set up an experiment, adjust sample size and MDE, and observe power vs significance tradeoffs interactively.",
+  interviewGraph: {
+    initialStageId: "ps_e1_stage1",
+    artifactDimensions: [
+      { label: "Randomization Unit", recoveryStageId: "ps_e1_rec1" },
+      { label: "Sample Size", recoveryStageId: "ps_e1_rec2" },
+      { label: "SRM Detection", recoveryStageId: "ps_e1_terminal", passLabel: "Experiment Validity" },
+    ],
+    stages: {
+      ps_e1_stage1: {
+        id: "ps_e1_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Randomization unit",
+        prompt: "Your team wants to test a new checkout flow. A junior DS proposes session-level randomization 'to get results faster.' What's the problem?",
+        choices: [
+          { id: "a", label: "Session-level randomization is fine — more sessions means faster results", description: "More sessions isn't useful if the same users are counted multiple times inconsistently." },
+          { id: "b", label: "The same user may see treatment in one session and control in another, violating the independence assumption and inflating apparent sample size", description: "Double-dipping corrupts the causal estimate — the user-level effect is confounded." },
+          { id: "c", label: "Sessions are harder to track than users technically", description: "Technical difficulty isn't the main issue." },
+        ],
+        branches: { a: "ps_e1_rec1", b: "ps_e1_stage2", c: "ps_e1_rec1" },
+        rationale: "B is correct. Session-level randomization means the same user may experience both variants. Their behavior in session 2 is influenced by what they saw in session 1. The sessions are not independent units of observation. This violates SUTVA and inflates the effective N (sessions >> users), making the confidence intervals too narrow.",
+      },
+      ps_e1_rec1: {
+        id: "ps_e1_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Randomization units",
+        prompt: "Why is user-level randomization the standard for most product experiments?",
+        choices: [
+          { id: "a", label: "Each user sees one consistent variant, preserving independence between units and making the experiment estimate reflect the true user-level treatment effect", description: "User-level consistency eliminates within-user contamination." },
+        ],
+        branches: { a: "ps_e1_stage2" },
+        rationale: "User-level randomization ensures each user has a single, consistent treatment assignment. This preserves the independence assumption required for valid causal inference.",
+      },
+      ps_e1_stage2: {
+        id: "ps_e1_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · SRM check",
+        prompt: "Your experiment was designed 50/50. After 7 days, the assignment is 48,200 treatment vs 51,800 control. What do you do?",
+        choices: [
+          { id: "a", label: "Report the primary metric results — small imbalances happen by chance", description: "3,600 difference in 100,000 total assignments is unlikely by chance alone." },
+          { id: "b", label: "Run a chi-squared test. If p < 0.05, declare SRM, stop the experiment, and fix the randomization bug before continuing", description: "SRM means the randomization is broken. Results from a broken randomization are invalid." },
+          { id: "c", label: "Reweight the results post-hoc to correct for the imbalance", description: "Post-hoc reweighting doesn't fix the underlying randomization violation." },
+        ],
+        branches: { a: "ps_e1_rec2", b: "ps_e1_stage3", c: "ps_e1_rec2" },
+        rationale: "B is correct. A 48%/52% split in 100,000 samples is unlikely by chance (chi-squared would show p << 0.001). SRM indicates the randomization mechanism is broken — a JavaScript bug, caching issue, or bot traffic asymmetry. You cannot trust results from an experiment with SRM, regardless of what the primary metric shows.",
+      },
+      ps_e1_rec2: {
+        id: "ps_e1_rec2",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery 2 · SRM implications",
+        prompt: "Why does Sample Ratio Mismatch invalidate an experiment?",
+        choices: [
+          { id: "a", label: "SRM means the randomization mechanism is broken — the groups are not comparable, so the primary metric difference may reflect selection bias, not treatment effect", description: "Broken randomization = broken causal inference." },
+        ],
+        branches: { a: "ps_e1_stage3" },
+        rationale: "A/B testing relies on random assignment creating comparable groups. SRM breaks this: the groups differ systematically. Any observed metric difference may be selection bias, not the treatment.",
+      },
+      ps_e1_stage3: {
+        id: "ps_e1_stage3",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Sample size components",
+        prompt: "You reduced the MDE from 2% to 1% absolute improvement (you want to detect smaller effects). How does this affect required sample size?",
+        choices: [
+          { id: "a", label: "Sample size doubles — halving the MDE requires twice as many observations", description: "Close — but the relationship is quadratic." },
+          { id: "b", label: "Sample size quadruples — n scales as 1/Δ², so halving Δ multiplies n by 4", description: "The sample size formula: n ≈ 16σ²/Δ². Halving Δ increases n by 4×." },
+          { id: "c", label: "Sample size is unchanged — MDE doesn't affect sample size calculation", description: "MDE is one of the key inputs to sample size calculation." },
+        ],
+        branches: { a: "ps_e1_stage3", b: "ps_e1_stage3", c: "ps_e1_stage3" },
+        terminal: true,
+        rationale: "B is correct. n ∝ 1/Δ². Detecting a smaller effect requires disproportionately more data. This is why MDE selection is critical: a business must decide whether an improvement smaller than X% is worth detecting. If X is too small, the experiment becomes infeasible given traffic constraints.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "What are the four inputs needed to calculate minimum sample size for an A/B test?",
+      options: [
+        "Number of variants, experiment duration, server capacity, and traffic volume",
+        "Minimum Detectable Effect (MDE), baseline metric variance, desired power, and significance level (alpha)",
+        "Conversion rate, revenue per user, DAU, and experiment budget",
+      ],
+      correctIndex: 1,
+      explanation: "The four standard inputs: MDE (smallest practically significant effect), baseline variance (σ²), power (1−β, typically 0.8), and α (false positive rate, typically 0.05). These feed into the formula n ≈ 16σ²/Δ² (for 80% power, 5% significance). Without all four, you cannot calculate a valid sample size.",
+    },
+    {
+      question: "What is an AA test and why should you run one before real experiments?",
+      options: [
+        "A test comparing variant A against another identical variant A, which should show no significant differences — validates that the randomization infrastructure is working correctly",
+        "A test of statistical significance at the 1% alpha level for higher confidence",
+        "An experiment comparing two existing product versions before testing a new variant",
+      ],
+      correctIndex: 0,
+      explanation: "An AA test assigns both groups to the same (unchanged) experience. The expected result: no significant differences on any metric. If you observe significant differences, your randomization logic, assignment hashing, or logging has a bug. Fix it before running real experiments — a broken infrastructure will produce false positives.",
+    },
+    {
+      question: "Your experiment has 50,000 users in treatment and 50,000 in control, designed 50/50. A chi-squared test gives p=0.41. What does this indicate?",
+      options: [
+        "SRM detected — the experiment is invalid",
+        "No SRM detected — the 50/50 split is consistent with random variation, randomization appears valid",
+        "The experiment is underpowered — more users are needed",
+      ],
+      correctIndex: 1,
+      explanation: "A chi-squared p-value of 0.41 means the observed split is very consistent with the expected 50/50 (p >> 0.05). No SRM. The randomization appears valid. SRM would be flagged at p < 0.05, indicating the split is too unlikely to be explained by chance.",
+    },
+  ],
+},
+
+"ps-e2": {
+  durationLabel: "18 min",
+  outcomes: [
+    "Identify p-hacking and explain why early stopping inflates false positive rates",
+    "Explain the novelty effect and how to distinguish it from a genuine improvement",
+    "Recognize carryover effects and when a washout period is required",
+    "Describe network interference and why SUTVA is violated in marketplace experiments",
+  ],
+  learnMarkdown: `## When A/B Tests Go Wrong
+
+A well-designed experiment can still produce wrong answers. These are the most common failure modes.
+
+---
+
+## P-Hacking: Early Stopping
+
+**The problem**: you check results every day and stop the experiment when p < 0.05. This inflates your false positive rate dramatically.
+
+**Why**: each check is an independent opportunity to get a false positive by chance. If you check 20 times at α=0.05, the probability of at least one false positive is 1 − (0.95)²⁰ ≈ 64%.
+
+**Fix**: commit to a fixed sample size (or fixed duration) **before** starting. Only analyze results once at the predetermined endpoint. If you need continuous monitoring, use **sequential testing** methods (e-values, always-valid p-values) that explicitly account for optional stopping.
+
+---
+
+## Novelty Effect
+
+New features get engagement boosts simply because they're new. Users explore anything different. This engagement decays back to the true level over 2–6 weeks.
+
+**How to distinguish**: run the experiment for at least 4 weeks. Plot week-over-week treatment effect size. If it decays, you're seeing a novelty effect. Look at **holdout cohort engagement** over time — users who have been in treatment for 4+ weeks vs. fresh entrants.
+
+---
+
+## Carryover Effects
+
+**Problem**: the effect of one variant persists after the experiment ends. This contaminates follow-up experiments.
+
+**When it matters most**: recommendation systems that learned user preferences, personalization features that modified a user's internal state, experiments that sent emails (the email is already in the inbox).
+
+**Fix**: washout period (typically 1–2 weeks where no experiment runs in that allocation slot) between sequential experiments. Or use between-subjects designs (each user sees only one variant ever).
+
+---
+
+## Instrumentation Bugs
+
+The most common A/B test failure: logging events incorrectly. Common symptoms:
+- SRM (covered in previous lesson)
+- Primary metric shows impossible values (click rate > 100%)
+- Control group shows unexpected changes (treatment code leaked to control)
+
+**Prevention**: always validate logging during a pilot with small traffic before scaling.
+
+---
+
+## Network Interference (SUTVA Violation)
+
+SUTVA (Stable Unit Treatment Value Assumption): treating user A must not affect user B's outcomes.
+
+**Violations are common**:
+- Ridesharing: reducing driver prices for treatment users increases competition for supply, affecting control users' wait times
+- Social networks: recommending a post to treatment users changes its engagement signal, affecting control users' feeds
+- Marketplaces: treatment-side demand changes affect supply availability for control users
+
+**Fix**: cluster randomization (randomize by city, social community, or supply zone instead of individual user).
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Sequential Testing
+
+**Sequential testing** methods allow you to look at data continuously without inflating the false positive rate. Key approaches:
+
+**Always-Valid Inference (Johari et al.)**: convert the p-value into an e-value that can be multiplied across sequential observations. The e-value is always valid — you can stop whenever it exceeds 1/α.
+
+**mSPRT (mixture Sequential Probability Ratio Test)**: used by platforms like Optimizely. Pre-specify a mixture distribution over effect sizes, get a test statistic that's valid at any stopping time.
+
+These approaches trade statistical power for continuous monitoring flexibility — they require ~30% more data to detect the same effect as a fixed-horizon test.
+`,
+  tryGuidance: "No interactive viz — work through the experiment failure mode scenarios in the interview simulation.",
+  interviewGraph: {
+    initialStageId: "ps_e2_stage1",
+    artifactDimensions: [
+      { label: "P-Hacking Detection", recoveryStageId: "ps_e2_rec1" },
+      { label: "Interference", recoveryStageId: "ps_e2_terminal", passLabel: "Experiment Validity" },
+    ],
+    stages: {
+      ps_e2_stage1: {
+        id: "ps_e2_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Early peek",
+        prompt: "Day 3 of your 14-day experiment: p=0.04. The PM wants to stop and call it a win. What do you say?",
+        choices: [
+          { id: "a", label: "Agree — p < 0.05 is p < 0.05 regardless of when you stop", description: "The number of checks inflates the false positive rate." },
+          { id: "b", label: "Push back — stopping early when p dips below 0.05 is p-hacking; the experiment was designed for 14 days and must run to completion", description: "Early stopping with α=0.05 on day 3 of 14 gives an actual false positive rate far above 5%." },
+        ],
+        branches: { a: "ps_e2_rec1", b: "ps_e2_stage2" },
+        rationale: "B is correct. P-hacking via early stopping is one of the most common and dangerous A/B test failures. The pre-registered duration exists precisely to prevent this. Every early check is a fresh opportunity for a false positive.",
+      },
+      ps_e2_rec1: {
+        id: "ps_e2_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Fixed horizon",
+        prompt: "Why must you commit to experiment duration before starting?",
+        choices: [
+          { id: "a", label: "Each additional check at α=0.05 is another chance for a false positive; only one pre-specified analysis preserves the 5% false positive rate", description: "20 checks at 5% each → ~64% chance of at least one false positive." },
+        ],
+        branches: { a: "ps_e2_stage2" },
+        rationale: "Pre-commitment to a fixed horizon is the only way to maintain the stated alpha level in a standard fixed-horizon test.",
+      },
+      ps_e2_stage2: {
+        id: "ps_e2_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Novelty effect",
+        prompt: "Your experiment shows +8% engagement on day 1, +6% on day 7, +3% on day 14, +1% on day 21. What does this pattern suggest?",
+        choices: [
+          { id: "a", label: "The feature is working — any positive lift is a success", description: "A decaying lift may indicate novelty, not genuine value." },
+          { id: "b", label: "Novelty effect — the lift is decaying toward zero, suggesting users are exploring something new rather than getting lasting value", description: "True improvements maintain or grow their effect as users settle into new habits." },
+          { id: "c", label: "The experiment is underpowered — need more users", description: "Underpowering causes wide CIs, not a systematic decay pattern." },
+        ],
+        branches: { a: "ps_e2_rec1", b: "ps_e2_terminal" },
+        rationale: "B is correct. A decaying treatment effect is the signature of a novelty effect — users explore new UI elements, then revert to old habits as the novelty wears off. A genuine improvement either maintains its effect or grows as users adopt new behaviors. Run the experiment for at least 3-4 weeks to distinguish.",
+      },
+      ps_e2_terminal: {
+        id: "ps_e2_terminal",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Marketplace interference",
+        prompt: "You're testing a surge pricing reduction for Uber drivers in treatment cities. Control cities show unexpectedly worse metrics. Why?",
+        choices: [
+          { id: "a", label: "The control cities had different baseline behavior", description: "Baseline differences could be part of it, but there's a structural interference mechanism." },
+          { id: "b", label: "Network interference: treatment cities have more driver supply due to better pricing, pulling driver supply away from control cities and worsening control city metrics — SUTVA is violated", description: "Supply is a shared resource. Improving one side affects the other." },
+        ],
+        branches: { a: "ps_e2_terminal", b: "ps_e2_terminal" },
+        terminal: true,
+        rationale: "B is correct. This is a classic marketplace interference problem. Drivers are mobile — better pay in treatment cities attracts drivers from nearby control cities, reducing control city supply and increasing wait times. The control group is contaminated by the treatment. Fix: use non-adjacent city pairs or switchback experiments.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "An experiment is designed to run 14 days. You peek on day 5 and p=0.03. You peek on day 10 and p=0.07. You run to day 14 and p=0.04. Should you report this as significant?",
+      options: [
+        "Yes — the final p-value at the pre-specified endpoint is 0.04 < 0.05",
+        "No — you peeked twice before the endpoint, which inflated the family-wise error rate; the final p-value of 0.04 can no longer be interpreted at face value",
+        "Yes — intermediate peeks are irrelevant if you wait for the final result",
+      ],
+      correctIndex: 1,
+      explanation: "Once you peek at intermediate results, you may have already stopped (informally) if the result had looked better. Multiple looks inflate the effective alpha. The actual false positive rate for 'check on day 5, day 10, and day 14' at nominal α=0.05 is approximately 14%, not 5%. The pre-registration commitment to one final analysis is what makes the alpha valid.",
+    },
+    {
+      question: "What distinguishes a novelty effect from a genuine product improvement in an A/B test?",
+      options: [
+        "Novelty effects always show higher statistical significance than genuine improvements",
+        "A novelty effect decays over time toward zero; a genuine improvement maintains or grows its effect as users adopt new behaviors",
+        "Novelty effects only appear in consumer apps, not B2B products",
+      ],
+      correctIndex: 1,
+      explanation: "The distinguishing feature is the temporal trajectory. Novelty: users explore the new thing → engagement spikes → curiosity satisfied → reverts to baseline. Genuine improvement: users adopt new behavior → initial lift → maintains or grows as adoption deepens. Running experiments for 3-4+ weeks is the standard way to distinguish them.",
+    },
+    {
+      question: "Why does standard A/B randomization fail for a ridesharing marketplace experiment?",
+      options: [
+        "Ridesharing apps have too many users for standard A/B infrastructure",
+        "SUTVA is violated: changing driver incentives for treatment users affects supply availability for control users — treatment and control are not independent",
+        "Ridesharing requires sequential testing due to continuous user sessions",
+      ],
+      correctIndex: 1,
+      explanation: "SUTVA requires that treating user A doesn't affect user B's outcomes. In ridesharing, supply is a shared resource — give drivers in the treatment group better pay and they migrate toward treatment-side demand, reducing supply for control users. Fix: cluster randomization by geographic market (treat/hold-out entire cities), so treatment and control zones don't share supply.",
+    },
+  ],
+},
+
+"ps-e3": {
+  durationLabel: "12 min",
+  outcomes: [
+    "Define novelty effect and describe how it differs from a genuine feature improvement",
+    "Explain permanent holdout groups and their role in measuring true long-term impact",
+    "Identify cookie churn bias in long-term experiment analysis",
+    "Apply cohort analysis to separate novelty from sustained value",
+  ],
+  learnMarkdown: `## Novelty Effects & Long-Term Holdouts
+
+Short experiments lie. A feature that appears to win in a 7-day test may simply be benefiting from user curiosity. Long-term holdout groups exist to measure the true, novelty-adjusted impact.
+
+---
+
+## The Novelty Effect Mechanism
+
+Users engage with new things simply because they're new. When you change a UI element, recommendation format, or onboarding flow:
+
+1. Users notice the change
+2. They explore it out of curiosity
+3. The novelty wears off over 2–6 weeks
+4. Engagement converges back toward baseline
+
+This makes short experiments systematically mislead toward positive results.
+
+---
+
+## Distinguishing Novelty from Real Improvement
+
+| Novelty effect | Genuine improvement |
+|----------------|-------------------|
+| Effect decays over time | Effect maintains or grows |
+| New users show stronger response | New and old users respond similarly |
+| Reverting the feature is painless | Users notice and miss it when reverted |
+
+**Method**: plot weekly treatment effect size. Decay pattern = novelty. Stable or growing = genuine.
+
+---
+
+## Permanent Holdout Groups
+
+A **permanent holdout** keeps 1–5% of users on the old experience indefinitely — even after the feature ships to everyone else.
+
+Purpose:
+- Measure cumulative feature impact over months (not just weeks)
+- Provide a long-run control for novelty-adjusted baseline
+- Detect slow-acting negative effects (e.g., filter bubbles from recommendation changes)
+
+Implementation: the holdout group is excluded from all feature launches in a particular product area. They're the "never-treated" control.
+
+---
+
+## Cookie Churn Bias
+
+Long experiments suffer from **cookie churn**: users clear cookies or switch devices, and re-enter the experiment as if new. Depending on hash assignment, they may land in a different arm.
+
+Effect: contamination of both arms over time. Especially problematic for 30+ day experiments. Mitigation: use login-based ID (not cookie-based) for persistent assignment.
+
+---
+
+## Survivor Bias
+
+Long-term experiment cohorts suffer from survivor bias: only active users remain after 30 days. Their behavior doesn't represent the full initial cohort (which included users who churned).
+
+Use **intent-to-treat analysis**: analyze all users who were randomized, including those who stopped using the product. This is the gold standard in clinical trials and applies directly to product experiments.
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Holdout Group Governance
+
+Running permanent holdout groups creates organizational friction — users in holdout don't get improvements that ship to everyone else. This must be governed carefully:
+
+- Holdout users should not receive features in the specific product area under study
+- Rotate holdout membership periodically (every 6–12 months) to prevent perpetual deprivation of improvements
+- Multiple teams should not independently run holdouts on the same users — coordinate a global holdout
+- Holdout size tradeoff: larger holdout = better statistical power for long-term estimates; smaller holdout = less withholding of improvements from users
+`,
+  tryGuidance: "No interactive viz — work through the holdout group design and novelty effect detection scenarios in the interview simulation.",
+  interviewGraph: {
+    initialStageId: "ps_e3_stage1",
+    artifactDimensions: [
+      { label: "Novelty Detection", recoveryStageId: "ps_e3_rec1" },
+      { label: "Holdout Design", recoveryStageId: "ps_e3_terminal", passLabel: "Long-Term Measurement" },
+    ],
+    stages: {
+      ps_e3_stage1: {
+        id: "ps_e3_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Short test interpretation",
+        prompt: "A 7-day A/B test shows +12% engagement for a new content format. The PM wants to ship immediately. What concern do you raise?",
+        choices: [
+          { id: "a", label: "Ship — 7 days is sufficient to confirm a positive result", description: "7 days is typically too short to distinguish novelty from genuine improvement." },
+          { id: "b", label: "The lift may be a novelty effect — users exploring new content format; recommend extending to 3-4 weeks and monitoring whether the effect decays", description: "Novelty effects decay over 2-6 weeks." },
+          { id: "c", label: "The sample size is too small after 7 days", description: "Sample size depends on traffic volume, not calendar time." },
+        ],
+        branches: { a: "ps_e3_rec1", b: "ps_e3_stage2", c: "ps_e3_rec1" },
+        rationale: "B is correct. A 7-day test captures the novelty peak but not the decay. A 4-week test would show whether the +12% holds (genuine improvement) or shrinks toward 0% (novelty). The cost of a 3-week extension is far less than the cost of shipping a feature that only looks good due to novelty.",
+      },
+      ps_e3_rec1: {
+        id: "ps_e3_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Novelty timeline",
+        prompt: "How long does a novelty effect typically take to decay?",
+        choices: [
+          { id: "a", label: "2-6 weeks — run experiments for at least 3-4 weeks for consumer features to distinguish novelty from genuine improvement", description: "Novelty fades as users settle into new habits." },
+        ],
+        branches: { a: "ps_e3_stage2" },
+        rationale: "Novelty effects typically decay over 2-6 weeks. Running tests for 3-4+ weeks is standard practice for features where sustained engagement is the goal.",
+      },
+      ps_e3_stage2: {
+        id: "ps_e3_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Permanent holdout value",
+        prompt: "Six months after shipping a recommendation system revamp, engagement looks great. How do you know the improvement is genuine vs. user habituation?",
+        choices: [
+          { id: "a", label: "Compare to the same period last year using seasonality adjustment", description: "Year-over-year comparison can't control for external factors." },
+          { id: "b", label: "If you maintained a permanent holdout group (1-5% of users on the old experience), compare their metrics to the shipped group — the gap is the true long-term impact", description: "Permanent holdout is the only clean measurement of long-term feature impact." },
+        ],
+        branches: { a: "ps_e3_rec1", b: "ps_e3_terminal" },
+        rationale: "B is correct. A permanent holdout group is the gold standard for measuring long-term feature impact. Without it, any post-ship analysis is confounded by seasonality, external events, and cumulative product changes. The holdout-to-treatment gap at 6 months is the best estimate of true feature value.",
+      },
+      ps_e3_terminal: {
+        id: "ps_e3_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · Holdout principle",
+        prompt: "What is the fundamental role of a permanent holdout group?",
+        choices: [
+          { id: "a", label: "It provides a clean, long-running control group for measuring true cumulative feature impact, free from novelty effects and external confounders", description: "The holdout is never treated — it stays on the baseline experience." },
+        ],
+        branches: { a: "ps_e3_terminal" },
+        terminal: true,
+        rationale: "The permanent holdout group is never exposed to shipped features in its product area. The long-term gap between holdout and shipped users gives an unconfounded estimate of cumulative feature value.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "What is the main purpose of a permanent holdout group?",
+      options: [
+        "To test features on a small audience before wider rollout",
+        "To maintain a long-term control group that measures true cumulative feature impact, separated from novelty effects",
+        "To identify users who are resistant to product changes",
+      ],
+      correctIndex: 1,
+      explanation: "A permanent holdout group stays on the baseline experience indefinitely. After months or years, comparing holdout metrics to the general population (who received all shipped features) gives an unconfounded estimate of cumulative product impact. This can't be measured any other way — you can't un-ship features to create an after-the-fact control.",
+    },
+    {
+      question: "What is cookie churn bias in long-term experiments?",
+      options: [
+        "Users who prefer the control experience systematically clear their cookies",
+        "Users who clear cookies or switch devices re-enter the experiment and may be assigned to a different variant, contaminating both arms over time",
+        "The experiment cookie expires after 30 days, ending the experiment prematurely",
+      ],
+      correctIndex: 1,
+      explanation: "When users clear cookies or use new devices, they re-enter the experiment with a fresh assignment. If they land in a different arm, their exposure history is mixed — they've seen both variants. This contaminates both arms and inflates variance in long-run estimates. Fix: use login-based persistent IDs rather than cookie-based assignment.",
+    },
+    {
+      question: "You run a 4-week experiment. Week 1: +10% lift. Week 2: +7%. Week 3: +4%. Week 4: +2%. What is your recommendation?",
+      options: [
+        "Ship — any positive lift at week 4 means the feature is net positive",
+        "Do not ship — the decaying lift pattern strongly suggests a novelty effect; the true long-term impact is near zero",
+        "Extend the experiment to 8 weeks to confirm",
+      ],
+      correctIndex: 1,
+      explanation: "The decay from +10% to +2% over 4 weeks is the signature novelty effect trajectory. Extrapolating the decay, the feature likely reaches near-zero lift by week 5-6. Shipping a feature whose value is entirely novelty-driven means users will have a worse long-term experience than if they hadn't gotten the feature at all — the novelty high is followed by a reversion.",
+    },
+  ],
+},
+
+"ps-e4": {
+  durationLabel: "15 min",
+  outcomes: [
+    "Explain SUTVA and why it's violated in networked systems",
+    "Describe cluster randomization and why it controls network interference",
+    "Design a geo experiment for a marketplace product",
+    "Explain switchback experiments and their tradeoffs vs. geo experiments",
+  ],
+  learnMarkdown: `## Network Effects & Interference
+
+Standard A/B testing assumes treating user A doesn't affect user B. In networked products and marketplaces, this assumption is almost always wrong.
+
+---
+
+## SUTVA: The Core Assumption
+
+**SUTVA** (Stable Unit Treatment Value Assumption): each unit's (user's) outcome depends only on their own assignment, not on others' assignments.
+
+Violations occur when:
+- Users interact with each other (social networks, messaging)
+- Users compete for shared resources (marketplace supply, ride availability)
+- User behavior affects others through an algorithm (engagement signals feed recommendations)
+
+---
+
+## Marketplace Interference Example
+
+Uber runs an experiment: treatment drivers get a 10% pay increase. Control drivers get the usual rate.
+
+Interference mechanism:
+1. Treatment drivers work more hours (better pay)
+2. They serve more trips in treatment-area demand
+3. Less supply remains for control-area demand
+4. Control users experience longer wait times
+
+The control group's outcome was affected by the treatment — SUTVA violated. The estimated treatment effect is biased.
+
+---
+
+## Cluster Randomization
+
+Instead of randomizing individuals, randomize **clusters** that are roughly isolated:
+- **Geo experiments**: randomize by city, DMA (Designated Market Area), or region. Treat all users in some cities, hold all users in others.
+- **Social cluster randomization**: identify social communities and randomize whole communities.
+- **Time-based randomization** (switchback): alternate treatment/control periods in the same market.
+
+---
+
+## Geo Experiments
+
+Design:
+1. Match cities into comparable pairs (similar size, demographics, traffic mix)
+2. Randomly assign one city per pair to treatment, one to control
+3. Run for 4–8 weeks
+4. Use a difference-in-differences estimator
+
+Key requirement: cities must be geographically separated enough that supply/demand doesn't spill across borders.
+
+---
+
+## Switchback Experiments
+
+Alternate treatment and control periods in the same market (e.g., even hours = treatment, odd hours = control).
+
+Advantages:
+- Controls for geographic heterogeneity — same market, different times
+- No spillover between markets
+
+Disadvantages:
+- Assumes the treatment effect is immediate (no carryover between time periods)
+- Users may experience both variants, creating carryover
+
+---
+
+## CUPED for Variance Reduction
+
+Geo experiments have fewer randomization units (cities vs. millions of users). This inflates variance. **CUPED** (using pre-experiment metrics as covariates) can reduce variance by 30–50%, enabling smaller geo experiments to have adequate power.
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Graph Cluster Randomization
+
+For social networks, geo randomization is often impossible. Graph cluster randomization partitions the social graph into communities (using spectral clustering or Louvain algorithm) and randomizes at the community level.
+
+The challenge: social communities overlap. Perfect isolation is impossible. Bias-variance tradeoff: larger clusters have less spillover but fewer randomization units (less power).
+
+Recent work at LinkedIn and Facebook uses **ego-network randomization**: for each user, randomize based on their network neighborhood, not individual assignment. This reduces spillover at the cost of some assignment imbalance.
+`,
+  tryGuidance: "No interactive viz — work through the interference design scenarios in the interview simulation.",
+  interviewGraph: {
+    initialStageId: "ps_e4_stage1",
+    artifactDimensions: [
+      { label: "Interference Recognition", recoveryStageId: "ps_e4_rec1" },
+      { label: "Cluster Design", recoveryStageId: "ps_e4_terminal", passLabel: "Interference Mitigation" },
+    ],
+    stages: {
+      ps_e4_stage1: {
+        id: "ps_e4_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Marketplace experiment",
+        prompt: "You're A/B testing a 5% discount for DoorDash customers. Treatment users get the discount, control users get full price. Your primary metric is orders placed. Why might standard user-level randomization give biased results?",
+        choices: [
+          { id: "a", label: "Sample size is too small for a 5% discount effect", description: "Sample size is a power issue, not an interference issue." },
+          { id: "b", label: "Treatment users order more, increasing demand; restaurants and delivery capacity are finite, so control users may experience slower delivery or unavailability — SUTVA violated", description: "Shared supply creates interference: treatment demand competes with control demand." },
+          { id: "c", label: "Control users will find out about the discount and demand it, confounding results", description: "This is a contamination problem, not an interference problem." },
+        ],
+        branches: { a: "ps_e4_rec1", b: "ps_e4_stage2", c: "ps_e4_rec1" },
+        rationale: "B is correct. Delivery capacity (restaurants, drivers) is a shared resource. Treatment users ordering more creates congestion that affects control users' experience. This is supply-side interference — the treatment affects control outcomes through a shared supply pool.",
+      },
+      ps_e4_rec1: {
+        id: "ps_e4_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · SUTVA violation",
+        prompt: "What condition causes SUTVA to be violated in a marketplace A/B test?",
+        choices: [
+          { id: "a", label: "When treatment and control users compete for the same finite resource — supply, capacity, inventory — so treating one group changes outcomes for the other", description: "Shared resources create interference pathways." },
+        ],
+        branches: { a: "ps_e4_stage2" },
+        rationale: "SUTVA requires independence between units. Shared resources create dependencies: treating one user changes available supply for another.",
+      },
+      ps_e4_stage2: {
+        id: "ps_e4_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Geo experiment design",
+        prompt: "How do you redesign the DoorDash discount experiment to avoid interference?",
+        choices: [
+          { id: "a", label: "Use session-level randomization instead of user-level", description: "Session-level randomization has the same interference problem and adds others." },
+          { id: "b", label: "Geo experiment: randomize by city — all users in treatment cities get the discount, all users in control cities don't; this eliminates cross-group supply interference within a market", description: "Geographic isolation prevents supply spillover." },
+          { id: "c", label: "Increase sample size to overcome the interference bias", description: "More observations of a biased estimator doesn't remove the bias." },
+        ],
+        branches: { a: "ps_e4_rec1", b: "ps_e4_terminal" },
+        rationale: "B is correct. Geo randomization assigns whole markets to treatment or control. Within a market, all users are in the same group, so there's no cross-group competition for supply. The treatment effect is measured by comparing treated cities vs. control cities using difference-in-differences.",
+      },
+      ps_e4_terminal: {
+        id: "ps_e4_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · Interference principle",
+        prompt: "When should you use cluster randomization instead of user-level randomization?",
+        choices: [
+          { id: "a", label: "Whenever SUTVA is violated — users interact, share resources, or influence each other through shared algorithms — requiring whole clusters to be assigned together", description: "Cluster randomization prevents cross-group interference by keeping all interactions within one arm." },
+        ],
+        branches: { a: "ps_e4_terminal" },
+        terminal: true,
+        rationale: "Cluster randomization is the standard fix for SUTVA violations. By assigning whole clusters (cities, social communities, time periods) to treatment or control, you eliminate the mechanism through which treatment and control units interact.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "What is SUTVA and when is it violated in product experiments?",
+      options: [
+        "Stable Unit Treatment Value Assumption: each user's outcome depends only on their own treatment assignment — violated when users interact or compete for shared resources",
+        "Sequential Unit Testing and Variance Analysis: a method for detecting SRM in experiments",
+        "A statistical assumption that sample sizes must be equal between arms",
+      ],
+      correctIndex: 0,
+      explanation: "SUTVA requires that treating user A doesn't affect user B's outcome. It's violated in social networks (user interactions), marketplaces (shared supply), and recommendation systems (engagement signals feed algorithms that affect other users). When SUTVA is violated, standard A/B estimates are biased.",
+    },
+    {
+      question: "What is a switchback experiment and what assumption must hold for it to be valid?",
+      options: [
+        "An experiment where users switch between variants randomly each session",
+        "An experiment that alternates treatment and control periods in the same market — valid only if the treatment effect is immediate and doesn't carry over across time periods",
+        "An experiment that tests the reverse of the original hypothesis",
+      ],
+      correctIndex: 1,
+      explanation: "Switchback experiments (e.g., even hours = treatment, odd hours = control in the same city) control for geographic heterogeneity. The key assumption: the treatment effect kicks in and dissipates immediately within each period. If there's carryover — e.g., a treatment hour changes driver behavior that persists into the next control hour — the estimate is biased.",
+    },
+    {
+      question: "Why does geo randomization in a marketplace experiment have lower statistical power than user-level randomization?",
+      options: [
+        "Geo experiments require more complex statistical models that are less efficient",
+        "Geo experiments have fewer randomization units (cities vs. millions of users), dramatically increasing the variance of the treatment effect estimate",
+        "Geographic markets are harder to instrument than user-level tracking",
+      ],
+      correctIndex: 1,
+      explanation: "Statistical power depends on the number of randomization units. User-level: millions of units, tight confidence intervals. Geo experiments: dozens or hundreds of cities — far fewer units, much wider confidence intervals. This is the fundamental power tradeoff of cluster randomization. CUPED (using pre-experiment city metrics as covariates) can partially compensate by reducing per-unit variance.",
+    },
+  ],
+},
+
+"ps-c1": {
+  durationLabel: "20 min",
+  outcomes: [
+    "Apply the 5-step metric drop diagnostic framework in interview conditions",
+    "Distinguish data pipeline issues from real metric changes",
+    "Segment by platform, geography, cohort, and feature to isolate root cause",
+    "Structure a clear, confident verbal answer with confidence level and next steps",
+  ],
+  learnMarkdown: `## Diagnosing a Metric Drop: Framework
+
+When a metric drops unexpectedly, the worst response is guessing. The best response is systematic: rule out instrumentation issues first, then segment to isolate the driver, then hypothesize causes.
+
+---
+
+## 5-Step Diagnostic Framework
+
+### Step 1: Is it Real?
+Before investigating causes, verify the data is valid:
+- Check data pipeline completeness (is logging still running? any ETL failures?)
+- Look for impossible values (negative counts, click rate > 100%)
+- Compare to a second data source (GA vs internal DB)
+- Check if the sample size is sufficient to trust the reading
+
+If the data is bad, stop here and fix instrumentation. 80% of "metric drops" in production are logging bugs.
+
+### Step 2: Is it External?
+- Seasonality (holiday, day of week pattern, annual cycle)
+- Competitor action or PR event affecting user behavior
+- Macroeconomic event (recession, major news)
+- Platform change outside your control (iOS update, Google algorithm change)
+
+### Step 3: Segment Breakdown
+If the drop is real and not fully explained externally, segment along every available axis:
+- **Platform**: iOS vs Android vs Web — is the drop concentrated in one?
+- **Geography**: US vs international, specific regions
+- **User cohort**: new users vs returning users (last 30 days vs older)
+- **Feature/surface**: homepage vs search vs notification-driven sessions
+- **Time of day/week**: weekday vs weekend, hour of day
+
+The goal: find the segment where the drop is concentrated. That tells you which team owns the fix.
+
+### Step 4: Causal Event Timeline
+What changed in the last 48 hours?
+- Deployments (check the deploy log)
+- A/B experiment launches or stops
+- Marketing campaign starts or ends
+- Content moderation policy change
+- Infrastructure migration
+
+### Step 5: Hypothesis Ranking
+List hypotheses. Rank by probability × impact × ease of validation. Investigate the most probable hypothesis first.
+
+---
+
+## Presenting Findings
+
+Structure: "I believe X happened (confidence: HIGH/MEDIUM), because [evidence]. The next step is [specific validation]. The team to engage is [team]."
+
+Never say "I don't know" without a next step. Even if you can't identify the root cause, you can always say which hypothesis you're testing next and what data would confirm or reject it.
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Segmentation in Practice
+
+**The segmentation trap**: with many segments, some will show drops by random variation alone (multiple comparison problem). Before declaring a segment as the problem area, ensure the drop in that segment is significant and the drop in other segments is not significant. The pattern "drop concentrated in X, stable in Y and Z" is more convincing than "X dropped most."
+
+**Cohort analysis**: plot the metric for each weekly user acquisition cohort. If new cohorts (last 2 weeks) show the drop but older cohorts are stable, the problem is in acquisition quality or onboarding. If all cohorts drop simultaneously, the problem is a product change that affects all users.
+`,
+  tryGuidance: "No interactive viz — practice the full diagnostic framework on the interview scenarios below.",
+  interviewGraph: {
+    initialStageId: "ps_c1_stage1",
+    artifactDimensions: [
+      { label: "Data Validity Check", recoveryStageId: "ps_c1_rec1" },
+      { label: "Segmentation", recoveryStageId: "ps_c1_rec2" },
+      { label: "Root Cause Structure", recoveryStageId: "ps_c1_terminal", passLabel: "Diagnostic Mastery" },
+    ],
+    stages: {
+      ps_c1_stage1: {
+        id: "ps_c1_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · First check",
+        prompt: "DAU dropped 20% on Monday morning. What is your very first investigation step?",
+        choices: [
+          { id: "a", label: "Immediately check the deploy log for weekend releases", description: "Deployments are a possible cause but you haven't verified the data is real yet." },
+          { id: "b", label: "Verify the data is real: check logging pipeline health, look for ETL failures, compare to a second source, check for impossible values", description: "Most production metric drops are logging bugs, not real product issues." },
+          { id: "c", label: "Segment by platform to find where the drop is concentrated", description: "Segmentation is step 3 — do data validation first." },
+        ],
+        branches: { a: "ps_c1_rec1", b: "ps_c1_stage2", c: "ps_c1_rec1" },
+        rationale: "B is correct. The number one cause of sudden large metric drops in production is data pipeline failure — ETL jobs failing, logging breaking, or an instrumentation bug. Validating the data takes 5 minutes and saves hours of unnecessary investigation.",
+      },
+      ps_c1_rec1: {
+        id: "ps_c1_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Data validity first",
+        prompt: "Why check data validity before investigating product causes?",
+        choices: [
+          { id: "a", label: "Most large sudden metric drops are logging or pipeline failures, not product changes — validating data first prevents wasted investigation", description: "5 minutes of data validation can save hours of root cause analysis." },
+        ],
+        branches: { a: "ps_c1_stage2" },
+        rationale: "In production, 70-80% of sudden large drops are instrumentation failures. Check the data first.",
+      },
+      ps_c1_stage2: {
+        id: "ps_c1_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Segment the drop",
+        prompt: "Data is valid. DAU is genuinely down 20%. You check platforms: iOS down 35%, Android flat, Web flat. What does this tell you?",
+        choices: [
+          { id: "a", label: "The whole product is broken — 20% drop is severe", description: "The concentration tells you which surface is affected." },
+          { id: "b", label: "The problem is iOS-specific — the drop is concentrated in iOS, Android and Web are unaffected — check iOS-specific changes (App Store update, iOS system change, iOS-specific code path)", description: "Platform concentration dramatically narrows the hypothesis space." },
+          { id: "c", label: "iOS users are more engaged so the drop appears larger there", description: "iOS users being more engaged doesn't explain a 35% platform-specific drop." },
+        ],
+        branches: { a: "ps_c1_rec2", b: "ps_c1_stage3", c: "ps_c1_rec2" },
+        rationale: "B is correct. iOS concentration means the problem is in the iOS code path, iOS system, or App Store. Android and Web being flat rules out server-side issues, database problems, and most feature changes. Check: was there an iOS app version release? A new iOS system update? A push notification failing only on iOS?",
+      },
+      ps_c1_rec2: {
+        id: "ps_c1_rec2",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery 2 · Segmentation value",
+        prompt: "What does segment concentration in a metric drop tell you?",
+        choices: [
+          { id: "a", label: "It narrows the hypothesis space — the root cause must be in a system that affects only that segment, ruling out shared infrastructure problems", description: "Concentration = clue to the causal pathway." },
+        ],
+        branches: { a: "ps_c1_stage3" },
+        rationale: "Segment concentration dramatically reduces the number of hypotheses to investigate. A platform-specific drop rules out backend issues, marketing changes, and most feature releases.",
+      },
+      ps_c1_stage3: {
+        id: "ps_c1_stage3",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Framing the answer",
+        prompt: "You've found the drop is iOS-specific and correlates with an iOS app update pushed Sunday night. How do you present this finding?",
+        choices: [
+          { id: "a", label: "Say: 'I found a bug in the iOS update' without further evidence", description: "Don't over-conclude beyond your evidence." },
+          { id: "b", label: "Say: 'High confidence the iOS app update (v3.2.1) released Sunday is the root cause — DAU dropped 35% on iOS within 6 hours of release while Android/Web are flat. Next step: review v3.2.1 changelog with iOS engineering, consider rollback if critical path is broken.'", description: "State confidence level, evidence chain, and next steps." },
+        ],
+        branches: { a: "ps_c1_stage3", b: "ps_c1_stage3" },
+        terminal: true,
+        rationale: "B is the correct structure. A diagnostic finding should include: confidence level (high/medium/low), the evidence that supports it (timing correlation, segment concentration), what would confirm or refute it, and the immediate next step. This gives stakeholders the information they need to make a decision.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "What is the most common cause of a sudden large metric drop in a production system?",
+      options: [
+        "A major product bug that affects all users simultaneously",
+        "A data pipeline failure, logging bug, or ETL error — validating data health should always be the first step",
+        "Competitor actions drawing users away",
+      ],
+      correctIndex: 1,
+      explanation: "In production, the majority of sudden large metric drops are instrumentation failures — ETL jobs break, logging events stop firing, database ingestion fails. Before investigating product causes, verify the data is real: check pipeline health, look for duplicate/missing events, compare to a second data source.",
+    },
+    {
+      question: "DAU dropped 15%. Web platform is down 30%, iOS is down 5%, Android is flat. Where do you focus investigation?",
+      options: [
+        "Focus on iOS since it affects more users globally",
+        "Focus on Web — the drop is concentrated there, implying the root cause is in the Web code path or Web-specific infrastructure",
+        "Investigate all three platforms equally",
+      ],
+      correctIndex: 1,
+      explanation: "Segment concentration is your primary diagnostic signal. A 30% Web drop with flat Android and slight iOS movement points to a Web-specific cause: a Web frontend deploy, a CDN issue, a web-only A/B experiment. Investigating all three equally wastes time — follow the signal to where the drop is concentrated.",
+    },
+    {
+      question: "After investigation, you're 70% confident a bad deploy caused the drop but can't fully confirm yet. How should you frame this?",
+      options: [
+        "Say nothing until you have 100% certainty",
+        "State: 'Medium confidence — the drop correlates with deploy X in timing and segment concentration. Next step: review the deploy diff with engineering. Recommend rollback preparation while we confirm.'",
+        "Report the drop without any hypothesis to avoid being wrong",
+      ],
+      correctIndex: 1,
+      explanation: "In a real incident investigation, 70% confidence with a clear next step is actionable. Waiting for 100% certainty while DAU is down 15% is costly. The correct frame: state your confidence level explicitly, present the supporting evidence, identify what would confirm or refute, and recommend a parallel preparation (rollback readiness) while confirmation proceeds.",
+    },
+  ],
+},
+
+"ps-c2": {
+  durationLabel: "15 min",
+  outcomes: [
+    "Apply the build vs buy decision matrix using core competency and cost dimensions",
+    "Calculate total cost of build including maintenance and opportunity cost",
+    "Assess vendor lock-in risks for critical infrastructure",
+    "Answer the five key questions that structure any build vs buy decision",
+  ],
+  learnMarkdown: `## Build vs Buy Decisions
+
+Every DS and ML engineer eventually faces this question: should we build this component internally or buy/use an existing solution?
+
+---
+
+## The Decision Matrix
+
+Two key dimensions:
+1. **Core competency vs commodity**: is this something that differentiates your product, or is it table-stakes infrastructure everyone has?
+2. **Build cost vs buy cost**: what does it cost to build AND maintain vs. license and integrate?
+
+| | Core Competency | Commodity |
+|---|---|---|
+| **Low build cost** | Build — this is your moat | Evaluate carefully — buy may still be faster |
+| **High build cost** | Build — but budget carefully | Buy — don't build what you can buy |
+
+---
+
+## True Cost of Building
+
+Most teams underestimate build cost:
+- **Initial development**: the estimate everyone gives
+- **Ongoing maintenance**: ~20–40% of initial dev cost per year
+- **Operational burden**: oncall, incidents, upgrades
+- **Opportunity cost**: the other features your team didn't build instead
+
+Example: building an experiment platform takes 6 months of engineering. Buying Optimizely costs $50K/year. If your eng team costs $300K/year fully loaded, 6 months = $150K + ~$60K/year maintenance. Payback period: 2–3 years, during which your team built 0 other features.
+
+---
+
+## Vendor Lock-In Risks
+
+Vendor lock-in occurs when migrating away from a vendor becomes prohibitively expensive:
+- API proprietary formats (hard to switch)
+- Data stored in vendor-specific formats (export costs and incompatibilities)
+- Contract terms that increase over time
+- Vendor discontinuation or acquisition
+
+Mitigation:
+- Abstract the vendor behind an interface layer
+- Ensure you own your data and can export it
+- Use open standards where possible (ONNX for models, Parquet for data)
+- Negotiate migration provisions in contracts
+
+---
+
+## The 5 Key Questions
+
+1. **Is this differentiating?** Would you lose competitive advantage if a competitor used the same vendor?
+2. **What's the frequency of use?** Build overhead is only justified for core, frequently-used infrastructure.
+3. **What's your team's expertise?** Buying gets you expert-built software; building requires building that expertise.
+4. **What's the timeline pressure?** Buy to launch fast; build to own long-term.
+5. **What's the total cost including maintenance?** Don't compare initial build cost to annual license — compare 3-year TCO.
+
+---
+
+## Common DS Examples
+
+| Component | Typical recommendation |
+|-----------|----------------------|
+| Experiment platform | Buy (Optimizely, Statsig) for most teams; build only at Google/Netflix scale |
+| Feature store | Buy (Tecton, Feast-managed) unless you have 10+ ML teams |
+| ML monitoring | Buy (Arize, WhyLabs) for teams <5 ML engineers |
+| Data warehouse | Buy (Snowflake, BigQuery) — always |
+| Custom model | Build — this is your differentiator |
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Open Source vs Commercial
+
+A third option exists between build and buy: open source. Feast (feature store), MLflow (experiment tracking), Airflow (orchestration), dbt (data transformation) are free to use but require operational investment.
+
+The open source cost equation: licensing is zero, but engineering operational burden is real. A team of 3 running their own Airflow cluster spends ~15% of time on Airflow operations (upgrades, incidents, scale). That 15% × 3 engineers × salary is your "build" cost.
+
+Managed open source (e.g., managed Airflow on Cloud Composer, managed MLflow on Databricks) is a middle path: open standards, reduced operational burden, but still a licensing cost.
+`,
+  tryGuidance: "No interactive viz — practice the build vs buy decision scenarios in the interview simulation.",
+  interviewGraph: {
+    initialStageId: "ps_c2_stage1",
+    artifactDimensions: [
+      { label: "Cost Analysis", recoveryStageId: "ps_c2_rec1" },
+      { label: "Strategic Fit", recoveryStageId: "ps_c2_terminal", passLabel: "Build/Buy Judgment" },
+    ],
+    stages: {
+      ps_c2_stage1: {
+        id: "ps_c2_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Feature store decision",
+        prompt: "Your 3-person ML team needs a feature store. Should you build one or buy Tecton ($120K/year)?",
+        choices: [
+          { id: "a", label: "Build — you'll have full control and no vendor lock-in", description: "Building a feature store is a multi-month project for a 3-person team." },
+          { id: "b", label: "Buy — a 3-person team building a feature store from scratch would spend 6+ months on infrastructure instead of models; $120K/year is cheaper than the opportunity cost", description: "Feature stores are complex infrastructure. Tecton or managed Feast is the right call for small teams." },
+          { id: "c", label: "Neither — wait until you have more data before deciding", description: "Waiting has its own cost: training-serving skew continues until addressed." },
+        ],
+        branches: { a: "ps_c2_rec1", b: "ps_c2_stage2", c: "ps_c2_rec1" },
+        rationale: "B is correct. A feature store is infrastructure, not competitive differentiation. A 3-person team building one from scratch spends 6+ months that could have been spent on model improvements. $120K/year for Tecton or similar is justified when the alternative is diverting 2 engineers for 6 months ($150K+ in opportunity cost, then $60K/year maintenance).",
+      },
+      ps_c2_rec1: {
+        id: "ps_c2_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · True build cost",
+        prompt: "When calculating build vs buy, what costs do teams typically undercount?",
+        choices: [
+          { id: "a", label: "Ongoing maintenance (20-40% of initial dev/year), operational burden (oncall, incidents), and opportunity cost of features not built instead", description: "The initial estimate is usually just dev time — ongoing costs easily double the 3-year TCO." },
+        ],
+        branches: { a: "ps_c2_stage2" },
+        rationale: "Build decisions usually compare initial dev cost vs annual license. The full 3-year TCO comparison should include maintenance, operations, and what your team didn't build instead.",
+      },
+      ps_c2_stage2: {
+        id: "ps_c2_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Core competency test",
+        prompt: "Should a startup build its own data warehouse instead of using BigQuery to reduce costs?",
+        choices: [
+          { id: "a", label: "Yes — at scale the savings will be significant", description: "At startup scale, the team doesn't have the operational expertise for this." },
+          { id: "b", label: "No — a data warehouse engine is pure commodity infrastructure; building one would consume massive engineering resources with no competitive differentiation", description: "No startup has ever won by having a slightly better data warehouse than competitors." },
+        ],
+        branches: { a: "ps_c2_rec1", b: "ps_c2_terminal" },
+        rationale: "B is correct. A data warehouse is the clearest buy decision: pure commodity, extremely complex to build correctly, enormous operational burden, and zero differentiation. BigQuery, Snowflake, or Redshift are the standard answer. Every engineering hour spent on a custom data warehouse is an hour not spent on the actual product.",
+      },
+      ps_c2_terminal: {
+        id: "ps_c2_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · Build vs buy principle",
+        prompt: "What is the core question that determines whether to build or buy?",
+        choices: [
+          { id: "a", label: "Is this component core to your competitive differentiation? If yes and build cost is manageable, build. If it's commodity infrastructure, buy.", description: "Build your moat; buy everything else." },
+        ],
+        branches: { a: "ps_c2_terminal" },
+        terminal: true,
+        rationale: "The core principle: differentiation justifies build cost; commodities don't. Your models, proprietary data pipelines, and unique algorithms are moat-worthy. Your data warehouse, experiment platform, and monitoring tools are table stakes — buy them.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "What is vendor lock-in and what's the primary mitigation strategy?",
+      options: [
+        "Vendor lock-in occurs when migration to another vendor becomes prohibitively expensive due to proprietary formats, data, or contracts — mitigated by abstracting the vendor behind an interface layer and using open standards",
+        "Vendor lock-in occurs when a vendor increases prices — mitigated by multi-year contracts",
+        "Vendor lock-in is when a vendor has exclusive rights to your product data — mitigated by IP agreements",
+      ],
+      correctIndex: 0,
+      explanation: "Vendor lock-in means the switching cost exceeds the annual savings from switching — the vendor has you 'locked in' by making migration expensive. Mitigation: abstract the vendor behind an interface (so you can swap implementations), ensure data portability in open formats, and use open standards (ONNX, Parquet) where possible.",
+    },
+    {
+      question: "Your team is building a custom recommendation model for your e-commerce site. Should you build or buy the model?",
+      options: [
+        "Buy a commercial recommendation system — customization isn't worth the build cost",
+        "Build — the recommendation model directly drives product differentiation; your proprietary user behavior data and business logic make a custom model your competitive moat",
+        "Use an open source recommendation library with no customization",
+      ],
+      correctIndex: 1,
+      explanation: "Recommendation models are a core competency for e-commerce — they directly determine product discovery and revenue. Your proprietary user behavior data, business rules (margin, inventory), and product knowledge are inputs that make a custom model outperform generic solutions. This is the canonical 'build' case: differentiating, data-intensive, and requiring business logic that off-the-shelf tools can't accommodate.",
+    },
+    {
+      question: "What are the five key questions for any build vs buy decision?",
+      options: [
+        "Cost, timeline, team size, technical debt, and regulatory compliance",
+        "Is it differentiating? How frequently used? What's the team's expertise? What's the timeline? What's the 3-year total cost of ownership including maintenance?",
+        "Cloud provider, open source availability, API quality, vendor reputation, and support SLA",
+      ],
+      correctIndex: 1,
+      explanation: "The five questions: (1) Differentiation — would competitors benefit equally from the same vendor? (2) Frequency — is build overhead justified? (3) Expertise — do you have the skills? (4) Timeline — do you need speed? (5) TCO — 3-year total cost including maintenance, operations, and opportunity cost. These structure any defensible build/buy recommendation.",
+    },
+  ],
+},
+
+"ps-c3": {
+  durationLabel: "18 min",
+  outcomes: [
+    "Lead with business impact rather than methodology when communicating results",
+    "Translate confidence intervals into business-language dollar ranges",
+    "Explain model outputs (SHAP values) to non-technical stakeholders",
+    "Handle 'why did the AI do X' questions with prepared feature attribution answers",
+  ],
+  learnMarkdown: `## Communicating to Non-Technical Stakeholders
+
+A model that delivers great predictions but can't be explained to decision-makers has zero business value. Communication is a core DS skill.
+
+---
+
+## Rule 1: Lead with Business Impact
+
+**Wrong**: "Our model achieved AUC 0.87 on the holdout set."
+
+**Right**: "Our model identifies 78% of churners 30 days before they cancel, giving the retention team a 30-day window to intervene. Based on our historical conversion rate, this is worth $1.8M in retained revenue annually."
+
+Technical metrics (AUC, F1, RMSE) are internal benchmarks — they mean nothing to a VP of Sales. Translate every technical result into a business outcome: revenue saved, costs reduced, decisions improved.
+
+---
+
+## Translating Confidence Intervals
+
+A 95% confidence interval [3%, 7%] for a conversion rate lift is meaningless to most stakeholders. Translate:
+
+"We're 95% confident the true lift is between 3% and 7%. Given our current revenue of $20M, that's between $600K and $1.4M in additional annual revenue."
+
+This makes the uncertainty tangible and actionable: even the low end ($600K) justifies shipping.
+
+---
+
+## Explaining Model Outputs (SHAP)
+
+When a non-technical stakeholder asks "why did the model predict this customer will churn?", SHAP values give you a translation:
+
+**Technical**: "The SHAP value for login_frequency is -0.23 in log-odds space."
+
+**Stakeholder version**: "The three biggest drivers for this prediction are: (1) this customer hasn't logged in for 17 days — that's pushing the churn risk up by 35 percentage points, (2) they submitted a support ticket 3 days ago unresolved, and (3) their current tier has lower feature access than competitors. Together these explain 80% of the predicted risk."
+
+---
+
+## Handling "Why Did the AI Do X"
+
+Prepare a standard attribution answer for your model:
+
+1. State the top 3 features by SHAP magnitude
+2. Give the direction (pushed risk up / down)
+3. Give the magnitude in plain terms (not log-odds)
+4. Acknowledge model limitations: "This reflects patterns in historical data — we flag it as a signal to investigate, not a definitive answer."
+
+---
+
+## Choosing Visualizations by Audience
+
+| Audience | Chart type |
+|----------|-----------|
+| Non-technical executive | Large KPI number + trend arrow |
+| Product manager | Bar chart with absolute values + confidence band |
+| Data scientist | Scatter plot, ROC curve, calibration plot |
+| Engineer | Table with raw numbers |
+
+Never use a pie chart with more than 4 slices, 3D charts, or dual Y-axis without a clear reason — these obscure rather than reveal.
+
+---
+
+## The One-Sentence P-Value Explanation
+
+"A p-value of 0.04 means: if the feature had no real effect, there's only a 4% chance we'd see results this strong by random chance alone — so we're fairly confident the effect is real."
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Stakeholder Personas
+
+Different stakeholders need different translations of the same result:
+
+**CEO/VP**: bottom line impact, risk, timeline. No methodology at all. "We can save $2M/year by implementing this — 90% confidence based on 4-week experiment."
+
+**Product Manager**: metrics, tradeoffs, ship recommendation. "Primary metric +8%, guardrails all OK, no SRM. Recommend ship. One risk: novelty effect — run a 30-day holdout to confirm long-term value."
+
+**Finance**: ROI, variance, assumptions. "Expected return $1.8M, 95% CI [$600K, $3.1M]. Assumes 40% retention intervention conversion rate — sensitivity analysis attached."
+
+**Legal/Compliance**: fairness, auditability, model behavior. "Model uses 12 features, none protected class. SHAP explainability report available per-prediction. Audit log maintained for 3 years."
+
+Match your communication to the audience's decision-making need.
+`,
+  tryGuidance: "No interactive viz — practice the stakeholder communication scenarios in the interview simulation.",
+  interviewGraph: {
+    initialStageId: "ps_c3_stage1",
+    artifactDimensions: [
+      { label: "Impact Translation", recoveryStageId: "ps_c3_rec1" },
+      { label: "Model Explanation", recoveryStageId: "ps_c3_terminal", passLabel: "Stakeholder Comms" },
+    ],
+    stages: {
+      ps_c3_stage1: {
+        id: "ps_c3_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Executive communication",
+        prompt: "You present to the CEO: 'Our churn model has AUC 0.88 and F1 0.74.' What's the problem?",
+        choices: [
+          { id: "a", label: "AUC and F1 are strong metrics — CEOs should understand these", description: "Most non-technical executives don't know what AUC or F1 mean." },
+          { id: "b", label: "These are technical metrics with no business translation — a CEO wants to know: what does this mean for the company in dollars, decisions, or time saved?", description: "Lead with business impact: 'This model identifies 70% of churners 30 days early, worth $2M/year retained.'" },
+          { id: "c", label: "The metrics are too low — get to AUC 0.95 before presenting", description: "Communication style is the issue, not metric level." },
+        ],
+        branches: { a: "ps_c3_rec1", b: "ps_c3_stage2", c: "ps_c3_rec1" },
+        rationale: "B is correct. Technical metrics are internal quality measures. To a CEO, AUC 0.88 means nothing. The correct translation: 'We catch 70% of churners 30 days before they cancel. Our retention team closes 40% of interventions. At $500 average revenue per user, this is worth $2.1M in retained annual revenue.'",
+      },
+      ps_c3_rec1: {
+        id: "ps_c3_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Business translation",
+        prompt: "How do you translate a technical metric (AUC 0.88) into a business outcome for an executive?",
+        choices: [
+          { id: "a", label: "Quantify the operational impact: what fraction of the target problem does the model address, and what is the dollar value of those cases?", description: "AUC 0.88 → 'catches 74% of churners' → '74% × monthly churn volume × retention rate × LTV = $X/year'." },
+        ],
+        branches: { a: "ps_c3_stage2" },
+        rationale: "Every technical metric has a business translation. AUC → fraction of problem caught. Precision → false alarm rate → cost of acting on wrong signal. F1 → balance of both. Always compute the dollar impact chain.",
+      },
+      ps_c3_stage2: {
+        id: "ps_c3_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · SHAP explanation",
+        prompt: "A sales manager asks: 'Why did your model say this customer has 80% churn risk?' You have SHAP values. How do you respond?",
+        choices: [
+          { id: "a", label: "List all 20 SHAP values with their log-odds contributions", description: "20 features in log-odds is incomprehensible to a sales manager." },
+          { id: "b", label: "State the top 3 drivers in plain language: 'The biggest factors are: no login in 17 days (+35% risk), open support ticket for 5 days (+20% risk), and downgraded plan last month (+15% risk). These three account for most of the prediction.'", description: "3 factors, direction, magnitude in plain units, not log-odds." },
+        ],
+        branches: { a: "ps_c3_rec1", b: "ps_c3_terminal" },
+        rationale: "B is correct. Non-technical stakeholders need: (1) the top 3 factors — not all of them, (2) the direction (pushing risk up or down), and (3) the magnitude in familiar units (percentage points, not log-odds). This gives actionable information without overwhelming complexity.",
+      },
+      ps_c3_terminal: {
+        id: "ps_c3_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · Communication principle",
+        prompt: "What is the single most important principle when presenting data science results to non-technical stakeholders?",
+        choices: [
+          { id: "a", label: "Lead with business impact in their language: revenue, cost, risk, time — not technical metrics in data science language", description: "The result must answer: what should the decision-maker do, and what is it worth?" },
+        ],
+        branches: { a: "ps_c3_terminal" },
+        terminal: true,
+        rationale: "Technical metrics are the means, not the end. Every result should be translated into: what decision does this enable, and what is the expected value of making that decision vs. not? That's the language of business.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "Explain a p-value of 0.03 in one sentence to a product manager.",
+      options: [
+        "The null hypothesis was rejected at a 3% significance level",
+        "If this feature had no real effect, there's only a 3% chance we'd see results this strong by random variation alone — so we're fairly confident the effect is real",
+        "We are 97% confident the feature will improve metrics in production",
+      ],
+      correctIndex: 1,
+      explanation: "The plain-language p-value explanation focuses on the false positive risk: how likely is this result if nothing was really happening? 3% means low — we're fairly confident. Note: a p-value is NOT a confidence in the effect existing (that's a Bayesian posterior). It's the probability of the observed result (or more extreme) under the null hypothesis.",
+    },
+    {
+      question: "How do you communicate a 95% confidence interval of [3%, 7%] revenue lift to a VP of Revenue?",
+      options: [
+        "Explain that the CI means the parameter lies within this range with 95% probability",
+        "Translate: 'We're 95% confident the true revenue impact is between $X and $Y' (using actual dollar values from current revenue), making the uncertainty actionable",
+        "Report only the midpoint (5%) to avoid confusing the audience with ranges",
+      ],
+      correctIndex: 1,
+      explanation: "Abstract percentages are hard to act on. Dollar ranges are concrete: 'The 95% confidence interval is $600K to $1.4M additional annual revenue.' A VP can evaluate: is even the low end ($600K) worth the implementation cost? This makes uncertainty tangible and the decision easy.",
+    },
+    {
+      question: "What is the recommended approach when a stakeholder asks 'why did the AI recommend this for this customer?'",
+      options: [
+        "Explain the full model architecture and training procedure",
+        "Report the top 3 SHAP feature contributions in plain language with direction and magnitude, then acknowledge the model's limitations",
+        "Decline to answer — model explanations are proprietary",
+      ],
+      correctIndex: 1,
+      explanation: "The prepared attribution answer: (1) top 3 features by magnitude, (2) direction (pushing prediction up or down), (3) magnitude in familiar units (not log-odds), (4) a limitation acknowledgment ('this reflects historical patterns — treat it as a signal to investigate, not a certainty'). This builds trust while remaining honest about model limitations.",
+    },
+  ],
+},
+
+"mo-c1": {
+  durationLabel: "20 min",
+  outcomes: [
+    "Describe how ML CI/CD differs from software CI/CD by adding data validation and model evaluation gates",
+    "Design a 7-stage ML pipeline from lint to post-deploy monitoring",
+    "Define rollback triggers based on production metric degradation",
+    "Explain what Great Expectations does and where it fits in the pipeline",
+  ],
+  learnMarkdown: `## CI/CD for Machine Learning
+
+Standard software CI/CD runs tests and deploys code. ML CI/CD must also validate data, train a model, evaluate it against a champion, and monitor it post-deploy. Each stage is a gate — failure stops the pipeline.
+
+---
+
+## How ML CI/CD Differs
+
+| Stage | Software CI/CD | ML CI/CD |
+|-------|---------------|----------|
+| Test | Unit + integration tests | Unit tests + **data validation** |
+| Build | Compile/package | **Model training** (non-deterministic) |
+| Evaluate | N/A | **Model evaluation gate** vs champion |
+| Deploy | Blue-green / canary | **Shadow mode → canary → full** |
+| Monitor | Error rate, latency | + **data drift, prediction drift** |
+
+---
+
+## The 7-Stage ML Pipeline
+
+1. **Lint + unit tests**: code quality, import checks, fixture tests on small data
+2. **Data validation** (Great Expectations): schema check (correct columns, types), distribution drift (mean/std within expected range), null rate threshold, row count lower bound
+3. **Model training**: triggered by code change OR data drift signal. Training is non-deterministic — pin random seeds, log all hyperparameters.
+4. **Evaluation gate**: AUC > minimum threshold AND AUC > champion AUC by margin (e.g., 0.01). Both conditions required to proceed.
+5. **Staging / shadow mode**: new model receives production traffic, logs predictions, but serves the champion's predictions. Safe evaluation under real load.
+6. **Canary release**: 5–10% of traffic serves the challenger. Monitor for 24–72 hours against guardrail metrics.
+7. **Full rollout + post-deploy monitoring**: drift detection, prediction distribution monitoring, periodic business metric comparison to holdout.
+
+---
+
+## Data Validation with Great Expectations
+
+Great Expectations defines "expectations" — assertions about your data:
+- \`expect_column_to_exist("user_id")\`
+- \`expect_column_values_to_not_be_null("purchase_amount")\`
+- \`expect_column_mean_to_be_between("session_length", 45, 180)\`
+
+These run as a gate before training. If training data fails validation, the pipeline stops — training on bad data produces a bad model silently.
+
+---
+
+## Rollback Triggers
+
+Define rollback conditions before deployment:
+- Primary metric degrades > 5% from baseline
+- Error rate increases > 0.5 percentage points
+- p99 latency exceeds SLA
+
+Automated rollback: revert model registry version to champion, redirect traffic, alert on-call engineer.
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Continuous Training vs Continuous Delivery
+
+**CT (Continuous Training)** triggers model retraining automatically on schedule or data drift signal. The trained model is validated and deployed without human approval — used when: model decay is fast, labels arrive quickly, business risk of stale model outweighs deployment risk.
+
+**CD (Continuous Delivery)** produces a deployable artifact on every code push but requires human approval to deploy. Appropriate when: model changes require review, regulatory compliance mandates human sign-off, business stakes are high.
+
+Most production ML systems use CD with automated evaluation gates, not fully automated CT. True CT (train-and-ship without human review) is only appropriate for well-understood models with fast label feedback and low-risk predictions.
+`,
+  tryGuidance: "No interactive viz — work through the ML pipeline design scenarios in the interview simulation.",
+  interviewGraph: {
+    initialStageId: "mo_c1_stage1",
+    artifactDimensions: [
+      { label: "Pipeline Design", recoveryStageId: "mo_c1_rec1" },
+      { label: "Evaluation Gates", recoveryStageId: "mo_c1_terminal", passLabel: "ML CI/CD" },
+    ],
+    stages: {
+      mo_c1_stage1: {
+        id: "mo_c1_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Missing gates",
+        prompt: "A team's ML pipeline is: commit → train model → deploy. What critical gates are missing?",
+        choices: [
+          { id: "a", label: "Performance benchmarks and load testing", description: "Important for serving, but not the primary ML-specific gaps." },
+          { id: "b", label: "Data validation before training, model evaluation gate vs champion before deploy, and shadow/canary release before full rollout", description: "These three gates prevent bad data, worse models, and production failures from reaching users." },
+          { id: "c", label: "More unit tests and code coverage requirements", description: "Code tests alone don't catch data or model quality issues." },
+        ],
+        branches: { a: "mo_c1_rec1", b: "mo_c1_stage2", c: "mo_c1_rec1" },
+        rationale: "B is correct. The three missing gates: (1) data validation — bad training data silently produces bad models; (2) evaluation gate — deploying a worse model than the champion is worse than not deploying; (3) canary/shadow — production load reveals issues that staging misses.",
+      },
+      mo_c1_rec1: {
+        id: "mo_c1_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · ML-specific gates",
+        prompt: "What makes ML CI/CD different from standard software CI/CD?",
+        choices: [
+          { id: "a", label: "ML pipelines must validate data quality, train a non-deterministic model, and evaluate it against a champion — none of these exist in standard software pipelines", description: "Data validation + model evaluation are ML-specific requirements." },
+        ],
+        branches: { a: "mo_c1_stage2" },
+        rationale: "Data validation catches training data corruption. Model evaluation ensures the new model actually improves on the champion before deployment.",
+      },
+      mo_c1_stage2: {
+        id: "mo_c1_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Evaluation gate design",
+        prompt: "Your evaluation gate requires AUC > 0.85. The new model achieves AUC 0.86, but the current champion is AUC 0.89. Should it deploy?",
+        choices: [
+          { id: "a", label: "Yes — 0.86 exceeds the 0.85 threshold", description: "Deploying a worse model than the champion is a regression." },
+          { id: "b", label: "No — the gate should require AUC > threshold AND AUC > champion; deploying a model worse than the champion is a regression", description: "Absolute threshold + relative comparison to champion are both required." },
+        ],
+        branches: { a: "mo_c1_rec1", b: "mo_c1_terminal" },
+        rationale: "B is correct. The evaluation gate has two conditions: (1) exceeds absolute quality floor, (2) improves on the champion. Meeting only the floor is insufficient — you'd be deploying a 3-point AUC regression. Both gates must pass.",
+      },
+      mo_c1_terminal: {
+        id: "mo_c1_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · Pipeline mastered",
+        prompt: "What triggers rollback in a deployed ML model?",
+        choices: [
+          { id: "a", label: "Pre-defined production metric degradation thresholds: primary metric down >X%, error rate up >Y%, latency exceeds SLA — automated rollback to champion version", description: "Rollback triggers must be defined before deployment, not after problems appear." },
+        ],
+        branches: { a: "mo_c1_terminal" },
+        terminal: true,
+        rationale: "Rollback triggers are pre-defined, not reactive judgments. Automated rollback reduces mean time to recovery from a bad model deploy.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "What does Great Expectations do in an ML CI/CD pipeline?",
+      options: [
+        "It automatically generates model training code from data schemas",
+        "It validates data quality by running assertions (expectations) on training data before model training begins, blocking the pipeline if data quality fails",
+        "It monitors model predictions in production for distribution shift",
+      ],
+      correctIndex: 1,
+      explanation: "Great Expectations runs assertions about your data — column existence, null rates, value ranges, statistical distributions — before training. If training data fails these checks, the pipeline stops. This prevents the silent failure mode where a model trains successfully on corrupted data and deploys with degraded quality.",
+    },
+    {
+      question: "What is shadow mode deployment in ML and why use it before canary?",
+      options: [
+        "Shadow mode serves the new model's predictions to a small percentage of users",
+        "Shadow mode routes production traffic to the new model for logging purposes only — the champion's predictions are still served — allowing safe evaluation under real load without user risk",
+        "Shadow mode is a development environment that mirrors production data",
+      ],
+      correctIndex: 1,
+      explanation: "In shadow mode, the new model receives real production requests and logs its predictions, but users still see the champion's predictions. This lets you measure new model quality under real production traffic distribution — which often differs from your evaluation dataset — with zero user risk. Only after shadow mode validation do you proceed to canary.",
+    },
+    {
+      question: "Why should random seeds be pinned and all hyperparameters logged in ML training?",
+      options: [
+        "To make training faster by avoiding random initialization overhead",
+        "Because ML training is non-deterministic — pinning seeds and logging params ensures the training run can be reproduced, which is required for debugging and regulatory compliance",
+        "To prevent the model from overfitting during training",
+      ],
+      correctIndex: 1,
+      explanation: "Non-determinism in ML training (random initialization, data shuffling, dropout) means the same code on the same data can produce different models. Pinning random seeds + logging all hyperparameters + logging the data version ensures the training run is reproducible — critical for debugging model regressions and satisfying audit requirements.",
+    },
+  ],
+},
+
+"mo-c2": {
+  durationLabel: "15 min",
+  outcomes: [
+    "List the four MLflow components and what each tracks",
+    "Explain the MLflow model registry lifecycle: staging → production → archived",
+    "Describe DVC and how it tracks large data files without storing them in Git",
+    "Define full reproducibility and its four required components",
+  ],
+  learnMarkdown: `## Model Versioning & Experiment Tracking
+
+Reproducibility is the foundation of production ML. If you can't reproduce a model, you can't debug it, audit it, or improve it systematically.
+
+---
+
+## MLflow Components
+
+**1. Tracking**: logs parameters, metrics, and artifacts per run.
+\`\`\`python
+mlflow.log_param("n_estimators", 100)
+mlflow.log_metric("auc", 0.87)
+mlflow.log_artifact("feature_importance.png")
+\`\`\`
+
+**2. Experiments**: logical groupings of runs. Each experiment corresponds to a modeling task (e.g., "churn-model-v2").
+
+**3. Model Registry**: promotion workflow for models.
+- **Staging**: model passes evaluation gate; ready for human review
+- **Production**: human approves; live model serving from this version
+- **Archived**: replaced by newer production model; kept for rollback
+
+**4. Projects**: packaging code for reproducible runs (conda.yaml or Docker environment).
+
+---
+
+## DVC: Data Version Control
+
+Git tracks code well. Git is terrible at tracking large files (CSVs, Parquet, trained models). DVC solves this:
+
+1. \`dvc add data/train.csv\` — creates a \`data/train.csv.dvc\` pointer file
+2. The pointer file (small, text) is committed to Git
+3. The actual data is pushed to remote storage (S3, GCS, Azure Blob) with \`dvc push\`
+
+Result: Git contains the code + data pointers. DVC stores the actual data. Anyone with repo access + storage credentials can reproduce the exact data version.
+
+---
+
+## Full Reproducibility Requirements
+
+To exactly reproduce a model trained 6 months ago, you need:
+1. **Code version**: exact Git commit hash
+2. **Data version**: DVC-tracked version of training data
+3. **Environment**: conda.yaml or requirements.txt with pinned versions
+4. **Hyperparameter config**: logged in MLflow (or config file committed to Git)
+
+Missing any one of these makes exact reproduction impossible.
+
+---
+
+## The "model_v2_final_FINAL.pkl" Anti-Pattern
+
+Naming model files manually is the anti-pattern MLflow prevents:
+- No record of hyperparameters used
+- No metric history to compare versions
+- No approval workflow before production
+- No rollback capability
+
+Always use a model registry.
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Model Cards
+
+A model card is a short document accompanying each model version in the registry:
+- **Model description**: what it predicts, training data period
+- **Performance metrics**: per-segment evaluation results
+- **Intended use**: what use cases it's designed for
+- **Limitations**: known failure modes, out-of-distribution risk
+- **Fairness evaluation**: performance by demographic group if applicable
+
+Model cards are increasingly required for compliance (EU AI Act) and are good engineering practice regardless.
+`,
+  tryGuidance: "No interactive viz — work through the experiment tracking and reproducibility scenarios in the interview simulation.",
+  interviewGraph: {
+    initialStageId: "mo_c2_stage1",
+    artifactDimensions: [
+      { label: "Reproducibility", recoveryStageId: "mo_c2_rec1" },
+      { label: "Registry Workflow", recoveryStageId: "mo_c2_terminal", passLabel: "ML Versioning" },
+    ],
+    stages: {
+      mo_c2_stage1: {
+        id: "mo_c2_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Reproducing a model",
+        prompt: "A model from 8 months ago is producing unexpected predictions. How do you reproduce it exactly to debug it?",
+        choices: [
+          { id: "a", label: "Reinstall the same Python version and re-run the training script from Git", description: "Python version alone isn't enough — library versions, data version, and hyperparameters are also required." },
+          { id: "b", label: "Retrieve: the Git commit hash, DVC data version, conda.yaml environment, and MLflow-logged hyperparameters — then reconstruct the exact training environment", description: "All four components are required for exact reproduction." },
+          { id: "c", label: "Use the model artifact stored in the MLflow registry and skip retraining", description: "This gets you the artifact, but if you need to debug training, you need to reproduce the training run." },
+        ],
+        branches: { a: "mo_c2_rec1", b: "mo_c2_stage2", c: "mo_c2_rec1" },
+        rationale: "B is correct. Full reproduction requires: code (Git hash) + data (DVC version) + environment (conda.yaml with pinned deps) + config (MLflow-logged hyperparameters). Without all four, you can't exactly reproduce the training run.",
+      },
+      mo_c2_rec1: {
+        id: "mo_c2_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Four reproducibility pillars",
+        prompt: "What four things must be versioned to make an ML training run exactly reproducible?",
+        choices: [
+          { id: "a", label: "Code (Git commit), data (DVC version), environment (conda.yaml/requirements.txt with pinned versions), hyperparameters (MLflow log)", description: "All four together = exact reproduction." },
+        ],
+        branches: { a: "mo_c2_stage2" },
+        rationale: "Missing any one makes exact reproduction impossible. Code changes subtly between commits; data distributions shift; library behavior changes between versions; hyperparameters are often undocumented.",
+      },
+      mo_c2_stage2: {
+        id: "mo_c2_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Registry lifecycle",
+        prompt: "A new model passes the evaluation gate. What's the correct promotion path in the MLflow model registry?",
+        choices: [
+          { id: "a", label: "Direct to Production — it passed evaluation, no need for extra steps", description: "Human review before production is essential, especially for high-stakes models." },
+          { id: "b", label: "Staging first (for human review + staging environment validation) → Production (after approval) → old model moves to Archived", description: "The staging gate provides human oversight before production traffic is affected." },
+          { id: "c", label: "Archive the old model first, then promote the new one directly to Production", description: "Archiving before promotion removes the rollback option." },
+        ],
+        branches: { a: "mo_c2_rec1", b: "mo_c2_terminal" },
+        rationale: "B is correct. The registry lifecycle: Staging (evaluation gate passed, human reviews in staging env) → Production approval (human sign-off) → old Production moves to Archived (available for rollback). This maintains a rollback path and enforces human oversight.",
+      },
+      mo_c2_terminal: {
+        id: "mo_c2_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · Versioning principle",
+        prompt: "Why is DVC needed alongside Git for ML projects?",
+        choices: [
+          { id: "a", label: "Git stores code efficiently but fails on large binary files (data, models) — DVC tracks these with pointer files in Git while storing actual data in object storage", description: "DVC extends Git's versioning to large ML artifacts without bloating the repository." },
+        ],
+        branches: { a: "mo_c2_terminal" },
+        terminal: true,
+        rationale: "Git is optimized for text files. Adding a 10GB training dataset to Git would make the repository unusable. DVC's pointer approach — small .dvc files in Git, actual data in S3/GCS — gives you version control semantics without the storage overhead.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "What does MLflow's model registry provide that a file system with named model files cannot?",
+      options: [
+        "Faster model loading at inference time",
+        "A structured lifecycle (staging → production → archived) with a promotion workflow, version history, and rollback capability",
+        "Automatic hyperparameter optimization",
+      ],
+      correctIndex: 1,
+      explanation: "The model registry provides: (1) lifecycle management with human approval gates, (2) version history linked to experiments, (3) rollback capability (revert to previous production version), and (4) a single source of truth for which model version is serving. File naming (model_v2_final.pkl) provides none of these.",
+    },
+    {
+      question: "What does 'dvc push' do?",
+      options: [
+        "Pushes code changes to GitHub",
+        "Uploads the actual data files tracked by DVC to remote storage (S3, GCS), making them available for teammates to pull with 'dvc pull'",
+        "Pushes model artifacts to the MLflow registry",
+      ],
+      correctIndex: 1,
+      explanation: "After 'dvc add', DVC tracks the file locally. 'dvc push' uploads the actual data to the configured remote storage. Teammates run 'git pull' (to get the .dvc pointer files) and 'dvc pull' (to download the actual data). This separates code versioning (Git) from data versioning (DVC + object storage).",
+    },
+    {
+      question: "A colleague says 'I reproduced the model — I used the same training script and got AUC 0.85, which is close to the original 0.87.' Is this a successful reproduction?",
+      options: [
+        "Yes — AUC within 2 points is close enough for production purposes",
+        "No — exact reproduction requires the same code hash, data version, environment, and hyperparameters to produce bit-for-bit identical results; 'close' is not reproducible",
+        "Yes — some variance is expected in ML models",
+      ],
+      correctIndex: 1,
+      explanation: "In debugging and auditing contexts, 'close' is not the same as 'reproduced.' The 2-point AUC gap could be caused by a different data version (data was updated), a different library version (sklearn behavior changed), or a different random seed — each points to a different bug. True reproduction means identifying and fixing all four components to get the exact original result.",
+    },
+  ],
+},
+
+"mo-c3": {
+  durationLabel: "18 min",
+  outcomes: [
+    "Distinguish data drift (P(X) changes) from concept drift (P(y|X) changes) with real examples",
+    "Calculate and interpret the Population Stability Index (PSI)",
+    "Apply the KS test for detecting distributional shift in feature values",
+    "Design a monitoring strategy when ground truth labels arrive with a 30-day delay",
+  ],
+  learnMarkdown: `## Monitoring & Drift Detection
+
+A model that was accurate at training time can silently degrade in production. Without monitoring, you won't notice until business outcomes deteriorate. Monitoring is the last line of defense.
+
+---
+
+## Two Types of Drift
+
+### Data Drift (Covariate Shift)
+The input feature distribution P(X) changes, but the relationship P(y|X) may be stable.
+
+Example: a credit risk model trained on 2021 data. In 2024, more applicants are gig workers — the income distribution and employment type distribution have shifted. The model may still be accurate for the patterns it learned, but it's now evaluating a different population.
+
+### Concept Drift
+The relationship P(y|X) itself changes — the model's learned mapping is no longer valid.
+
+Example: a fraud detection model trained before cryptocurrency payments. Fraud patterns evolved to use crypto. Even for transactions with the same features as before, the fraud probability changed — the concept (what fraud looks like) drifted.
+
+**Why the distinction matters**: data drift may not impair model accuracy (if P(y|X) is stable). Concept drift always impairs accuracy. Data drift is detectable without labels; concept drift requires labels to confirm.
+
+---
+
+## Population Stability Index (PSI)
+
+PSI measures the shift between a reference distribution (training) and a current distribution (production):
+
+\`\`\`
+PSI = Σ (Actual% - Expected%) × ln(Actual% / Expected%)
+\`\`\`
+
+Computed by binning the feature into deciles:
+
+| PSI | Interpretation |
+|-----|----------------|
+| < 0.1 | Stable — no action needed |
+| 0.1 – 0.2 | Slight shift — investigate |
+| > 0.2 | Major shift — likely model degradation |
+
+PSI > 0.2 on a key feature is a trigger for retraining.
+
+---
+
+## KS Test for Drift Detection
+
+The **Kolmogorov-Smirnov test** compares two distributions without assuming normality:
+
+- H₀: the two distributions are the same
+- p < 0.05: statistically significant distributional shift
+
+More sensitive than PSI for detecting subtle shifts, but produces a binary decision (drift / no drift) rather than a magnitude.
+
+---
+
+## Monitoring with Delayed Labels
+
+When ground truth labels take 30+ days to arrive (e.g., loan defaults, churn), you can't measure accuracy in real time. Use **proxy metrics**:
+
+- **Prediction distribution shift**: if the distribution of predicted probabilities shifts, something changed
+- **Feature distribution monitoring**: PSI on input features (no labels needed)
+- **Downstream business metrics**: if the model drives decisions, downstream outcomes (click rate, conversion) can indicate model degradation
+- **Slice monitoring**: if a specific customer segment shows unusual prediction patterns, investigate
+
+When labels do arrive, run a retrospective accuracy check and compare to the training baseline.
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Gradual vs Sudden Drift
+
+**Sudden drift** (concept change): a discrete event changes the data distribution overnight — a new payment method, a new product launch, a regulation change. Symptoms: immediate sharp performance drop. Detection: rolling-window PSI with short window (7 days).
+
+**Gradual drift**: slow evolution of user behavior or data collection process. Symptoms: slow performance decay over months. Detection: requires long-window trend analysis (monthly PSI comparison to original baseline, not just last month's).
+
+**Seasonal drift**: recurring patterns that look like drift but are expected. Example: holiday shopping behavior changes feature distributions every December. Mitigation: compare to the same period last year, not the previous month.
+`,
+  tryGuidance: "No interactive viz — work through the drift detection scenarios in the interview simulation.",
+  interviewGraph: {
+    initialStageId: "mo_c3_stage1",
+    artifactDimensions: [
+      { label: "Drift Types", recoveryStageId: "mo_c3_rec1" },
+      { label: "Delayed Labels", recoveryStageId: "mo_c3_terminal", passLabel: "Drift Monitoring" },
+    ],
+    stages: {
+      mo_c3_stage1: {
+        id: "mo_c3_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Drift type identification",
+        prompt: "A spam classifier's accuracy drops after a major social network launches. The email features (word frequencies, sender patterns) all look the same. What type of drift is this?",
+        choices: [
+          { id: "a", label: "Data drift — the email feature distributions changed", description: "The question states features look the same — data drift isn't the cause." },
+          { id: "b", label: "Concept drift — the relationship between features and spam label changed because spammers adopted new tactics not represented in training data", description: "Same features, different meaning — P(y|X) changed." },
+          { id: "c", label: "No drift — accuracy drops are expected and don't indicate drift", description: "Systematic accuracy drop is a key drift indicator." },
+        ],
+        branches: { a: "mo_c3_rec1", b: "mo_c3_stage2", c: "mo_c3_rec1" },
+        rationale: "B is correct. Concept drift: spammers evolved tactics after observing what gets caught. The feature distributions (email structure, word frequencies) may look similar, but the same features now correspond to different spam/ham labels. The model's learned decision boundary is no longer valid.",
+      },
+      mo_c3_rec1: {
+        id: "mo_c3_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Data vs concept drift",
+        prompt: "What distinguishes data drift from concept drift?",
+        choices: [
+          { id: "a", label: "Data drift: P(X) changes but P(y|X) may be stable. Concept drift: P(y|X) itself changes — the relationship between features and target evolved.", description: "Data drift may not hurt the model; concept drift always does." },
+        ],
+        branches: { a: "mo_c3_stage2" },
+        rationale: "Data drift = the input population changed. Concept drift = the prediction task itself changed. The latter always requires retraining.",
+      },
+      mo_c3_stage2: {
+        id: "mo_c3_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Monitoring without labels",
+        prompt: "Your loan default model has a 60-day label delay. How do you monitor model health in real time?",
+        choices: [
+          { id: "a", label: "Wait 60 days for labels before running any quality checks", description: "60 days of silent degradation is unacceptable." },
+          { id: "b", label: "Monitor prediction score distribution (PSI on model outputs), input feature PSI, and downstream business proxy metrics; run accuracy check retrospectively when labels arrive", description: "Label-free monitoring detects problems early; retrospective accuracy confirms severity." },
+        ],
+        branches: { a: "mo_c3_rec1", b: "mo_c3_terminal" },
+        rationale: "B is correct. Label-free monitoring: input PSI detects data drift, prediction distribution shift detects model behavior change. These are leading indicators. When labels finally arrive at day 60, run a retrospective accuracy audit and compare to training baseline.",
+      },
+      mo_c3_terminal: {
+        id: "mo_c3_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · PSI threshold",
+        prompt: "Your monitoring system reports PSI = 0.24 on the 'income' feature. What do you do?",
+        choices: [
+          { id: "a", label: "PSI = 0.24 is above 0.2 — major shift detected. Investigate the income distribution change, assess model performance on recent data, and trigger retraining evaluation.", description: "PSI > 0.2 is the action threshold — major population shift likely affecting model accuracy." },
+        ],
+        branches: { a: "mo_c3_terminal" },
+        terminal: true,
+        rationale: "PSI > 0.2 = major shift. The 'income' feature distribution has changed substantially from training. This likely means the model's learned income-related patterns are no longer representative, and retraining on recent data should be evaluated.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "PSI = 0.07 on a feature. What action should you take?",
+      options: [
+        "Immediately retrain the model — any PSI above 0 indicates drift",
+        "No action required — PSI < 0.1 indicates a stable distribution, no significant shift detected",
+        "Trigger a full model audit — PSI below 0.1 still indicates moderate shift",
+      ],
+      correctIndex: 1,
+      explanation: "PSI < 0.1 is the 'stable' range — the feature distribution is consistent with training. PSI 0.1–0.2 is slight shift (investigate). PSI > 0.2 is major shift (likely action required). At 0.07, no action is needed — continue routine monitoring.",
+    },
+    {
+      question: "What is the key difference between monitoring a model with daily label feedback vs. a model with 60-day label delay?",
+      options: [
+        "Models with daily labels can use accuracy as a real-time signal; models with delayed labels must rely on proxy metrics (input PSI, prediction distribution, downstream business metrics) until labels arrive",
+        "Models with delayed labels should not be monitored until labels arrive",
+        "There is no meaningful difference — all models should use the same monitoring approach",
+      ],
+      correctIndex: 0,
+      explanation: "Daily labels enable real-time accuracy tracking — the best quality signal. With 60-day delay, you can't measure accuracy in real time. Proxy monitoring (input feature distributions, prediction score distribution, downstream outcomes) provides early warning signals. When labels arrive, run retrospective accuracy and compare to baseline to confirm whether the proxy signals correctly indicated degradation.",
+    },
+    {
+      question: "You have concept drift but no data drift. What does this mean practically?",
+      options: [
+        "Nothing — concept drift without data drift is impossible",
+        "The input features look the same, but the relationship between features and target changed — the model is making predictions based on patterns that are no longer valid, and retraining is required",
+        "The model is stable — only data drift requires retraining",
+      ],
+      correctIndex: 1,
+      explanation: "Concept drift without data drift: the inputs look normal, so input PSI won't flag it. But the labels would show accuracy degradation if you had them. Example: a churn model where user retention now depends on customer support quality (new factor) rather than historical engagement patterns (same features, different drivers). Input monitoring won't catch this — only label-based accuracy monitoring will.",
+    },
+  ],
+},
+
+"mo-c4": {
+  durationLabel: "15 min",
+  outcomes: [
+    "Compare three retraining trigger strategies: scheduled, performance-based, drift-triggered",
+    "Design a retraining pipeline for a fraud model with delayed labels",
+    "Explain retraining loops and how exploration prevents feedback loop corruption",
+    "Define the full retraining workflow: data refresh → train → evaluate → shadow → deploy",
+  ],
+  learnMarkdown: `## Automated Retraining Pipelines
+
+A model deployed 6 months ago is trained on 6-month-old data. The world has changed. Retraining keeps models current — but automated retraining introduces new failure modes.
+
+---
+
+## Three Trigger Strategies
+
+### 1. Scheduled Retraining
+Retrain on a fixed schedule (weekly, monthly) regardless of drift.
+
+- **Pros**: simple, predictable, no monitoring infrastructure required
+- **Cons**: may retrain unnecessarily (wasting compute), or retrain too late (if drift happens between schedules)
+
+### 2. Performance-Based Trigger
+Retrain when model accuracy drops below a threshold.
+
+- **Pros**: responds to actual model degradation
+- **Cons**: requires fast label feedback (useless if labels take 60 days)
+
+### 3. Drift-Triggered Retraining
+Retrain when PSI > 0.2 or KS test detects significant input distribution shift.
+
+- **Pros**: proactive — no labels needed; catches data drift early
+- **Cons**: data drift doesn't always impair model accuracy; may trigger unnecessary retraining
+
+**In practice**: combine strategies — scheduled as baseline, drift-triggered as early warning, performance-based for confirmation when labels arrive.
+
+---
+
+## Retraining Pipeline Steps
+
+1. **Data refresh**: collect the most recent N days of data. Decide: expanding window (all historical data) or sliding window (last N days only). Sliding window is better for concept drift; expanding window gives more data for rare events.
+2. **Train with same config**: use the same hyperparameters and feature set unless there's a reason to change. Changing multiple things at once makes debugging harder.
+3. **Evaluate on a held-out temporal test set**: always evaluate on data that comes after the training window (time-respecting split).
+4. **Shadow mode**: run the retrained model alongside the champion. Compare on recent production traffic.
+5. **Champion-challenger**: if retrained model beats champion, promote. If not, investigate — the retraining trigger may have been spurious.
+
+---
+
+## Retraining Loop Corruption
+
+When a model influences user behavior, the resulting data reflects the model's outputs, not ground truth. Example:
+
+- Recommendation model A recommends mostly pop music
+- Users interact with pop (because that's what they see)
+- Training data shows pop as high-engagement content
+- Retrained model recommends even more pop
+- Filter bubble deepens over time
+
+**Fix**: inject exploration — serve random or diverse recommendations to a small fraction of users (5–10%). Their interactions provide exploration data uncontaminated by the current model's biases.
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Online Learning vs Periodic Retraining
+
+**Periodic retraining** (batch): retrain on accumulated data every N days. Simple, stable, well-tested. Most production ML uses this.
+
+**Online learning**: update model weights incrementally as each new observation arrives. Can adapt within minutes. Risks: (1) more vulnerable to adversarial manipulation (single bad examples have outsized effect), (2) harder to debug and audit, (3) training stability issues with streaming optimizers.
+
+For most business applications, periodic retraining with drift monitoring is preferable to online learning. Online learning is appropriate for rapidly changing signal (real-time bidding, fraud with millisecond patterns) where batch retraining frequency is insufficient.
+`,
+  tryGuidance: "No interactive viz — work through the retraining design scenarios in the interview simulation.",
+  interviewGraph: {
+    initialStageId: "mo_c4_stage1",
+    artifactDimensions: [
+      { label: "Trigger Design", recoveryStageId: "mo_c4_rec1" },
+      { label: "Feedback Loops", recoveryStageId: "mo_c4_terminal", passLabel: "Retraining Pipeline" },
+    ],
+    stages: {
+      mo_c4_stage1: {
+        id: "mo_c4_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Delayed labels",
+        prompt: "Design a retraining trigger for a fraud model where ground truth labels (confirmed fraud/legitimate) arrive 45 days after transactions.",
+        choices: [
+          { id: "a", label: "Performance-based trigger: retrain when accuracy drops below 0.90", description: "Labels arrive 45 days late — by the time you measure accuracy, the degradation is 45+ days old." },
+          { id: "b", label: "Drift-triggered: monitor input feature PSI and prediction distribution daily; trigger retraining when PSI > 0.2. Validate with accuracy check when 45-day labels arrive.", description: "PSI provides early warning without labels; accuracy check confirms severity." },
+          { id: "c", label: "Scheduled: retrain every 30 days regardless of drift", description: "Schedule doesn't respond to actual drift timing, but is a useful fallback." },
+        ],
+        branches: { a: "mo_c4_rec1", b: "mo_c4_stage2", c: "mo_c4_stage2" },
+        rationale: "B is best for delayed labels. Performance-based trigger is blind for 45 days. Drift-triggered retraining (PSI on inputs, prediction distribution shift) provides early warning without needing labels. The accuracy check at day 45 confirms whether the drift actually impaired model quality.",
+      },
+      mo_c4_rec1: {
+        id: "mo_c4_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Label delay problem",
+        prompt: "When labels are delayed 45 days, which trigger strategy is feasible?",
+        choices: [
+          { id: "a", label: "Drift-triggered: monitor input distributions and prediction patterns (no labels needed) as a proactive signal", description: "PSI and prediction distribution are observable immediately without labels." },
+        ],
+        branches: { a: "mo_c4_stage2" },
+        rationale: "When labels are delayed, performance-based triggers are blind during the delay window. Drift monitoring on inputs and model outputs provides leading warning signals.",
+      },
+      mo_c4_stage2: {
+        id: "mo_c4_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Expanding vs sliding window",
+        prompt: "Your fraud model is retrained. Should you use all historical data (expanding window) or only the last 90 days (sliding window)?",
+        choices: [
+          { id: "a", label: "Always expanding — more data is always better for ML models", description: "More data is better if the historical data is still representative." },
+          { id: "b", label: "Sliding window if fraud patterns change rapidly (concept drift); expanding window if historical patterns are still valid and rare fraud examples need more history", description: "The right choice depends on drift velocity and minority class frequency." },
+        ],
+        branches: { a: "mo_c4_rec1", b: "mo_c4_terminal" },
+        rationale: "B is correct. Fraud patterns change — attackers adapt. Historical data from 2 years ago may describe patterns that no longer exist. Sliding window focuses on recent, relevant patterns. But fraud is rare — if you only train on 90 days, you may not have enough examples of rare fraud types. The right window length is empirical: compare model quality for different windows on a temporal validation set.",
+      },
+      mo_c4_terminal: {
+        id: "mo_c4_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · Exploration",
+        prompt: "Your recommendation model has been live for 2 years. You notice the training data has almost no pop music examples anymore — only classical. What likely happened?",
+        choices: [
+          { id: "a", label: "User preferences genuinely shifted to classical music over 2 years", description: "Possible, but a more systematic explanation exists." },
+          { id: "b", label: "Retraining loop: the model stopped recommending pop → users didn't see pop → no pop interaction data → model learned pop is unpopular → recommended pop even less. Inject exploration to break the loop.", description: "Feedback loop collapse — the model's outputs shaped the training data." },
+        ],
+        branches: { a: "mo_c4_terminal", b: "mo_c4_terminal" },
+        terminal: true,
+        rationale: "B is the retraining loop problem. The model's recommendations changed user behavior, which changed training data, which further reinforced the model's biases. Fix: serve diverse/random recommendations to 5-10% of users to generate exploration data uncontaminated by current model biases.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "What is the main disadvantage of scheduled retraining as the only trigger strategy?",
+      options: [
+        "Scheduled retraining is too complex to implement reliably",
+        "It retrains on a fixed calendar regardless of actual drift — may retrain unnecessarily (wasting compute) or too late (if drift happens between schedules)",
+        "Scheduled retraining doesn't support automated deployment",
+      ],
+      correctIndex: 1,
+      explanation: "Schedule-based retraining is simple but ignorant of actual data quality. If drift happens on day 3 of a 30-day cycle, the model runs degraded for 27 days. If no drift occurs, the retrain is wasted compute. A combined strategy (schedule + drift trigger) is more robust.",
+    },
+    {
+      question: "What is a retraining feedback loop and how does exploration mitigate it?",
+      options: [
+        "A loop where retraining takes too long and creates a scheduling backlog",
+        "A loop where model outputs influence user behavior, which creates training data reflecting the model's biases rather than true preferences — mitigated by serving random/diverse results to a small fraction of users to generate unbiased exploration data",
+        "A loop where the model retriggers retraining immediately after each deployment",
+      ],
+      correctIndex: 1,
+      explanation: "Feedback loops corrupt training data over time: if a recommendation model only recommends popular items, users only interact with popular items, and the next training set shows only popular items as valuable. Exploration (serving random or diverse content to 5-10% of traffic) generates interaction data independent of current model biases, breaking the loop.",
+    },
+    {
+      question: "When should you use a sliding window (last N days) instead of an expanding window (all historical data) for retraining?",
+      options: [
+        "Always — sliding windows produce better models because recent data is more relevant",
+        "When the task exhibits concept drift (patterns change over time) — old data may reflect patterns that no longer apply; when rare events need maximum history, expanding window provides more examples",
+        "When training data storage exceeds 1TB",
+      ],
+      correctIndex: 1,
+      explanation: "Sliding windows are appropriate when the concept being learned changes over time (fraud tactics, user preferences, economic conditions). Historical data from two years ago may actively hurt performance if it describes patterns that no longer exist. But for rare events where recent data alone doesn't provide enough positive examples, expanding windows provide more training signal at the cost of potentially stale patterns.",
+    },
+  ],
+},
+
+"mo-t1": {
+  durationLabel: "18 min",
+  outcomes: [
+    "Compare trunk-based development and Git Flow for data science teams",
+    "Write a PR checklist appropriate for data science changes",
+    "Use DVC alongside Git to manage data and model artifacts",
+    "Apply semantic versioning to ML models",
+  ],
+  learnMarkdown: `## Git Workflows for Data Teams
+
+Data science work creates unique Git challenges: large binary files, non-deterministic code, Jupyter notebooks with embedded outputs, and model artifacts. Standard software Git practices need adaptation.
+
+---
+
+## Branching Strategy
+
+### Trunk-Based Development
+All work happens on short-lived feature branches (< 2 days) merged frequently to main.
+
+- **Pros**: less merge conflict, better CI/CD integration, continuous integration is continuous
+- **Cons**: requires feature flags for large incomplete features
+- **Best for**: mature data teams with strong CI/CD culture
+
+### Git Flow
+Feature → develop → release → main, with hotfix branches.
+
+- **Pros**: structured release process, good for versioned model releases
+- **Cons**: long-lived branches cause painful merge conflicts
+- **Best for**: teams with formal model release cycles (e.g., quarterly model updates)
+
+**Recommendation**: trunk-based for analysis and pipeline code; Git Flow or a simplified version for model releases with formal governance.
+
+---
+
+## PR Checklist for Data Science
+
+Before merging a data science PR:
+- [ ] Data validation tests pass
+- [ ] Notebook outputs stripped (\`nbstripout\` or \`jupyter nbconvert --clear-output\`)
+- [ ] No secrets or API keys in code
+- [ ] \`.gitignore\` excludes \`*.pkl\`, \`*.csv\`, \`*.parquet\`, \`data/\`, \`models/\`
+- [ ] Model card updated (if model version changed)
+- [ ] DVC files committed (if data version changed)
+- [ ] CI pipeline green (unit tests + data validation)
+
+---
+
+## Why Strip Notebook Outputs?
+
+Jupyter notebooks embed execution outputs (plots, data samples, tensor values) in the JSON file. This:
+- Bloats Git history (images stored as base64)
+- Creates merge conflicts on every re-run
+- May expose sensitive data
+
+\`nbstripout\` is a git filter that automatically strips outputs on commit.
+
+---
+
+## Semantic Versioning for Models
+
+\`MAJOR.MINOR.PATCH\`:
+- **MAJOR**: backwards-incompatible interface change (new feature set, different output schema)
+- **MINOR**: backwards-compatible improvement (same features, better accuracy)
+- **PATCH**: bug fix (data processing error, numerical stability fix)
+
+Store the version in the MLflow registry and reference it in model serving infrastructure.
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Monorepo vs Polyrepo for ML
+
+**Monorepo** (one repo for everything: data pipelines, models, serving): easier cross-team refactoring, single CI/CD system, atomic commits across systems. Harder to scale (large repo, slow CI), requires careful ownership rules.
+
+**Polyrepo** (separate repos for data, models, serving): independent deployment, clear ownership, smaller repos. Harder to coordinate changes that span repos, versioning interfaces between repos requires care.
+
+Most large ML teams use a middle path: one repo per major system (data platform, ML platform, product) with versioned interfaces between them.
+`,
+  tryGuidance: "No interactive viz — work through the Git workflow and PR checklist scenarios in the interview simulation.",
+  interviewGraph: {
+    initialStageId: "mo_t1_stage1",
+    artifactDimensions: [
+      { label: "Large File Handling", recoveryStageId: "mo_t1_rec1" },
+      { label: "PR Quality", recoveryStageId: "mo_t1_terminal", passLabel: "DS Git Workflow" },
+    ],
+    stages: {
+      mo_t1_stage1: {
+        id: "mo_t1_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Large file commit",
+        prompt: "A data scientist committed a 500MB trained model file to Git. What went wrong and how do you prevent it?",
+        choices: [
+          { id: "a", label: "Nothing — version controlling models in Git is best practice", description: "Large binary files bloat Git history and slow all operations." },
+          { id: "b", label: "Model files should be tracked with DVC and stored in object storage, not Git. Add *.pkl and models/ to .gitignore and use DVC for model artifact versioning.", description: "DVC handles large artifacts; Git handles code and .dvc pointer files." },
+          { id: "c", label: "Use Git LFS to store the large file inside Git", description: "Git LFS still stores the file in Git's object model — better than vanilla Git but still grows the repo and adds cost. DVC with S3/GCS is the standard ML approach." },
+        ],
+        branches: { a: "mo_t1_rec1", b: "mo_t1_stage2", c: "mo_t1_stage2" },
+        rationale: "B is the standard approach. DVC tracks model artifacts with lightweight pointer files in Git; actual binaries go to object storage. This keeps the Git repository fast and manageable.",
+      },
+      mo_t1_rec1: {
+        id: "mo_t1_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Binary files in Git",
+        prompt: "Why are large binary files (models, datasets) problematic in Git?",
+        choices: [
+          { id: "a", label: "Git stores every version of every file — large binaries make the repository huge, slow to clone, and slow on every git operation", description: "Git's object store grows with every committed version of a file." },
+        ],
+        branches: { a: "mo_t1_stage2" },
+        rationale: "Git stores the full content of every version of every tracked file. A 500MB model committed 10 times = 5GB of Git history. This makes clone, fetch, and checkout slow for everyone on the team.",
+      },
+      mo_t1_stage2: {
+        id: "mo_t1_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Notebook outputs",
+        prompt: "A notebook PR has merge conflicts on every re-run even though the code didn't change. What's the cause and fix?",
+        choices: [
+          { id: "a", label: "The CI system is misconfigured and re-running notebooks on every PR", description: "CI running notebooks could cause this, but the core issue is notebook output storage." },
+          { id: "b", label: "Jupyter stores execution outputs (cell outputs, timestamps, execution counts) in the notebook JSON — these change on every run and cause conflicts; fix: use nbstripout to clear outputs before commit", description: "nbstripout removes outputs automatically as a Git filter." },
+        ],
+        branches: { a: "mo_t1_rec1", b: "mo_t1_terminal" },
+        rationale: "B is correct. Jupyter notebook files are JSON with embedded outputs. Every re-execution updates output content, execution counts, and metadata — generating merge conflicts even for unchanged code cells. nbstripout strips outputs as a pre-commit hook.",
+      },
+      mo_t1_terminal: {
+        id: "mo_t1_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · DS PR checklist",
+        prompt: "What items belong on a data science PR checklist that aren't on a standard software PR checklist?",
+        choices: [
+          { id: "a", label: "Notebook outputs stripped, .gitignore covers data/model files, DVC files committed if data changed, no secrets in code, model card updated", description: "Data science has unique artifacts that require unique PR checks." },
+        ],
+        branches: { a: "mo_t1_terminal" },
+        terminal: true,
+        rationale: "Standard software PRs check code correctness. DS PRs additionally check data artifact management (DVC), secret hygiene (API keys), notebook cleanliness (stripped outputs), and documentation (model card).",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "What does nbstripout do and why is it important for data science teams?",
+      options: [
+        "It compresses notebook file sizes for faster loading in Jupyter",
+        "It removes cell outputs (plots, data, execution counts) from Jupyter notebooks before committing, preventing merge conflicts and avoiding sensitive data exposure in Git history",
+        "It converts notebooks to Python scripts for production deployment",
+      ],
+      correctIndex: 1,
+      explanation: "Jupyter notebooks store execution outputs as embedded JSON. These change on every re-run, creating constant merge conflicts and potentially exposing sensitive data (printed dataframes, API responses) in Git history. nbstripout runs as a Git filter, automatically clearing outputs when files are staged for commit.",
+    },
+    {
+      question: "What should a .gitignore file for a data science project exclude?",
+      options: [
+        "Only Python __pycache__ directories and .pyc files",
+        "Large binary files: *.pkl, *.h5, *.csv, *.parquet, data/, models/, .env, credentials files — anything tracked by DVC or containing secrets",
+        "All data processing scripts to protect proprietary algorithms",
+      ],
+      correctIndex: 1,
+      explanation: "The .gitignore should exclude: model artifacts (*.pkl, *.h5, *.joblib), raw data (*.csv, *.parquet, data/), trained model directories (models/), and secrets (.env, credentials.json, *.key). These should be tracked by DVC (for data/models) or kept out of version control entirely (for secrets).",
+    },
+    {
+      question: "A model version is released as 2.1.0, then a bug in the data preprocessing is fixed with no change to features or output schema. What should the new version be?",
+      options: [
+        "3.0.0 — any change to the model code is a major version bump",
+        "2.2.0 — bug fixes increment the minor version",
+        "2.1.1 — a bug fix with no interface change is a patch version increment",
+      ],
+      correctIndex: 2,
+      explanation: "Semantic versioning: MAJOR.MINOR.PATCH. A bug fix that doesn't change the input/output interface or significantly change predictions is a patch (2.1.0 → 2.1.1). Minor version bumps (2.1.0 → 2.2.0) are for backwards-compatible improvements (better accuracy, same interface). Major version bumps are for breaking changes (new features required, different output schema).",
+    },
+  ],
+},
+
+"mo-t2": {
+  durationLabel: "12 min",
+  outcomes: [
+    "Choose between venv, conda, and Poetry for a given project type and explain the rationale",
+    "Create a reproducible environment specification that includes non-Python dependencies",
+    "Explain why pinned versions in requirements files are critical for reproducibility",
+    "Describe the environment portability problem and how conda solves it for GPU workstations",
+  ],
+  learnMarkdown: `## Virtual Environments: venv, conda, poetry
+
+Every Python project should have an isolated virtual environment. Without isolation, packages from different projects conflict, and you can't reproduce results on another machine.
+
+---
+
+## Why Environments Matter
+
+Without virtual environments:
+- Project A needs numpy 1.21, Project B needs numpy 1.26 — only one can be installed globally
+- Your code works on your machine but fails for a colleague because they have different library versions
+- Library upgrades break old projects silently
+
+With isolated environments, each project gets its own dependency tree.
+
+---
+
+## venv (Python Standard Library)
+
+\`\`\`bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+\`\`\`
+
+- **Handles**: Python packages only
+- **Does not handle**: CUDA, cuDNN, C libraries
+- **Reproduce with**: \`pip freeze > requirements.txt\` (pin exact versions)
+- **Best for**: simple scripts, production API services, CI environments
+
+**Critical**: use \`pip freeze\` (exact pinned versions), not a hand-written requirements file without pins. \`requests\` without a version can resolve to any version.
+
+---
+
+## conda
+
+\`\`\`bash
+conda env create -f environment.yml
+conda activate myenv
+\`\`\`
+
+- **Handles**: Python packages + non-Python dependencies (CUDA, cuDNN, MKL, R packages)
+- **Reproduce with**: \`environment.yml\` with pinned versions
+- **Best for**: data science workstations with GPU, mixed Python/non-Python stacks
+
+**When conda is essential**: installing PyTorch or TensorFlow with CUDA requires matching CUDA and cuDNN versions. conda manages these C libraries as first-class packages — pip cannot.
+
+---
+
+## Poetry
+
+\`\`\`bash
+poetry install  # creates venv, installs deps from pyproject.toml
+poetry add numpy  # adds + pins to pyproject.toml + poetry.lock
+\`\`\`
+
+- **Handles**: Python packages + dependency resolution with a lock file
+- **Key feature**: \`poetry.lock\` pins the complete dependency tree (every transitive dependency), ensuring exact same installation anywhere
+- **Best for**: production Python libraries, microservices, teams that publish packages
+
+---
+
+## Choosing Between Them
+
+| Scenario | Tool |
+|----------|------|
+| GPU deep learning workstation | conda |
+| Production REST API | Poetry or venv with pinned requirements.txt |
+| Quick script or notebook | venv |
+| Python library you publish | Poetry |
+| Mixed Python + R or CUDA | conda |
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Docker as the Ultimate Environment
+
+For production deployments, a Docker image is a self-contained environment that includes the Python installation, all packages, and the application code. It solves the environment portability problem completely — if the Docker image runs on your laptop, it runs in production.
+
+The relationship: development uses conda/venv for iteration speed; staging and production use Docker for portability. Your conda environment.yml or pip requirements.txt becomes the INPUT to your Dockerfile.
+`,
+  tryGuidance: "No interactive viz — work through the environment selection scenarios in the interview simulation.",
+  interviewGraph: {
+    initialStageId: "mo_t2_stage1",
+    artifactDimensions: [
+      { label: "Tool Selection", recoveryStageId: "mo_t2_rec1" },
+      { label: "Reproducibility", recoveryStageId: "mo_t2_terminal", passLabel: "Env Management" },
+    ],
+    stages: {
+      mo_t2_stage1: {
+        id: "mo_t2_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · GPU workstation",
+        prompt: "A new teammate joins and needs to run your PyTorch deep learning code on a GPU workstation. What environment tool do you recommend and why?",
+        choices: [
+          { id: "a", label: "venv — it's the simplest option and comes with Python", description: "venv can't manage CUDA and cuDNN versions — critical for PyTorch GPU." },
+          { id: "b", label: "conda — it manages CUDA/cuDNN as packages alongside Python, ensuring the GPU stack versions are compatible", description: "conda install pytorch cudatoolkit=11.8 handles the full CUDA dependency chain." },
+          { id: "c", label: "pip install torch — direct install without a virtual environment", description: "Global installs conflict with other projects." },
+        ],
+        branches: { a: "mo_t2_rec1", b: "mo_t2_stage2", c: "mo_t2_rec1" },
+        rationale: "B is correct. PyTorch GPU requires matching CUDA toolkit, cuDNN, and driver versions. conda manages these non-Python C libraries as first-class packages in the environment.yml. pip/venv cannot install or version-lock CUDA — you'd need to install it separately with no coordination.",
+      },
+      mo_t2_rec1: {
+        id: "mo_t2_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Non-Python deps",
+        prompt: "Why can't pip/venv manage CUDA for GPU deep learning?",
+        choices: [
+          { id: "a", label: "pip only manages Python packages — CUDA is a C/C++ toolkit that pip can't install or version-lock; conda handles both Python and system-level C libraries", description: "This is the fundamental limitation that makes conda necessary for GPU work." },
+        ],
+        branches: { a: "mo_t2_stage2" },
+        rationale: "pip's package ecosystem is limited to Python-installable packages. CUDA is a system-level toolkit. conda extends package management to the system level.",
+      },
+      mo_t2_stage2: {
+        id: "mo_t2_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Pinning versions",
+        prompt: "A colleague shares requirements.txt with just 'pandas' (no version pin). What's the problem?",
+        choices: [
+          { id: "a", label: "Unversioned requirements are fine — pip will install the latest stable version", description: "Latest version today may not be available or may behave differently next year." },
+          { id: "b", label: "Without a pin, different installs get different pandas versions — code using pandas 1.5 API may break with pandas 2.0, making the environment non-reproducible", description: "pandas 2.0 had breaking API changes from 1.x. Unpinned = non-reproducible." },
+        ],
+        branches: { a: "mo_t2_rec1", b: "mo_t2_terminal" },
+        rationale: "B is correct. Unpinned requirements are non-reproducible by definition. A colleague installing the same requirements.txt 6 months later may get a different pandas version with breaking changes. Always use pip freeze to generate pinned requirements with exact versions.",
+      },
+      mo_t2_terminal: {
+        id: "mo_t2_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · Environment portability",
+        prompt: "You need to ensure a Python API service runs identically in dev, staging, and production. What's the best environment approach?",
+        choices: [
+          { id: "a", label: "Poetry with poetry.lock for development + Docker for deployment — Poetry pins the full transitive dependency tree, Docker packages the environment into a portable image", description: "Poetry lock file = exact reproducibility. Docker image = portability across machines." },
+        ],
+        branches: { a: "mo_t2_terminal" },
+        terminal: true,
+        rationale: "The layered approach: Poetry (or pip with pinned requirements.txt) defines the Python dependency tree. Docker packages the environment + code into an immutable image that runs identically anywhere.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "When should you use conda instead of venv for a data science project?",
+      options: [
+        "Always — conda is strictly better than venv for all Python projects",
+        "When the project requires non-Python dependencies like CUDA/cuDNN for GPU computing, or mixed language stacks (Python + R)",
+        "When the project has more than 20 Python dependencies",
+      ],
+      correctIndex: 1,
+      explanation: "Use conda when you need non-Python system-level dependencies — especially CUDA/cuDNN for GPU deep learning, or mixed-language environments. For pure-Python projects (APIs, web services, scripts), venv or Poetry are simpler and more portable. Conda's overhead isn't worth it for pure-Python work.",
+    },
+    {
+      question: "What is the difference between pip freeze and a hand-written requirements.txt?",
+      options: [
+        "pip freeze is faster to run but produces less accurate results",
+        "pip freeze outputs every installed package with exact pinned versions; a hand-written file typically lists only direct dependencies without version pins, leading to non-reproducible installs",
+        "pip freeze only works inside conda environments",
+      ],
+      correctIndex: 1,
+      explanation: "pip freeze captures the exact installed state: every package including transitive dependencies, with exact version pins. A hand-written requirements.txt like 'requests\\npandas' resolves to whatever current versions pip finds — different installations on different days get different versions. For reproducibility, use pip freeze.",
+    },
+    {
+      question: "What advantage does Poetry's lock file have over a standard requirements.txt?",
+      options: [
+        "The lock file is smaller and faster to parse than requirements.txt",
+        "The lock file pins every transitive dependency (not just direct deps) to exact versions, ensuring identical installation environments across all machines and times",
+        "Poetry's lock file automatically updates dependencies weekly",
+      ],
+      correctIndex: 1,
+      explanation: "requirements.txt typically lists direct dependencies (what you explicitly installed). Poetry's poetry.lock records every package in the full dependency tree — including the dependencies of your dependencies — at exact versions. This ensures that a colleague running 'poetry install' 6 months later gets bit-for-bit the same environment.",
+    },
+  ],
+},
+
+"mo-t3": {
+  durationLabel: "22 min",
+  outcomes: [
+    "Build a FastAPI model-serving endpoint with Pydantic validation",
+    "Explain why loading the model inside the predict function is a critical performance anti-pattern",
+    "Implement async endpoints correctly for I/O-bound vs CPU-bound workloads",
+    "Add a health check endpoint and structured logging to a serving API",
+  ],
+  learnMarkdown: `## Building APIs with FastAPI
+
+FastAPI is the standard choice for serving ML models as REST APIs. It's faster than Flask for I/O-bound workloads, generates OpenAPI docs automatically from type hints, and validates requests via Pydantic.
+
+---
+
+## The Model Loading Anti-Pattern
+
+**Never do this**:
+\`\`\`python
+@app.post("/predict")
+def predict(request: PredictRequest):
+    model = joblib.load("model.pkl")  # WRONG — reloads on every request
+    return {"prediction": model.predict([request.features])[0]}
+\`\`\`
+
+This reloads the model from disk on every single request. For a 100MB model, that's ~1-2 seconds of overhead per prediction. At 100 RPS, this is 100 model loads per second — your server immediately falls over.
+
+**Correct pattern**: load once at startup as a module-level global:
+\`\`\`python
+import joblib
+model = joblib.load("model.pkl")  # loaded once at startup
+
+@app.post("/predict")
+def predict(request: PredictRequest):
+    return {"prediction": model.predict([request.features])[0]}
+\`\`\`
+
+---
+
+## Pydantic Request/Response Models
+
+\`\`\`python
+from pydantic import BaseModel, Field
+from typing import List
+
+class PredictRequest(BaseModel):
+    user_id: str
+    features: List[float] = Field(..., min_length=10, max_length=10)
+
+class PredictResponse(BaseModel):
+    prediction: float
+    confidence: float
+\`\`\`
+
+FastAPI validates incoming requests against the schema automatically. Invalid requests return 422 Unprocessable Entity before reaching your handler.
+
+---
+
+## async vs def Endpoints
+
+\`\`\`python
+@app.post("/predict")
+async def predict_async(request: PredictRequest):
+    # async for I/O-bound operations: DB lookups, HTTP calls to other services
+    user_history = await db.fetch_user(request.user_id)
+    return model.predict(features)
+
+@app.post("/predict-sync")
+def predict_sync(request: PredictRequest):
+    # def for CPU-bound operations: model inference
+    # FastAPI runs def endpoints in a thread pool automatically
+    return model.predict(request.features)
+\`\`\`
+
+Key rule: use \`async def\` for I/O-bound handlers. Use \`def\` (not async def) for CPU-bound handlers — FastAPI automatically runs these in a thread pool.
+
+---
+
+## Health Check + Structured Logging
+
+\`\`\`python
+@app.get("/health")
+def health():
+    return {"status": "ok", "model_version": MODEL_VERSION}
+
+import structlog
+log = structlog.get_logger()
+
+@app.post("/predict")
+def predict(request: PredictRequest):
+    result = model.predict(request.features)
+    log.info("prediction", user_id=request.user_id,
+              prediction=result, latency_ms=elapsed)
+    return {"prediction": result}
+\`\`\`
+
+Health endpoints are polled by load balancers and Kubernetes. Structured logs (JSON format) enable querying by field in observability platforms.
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Background Tasks and Model Caching
+
+FastAPI's \`BackgroundTasks\` allow post-response work without blocking the client response:
+\`\`\`python
+@app.post("/predict")
+async def predict(request: PredictRequest, background_tasks: BackgroundTasks):
+    result = model.predict(request.features)
+    background_tasks.add_task(log_prediction, request, result)
+    return {"prediction": result}
+\`\`\`
+
+For expensive feature lookups (Redis, database), use a TTL cache at the application level. \`functools.lru_cache\` for in-memory; Redis for distributed caching. Cache feature vectors with a TTL appropriate for your feature freshness requirements.
+`,
+  tryGuidance: "No interactive viz — work through the API design and error handling scenarios in the interview simulation.",
+  interviewGraph: {
+    initialStageId: "mo_t3_stage1",
+    artifactDimensions: [
+      { label: "Model Loading", recoveryStageId: "mo_t3_rec1" },
+      { label: "Request Validation", recoveryStageId: "mo_t3_terminal", passLabel: "FastAPI Design" },
+    ],
+    stages: {
+      mo_t3_stage1: {
+        id: "mo_t3_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Slow predictions",
+        prompt: "Your FastAPI model endpoint takes 2 seconds per prediction. The model inference itself takes 5ms. What's likely wrong?",
+        choices: [
+          { id: "a", label: "The model is too complex — use a simpler model", description: "5ms inference is fast — the bottleneck isn't model complexity." },
+          { id: "b", label: "The model is probably being loaded from disk inside the predict function on every request — move the model load to module level (startup)", description: "Loading a model from disk on each request adds seconds of overhead." },
+          { id: "c", label: "FastAPI is slower than Flask for model serving", description: "FastAPI is generally faster than Flask, not slower." },
+        ],
+        branches: { a: "mo_t3_rec1", b: "mo_t3_stage2", c: "mo_t3_rec1" },
+        rationale: "B is the most likely cause. 5ms inference + 2s total = ~1.995s overhead. Loading a model from disk (joblib.load, pickle.load, torch.load) takes 0.5-3 seconds depending on model size. Moving the load to module level eliminates this entirely.",
+      },
+      mo_t3_rec1: {
+        id: "mo_t3_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Startup loading",
+        prompt: "Where should model loading happen in a FastAPI application?",
+        choices: [
+          { id: "a", label: "At module level (once when the application starts), not inside the request handler which runs on every request", description: "Module-level load = O(1) loads total. Handler-level load = O(requests) loads." },
+        ],
+        branches: { a: "mo_t3_stage2" },
+        rationale: "Module-level initialization runs once when the application process starts. Handler functions run on every incoming request. Model loading belongs at startup.",
+      },
+      mo_t3_stage2: {
+        id: "mo_t3_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · async vs def",
+        prompt: "Your predict endpoint does: (1) database lookup for user features, (2) model inference. Should the handler be async def or def?",
+        choices: [
+          { id: "a", label: "def — model inference is CPU-bound, FastAPI handles threading automatically", description: "Correct reasoning for inference, but misses the I/O step." },
+          { id: "b", label: "async def — the database lookup is I/O-bound and should be awaited; model inference can run in a thread pool via run_in_executor if needed", description: "async def correctly handles awaitable I/O; CPU-bound inference can be offloaded." },
+          { id: "c", label: "It doesn't matter — FastAPI handles both identically", description: "async def and def have different execution models in FastAPI." },
+        ],
+        branches: { a: "mo_t3_stage2", b: "mo_t3_terminal" },
+        rationale: "B is correct. The DB lookup is I/O-bound and should be awaited with async. Using def would block the event loop during the DB call. Note: model inference (CPU-bound) inside an async def will block the event loop — wrap it in run_in_executor or use a def endpoint (FastAPI runs def handlers in a thread pool).",
+      },
+      mo_t3_terminal: {
+        id: "mo_t3_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · FastAPI advantages",
+        prompt: "Why choose FastAPI over Flask for a new ML serving endpoint?",
+        choices: [
+          { id: "a", label: "Type hints → automatic OpenAPI docs + Pydantic request validation + native async support + better throughput for I/O-bound workloads", description: "FastAPI's type system drives documentation, validation, and IDE support automatically." },
+        ],
+        branches: { a: "mo_t3_terminal" },
+        terminal: true,
+        rationale: "FastAPI's key advantages: (1) OpenAPI docs auto-generated from type hints — no separate documentation to maintain, (2) Pydantic validation — invalid requests caught before handlers, (3) async-first design — higher throughput for I/O-heavy endpoints, (4) better IDE support from type annotations.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "What is wrong with this FastAPI endpoint: 'def predict(): model = load_model(path); return model.predict(data)'?",
+      options: [
+        "The function is missing a return type annotation",
+        "The model is loaded from disk on every request — this adds seconds of latency per prediction and will cause the service to fail under load",
+        "FastAPI doesn't support synchronous def handlers",
+      ],
+      correctIndex: 1,
+      explanation: "Loading the model inside the request handler means every prediction request incurs the full model deserialization cost (0.5-3+ seconds). The fix: load at module level once at application startup. The loaded model object is then reused across all requests with no additional I/O.",
+    },
+    {
+      question: "What does Pydantic BaseModel provide for FastAPI request validation?",
+      options: [
+        "It encrypts request payloads for security",
+        "It defines expected request fields, types, and constraints — FastAPI validates incoming JSON against the schema and returns 422 Unprocessable Entity for invalid requests before they reach your handler",
+        "It compresses request bodies to reduce network overhead",
+      ],
+      correctIndex: 1,
+      explanation: "Pydantic models define the expected structure of requests. FastAPI automatically validates incoming requests against the model: wrong types, missing required fields, and constraint violations (min/max) are caught and returned as 422 errors. This eliminates manual input validation code in handlers.",
+    },
+    {
+      question: "Why add a /health endpoint to a model serving API?",
+      options: [
+        "FastAPI requires a /health endpoint to function",
+        "Load balancers and Kubernetes use health endpoints to determine if a pod/instance is ready to serve traffic — unhealthy instances are removed from the load balancer pool automatically",
+        "Health endpoints reduce prediction latency by warming up the model",
+      ],
+      correctIndex: 1,
+      explanation: "Kubernetes liveness and readiness probes call the /health endpoint. A 200 response means the pod is healthy and ready for traffic. A non-200 response triggers restart (liveness) or temporary removal from load balancing (readiness). Without a health endpoint, Kubernetes can't distinguish a healthy pod from one that's stuck at startup loading the model.",
+    },
+  ],
+},
+
+"mo-t4": {
+  durationLabel: "20 min",
+  outcomes: [
+    "Explain Docker's layer caching and why requirements should be copied before source code",
+    "Write a Dockerfile for a Python ML serving application",
+    "Use multi-stage builds to reduce production image size",
+    "Configure Docker resource limits for ML inference containers",
+  ],
+  learnMarkdown: `## Docker for Data Scientists
+
+Docker packages your application + environment into a portable image. It solves the classic "works on my machine" problem.
+
+---
+
+## Dockerfile Anatomy
+
+\`\`\`dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# COPY requirements FIRST — before source code
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# COPY source code second
+COPY . .
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+\`\`\`
+
+---
+
+## Layer Caching: The Critical Insight
+
+Each Dockerfile instruction creates a **layer**. Layers are cached. If a layer's inputs haven't changed, Docker reuses the cached layer instead of rebuilding it.
+
+If you copy ALL source code before installing dependencies:
+\`\`\`dockerfile
+COPY . .  # Any code change invalidates cache
+RUN pip install -r requirements.txt  # Re-runs on every code change
+\`\`\`
+
+Every code edit triggers a full \`pip install\` — slow. The correct order: copy requirements first, install, then copy code. Dependency installation is cached as long as requirements.txt doesn't change. Code changes only rebuild the fast "copy source" layer.
+
+---
+
+## Multi-Stage Builds
+
+\`\`\`dockerfile
+# Stage 1: Build
+FROM python:3.11 AS builder
+COPY requirements.txt .
+RUN pip install --user -r requirements.txt
+
+# Stage 2: Runtime (slim)
+FROM python:3.11-slim
+COPY --from=builder /root/.local /root/.local
+COPY . .
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+\`\`\`
+
+The builder stage has full build tools (compilers for C extensions). The final image is slim — no build tools, smaller attack surface, faster pull. Typical size reduction: 800MB → 150MB.
+
+---
+
+## .dockerignore
+
+Like .gitignore for Docker builds. Exclude:
+\`\`\`
+data/
+models/
+*.ipynb
+__pycache__/
+.git/
+.env
+*.pyc
+\`\`\`
+
+Without .dockerignore, Docker sends your entire working directory (including 10GB data files) to the Docker daemon as build context — very slow.
+
+---
+
+## Resource Limits
+
+\`\`\`bash
+docker run --memory=4g --cpus=2 my-model-server
+\`\`\`
+
+Without limits, a single runaway ML inference job can consume all host memory and starve other containers. Always set resource limits for ML containers.
+
+---
+
+## docker-compose for Local Development
+
+\`\`\`yaml
+services:
+  model-server:
+    build: .
+    ports: ["8000:8000"]
+    environment:
+      - MODEL_PATH=/models/churn_v3.pkl
+  redis:
+    image: redis:7-alpine
+\`\`\`
+
+Compose orchestrates multi-container local development (model server + Redis feature cache + database).
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Container Security for ML
+
+**Don't run as root**: the default Docker container runs as root. If the container is compromised, root access to the host is possible. Add a non-root user:
+\`\`\`dockerfile
+RUN useradd -m appuser
+USER appuser
+\`\`\`
+
+**Scan for vulnerabilities**: use \`docker scout cves\` or Trivy to scan images for CVEs in base images and installed packages. Rebuild regularly to pick up security patches.
+
+**Secret management**: never embed secrets in Dockerfile (they persist in image layers). Inject at runtime via environment variables or Docker secrets.
+`,
+  tryGuidance: "Use the Dockerfile layer diagram to see how caching speeds up rebuilds when source code changes vs when dependencies change.",
+  interviewGraph: {
+    initialStageId: "mo_t4_stage1",
+    artifactDimensions: [
+      { label: "Layer Caching", recoveryStageId: "mo_t4_rec1" },
+      { label: "Production Best Practices", recoveryStageId: "mo_t4_terminal", passLabel: "Docker Mastery" },
+    ],
+    stages: {
+      mo_t4_stage1: {
+        id: "mo_t4_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Slow builds",
+        prompt: "Every time you change one line of Python code, docker build takes 4 minutes to reinstall all dependencies. Why and how do you fix it?",
+        choices: [
+          { id: "a", label: "Install fewer dependencies to speed up builds", description: "Removing needed packages isn't the fix." },
+          { id: "b", label: "COPY . . comes before RUN pip install — any code change invalidates the pip install cache layer. Fix: copy requirements.txt first, run pip install, then copy source code.", description: "Layer cache invalidation cascades: changing an early layer rebuilds all subsequent layers." },
+          { id: "c", label: "Use a faster base image", description: "Faster base image helps but doesn't fix the caching problem." },
+        ],
+        branches: { a: "mo_t4_rec1", b: "mo_t4_stage2", c: "mo_t4_rec1" },
+        rationale: "B is correct. Docker caches each layer. COPY . . copies all source files — any change invalidates this layer and all subsequent layers including pip install. Moving requirements.txt copy + pip install before COPY . . means pip install is cached unless requirements.txt changes.",
+      },
+      mo_t4_rec1: {
+        id: "mo_t4_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Cache invalidation",
+        prompt: "Why does the order of instructions in a Dockerfile matter for build performance?",
+        choices: [
+          { id: "a", label: "When a layer changes, all subsequent layers are rebuilt — expensive operations (pip install) should come before frequently changing content (source code)", description: "Stable layers before volatile layers maximizes cache hits." },
+        ],
+        branches: { a: "mo_t4_stage2" },
+        rationale: "Docker's layer cache is invalidated by any change in the instruction or its inputs. Put stable, expensive steps early; put frequently-changing steps late.",
+      },
+      mo_t4_stage2: {
+        id: "mo_t4_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Image size",
+        prompt: "Your Docker image is 2.8GB. How do you reduce it significantly?",
+        choices: [
+          { id: "a", label: "Compress the image with docker save", description: "Compression reduces storage but not the actual layer count or content." },
+          { id: "b", label: "Multi-stage build: use a full image for building (compiling C extensions), copy only the installed packages to a slim runtime image — no build tools in final image", description: "Multi-stage builds routinely reduce images from 800MB to 100-200MB." },
+          { id: "c", label: "Remove the .dockerignore file so Docker has less to process", description: ".dockerignore reduces build context size, not the final image size." },
+        ],
+        branches: { a: "mo_t4_rec1", b: "mo_t4_terminal" },
+        rationale: "B is correct. Multi-stage builds separate the build environment (which needs compilers, build tools, dev headers) from the runtime environment (which only needs the installed packages and application code). The final image gets only what's needed for runtime.",
+      },
+      mo_t4_terminal: {
+        id: "mo_t4_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · Resource limits",
+        prompt: "Why should you always set --memory and --cpus limits when running ML inference containers?",
+        choices: [
+          { id: "a", label: "Without limits, a single ML container can consume all host memory and CPU, starving co-located containers and potentially crashing the host", description: "Resource limits protect host stability and neighbor containers." },
+        ],
+        branches: { a: "mo_t4_terminal" },
+        terminal: true,
+        rationale: "ML models can be memory-hungry. Without limits, a memory leak or unexpectedly large batch causes the container to consume all available host memory (OOM kill or host crash). Explicit limits protect the host and enable predictable resource planning.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "Why copy requirements.txt and run pip install before copying the rest of the application code?",
+      options: [
+        "pip install requires requirements.txt to be in the root directory before other files exist",
+        "This order maximizes layer cache reuse: pip install is cached when only requirements.txt is unchanged, even if source code changes — making iterative development builds much faster",
+        "Docker requires dependencies to be installed before source files can be copied",
+      ],
+      correctIndex: 1,
+      explanation: "Docker's layer cache is invalidated when a layer's inputs change. Placing pip install after COPY requirements.txt means: if only source code changed (not requirements.txt), the pip install layer is unchanged and cached. Without this ordering, every code change would trigger a full pip install.",
+    },
+    {
+      question: "What does a .dockerignore file do?",
+      options: [
+        "It prevents Docker from running certain commands inside the container",
+        "It excludes files and directories from the build context sent to the Docker daemon, reducing build time and preventing accidental inclusion of large data files or secrets",
+        "It specifies which container images should be ignored by docker-compose",
+      ],
+      correctIndex: 1,
+      explanation: "When you run 'docker build', Docker sends the entire build context (current directory) to the daemon. Without .dockerignore, this includes data directories, model files, .git/, and .env — potentially gigabytes of content. .dockerignore tells Docker which paths to exclude, keeping the build context small and preventing accidental secret exposure.",
+    },
+    {
+      question: "What is the benefit of a multi-stage Docker build for an ML serving application?",
+      options: [
+        "Multi-stage builds allow running multiple applications in one container",
+        "The build stage uses a full image with compilers to build C extensions; the final stage uses a slim image with only runtime dependencies — dramatically reducing the production image size",
+        "Multi-stage builds enable parallel compilation of Python packages",
+      ],
+      correctIndex: 1,
+      explanation: "Build tools (gcc, g++, python-dev, cmake) needed to compile C extensions (numpy, scipy, some ML libraries) add hundreds of MB to images. Multi-stage builds install everything in a build image, then copy only the compiled packages into a minimal runtime image. Production images can go from 800MB+ to under 200MB.",
+    },
+  ],
+},
+
+"mo-t5": {
+  durationLabel: "25 min",
+  outcomes: [
+    "Match AWS services to ML workload types: S3, EC2, SageMaker, Lambda",
+    "Explain spot instances and when to use them for training vs serving",
+    "Compare SageMaker managed endpoints vs DIY EC2 serving",
+    "Apply IAM least-privilege principles to ML infrastructure",
+  ],
+  learnMarkdown: `## Cloud Basics: AWS for Data Scientists
+
+AWS is the most common cloud environment for DS work. Knowing which service fits which ML task saves time and money.
+
+---
+
+## Core Services for ML
+
+### S3 (Simple Storage Service)
+Object storage for everything large and durable:
+- Raw data, processed features, training datasets
+- Trained model artifacts
+- Experiment outputs, logs
+- Lifecycle policies move infrequently accessed data to cheaper storage tiers (Glacier)
+
+**Key**: S3 is cheap (~$0.023/GB/month), globally accessible, highly durable (99.999999999%). All other AWS ML services integrate with S3.
+
+### EC2 (Elastic Compute Cloud)
+Virtual machines for custom compute:
+- **p3/p4/p5**: GPU instances for deep learning training
+- **m5/c5**: CPU instances for inference or data processing
+- **Spot instances**: up to 70% cheaper than on-demand for fault-tolerant workloads. Good for training jobs (can checkpoint and restart). Bad for real-time serving (can be interrupted).
+
+### SageMaker
+Fully managed ML platform:
+- **Training jobs**: auto-provision training compute, integrate with S3, auto-terminate when done
+- **Managed endpoints**: auto-scale serving infrastructure, A/B testing built-in, model registry integration
+- **Feature store**: online + offline store with consistent feature computation
+- **Pipelines**: workflow orchestration for ML pipelines
+
+**When to use SageMaker**: teams of 2+ ML engineers, production models requiring auto-scaling, or when you want managed infrastructure.
+
+### Lambda
+Serverless functions for event-driven prediction:
+- Zero infrastructure management
+- Cold start: 2-5 seconds for large Lambda packages (model loading)
+- Max runtime: 15 minutes
+- **Good for**: infrequent, low-volume predictions; preprocessing webhooks
+- **Bad for**: high-frequency, latency-sensitive predictions; large models
+
+---
+
+## IAM Best Practices
+
+- Use **roles**, not users, for service-to-service access
+- Apply **least privilege**: grant only the permissions actually needed
+- Never embed access keys in code — use IAM roles + instance profiles
+- Rotate any long-lived credentials regularly
+
+---
+
+## Cost Optimization
+
+| Workload | Cost-optimal approach |
+|----------|----------------------|
+| Training | Spot instances (save 70%) |
+| Always-on serving | Reserved instances (save 30-40%) |
+| Data storage | S3 + lifecycle to Glacier for old data |
+| Dev/test | Spot or on-demand with auto-termination |
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: SageMaker vs DIY on EC2
+
+**DIY EC2**: full control, lower per-instance cost, operational burden (install drivers, manage scaling, handle failures). Appropriate at companies with dedicated MLOps teams and custom requirements.
+
+**SageMaker**: higher per-instance cost (managed premium), but: auto-scaling, managed endpoints with health checks, built-in A/B testing, direct model registry integration. Appropriate for smaller ML teams or when speed of deployment matters more than cost optimization.
+
+Typical breakeven: if your team spends > 2 hours/week managing EC2 serving infrastructure, SageMaker likely pays for itself in engineering time.
+`,
+  tryGuidance: "No interactive viz — work through the AWS service selection scenarios in the interview simulation.",
+  interviewGraph: {
+    initialStageId: "mo_t5_stage1",
+    artifactDimensions: [
+      { label: "Service Selection", recoveryStageId: "mo_t5_rec1" },
+      { label: "Cost & Security", recoveryStageId: "mo_t5_terminal", passLabel: "AWS for ML" },
+    ],
+    stages: {
+      mo_t5_stage1: {
+        id: "mo_t5_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Training infrastructure",
+        prompt: "You need to train a deep learning model weekly. The training takes 8 hours on a GPU. What's the most cost-effective approach?",
+        choices: [
+          { id: "a", label: "On-demand p3.2xlarge running 24/7", description: "Running 24/7 for weekly 8h training wastes 160h of compute per week." },
+          { id: "b", label: "Spot p3.2xlarge for training (can checkpoint every hour) — provision when needed, terminate when done; 60-70% cheaper than on-demand", description: "Spot for fault-tolerant batch training is the standard cost-optimization." },
+          { id: "c", label: "Lambda function for model training", description: "Lambda max runtime is 15 minutes — insufficient for 8-hour training." },
+        ],
+        branches: { a: "mo_t5_rec1", b: "mo_t5_stage2", c: "mo_t5_rec1" },
+        rationale: "B is correct. Weekly batch training is the ideal spot instance use case: fault-tolerant (checkpoint + resume), doesn't need to be always-on, and can be submitted via SageMaker Training Job which handles spot interruption and restart automatically. 70% cost reduction vs on-demand.",
+      },
+      mo_t5_rec1: {
+        id: "mo_t5_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Spot vs on-demand",
+        prompt: "When are spot instances inappropriate for ML workloads?",
+        choices: [
+          { id: "a", label: "For real-time serving endpoints that must have guaranteed availability — spot instances can be interrupted with 2 minutes notice, causing downtime", description: "Serving requires guaranteed availability; training can handle interruption." },
+        ],
+        branches: { a: "mo_t5_stage2" },
+        rationale: "Spot instances are interrupted when AWS reclaims capacity. This is acceptable for batch training (checkpoint + restart) but not for real-time serving (would cause prediction failures).",
+      },
+      mo_t5_stage2: {
+        id: "mo_t5_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Serving deployment",
+        prompt: "You need to deploy a model that serves 1000 RPS with <100ms p99 latency, and traffic spikes 5× during peak hours. SageMaker or DIY EC2?",
+        choices: [
+          { id: "a", label: "DIY EC2 — more control over the serving stack", description: "Managing your own auto-scaling, load balancing, and health checks for 1000 RPS peaks is significant operational work." },
+          { id: "b", label: "SageMaker managed endpoint — auto-scaling handles 5× traffic spikes automatically, with built-in health checks and load balancing; the managed premium is worth the operational savings at this scale", description: "SageMaker auto-scaling is battle-tested for traffic spikes." },
+        ],
+        branches: { a: "mo_t5_rec1", b: "mo_t5_terminal" },
+        rationale: "B is reasonable for a small-to-medium team. SageMaker's managed endpoints include automatic scaling, load balancing, and health checks. The premium over raw EC2 cost is offset by the engineering time saved on infrastructure management.",
+      },
+      mo_t5_terminal: {
+        id: "mo_t5_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · IAM security",
+        prompt: "Your ML training job needs to read data from S3 and write model artifacts back. What's the secure way to provide credentials?",
+        choices: [
+          { id: "a", label: "Embed AWS access keys as environment variables in the training job config", description: "Embedded keys in config can be logged, committed to Git, or exposed in error messages." },
+          { id: "b", label: "Attach an IAM role to the EC2 instance or SageMaker training job with S3 read/write permissions — no credentials in code or config", description: "IAM roles provide temporary credentials automatically via instance metadata; no secrets to manage." },
+        ],
+        branches: { a: "mo_t5_terminal", b: "mo_t5_terminal" },
+        terminal: true,
+        rationale: "IAM roles are the secure approach. The EC2 instance or SageMaker job gets a role attached that grants specific S3 permissions. AWS provides temporary credentials automatically via instance metadata — no access keys to manage, rotate, or accidentally expose.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "For a data science team of 3 that needs to deploy a real-time model endpoint with auto-scaling, what AWS service should they use?",
+      options: [
+        "EC2 with custom auto-scaling groups and Application Load Balancer",
+        "SageMaker managed endpoints — provides auto-scaling, health checks, and A/B testing without managing the underlying infrastructure",
+        "Lambda — serverless is always the simplest option",
+      ],
+      correctIndex: 1,
+      explanation: "For a small team without dedicated infrastructure engineers, SageMaker managed endpoints provide production-grade serving infrastructure (auto-scaling, health checks, rolling deployments) without requiring expertise in EC2 auto-scaling groups, load balancers, and container orchestration. Lambda has cold start latency and 15-minute max runtime that make it unsuitable for high-volume real-time serving.",
+    },
+    {
+      question: "Why should you never embed AWS access keys in application code or Docker images?",
+      options: [
+        "AWS access keys are too long to embed efficiently",
+        "Embedded keys can be committed to Git history, exposed in error logs, or extracted from Docker image layers — use IAM roles instead, which provide automatic temporary credentials",
+        "AWS requires keys to be stored only in environment variables",
+      ],
+      correctIndex: 1,
+      explanation: "Access keys embedded in code are frequently leaked via Git commits (even in private repos — git history persists after deletion), Docker image inspection (docker history), or log files. IAM roles solve this: the EC2 instance or container gets a role, AWS rotates temporary credentials automatically via instance metadata, and no long-lived key is ever stored anywhere.",
+    },
+    {
+      question: "When is Lambda a good choice for ML inference, and when is it a poor choice?",
+      options: [
+        "Lambda is always better than EC2 for cost optimization",
+        "Lambda is good for infrequent, low-volume, low-latency-tolerance predictions; poor for high-frequency, latency-sensitive, or large-model workloads due to cold start latency and 15-minute execution limit",
+        "Lambda is good for training but not for inference",
+      ],
+      correctIndex: 1,
+      explanation: "Lambda is serverless — zero management overhead for infrequent use cases (webhooks, batch triggers, low-traffic endpoints). But: cold starts (2-5s for packages > 50MB), 15-minute max runtime, and memory limits (10GB max) make it unsuitable for large models or high-frequency real-time serving. EC2 or SageMaker endpoints are better for always-warm, low-latency use cases.",
+    },
+  ],
+},
+
+"mo-v1": {
+  durationLabel: "20 min",
+  outcomes: [
+    "Use the figure/axes API for multi-panel visualization control",
+    "Select the correct chart type for each data relationship type",
+    "Apply Tufte's data-ink ratio principle to remove chart clutter",
+    "Save publication-quality figures with appropriate DPI and tight layout",
+  ],
+  learnMarkdown: `## Matplotlib & Seaborn: Static Viz Done Right
+
+Good visualization communicates insight. Bad visualization hides it. The choice of chart type and the elimination of visual noise are as important as the data itself.
+
+---
+
+## Figure/Axes Architecture
+
+Matplotlib has two interfaces:
+
+**Functional (pyplot)**:
+\`\`\`python
+plt.plot(x, y)
+plt.xlabel("Date")
+plt.show()
+\`\`\`
+Simple for single plots, but loses control with multiple subplots.
+
+**Object-oriented (recommended)**:
+\`\`\`python
+fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+axes[0, 0].plot(x, y)
+axes[0, 0].set_xlabel("Date")
+axes[1, 0].bar(categories, values)
+fig.tight_layout()
+fig.savefig("output.png", dpi=300, bbox_inches='tight')
+\`\`\`
+
+Rule: use \`ax.method()\` for anything beyond a single plot. The axes object gives explicit control over each panel.
+
+---
+
+## Chart Type Selection
+
+| Data relationship | Chart type |
+|-------------------|-----------|
+| Correlation between two numeric variables | Scatter plot |
+| Distribution of one variable | Histogram or KDE |
+| Comparison across groups | Bar chart (avoid pie with >4 slices) |
+| Change over time | Line chart |
+| Distribution by group | Box plot or violin plot |
+| Matrix/correlation table | Heatmap |
+| Multi-variable scatter | Pairplot (seaborn) |
+
+---
+
+## Removing Chart Junk (Tufte's Data-Ink Ratio)
+
+Every visual element should encode data. Remove elements that don't:
+
+\`\`\`python
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+ax.grid(axis='y', alpha=0.3)  # subtle, not dominant
+ax.tick_params(labelsize=10)
+\`\`\`
+
+Eliminate: 3D effects, heavy gridlines, background fills, thick borders, redundant axis labels.
+
+---
+
+## Seaborn Statistical Plots
+
+Seaborn wraps matplotlib with statistical aware defaults:
+
+\`\`\`python
+import seaborn as sns
+
+# Violin: distribution shape by group
+sns.violinplot(data=df, x='group', y='value', ax=ax)
+
+# Pairplot: scatter matrix
+sns.pairplot(df[['feature1', 'feature2', 'target']], hue='segment')
+
+# Heatmap for correlation
+sns.heatmap(df.corr(), annot=True, cmap='coolwarm', ax=ax)
+\`\`\`
+
+---
+
+## Saving Publication-Quality Figures
+
+\`\`\`python
+fig.savefig("analysis.png", dpi=300, bbox_inches='tight',
+            facecolor='white')
+\`\`\`
+
+- \`dpi=300\`: 300 dots per inch for print quality
+- \`bbox_inches='tight'\`: removes extra whitespace
+- \`facecolor='white'\`: ensures white background (not transparent)
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Color Theory for Data Visualization
+
+**Sequential palettes** (viridis, plasma, Blues): for ordered numeric data — low to high. Perceptually uniform and colorblind-friendly.
+
+**Diverging palettes** (RdBu, coolwarm): for data with a meaningful midpoint (correlation: -1 to 1, temperature relative to average). Neutral color at center, diverging colors at extremes.
+
+**Qualitative palettes** (tab10, Set2): for categorical data with no inherent order. Distinguishable but not implying magnitude.
+
+**Avoid**: pure red-green combinations (8% of men have red-green color blindness). Use blue-orange or viridis instead for maximum accessibility.
+`,
+  tryGuidance: "Use the visualization gallery to compare chart types for different data relationships and practice the figure/axes API on sample datasets.",
+  interviewGraph: {
+    initialStageId: "mo_v1_stage1",
+    artifactDimensions: [
+      { label: "Chart Selection", recoveryStageId: "mo_v1_rec1" },
+      { label: "API Mastery", recoveryStageId: "mo_v1_terminal", passLabel: "Visualization" },
+    ],
+    stages: {
+      mo_v1_stage1: {
+        id: "mo_v1_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Chart type",
+        prompt: "You want to compare the distribution of model prediction scores across 5 customer segments. Which chart type is most informative?",
+        choices: [
+          { id: "a", label: "Bar chart showing average score per segment", description: "Averages hide distribution shape — two segments with the same mean can have very different spreads." },
+          { id: "b", label: "Violin plot or box plot showing distribution shape and spread per segment", description: "Violin shows full distribution; box shows quartiles + outliers. Both reveal distribution, not just mean." },
+          { id: "c", label: "Pie chart showing segment proportions", description: "Pie charts show composition, not distribution." },
+        ],
+        branches: { a: "mo_v1_rec1", b: "mo_v1_stage2", c: "mo_v1_rec1" },
+        rationale: "B is correct. Comparing distributions across groups calls for violin plots (full distribution shape) or box plots (quartiles + outliers). Bar charts showing only means hide bimodality, skewness, and outliers that may be clinically important.",
+      },
+      mo_v1_rec1: {
+        id: "mo_v1_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Distributions",
+        prompt: "Why is a bar chart showing means inadequate for comparing distributions?",
+        choices: [
+          { id: "a", label: "Two distributions can have identical means but completely different shapes — a bar chart hides bimodality, skewness, and outliers that violin/box plots reveal", description: "The mean is a single number that summarizes without describing." },
+        ],
+        branches: { a: "mo_v1_stage2" },
+        rationale: "Always show the distribution shape when comparing groups, not just summary statistics.",
+      },
+      mo_v1_stage2: {
+        id: "mo_v1_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Axes API",
+        prompt: "You want 4 related plots sharing x-axis labels in a 2×2 grid. Should you use plt.plot() or the fig/axes API?",
+        choices: [
+          { id: "a", label: "plt.plot() — simpler code", description: "pyplot's functional interface loses control of individual subplot panels." },
+          { id: "b", label: "fig, axes = plt.subplots(2, 2) — explicit control over each axes object, shared axis labels, and the overall figure", description: "Object-oriented API is standard for multi-panel figures." },
+        ],
+        branches: { a: "mo_v1_rec1", b: "mo_v1_terminal" },
+        rationale: "B is correct. The object-oriented (axes) API gives explicit control: axes[0,0].plot(...), axes[0,1].bar(...), shared axes (sharex=True), individual titles and labels per panel. The functional pyplot API is sufficient for single plots but gets unwieldy for subplots.",
+      },
+      mo_v1_terminal: {
+        id: "mo_v1_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · Data-ink ratio",
+        prompt: "Apply Tufte's data-ink ratio principle to a cluttered chart. What should you remove?",
+        choices: [
+          { id: "a", label: "Top and right spines, heavy gridlines, background fills, 3D effects — every visual element that doesn't encode data", description: "Remove ink that doesn't carry information." },
+        ],
+        branches: { a: "mo_v1_terminal" },
+        terminal: true,
+        rationale: "Tufte: maximize data-ink ratio by removing non-data ink. Top and right spines are redundant (axes already defined), heavy gridlines compete with data, background fills add noise. What remains should be data and necessary reference.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "What is the difference between plt.plot() and ax.plot() in matplotlib?",
+      options: [
+        "plt.plot() is for line charts; ax.plot() is for scatter plots",
+        "plt.plot() is the functional interface (implicit current axes); ax.plot() is the object-oriented interface (explicit axes object) — the latter is recommended for multi-panel figures and production code",
+        "ax.plot() produces higher resolution output",
+      ],
+      correctIndex: 1,
+      explanation: "plt.plot() operates on whatever axes is currently active — convenient for single plots but ambiguous for multiple subplots. ax.plot() operates on a specific named axes object, giving explicit control over multi-panel layouts. For any figure with more than one subplot, use the object-oriented (ax) interface.",
+    },
+    {
+      question: "You want to visualize the correlation matrix of 8 features. Which chart type is most appropriate?",
+      options: [
+        "Bar chart with one bar per feature pair",
+        "Heatmap with annotated correlation coefficients (e.g., seaborn heatmap with annot=True)",
+        "Scatter plot matrix (pairplot)",
+      ],
+      correctIndex: 1,
+      explanation: "A heatmap is the standard for correlation matrices: color encodes correlation strength, annotations show exact values, and the symmetric matrix is instantly interpretable at a glance. A pairplot shows scatter plots between each pair — useful for exploring non-linear relationships but visually overwhelming for 8 features (56 scatter plots). Bar charts are not appropriate for pairwise relationships.",
+    },
+    {
+      question: "What does bbox_inches='tight' do in fig.savefig()?",
+      options: [
+        "It compresses the image to reduce file size",
+        "It removes extra whitespace around the figure so the saved image's bounding box tightly fits the visible content",
+        "It enforces a fixed aspect ratio for the saved figure",
+      ],
+      correctIndex: 1,
+      explanation: "By default, matplotlib may include extra whitespace around figures. bbox_inches='tight' calculates the minimum bounding box that contains all visible elements (title, axis labels, legend) and clips to that. This is essential for figures embedded in reports or papers where extra whitespace looks unprofessional.",
+    },
+  ],
+},
+
+"mo-v2": {
+  durationLabel: "18 min",
+  outcomes: [
+    "Create interactive charts with plotly.express and go.Figure",
+    "Build a Dash callback that connects a dropdown filter to a chart",
+    "Choose between scattergl and scatter for large datasets",
+    "Identify when Plotly is and is not appropriate vs matplotlib",
+  ],
+  learnMarkdown: `## Plotly: Interactive Visualizations
+
+Plotly creates interactive, web-ready charts. Users can hover for details, zoom, pan, and filter. For exploratory analysis and dashboards, this interactivity is invaluable.
+
+---
+
+## plotly.express vs go.Figure
+
+**plotly.express** (recommended starting point):
+\`\`\`python
+import plotly.express as px
+
+fig = px.scatter(df, x='feature_a', y='feature_b',
+                 color='segment', hover_data=['user_id'],
+                 title='Feature Correlation by Segment')
+fig.show()
+\`\`\`
+
+One-liners for common chart types: px.scatter, px.bar, px.histogram, px.box, px.line, px.imshow.
+
+**go.Figure** (full control):
+\`\`\`python
+import plotly.graph_objects as go
+
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=x, y=y, mode='lines', name='Model'))
+fig.add_trace(go.Scatter(x=x, y=y_baseline, mode='lines',
+                          name='Baseline', line=dict(dash='dash')))
+fig.update_layout(title='Model vs Baseline',
+                  xaxis_title='Date', yaxis_title='Metric')
+\`\`\`
+
+Use go when you need multiple traces, custom colors, or layout configurations not exposed by express.
+
+---
+
+## Dash for Interactive Dashboards
+
+\`\`\`python
+from dash import Dash, dcc, html, Input, Output
+
+app = Dash(__name__)
+app.layout = html.Div([
+    dcc.Dropdown(id='segment-filter',
+                 options=['All', 'New', 'Returning'],
+                 value='All'),
+    dcc.Graph(id='scatter-chart')
+])
+
+@app.callback(
+    Output('scatter-chart', 'figure'),
+    Input('segment-filter', 'value')
+)
+def update_chart(selected_segment):
+    filtered = df if selected_segment == 'All' else df[df.segment == selected_segment]
+    return px.scatter(filtered, x='feature_a', y='feature_b')
+\`\`\`
+
+Dash uses React under the hood. Callbacks connect component inputs to outputs — no JavaScript required.
+
+---
+
+## Performance with Large Data
+
+| Scenario | Solution |
+|----------|---------|
+| > 10,000 points scatter | Use \`go.Scattergl\` (WebGL renderer) instead of go.Scatter |
+| > 100,000 points | Use Datashader to pre-rasterize, display as image |
+| Streaming data | Use Plotly's extendData for incremental updates |
+
+---
+
+## When NOT to Use Plotly
+
+- **Static reports/PDFs**: use matplotlib (Plotly requires a browser or Jupyter for interactivity)
+- **Very large datasets without filtering**: WebGL handles 100K+ points, but CPU-side rendering is slow
+- **Publication figures**: matplotlib with vector output (SVG, PDF) is standard for papers
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Dash vs Streamlit
+
+**Dash**: React-based, full-featured web app framework. Steeper learning curve but highly customizable. Production-ready, deployable as a standard web app. Better for complex multi-page applications with custom layouts.
+
+**Streamlit**: simpler API, faster prototyping, runs top-to-bottom like a script. Better for quick DS demos and internal tools. Less suitable for complex interactive dashboards with many interdependent widgets.
+
+For quick prototyping: Streamlit. For production dashboards with complex interactivity: Dash. For maximum flexibility: a React frontend calling FastAPI endpoints.
+`,
+  tryGuidance: "Interact with the Plotly examples — hover, zoom, filter by segment — to experience the interactivity available before building your own.",
+  interviewGraph: {
+    initialStageId: "mo_v2_stage1",
+    artifactDimensions: [
+      { label: "Tool Selection", recoveryStageId: "mo_v2_rec1" },
+      { label: "Performance", recoveryStageId: "mo_v2_terminal", passLabel: "Interactive Viz" },
+    ],
+    stages: {
+      mo_v2_stage1: {
+        id: "mo_v2_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Tool choice",
+        prompt: "A PM asks for a scatter plot they can hover over and filter by customer segment. Should you use matplotlib or Plotly?",
+        choices: [
+          { id: "a", label: "Matplotlib — it's the standard for all data visualization", description: "Matplotlib produces static images. Hover and filter require interactivity." },
+          { id: "b", label: "Plotly — it provides hover tooltips, zoom/pan, and filter interactivity natively; appropriate for interactive web-delivered charts", description: "px.scatter with color='segment' and hover_data gives this in one line." },
+          { id: "c", label: "Neither — export to a BI tool like Tableau", description: "Plotly can do this directly without an external tool." },
+        ],
+        branches: { a: "mo_v2_rec1", b: "mo_v2_stage2", c: "mo_v2_rec1" },
+        rationale: "B is correct. Matplotlib outputs static images (PNG, SVG, PDF) — no interactivity. Plotly renders interactive HTML/JavaScript charts with hover, zoom, and filter. For stakeholder exploration, Plotly is the right tool.",
+      },
+      mo_v2_rec1: {
+        id: "mo_v2_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Static vs interactive",
+        prompt: "When is matplotlib preferred over Plotly?",
+        choices: [
+          { id: "a", label: "Static reports, PDFs, and academic papers — matplotlib produces publication-quality vector output; Plotly's interactivity adds no value when the medium doesn't support it", description: "Match the tool to the output medium." },
+        ],
+        branches: { a: "mo_v2_stage2" },
+        rationale: "Plotly's interactivity requires a browser. For PDF reports or printed figures, matplotlib with dpi=300 is the standard.",
+      },
+      mo_v2_stage2: {
+        id: "mo_v2_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Large dataset performance",
+        prompt: "You're plotting 500,000 user engagement events as a scatter plot. The page loads slowly. What's the fix?",
+        choices: [
+          { id: "a", label: "Sample down to 1,000 points for faster rendering", description: "Sampling loses information — patterns in the full dataset may not appear in a sample." },
+          { id: "b", label: "Use go.Scattergl (WebGL renderer) instead of go.Scatter — handles hundreds of thousands of points with GPU-accelerated rendering", description: "WebGL renders in the browser's GPU, bypassing the Python-side CPU bottleneck." },
+          { id: "c", label: "Use a bar chart instead of scatter for large datasets", description: "Changing chart type to avoid the performance issue loses the scatter relationship information." },
+        ],
+        branches: { a: "mo_v2_rec1", b: "mo_v2_terminal" },
+        rationale: "B is correct. go.Scattergl uses WebGL for rendering — the browser's GPU handles the 500K points instead of the CPU DOM renderer. This is 10-100× faster for large point sets.",
+      },
+      mo_v2_terminal: {
+        id: "mo_v2_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · px vs go",
+        prompt: "When do you use go.Figure instead of plotly.express?",
+        choices: [
+          { id: "a", label: "When you need multiple traces on one figure, custom layouts, or configurations not exposed by express's simplified API", description: "express is a convenience wrapper; go gives full control." },
+        ],
+        branches: { a: "mo_v2_terminal" },
+        terminal: true,
+        rationale: "plotly.express is excellent for standard single-trace charts. go.Figure is needed for: multiple traces (model vs baseline), mixed chart types, custom colorscales, annotations, shapes, or layout configurations beyond express's defaults.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "What is the key tradeoff between plotly.express and go.Figure?",
+      options: [
+        "plotly.express is faster to render; go.Figure is more memory-efficient",
+        "plotly.express is a convenient high-level API for standard charts with a one-liner syntax; go.Figure provides full control over every trace and layout property but requires more code",
+        "plotly.express only works in Jupyter; go.Figure works everywhere",
+      ],
+      correctIndex: 1,
+      explanation: "plotly.express wraps common chart types into concise one-liners with sensible defaults — great for 80% of use cases. go.Figure gives access to every Plotly API property: multiple traces, custom colors, annotations, subplots, mixed chart types. Start with express; switch to go when you hit express's limits.",
+    },
+    {
+      question: "Why use go.Scattergl instead of go.Scatter for a chart with 200,000 data points?",
+      options: [
+        "Scattergl supports more hover tooltip configurations",
+        "Scattergl uses WebGL rendering in the browser's GPU, which is 10-100× faster than the SVG/DOM renderer used by Scatter — essential for large point sets",
+        "Scattergl automatically samples the data to 10,000 points for display",
+      ],
+      correctIndex: 1,
+      explanation: "go.Scatter renders using SVG/DOM, where each point is an SVG element. At 200K points, this creates 200K DOM nodes — extremely slow. go.Scattergl renders via WebGL: the GPU handles all 200K points as a single draw call, making rendering near-instant for even millions of points.",
+    },
+    {
+      question: "In a Dash callback, what do the Input() and Output() decorators specify?",
+      options: [
+        "Input() specifies the data source; Output() specifies the chart title",
+        "Input() specifies which component property triggers the callback (e.g., dropdown value change); Output() specifies which component property the callback updates (e.g., a graph's figure)",
+        "They specify the HTTP methods for the Dash server endpoints",
+      ],
+      correctIndex: 1,
+      explanation: "Dash callbacks use a reactive programming model. Output('graph-id', 'figure') means 'this function updates the figure property of the component with id graph-id.' Input('dropdown-id', 'value') means 'run this function whenever the value property of dropdown-id changes.' The callback function takes the Input values and returns the Output values.",
+    },
+  ],
+},
+
+"mo-v3": {
+  durationLabel: "15 min",
+  outcomes: [
+    "Apply Tufte's data-ink ratio and chartjunk principles to redesign cluttered dashboards",
+    "Select the correct chart type for each communication goal",
+    "Structure a dashboard with a hero KPI row, trend layer, and drill-down layer",
+    "Identify common visualization mistakes: 3D charts, dual Y-axis, misleading truncation",
+  ],
+  learnMarkdown: `## Dashboard Design Principles
+
+A dashboard with 20 KPIs communicates nothing. A dashboard with 5 well-chosen KPIs, arranged hierarchically, lets a decision-maker understand the business state in 30 seconds.
+
+---
+
+## Tufte's Core Principles
+
+**Data-ink ratio**: maximize the proportion of ink (or pixels) that encodes data. Remove everything that doesn't.
+
+**Chartjunk**: visual elements that add complexity without information:
+- 3D effects (distort area, add non-data depth)
+- Heavy gridlines (compete with data)
+- Decorative fills and gradients
+- Excessive tick marks
+- Dual Y-axis (implies a relationship that may not exist; confuses scale)
+
+**Small multiples**: instead of one complex chart, use many small identical charts with a single variable changing. Easier to compare than a cluttered overlay.
+
+---
+
+## Chart Type Rules
+
+| Goal | Chart | Avoid |
+|------|-------|-------|
+| Change over time | Line chart | Bar chart for many time points |
+| Compare categories | Bar chart | Pie chart (>4 slices unreadable) |
+| Part-to-whole | Stacked bar or treemap | 3D pie |
+| Distribution | Histogram, violin | 3D bar |
+| Correlation | Scatter | Bubble chart (3rd variable as bubble size is hard to read) |
+
+**Never** use pie charts with more than 4 slices — humans can't compare angles accurately.
+
+---
+
+## Dashboard Hierarchy
+
+Structure dashboards in three layers:
+
+1. **Hero KPIs** (top row): 3-5 large numbers with trend arrows. "Revenue: $4.2M ↑ 8%." These answer: is the business healthy right now?
+
+2. **Trend layer**: line charts of key metrics over 90 days. Answers: is this a recent change or sustained?
+
+3. **Segment/drill-down**: breakdowns by platform, geo, cohort. Answers: where is the change coming from?
+
+Decision-makers scan top to bottom. Put the most important information at the top.
+
+---
+
+## Common Mistakes to Avoid
+
+**Y-axis truncation**: starting the Y-axis at 89% instead of 0% makes a 0.5% change look like a 50% change. Always start at zero for bar charts; annotation is acceptable for line charts.
+
+**Too many colors**: more than 7 colors are indistinguishable. Use color only when it encodes a data dimension, not for decoration.
+
+**Colorblind accessibility**: avoid pure red/green combinations. Use blue/orange or viridis palette.
+
+**Dual Y-axis**: two Y-axes imply a relationship between the two series. If there's no causal relationship, a dual axis misleads. Use small multiples instead.
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Storytelling with Data
+
+A dashboard is a tool for monitoring. A presentation is a tool for persuasion. They have different design requirements.
+
+**Dashboard**: must be readable at a glance, updated in real time or near-real time, self-explanatory. Minimize text — use chart titles as questions ("Did CTR improve after the launch?"), not descriptions.
+
+**Analysis presentation**: narrative arc. Start with the question, show the data, reveal the answer, recommend the action. Each chart should advance the narrative — if a chart doesn't change what the audience thinks or does, cut it.
+
+Cole Nussbaumer Knaflic's *Storytelling with Data* is the standard reference for DS communication design.
+`,
+  tryGuidance: "No interactive viz — apply the design principles to the mock dashboard scenarios in the interview simulation.",
+  interviewGraph: {
+    initialStageId: "mo_v3_stage1",
+    artifactDimensions: [
+      { label: "Chartjunk Removal", recoveryStageId: "mo_v3_rec1" },
+      { label: "Dashboard Structure", recoveryStageId: "mo_v3_terminal", passLabel: "Design Mastery" },
+    ],
+    stages: {
+      mo_v3_stage1: {
+        id: "mo_v3_stage1",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Bad chart critique",
+        prompt: "A colleague's dashboard has: 3D pie chart with 12 slices, dual Y-axis showing revenue and NPS, Y-axis starting at 95% for a metric that ranges 95-99%. What should you fix?",
+        choices: [
+          { id: "a", label: "The colors — pie charts need more distinct colors", description: "Color is a secondary issue; the chart type and axis problems are primary." },
+          { id: "b", label: "Replace pie with bar chart (12 slices are unreadable as pie), remove dual Y-axis (use small multiples), start Y-axis at 0 or annotate the truncation clearly", description: "Three separate design violations, three specific fixes." },
+          { id: "c", label: "Add more data to fill the chart better", description: "More data won't fix structural design problems." },
+        ],
+        branches: { a: "mo_v3_rec1", b: "mo_v3_stage2", c: "mo_v3_rec1" },
+        rationale: "B correctly identifies three distinct issues: (1) 12-slice pie is unreadable — bar chart sorts by value and is readable at any count; (2) dual Y-axis implies a relationship between revenue and NPS that may not be meaningful — small multiples are cleaner; (3) Y-axis starting at 95% makes a 1-point change look like a massive swing.",
+      },
+      mo_v3_rec1: {
+        id: "mo_v3_rec1",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Chartjunk definition",
+        prompt: "What is Tufte's concept of chartjunk and why does it matter?",
+        choices: [
+          { id: "a", label: "Visual elements that add complexity without encoding data — they increase cognitive load without improving understanding", description: "3D effects, heavy gridlines, decorative fills are classic chartjunk." },
+        ],
+        branches: { a: "mo_v3_stage2" },
+        rationale: "Chartjunk forces the viewer to process visual information that carries no data signal. Every unnecessary element is cognitive overhead that detracts from data comprehension.",
+      },
+      mo_v3_stage2: {
+        id: "mo_v3_stage2",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Dashboard hierarchy",
+        prompt: "You're redesigning an executive dashboard with 20 KPIs. How do you structure it?",
+        choices: [
+          { id: "a", label: "Show all 20 KPIs in a grid — executives need full information", description: "20 equal KPIs overwhelm — there's no signal in undifferentiated noise." },
+          { id: "b", label: "3-layer hierarchy: 3-5 hero KPIs (large, trend arrows) → trend charts for key metrics → segment drill-downs; prioritize by decision importance", description: "Hierarchy guides the eye from summary to detail." },
+        ],
+        branches: { a: "mo_v3_rec1", b: "mo_v3_terminal" },
+        rationale: "B is correct. Not all metrics are equal in an executive dashboard. The hero layer (3-5 KPIs) answers 'are we healthy?' The trend layer answers 'is this sustained?' The drill-down answers 'where is the issue?' Executives read top-to-bottom — put the most critical information first.",
+      },
+      mo_v3_terminal: {
+        id: "mo_v3_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · Design principle",
+        prompt: "What is the single most important dashboard design principle?",
+        choices: [
+          { id: "a", label: "Maximize the data-ink ratio: every visual element should encode data, and anything that doesn't should be removed", description: "This principle naturally leads to all other improvements." },
+        ],
+        branches: { a: "mo_v3_terminal" },
+        terminal: true,
+        rationale: "The data-ink ratio principle subsumes all other design guidance: remove gridlines, spines, 3D effects, decorative fills — all of these are non-data ink. What remains is clear, focused, and readable.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "Why should you avoid pie charts with more than 4 slices?",
+      options: [
+        "Pie charts are computationally expensive to render",
+        "Humans cannot accurately compare angles — it's nearly impossible to determine which of 12 slices is larger when they're close in size; bar charts allow direct length comparison which is far more accurate",
+        "Pie charts with many slices are not supported by most visualization libraries",
+      ],
+      correctIndex: 1,
+      explanation: "Human visual perception is good at comparing lengths (bar charts) but poor at comparing angles and areas (pie charts). With more than 4 slices, the differences become too small to perceive accurately. A sorted bar chart achieves the same goal (part-to-whole comparison) with far better perceptual accuracy.",
+    },
+    {
+      question: "What is the problem with a Y-axis that starts at 97% for a metric ranging from 97% to 99%?",
+      options: [
+        "A Y-axis starting at 97% is fine — it zooms in to show meaningful variation",
+        "It makes a 1-percentage-point change (97% to 98%) look as large as a 97-percentage-point change would on a full-range axis — misleading stakeholders about the magnitude of change",
+        "Starting the Y-axis at a non-zero value is only problematic for line charts",
+      ],
+      correctIndex: 1,
+      explanation: "Y-axis truncation inflates the visual magnitude of changes. If the Y-axis shows 97–99%, a line going from 97% to 98% fills the entire chart height, making it look like a massive improvement. A stakeholder unfamiliar with the axis range could easily misinterpret the scale. For bar charts, always start at zero. For line charts, truncation is more defensible but should be clearly annotated.",
+    },
+    {
+      question: "When is a dual Y-axis appropriate, and when should you use small multiples instead?",
+      options: [
+        "Dual Y-axis is always appropriate when showing two metrics with different scales on the same time series",
+        "Dual Y-axis is only appropriate when there's a meaningful quantitative relationship between the two series; use small multiples (separate charts) when you just want to show trends on the same time period without implying a causal or proportional relationship",
+        "Small multiples are only for geographic data; dual Y-axis is standard for time series",
+      ],
+      correctIndex: 1,
+      explanation: "A dual Y-axis visually implies that the two series are related — their relative positions and slopes appear meaningful. If you show revenue and NPS on a dual axis, viewers will look for the relationship between them. Small multiples (two separate charts aligned vertically) allow comparison of trends without implying a quantitative relationship between the two series.",
+    },
+  ],
+},
+
+"sp-r1": {
+    durationLabel: "18 min",
+    outcomes: [
+      "Explain user-based vs item-based collaborative filtering",
+      "Identify the cold-start problem and its mitigations",
+      "Interpret similarity metrics (cosine, Pearson) for recommendations",
+    ],
+    learnMarkdown: `## Collaborative Filtering
+
+Collaborative filtering recommends items based on the behavior of similar users or items — no item metadata needed.
+
+### User-Based CF
+Find users similar to the target user, then recommend what those similar users liked:
+
+\`\`\`
+similarity(u, v) = cosine(ratings_u, ratings_v)
+predicted(u, i) = mean(u) + Σ sim(u,v)*(r_vi - mean(v)) / Σ|sim(u,v)|
+\`\`\`
+
+### Item-Based CF
+Find items similar to what the target user rated, recommend similar items:
+- More stable than user-based (items change less than user taste)
+- Amazon pioneered this approach at scale
+
+### Similarity Metrics
+| Metric | Formula | Best For |
+|--------|---------|---------|
+| Cosine | cos(θ) between rating vectors | Sparse vectors |
+| Pearson | correlation of centered ratings | Rating bias correction |
+| Jaccard | intersection/union of rated items | Implicit feedback |
+
+### The Cold-Start Problem
+- **New user**: No history → can't find similar users
+- **New item**: No ratings → can't compute similarity
+- **Mitigations**: Popularity-based fallback, content features, onboarding questions
+
+### Scalability Challenges
+- Computing all user pairs: O(U²) — infeasible for millions of users
+- Solution: Approximate nearest neighbors (FAISS, ScaNN), matrix factorization`,
+
+    video: null,
+    videoFallbackMarkdown: `## Matrix Factorization as Collaborative Filtering
+
+Latent factor models (SVD, ALS) decompose the rating matrix R ≈ U × Vᵀ:
+- U: user latent factor matrix (U × K)
+- V: item latent factor matrix (I × K)
+- K: number of latent dimensions (e.g., 50–200)
+
+**Alternating Least Squares (ALS)**: Fix V, solve for U; fix U, solve for V. Repeat until convergence. Parallelizable — used in Spark MLlib.
+
+**Implicit Feedback**: When you only have clicks/views (not explicit ratings), weight the confidence: c_ui = 1 + α * r_ui where r_ui is interaction count.`,
+
+    tryGuidance: "Explore how user similarity drives recommendations. Adjust the rating matrix and watch predicted scores update.",
+
+    interviewGraph: {
+      initialStageId: "sp_r1_stage1",
+      artifactDimensions: [
+        { label: "CF Mechanics", recoveryStageId: "sp_r1_rec1" },
+        { label: "Cold-Start", recoveryStageId: "sp_r1_rec2" },
+        { label: "Scalability", recoveryStageId: "sp_r1_rec3", passLabel: "RecSys Ready" },
+      ],
+      stages: {
+        sp_r1_stage1: {
+          id: "sp_r1_stage1",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · User vs Item CF",
+          prompt: "A streaming platform uses user-based CF. As the user base grows to 50M, recommendations become slow. An engineer suggests switching to item-based CF. Why might this help?",
+          choices: [
+            { id: "a", label: "Items are fewer and more stable than users", description: "Item similarity matrix is smaller and changes less frequently" },
+            { id: "b", label: "Item-based CF is always more accurate", description: "Accuracy depends on the domain, not the approach" },
+            { id: "c", label: "Users don't like being compared to other users", description: "Privacy concern, but not the performance reason" },
+            { id: "d", label: "Item-based CF avoids the cold-start problem", description: "Both approaches have cold-start issues" },
+          ],
+          branches: { a: "sp_r1_stage2", b: "sp_r1_rec1", c: "sp_r1_rec1", d: "sp_r1_rec1" },
+          rationale: "Item-based CF wins at scale because the number of items (movies, products) is typically much smaller and more stable than the number of users. Pre-computing item-item similarities offline is feasible; recomputing user-user similarities for 50M users is not.",
+        },
+        sp_r1_rec1: {
+          id: "sp_r1_rec1",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · CF Mechanics",
+          prompt: "In user-based CF, user A rated movies [5, 3, 0, 4] and user B rated [4, 0, 2, 5]. Which similarity metric handles the missing ratings (0s) best for sparse data?",
+          choices: [
+            { id: "a", label: "Cosine similarity on non-zero entries only", description: "Ignores missing ratings — appropriate for sparse data" },
+            { id: "b", label: "Euclidean distance on the full vectors", description: "0s for unrated items would distort the distance" },
+            { id: "c", label: "Pearson correlation on all entries", description: "Treating 0 as a rating of 0 is incorrect for missing data" },
+            { id: "d", label: "Jaccard on the full rating vectors", description: "Jaccard is for binary data — not raw ratings" },
+          ],
+          branches: { a: "sp_r1_stage2", b: "sp_r1_stage2", c: "sp_r1_stage2", d: "sp_r1_stage2" },
+          rationale: "For sparse rating matrices, cosine similarity computed only over co-rated items avoids the distortion of treating unrated items as 0. Pearson is better when you want to correct for rating bias (some users always rate high/low).",
+        },
+        sp_r1_stage2: {
+          id: "sp_r1_stage2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Cold-Start",
+          prompt: "A new user signs up and watches one movie. Your CF system has almost no data about this user. What is the BEST immediate strategy?",
+          choices: [
+            { id: "a", label: "Serve popularity-based recommendations then shift to CF", description: "Fallback to popular items while collecting data" },
+            { id: "b", label: "Ask the user to rate 50 items before showing anything", description: "High friction — most users will leave" },
+            { id: "c", label: "Use the ratings of randomly selected users", description: "Random neighbors add noise, not signal" },
+            { id: "d", label: "Wait 30 days until enough data is collected", description: "Users won't return if the experience is bad from day one" },
+          ],
+          branches: { a: "sp_r1_stage3", b: "sp_r1_rec2", c: "sp_r1_rec2", d: "sp_r1_rec2" },
+          rationale: "Popularity-based fallback (trending, top-rated) is the standard cold-start strategy. You surface content likely to be enjoyed while collecting implicit signals (watch time, clicks) to bootstrap the user's profile. A short onboarding quiz (3–5 questions) is also acceptable friction.",
+        },
+        sp_r1_rec2: {
+          id: "sp_r1_rec2",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Cold-Start",
+          prompt: "Which of these is NOT a valid cold-start mitigation strategy?",
+          choices: [
+            { id: "a", label: "Content-based filtering using item metadata", description: "Doesn't require user history — valid mitigation" },
+            { id: "b", label: "Asking onboarding preference questions", description: "Collects initial preferences — valid mitigation" },
+            { id: "c", label: "Computing CF on the full matrix excluding new users", description: "Correct — this is what you do anyway, it doesn't help the new user" },
+            { id: "d", label: "Using demographic similarity to find proxy users", description: "Age/location can proxy for taste — valid mitigation" },
+          ],
+          branches: { a: "sp_r1_stage3", b: "sp_r1_stage3", c: "sp_r1_stage3", d: "sp_r1_stage3" },
+          rationale: "Option C doesn't help — you're already excluding new users from CF because they have no history. The real mitigations are: content-based fallback, onboarding questions, demographic proxies, or popularity-based recommendations.",
+        },
+        sp_r1_stage3: {
+          id: "sp_r1_stage3",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · Scale & Matrix Factorization",
+          prompt: "Your team wants to replace item-based CF with matrix factorization (ALS). A stakeholder asks: 'What do the latent factors actually represent?' Best answer?",
+          choices: [
+            { id: "a", label: "They are learned abstract features that capture taste patterns", description: "Correct — latent factors are not interpretable genre labels" },
+            { id: "b", label: "They are explicit genre tags like action, comedy, drama", description: "Those are content features, not latent factors" },
+            { id: "c", label: "They represent user demographics like age and gender", description: "Demographics are not learned from ratings alone" },
+            { id: "d", label: "They are the top principal components of the rating matrix", description: "SVD is related but ALS/implicit factorization is not pure PCA" },
+          ],
+          branches: { a: "sp_r1_end", b: "sp_r1_rec3", c: "sp_r1_rec3", d: "sp_r1_rec3" },
+          rationale: "Latent factors are abstract learned representations — they might correlate with genres or demographics, but they're not interpretable labels. A factor might capture 'cerebral sci-fi enjoyed by night-owl viewers' — a pattern the model discovered without being told.",
+        },
+        sp_r1_rec3: {
+          id: "sp_r1_rec3",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Matrix Factorization",
+          prompt: "ALS (Alternating Least Squares) factorization is used for implicit feedback (clicks, views) rather than explicit ratings. What adjustment is made?",
+          choices: [
+            { id: "a", label: "Confidence weighting: c_ui = 1 + α * interaction_count", description: "More interactions → higher confidence, not just a binary signal" },
+            { id: "b", label: "Treating all unobserved items as negative ratings of -1", description: "Unobserved means unknown, not disliked — too harsh" },
+            { id: "c", label: "Ignoring unobserved items entirely in the loss function", description: "You must model unobserved items or the model has no signal to push against" },
+            { id: "d", label: "Converting clicks to a 1-5 star rating scale", description: "Clicks are ordinal at best — this loses information" },
+          ],
+          branches: { a: "sp_r1_end", b: "sp_r1_end", c: "sp_r1_end", d: "sp_r1_end" },
+          rationale: "For implicit feedback, ALS uses confidence weighting: c_ui = 1 + α * r_ui where r_ui is the raw interaction count. This treats frequently accessed items as higher-confidence positives, while unobserved items become low-confidence negatives (contributing to the loss with weight 1).",
+        },
+        sp_r1_end: {
+          id: "sp_r1_end",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Collaborative Filtering Mastered",
+          prompt: "You've completed collaborative filtering. Which scenario best fits item-based CF over user-based CF in production?",
+          choices: [
+            { id: "a", label: "Item catalog is small and stable, user base is massive", description: "Item similarity precomputation scales better" },
+            { id: "b", label: "New items launch daily, user base is small", description: "User-based CF would handle frequent new items better" },
+            { id: "c", label: "Pure cold-start scenario with no historical data", description: "Neither CF variant helps without data" },
+            { id: "d", label: "When you need human-interpretable explanations", description: "Neither produces interpretable explanations easily" },
+          ],
+          branches: { a: "sp_r1_end", b: "sp_r1_end", c: "sp_r1_end", d: "sp_r1_end" },
+          terminal: true,
+          rationale: "Item-based CF shines when items are relatively stable (movies, products) and users are plentiful. The item similarity matrix can be computed offline once and served at low latency. User-based CF struggles at scale because the user-user similarity matrix grows as O(U²).",
+        },
+      },
+    },
+
+    knowledgeCheck: [
+      {
+        question: "A user has rated 5 items. Another user has rated 200 items but only 2 overlap with the first user. Cosine similarity returns 0.92. Should you trust this similarity score?",
+        options: [
+          "Yes — 0.92 is very high, strong signal",
+          "No — high similarity from only 2 co-rated items is unreliable",
+          "Yes — more items rated means better data quality",
+          "No — cosine similarity is always unreliable for CF",
+        ],
+        correctIndex: 1,
+        explanation: "High cosine similarity computed from only 2 co-rated items is statistically unreliable. Many CF systems apply shrinkage: sim_shrunk = sim * n_common / (n_common + λ) where λ is a regularization term. With n_common=2, the similarity would be heavily discounted.",
+      },
+      {
+        question: "What is the 'gray sheep' problem in collaborative filtering?",
+        options: [
+          "Users who only watch content on weekends",
+          "Users whose tastes don't correlate well with any other user",
+          "Items that have very few ratings",
+          "The cold-start problem for new items",
+        ],
+        correctIndex: 1,
+        explanation: "Gray sheep are users with unusual or eclectic tastes that don't align with any cluster of other users. CF performs poorly for them because there are no good nearest neighbors. Content-based or hybrid approaches work better for gray sheep.",
+      },
+      {
+        question: "Why does item-based CF typically produce more stable recommendations than user-based CF?",
+        options: [
+          "Items have more metadata than users",
+          "Item similarity changes less frequently than user taste patterns",
+          "Items are rated by more people than users rate items",
+          "Item-based CF uses a more advanced algorithm",
+        ],
+        correctIndex: 1,
+        explanation: "Item similarities are relatively stable — 'Inception' and 'Interstellar' will remain similar over time. User tastes shift more frequently. This means item-item similarity matrices can be precomputed offline and refreshed less often, making the system more stable and efficient.",
+      },
+    ],
+  },
+
+  "sp-r2": {
+    durationLabel: "15 min",
+    outcomes: [
+      "Build content-based recommendations using item features",
+      "Compare TF-IDF and embedding-based item representations",
+      "Explain why content-based avoids cold-start for new items",
+    ],
+    learnMarkdown: `## Content-Based Filtering
+
+Content-based filtering recommends items similar to what the user liked, based on item attributes — no other users needed.
+
+### How It Works
+1. Represent each item as a feature vector (genre, director, keywords, embeddings)
+2. Build a user profile from items they rated positively
+3. Score unrated items by similarity to the user profile
+
+\`\`\`python
+# TF-IDF representation of movie descriptions
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+tfidf = TfidfVectorizer(stop_words='english')
+item_matrix = tfidf.fit_transform(movie_descriptions)  # (n_items, n_features)
+user_profile = item_matrix[liked_movies].mean(axis=0)   # average liked-item vector
+scores = cosine_similarity(user_profile, item_matrix)   # score all items
+\`\`\`
+
+### Feature Representations
+| Type | Examples | Pros | Cons |
+|------|---------|------|------|
+| Categorical | Genre, Director | Interpretable | Sparse, brittle |
+| TF-IDF | Description text | Captures nuance | High-dimensional |
+| Embeddings | BERT, CLIP | Semantic understanding | Black box |
+
+### Advantages over CF
+- **No cold-start for new items**: New items can be recommended the moment their metadata is available
+- **Explainable**: "Because you liked X (action, Nolan), here's Y"
+- **No popularity bias**: Niche items can still be recommended
+
+### Disadvantages
+- **Filter bubble**: Only recommends items similar to past history — no discovery
+- **Requires rich metadata**: Quality depends on item feature quality
+- **No cross-domain signals**: Misses the "users like you also liked" signal`,
+
+    video: null,
+    videoFallbackMarkdown: `## Embedding-Based Content Filtering
+
+Modern content-based systems use pretrained embeddings:
+- **Text items (articles, products)**: Sentence-BERT embeddings → cosine similarity
+- **Images**: CLIP embeddings enable text-to-image and image-to-image retrieval
+- **Multi-modal**: Combine text + image embeddings with learned weights
+
+**Approximate Nearest Neighbor Search**: With millions of items, brute-force cosine similarity is too slow. Use FAISS (Facebook AI Similarity Search) or ScaNN (Google) to find top-K similar items in sub-linear time.`,
+
+    tryGuidance: "No interactive visualization for this lesson. Review the TF-IDF code examples and try the knowledge check.",
+
+    interviewGraph: {
+      initialStageId: "sp_r2_stage1",
+      artifactDimensions: [
+        { label: "Content Representation", recoveryStageId: "sp_r2_rec1" },
+        { label: "CB vs CF Tradeoffs", recoveryStageId: "sp_r2_rec2", passLabel: "Content-Based Expert" },
+      ],
+      stages: {
+        sp_r2_stage1: {
+          id: "sp_r2_stage1",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · Item Representation",
+          prompt: "You're building a news article recommender. Articles have: title, full text, publication date, author, and category tags. Which representation would best capture semantic similarity between articles?",
+          choices: [
+            { id: "a", label: "Sentence-BERT embeddings of the article text", description: "Dense semantic vectors capture meaning, not just keywords" },
+            { id: "b", label: "One-hot encoding of category tags only", description: "Ignores the rich text content" },
+            { id: "c", label: "Author name as the only feature", description: "Author alone misses topic-level similarity" },
+            { id: "d", label: "Publication date as a numeric feature", description: "Recency is a filter, not a similarity metric" },
+          ],
+          branches: { a: "sp_r2_stage2", b: "sp_r2_rec1", c: "sp_r2_rec1", d: "sp_r2_rec1" },
+          rationale: "Sentence-BERT embeddings capture semantic meaning — two articles about 'Fed rate hikes' and 'central bank interest decisions' would be close in embedding space even if they share few exact words. TF-IDF is a strong second choice for keyword-heavy domains.",
+        },
+        sp_r2_rec1: {
+          id: "sp_r2_rec1",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Item Representation",
+          prompt: "TF-IDF scores a term highly when it appears frequently in one document but rarely across all documents. This makes it useful for recommendations because:",
+          choices: [
+            { id: "a", label: "It identifies terms that make a document distinctive", description: "Rare-but-frequent terms characterize the document's unique topic" },
+            { id: "b", label: "It weights common words like 'the' and 'and' highly", description: "Those are filtered by IDF — they appear in every document" },
+            { id: "c", label: "It guarantees documents in the same category score similarly", description: "TF-IDF ignores category metadata" },
+            { id: "d", label: "It normalizes all documents to the same length", description: "TF-IDF doesn't inherently normalize by length" },
+          ],
+          branches: { a: "sp_r2_stage2", b: "sp_r2_stage2", c: "sp_r2_stage2", d: "sp_r2_stage2" },
+          rationale: "IDF (Inverse Document Frequency) penalizes common words and boosts rare ones. A term like 'quantitative easing' appearing frequently in one article but rarely elsewhere gets a high TF-IDF score — correctly flagging this article as being about monetary policy.",
+        },
+        sp_r2_stage2: {
+          id: "sp_r2_stage2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Filter Bubble & Diversity",
+          prompt: "Your content-based music recommender is working, but users complain that recommendations feel repetitive — always the same artist and genre. What is happening and how do you fix it?",
+          choices: [
+            { id: "a", label: "Filter bubble — inject diversity via MMR or random exploration", description: "Maximum Marginal Relevance penalizes items too similar to already-recommended items" },
+            { id: "b", label: "Switch entirely to collaborative filtering", description: "CF has its own issues and you'd lose content-based advantages" },
+            { id: "c", label: "Lower the similarity threshold to recommend more items", description: "Lower threshold means less relevant, not more diverse" },
+            { id: "d", label: "Add more features to the item representation", description: "More features don't fix the echo chamber — the algorithm still maximizes similarity" },
+          ],
+          branches: { a: "sp_r2_end", b: "sp_r2_rec2", c: "sp_r2_rec2", d: "sp_r2_rec2" },
+          rationale: "The filter bubble is the core weakness of pure content-based filtering. Maximum Marginal Relevance (MMR) selects items that are relevant to the user profile BUT also different from already-selected items. You can also blend in popularity-based or CF-based items to inject discovery.",
+        },
+        sp_r2_rec2: {
+          id: "sp_r2_rec2",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · CB vs CF Tradeoffs",
+          prompt: "A new product is added to your e-commerce catalog. It has detailed metadata (category, description, images) but zero purchases or reviews. Which recommender system can immediately serve it?",
+          choices: [
+            { id: "a", label: "Content-based filtering", description: "Uses item metadata — no purchase history needed" },
+            { id: "b", label: "User-based collaborative filtering", description: "Needs interaction data for the new item" },
+            { id: "c", label: "Item-based collaborative filtering", description: "Can't compute item similarity without ratings" },
+            { id: "d", label: "Matrix factorization (ALS)", description: "Factorizes the existing rating matrix — new item not in it" },
+          ],
+          branches: { a: "sp_r2_end", b: "sp_r2_end", c: "sp_r2_end", d: "sp_r2_end" },
+          rationale: "Content-based filtering is the only approach that can handle new items immediately, because it relies on item features (description, category) rather than interaction history. This is its key advantage over all collaborative filtering variants.",
+        },
+        sp_r2_end: {
+          id: "sp_r2_end",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Content-Based Mastered",
+          prompt: "When would you choose content-based filtering as your PRIMARY recommendation strategy?",
+          choices: [
+            { id: "a", label: "Small user base, rich item metadata, frequent new items", description: "All three conditions favor content-based" },
+            { id: "b", label: "Large user base, sparse item metadata, stable catalog", description: "CF would win here" },
+            { id: "c", label: "When you want serendipitous cross-category discovery", description: "CF enables discovery; CB stays within the user's taste bubble" },
+            { id: "d", label: "When item popularity signals are your strongest feature", description: "Popularity is a CF/hybrid strength" },
+          ],
+          branches: { a: "sp_r2_end", b: "sp_r2_end", c: "sp_r2_end", d: "sp_r2_end" },
+          terminal: true,
+          rationale: "Content-based is ideal when: users are too sparse for CF to work, item metadata is rich and reliable, and the catalog updates frequently with new items (news, e-commerce). Its weakness is the filter bubble — in mature systems, it's usually one component of a hybrid.",
+        },
+      },
+    },
+
+    knowledgeCheck: [
+      {
+        question: "A content-based recommender recommends sci-fi movies because the user rated 'Interstellar' highly. The user actually loves Nolan's directing style, not sci-fi specifically. What does this reveal?",
+        options: [
+          "A bug in the similarity metric",
+          "Content features may not capture the user's true preference signal",
+          "The TF-IDF weights need recalibration",
+          "Collaborative filtering would have the same problem",
+        ],
+        correctIndex: 1,
+        explanation: "Content-based filtering is only as good as the features used. If 'director' is a weak or missing feature but 'genre' is strong, the model will over-index on genre. This is why feature engineering for content-based systems is crucial — and why hybrid models that incorporate CF signals are more robust.",
+      },
+      {
+        question: "What is Maximum Marginal Relevance (MMR) used for in content-based recommendations?",
+        options: [
+          "Maximizing click-through rate on recommended items",
+          "Balancing relevance and diversity to reduce filter bubble effects",
+          "Merging content features from multiple data sources",
+          "Ranking items by their marginal revenue contribution",
+        ],
+        correctIndex: 1,
+        explanation: "MMR selects the next recommended item to maximize relevance to the user profile MINUS a penalty for similarity to already-selected items. This explicitly trades off relevance vs. diversity, reducing the echo chamber effect of pure similarity-based ranking.",
+      },
+    ],
+  },
+
+  "sp-r3": {
+    durationLabel: "16 min",
+    outcomes: [
+      "Explain how hybrid systems combine CF and content-based filtering",
+      "Describe matrix factorization and its role in modern recsys",
+      "Identify when each hybrid strategy is appropriate",
+    ],
+    learnMarkdown: `## Hybrid Systems & Matrix Factorization
+
+Most production recommendation systems are hybrid — combining collaborative filtering, content-based, and often deep learning signals.
+
+### Hybrid Strategies
+| Strategy | How | Example |
+|---------|-----|---------|
+| **Weighted** | score = α*CF + (1-α)*CB | Netflix early system |
+| **Switching** | Use CB for cold users, CF when enough data | Amazon |
+| **Feature augmentation** | CF adds features to CB model | Content + user embeddings |
+| **Cascade** | CB filters candidates → CF re-ranks | Most search + recsys pipelines |
+
+### Matrix Factorization Deep Dive
+Decompose the rating matrix R (n_users × n_items) into:
+- **U** (n_users × k): user latent factors
+- **V** (n_items × k): item latent factors
+- Predicted rating: r̂_ui = uᵢ · vⱼ + bias_u + bias_i + global_bias
+
+\`\`\`
+Objective: min Σ (r_ui - û_i · v̂_j)² + λ(||U||² + ||V||²)
+           (u,i) observed
+\`\`\`
+
+**SVD++**: Extends SVD with implicit feedback (which items a user has interacted with, regardless of rating).
+
+### Two-Tower Models (Modern Approach)
+\`\`\`
+User features → [MLP] → user embedding (256-dim)
+                                                → dot product → relevance score
+Item features → [MLP] → item embedding (256-dim)
+\`\`\`
+- Used at YouTube, Pinterest, Twitter
+- Item embeddings precomputed → fast retrieval via ANN search
+- Naturally handles both user and item features → solves cold-start
+
+### Practical Pipeline
+1. **Candidate generation**: Fast retrieval of top-K (~100-1000) candidates
+2. **Ranking**: Expensive model scores and re-ranks candidates
+3. **Post-processing**: Business rules, diversity, freshness`,
+
+    video: null,
+    videoFallbackMarkdown: `## Netflix Prize and the Rise of Hybrid Systems
+
+The Netflix Prize (2006-2009) showed that ensembling many models outperformed any single algorithm. The winning solution blended 800+ models. Key insight: diverse models that fail in different ways combine to cover each other's weaknesses.
+
+**Modern production recsys** (YouTube, TikTok) use learned embeddings + two-tower retrieval + neural ranking layers. The hybrid nature is baked into the architecture — item features and user-item interaction history are jointly encoded.`,
+
+    tryGuidance: "No interactive visualization for this lesson. Review the hybrid strategies and try the knowledge check.",
+
+    interviewGraph: {
+      initialStageId: "sp_r3_stage1",
+      artifactDimensions: [
+        { label: "Hybrid Strategy", recoveryStageId: "sp_r3_rec1" },
+        { label: "Matrix Factorization", recoveryStageId: "sp_r3_rec2", passLabel: "Recsys Architect" },
+      ],
+      stages: {
+        sp_r3_stage1: {
+          id: "sp_r3_stage1",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · Choosing a Hybrid Strategy",
+          prompt: "You're designing a recipe recommendation system. New users get poor recommendations (cold-start). Existing users occasionally receive irrelevant suggestions because CF over-indexes on popularity. Which hybrid strategy addresses BOTH issues?",
+          choices: [
+            { id: "a", label: "Switching hybrid: content-based for new users, CF for established users", description: "Directly addresses cold-start; CF improves as history grows" },
+            { id: "b", label: "Weighted hybrid with equal weights for all users", description: "Equal weights don't adapt to the user's data richness" },
+            { id: "c", label: "Pure content-based for all users", description: "Won't leverage user-user similarity signals for established users" },
+            { id: "d", label: "Pure collaborative filtering for all users", description: "Doesn't solve the cold-start problem" },
+          ],
+          branches: { a: "sp_r3_stage2", b: "sp_r3_rec1", c: "sp_r3_rec1", d: "sp_r3_rec1" },
+          rationale: "A switching hybrid is the clean solution: start with content-based (using recipe attributes: cuisine, ingredients, dietary tags) and transition to CF once the user has enough interaction history. The switching threshold might be 10-20 rated recipes.",
+        },
+        sp_r3_rec1: {
+          id: "sp_r3_rec1",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Hybrid Strategy",
+          prompt: "In a cascade hybrid system, the first stage generates 500 candidates using a fast retrieval model, and the second stage re-ranks them. Why not just run the expensive ranking model on all items?",
+          choices: [
+            { id: "a", label: "The expensive model would take too long for millions of items", description: "Latency: a 10ms model on 10M items = 27 hours per request" },
+            { id: "b", label: "The ranking model is less accurate than the retrieval model", description: "The opposite — ranking models are typically more sophisticated" },
+            { id: "c", label: "Regulatory constraints prevent scoring all items", description: "Not a typical constraint" },
+            { id: "d", label: "The retrieval model produces better final rankings", description: "Retrieval is optimized for speed/recall, not precision ranking" },
+          ],
+          branches: { a: "sp_r3_stage2", b: "sp_r3_stage2", c: "sp_r3_stage2", d: "sp_r3_stage2" },
+          rationale: "The cascade architecture exists purely for efficiency. Retrieval (ANN search on embeddings) fetches top-K in milliseconds. The expensive ranking model (with many features, cross-interactions) then scores only those K candidates — achieving high quality at acceptable latency.",
+        },
+        sp_r3_stage2: {
+          id: "sp_r3_stage2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Matrix Factorization",
+          prompt: "In matrix factorization, you have a user vector u = [0.8, 0.1, 0.5] and two item vectors: item A = [0.9, 0.2, 0.4] and item B = [0.1, 0.9, 0.2]. Which item gets the higher predicted rating, and why?",
+          choices: [
+            { id: "a", label: "Item A — its latent factors align better with the user's factors", description: "Dot product: A = 0.72+0.02+0.20=0.94 vs B = 0.08+0.09+0.10=0.27" },
+            { id: "b", label: "Item B — it has a larger factor in dimension 2", description: "The user has a low weight (0.1) in dimension 2, so B's strength there doesn't matter" },
+            { id: "c", label: "Both are equal — all factor dimensions contribute equally", description: "Dimensions are weighted by the user's factor values" },
+            { id: "d", label: "Cannot determine without knowing the global bias", description: "Bias shifts the prediction uniformly — doesn't change the relative ranking" },
+          ],
+          branches: { a: "sp_r3_end", b: "sp_r3_rec2", c: "sp_r3_rec2", d: "sp_r3_rec2" },
+          rationale: "Predicted rating = dot product of user and item vectors. Item A: 0.8×0.9 + 0.1×0.2 + 0.5×0.4 = 0.72 + 0.02 + 0.20 = 0.94. Item B: 0.8×0.1 + 0.1×0.9 + 0.5×0.2 = 0.08 + 0.09 + 0.10 = 0.27. Item A wins because its strong dimension-1 factor aligns with the user's strong dimension-1 preference.",
+        },
+        sp_r3_rec2: {
+          id: "sp_r3_rec2",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Matrix Factorization",
+          prompt: "Regularization (λ||U||² + λ||V||²) is added to the matrix factorization objective. What does this prevent?",
+          choices: [
+            { id: "a", label: "Overfitting — large factor values that perfectly fit training ratings but generalize poorly", description: "L2 regularization penalizes large weights" },
+            { id: "b", label: "The cold-start problem for new users", description: "Regularization doesn't create ratings where none exist" },
+            { id: "c", label: "Negative predicted ratings", description: "Nothing in standard MF prevents negative predictions" },
+            { id: "d", label: "Items with many ratings from dominating the loss", description: "That's addressed with per-item loss weighting, not regularization" },
+          ],
+          branches: { a: "sp_r3_end", b: "sp_r3_end", c: "sp_r3_end", d: "sp_r3_end" },
+          rationale: "L2 regularization prevents overfitting by penalizing large factor values. Without it, the model would set factors to arbitrarily large values to perfectly fit the training ratings, but would generalize poorly to unseen user-item pairs.",
+        },
+        sp_r3_end: {
+          id: "sp_r3_end",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Hybrid Systems Mastered",
+          prompt: "A two-tower model encodes users and items into the same embedding space. After training, how are item recommendations served at low latency for millions of items?",
+          choices: [
+            { id: "a", label: "Precompute item embeddings; use ANN search at query time", description: "Items don't change per-request; user embedding + ANN retrieval is fast" },
+            { id: "b", label: "Re-encode all items on every user request", description: "Would take seconds to minutes per request" },
+            { id: "c", label: "Store the full dot-product matrix between all users and items", description: "Memory: 100M users × 10M items × 4 bytes = 4 petabytes" },
+            { id: "d", label: "Use only the top-100 most popular items for all users", description: "Defeats the purpose of personalization" },
+          ],
+          branches: { a: "sp_r3_end", b: "sp_r3_end", c: "sp_r3_end", d: "sp_r3_end" },
+          terminal: true,
+          rationale: "Two-tower deployment pattern: (1) precompute all item embeddings and index them in an ANN store (FAISS, ScaNN); (2) at query time, compute the user embedding from their real-time features; (3) run ANN search to retrieve top-K items in <10ms. Only the user tower runs online; the item tower runs offline.",
+        },
+      },
+    },
+
+    knowledgeCheck: [
+      {
+        question: "What is the main advantage of SVD++ over standard SVD for matrix factorization?",
+        options: [
+          "SVD++ runs faster because it uses fewer parameters",
+          "SVD++ incorporates implicit feedback (which items were interacted with) alongside explicit ratings",
+          "SVD++ is more interpretable because it uses sparse factors",
+          "SVD++ solves the cold-start problem completely",
+        ],
+        correctIndex: 1,
+        explanation: "SVD++ extends standard SVD by adding a term for implicit feedback — the set of items a user has interacted with (viewed, clicked, purchased), regardless of whether they rated them. This provides additional signal about user preferences beyond explicit ratings alone.",
+      },
+      {
+        question: "In a production two-stage recommendation system, what is the primary optimization objective of the RETRIEVAL stage?",
+        options: [
+          "Precision — return only highly relevant items",
+          "Recall — don't miss relevant items, even at the cost of including some irrelevant ones",
+          "Diversity — return items from varied categories",
+          "Revenue — return the highest-margin items first",
+        ],
+        correctIndex: 1,
+        explanation: "The retrieval stage optimizes for recall — its job is to filter millions of items down to a few hundred candidates without missing the truly relevant ones. The ranking stage then handles precision. Missing a relevant item at retrieval means it can never be recommended, no matter how good the ranker is.",
+      },
+    ],
+  },
+
+  "sp-r4": {
+    durationLabel: "14 min",
+    outcomes: [
+      "Explain why accuracy metrics alone are insufficient for recommender evaluation",
+      "Calculate and interpret NDCG, Precision@K, and Recall@K",
+      "Describe coverage, diversity, and novelty as beyond-accuracy metrics",
+    ],
+    learnMarkdown: `## Evaluation: Beyond Accuracy
+
+Recommender systems are not just about predicting ratings correctly — they're about producing recommendations that users actually value.
+
+### Ranking Metrics (More Important Than RMSE)
+
+**Precision@K**: Of the K items recommended, what fraction did the user like?
+\`\`\`
+Precision@K = |relevant ∩ recommended_top_K| / K
+\`\`\`
+
+**Recall@K**: Of all items the user liked, what fraction appeared in the top K?
+\`\`\`
+Recall@K = |relevant ∩ recommended_top_K| / |relevant|
+\`\`\`
+
+**NDCG@K** (Normalized Discounted Cumulative Gain): Rewards putting relevant items higher in the list.
+\`\`\`
+DCG@K = Σ (2^rel_i - 1) / log2(i + 1)   for i = 1..K
+NDCG@K = DCG@K / IDCG@K                   (normalized by ideal DCG)
+\`\`\`
+
+### Beyond-Accuracy Metrics
+| Metric | Definition | Why It Matters |
+|--------|-----------|---------------|
+| **Coverage** | % of catalog ever recommended | Ensures niche items get exposure |
+| **Diversity** | Avg dissimilarity within a recommendation list | Avoids filter bubble |
+| **Novelty** | How unexpected/surprising are the recommendations | Encourages discovery |
+| **Serendipity** | Relevant AND surprising | The "wow" factor |
+
+### Why RMSE Fails
+Netflix Prize winner improved RMSE by 10% but when deployed, barely moved engagement metrics. Users prefer surprising, timely, diverse recommendations over slightly more accurate rating predictions.
+
+### A/B Testing is Ground Truth
+Offline metrics (NDCG, Precision@K) are proxies. True evaluation requires live A/B tests measuring:
+- Click-through rate (CTR)
+- Session length / return visits
+- Conversion (purchase, subscription)`,
+
+    video: null,
+    videoFallbackMarkdown: `## Counterfactual Evaluation
+
+A fundamental challenge: offline evaluation uses held-out ratings, but the ratings were collected under a previous recommendation policy — biased toward items that were shown. Items never shown have no ratings.
+
+**Inverse Propensity Scoring (IPS)**: Weight each observation by 1/P(item was shown) to correct for exposure bias. Gives unbiased offline estimates of online performance.
+
+**Replay**: Log actions with random exploration, replay new policies against the logged data. Expensive but unbiased.`,
+
+    tryGuidance: "No interactive visualization for this lesson. Work through the NDCG calculation example and try the knowledge check.",
+
+    interviewGraph: {
+      initialStageId: "sp_r4_stage1",
+      artifactDimensions: [
+        { label: "Ranking Metrics", recoveryStageId: "sp_r4_rec1" },
+        { label: "Beyond Accuracy", recoveryStageId: "sp_r4_rec2", passLabel: "RecSys Evaluator" },
+      ],
+      stages: {
+        sp_r4_stage1: {
+          id: "sp_r4_stage1",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · NDCG vs Precision@K",
+          prompt: "System A returns [relevant, irrelevant, relevant, irrelevant, relevant] as its top-5. System B returns [irrelevant, irrelevant, relevant, relevant, relevant]. Precision@5 is 0.6 for both. Which system is better and why?",
+          choices: [
+            { id: "a", label: "System A — NDCG rewards relevant items appearing higher in the list", description: "Position matters: relevant items at ranks 1,3,5 beat 3,4,5" },
+            { id: "b", label: "System B — it has more relevant items at the bottom", description: "Relevant items lower in the list are worth less" },
+            { id: "c", label: "They are equal — Precision@5 is the same", description: "Precision@K ignores position; NDCG reveals the difference" },
+            { id: "d", label: "Cannot determine without the full catalog", description: "NDCG can be computed from these 5 positions alone" },
+          ],
+          branches: { a: "sp_r4_stage2", b: "sp_r4_rec1", c: "sp_r4_rec1", d: "sp_r4_rec1" },
+          rationale: "System A is better. NDCG discounts by log(rank), so a relevant item at rank 1 contributes ~3x more than one at rank 3. Precision@K treats all positions equally — it's a weaker metric when users scan results top-to-bottom. For recommendation carousels and search results, NDCG is preferred.",
+        },
+        sp_r4_rec1: {
+          id: "sp_r4_rec1",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Ranking Metrics",
+          prompt: "You have 10 relevant items in the user's history. Your system recommends 5 items, 3 of which are relevant. What is Recall@5?",
+          choices: [
+            { id: "a", label: "0.3 (3 out of 10 relevant items retrieved)", description: "Recall@5 = |relevant ∩ top-5| / |all relevant| = 3/10" },
+            { id: "b", label: "0.6 (3 out of 5 recommendations are relevant)", description: "That's Precision@5, not Recall@5" },
+            { id: "c", label: "0.5 (average of precision and recall)", description: "That would be F1, and the calculation is different" },
+            { id: "d", label: "1.0 (perfect recall because all recommendations are relevant)", description: "Recall measures coverage of all relevant items, not just recommended ones" },
+          ],
+          branches: { a: "sp_r4_stage2", b: "sp_r4_stage2", c: "sp_r4_stage2", d: "sp_r4_stage2" },
+          rationale: "Recall@K = relevant items in top-K / total relevant items. Here: 3/10 = 0.3. Precision@K = 3/5 = 0.6. Both matter: Precision shows how many recommendations are useful; Recall shows what fraction of all useful items you're surfacing.",
+        },
+        sp_r4_stage2: {
+          id: "sp_r4_stage2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Coverage & Diversity",
+          prompt: "Your music recommender has 10 million songs. After a week of recommendations across all users, only 50,000 songs have ever been recommended. What problem does this indicate?",
+          choices: [
+            { id: "a", label: "Low catalog coverage — popularity bias toward well-known songs", description: "The system recommends the same popular items to everyone" },
+            { id: "b", label: "Poor precision — too many irrelevant songs recommended", description: "Low coverage means too FEW items recommended, not poor quality" },
+            { id: "c", label: "High novelty — users are getting surprising recommendations", description: "Popularity bias means the opposite — familiar, not novel items" },
+            { id: "d", label: "The catalog is too large for the algorithm", description: "Catalog size is not the problem — the algorithm is biased" },
+          ],
+          branches: { a: "sp_r4_end", b: "sp_r4_rec2", c: "sp_r4_rec2", d: "sp_r4_rec2" },
+          rationale: "0.5% catalog coverage after a week means 99.5% of the catalog is never surfaced. This popularity bias creates a winner-takes-all dynamic that's bad for long-tail artists and for user discovery. Fixes include: diversity-aware ranking (MMR), coverage-constrained optimization, or exploration policies.",
+        },
+        sp_r4_rec2: {
+          id: "sp_r4_rec2",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Beyond Accuracy",
+          prompt: "A recommender system achieves very high NDCG offline but users report the recommendations feel stale and predictable. Which metric would have caught this problem?",
+          choices: [
+            { id: "a", label: "Novelty — measures how unexpected/unfamiliar recommended items are", description: "Low novelty means recommendations are too predictable" },
+            { id: "b", label: "Recall@K — measures how many relevant items are surfaced", description: "Recall doesn't capture predictability" },
+            { id: "c", label: "Coverage — measures how much of the catalog is recommended", description: "Coverage measures breadth, not individual-level novelty" },
+            { id: "d", label: "RMSE — measures prediction accuracy", description: "RMSE measures rating accuracy, not novelty" },
+          ],
+          branches: { a: "sp_r4_end", b: "sp_r4_end", c: "sp_r4_end", d: "sp_r4_end" },
+          rationale: "Novelty measures how unexpected recommendations are — often operationalized as the negative log of item popularity (1/popularity). A system that always recommends the most popular items will have high NDCG (popular items are often relevant) but low novelty. Serendipity goes further: relevant AND surprising.",
+        },
+        sp_r4_end: {
+          id: "sp_r4_end",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Evaluation Mastered",
+          prompt: "A PM asks: 'Our offline NDCG improved 5% — should we ship?' Best response?",
+          choices: [
+            { id: "a", label: "Run an A/B test — offline metrics don't guarantee online improvement", description: "NDCG is a proxy; true ground truth is live user behavior" },
+            { id: "b", label: "Yes — 5% NDCG improvement is statistically significant", description: "Statistical significance doesn't imply practical or online significance" },
+            { id: "c", label: "Only if the RMSE also improved", description: "RMSE is a weaker proxy than NDCG for ranking quality" },
+            { id: "d", label: "No — offline improvements never translate to online gains", description: "Too strong — offline metrics are imperfect but not useless" },
+          ],
+          branches: { a: "sp_r4_end", b: "sp_r4_end", c: "sp_r4_end", d: "sp_r4_end" },
+          terminal: true,
+          rationale: "Offline metrics are necessary but not sufficient. The Netflix Prize winner improved offline RMSE by 10% but showed minimal online engagement lift when deployed. Always validate with an A/B test before shipping. Offline improvements are a signal worth investigating, not a guarantee.",
+        },
+      },
+    },
+
+    knowledgeCheck: [
+      {
+        question: "Why is RMSE (root mean squared error) considered a poor metric for recommendation system evaluation?",
+        options: [
+          "It is computationally expensive to calculate",
+          "It optimizes rating prediction accuracy but not the quality of the ranked recommendation list",
+          "It requires explicit ratings which are rarely available",
+          "It cannot handle sparse rating matrices",
+        ],
+        correctIndex: 1,
+        explanation: "RMSE optimizes prediction accuracy for ALL items equally — including items rated 2/5 that users will never care about. What matters in recommendations is ranking: did the user's most-loved items appear near the top? NDCG and Precision/Recall@K directly measure ranking quality, making them more aligned with the actual user experience.",
+      },
+      {
+        question: "What is 'serendipity' in the context of recommender evaluation?",
+        options: [
+          "The ability to handle completely new users with no history",
+          "Recommendations that are both relevant and surprising to the user",
+          "The speed at which recommendations are generated",
+          "The percentage of the catalog covered by recommendations",
+        ],
+        correctIndex: 1,
+        explanation: "Serendipity = relevant + unexpected. A recommendation of 'Thriller' to someone who listens to pop music is expected (not serendipitous). A recommendation of a niche jazz album that the user ends up loving — and would never have found themselves — is serendipitous. It's the 'wow' dimension of recommendation quality.",
+      },
+    ],
+  },
+
+"sp-t1": {
+    durationLabel: "18 min",
+    outcomes: [
+      "Test a time series for stationarity using ADF and KPSS tests",
+      "Decompose a series into trend, seasonality, and residual components",
+      "Apply differencing and transformations to achieve stationarity",
+    ],
+    learnMarkdown: `## Stationarity & Decomposition
+
+A time series is **stationary** if its statistical properties (mean, variance, autocorrelation) do not change over time. Most forecasting models assume stationarity.
+
+### Why Stationarity Matters
+- ARIMA, VAR, and classical models require stationary inputs
+- Non-stationary series have time-dependent structure that invalidates standard inference
+- A series trending upward has a non-constant mean → not stationary
+
+### Testing for Stationarity
+\`\`\`python
+from statsmodels.tsa.stattools import adfuller, kpss
+
+# ADF test: H0 = unit root (non-stationary)
+result = adfuller(series)
+print(f"ADF Statistic: {result[0]:.4f}, p-value: {result[1]:.4f}")
+# p < 0.05 → reject H0 → stationary
+
+# KPSS test: H0 = stationary
+stat, p, lags, crit = kpss(series, regression='ct')
+# p < 0.05 → reject H0 → non-stationary
+\`\`\`
+
+| Test | H₀ | Reject H₀ means |
+|------|-----|----------------|
+| ADF | Non-stationary (unit root) | Stationary |
+| KPSS | Stationary | Non-stationary |
+
+Use both together — they have different power characteristics.
+
+### Classical Decomposition
+\`\`\`
+y(t) = Trend(t) + Seasonal(t) + Residual(t)     [additive]
+y(t) = Trend(t) × Seasonal(t) × Residual(t)     [multiplicative]
+\`\`\`
+
+\`\`\`python
+from statsmodels.tsa.seasonal import seasonal_decompose
+result = seasonal_decompose(series, model='additive', period=12)
+result.plot()
+\`\`\`
+
+### Achieving Stationarity
+| Transformation | Removes |
+|----------------|---------|
+| First differencing: Δy_t = y_t - y_{t-1} | Linear trend |
+| Second differencing | Quadratic trend |
+| Log transform | Heteroscedasticity (growing variance) |
+| Seasonal differencing: y_t - y_{t-m} | Seasonality of period m |
+
+### Autocorrelation Functions
+- **ACF** (Autocorrelation Function): correlation of series with itself at lag k
+- **PACF** (Partial ACF): correlation after removing intermediate lag effects
+- Used to identify the order of ARIMA models`,
+
+    video: null,
+    videoFallbackMarkdown: `## STL Decomposition
+
+STL (Seasonal-Trend decomposition using LOESS) is more robust than classical decomposition:
+- Handles any seasonal period (not just integer multiples)
+- Robust to outliers
+- Can model changing seasonal patterns over time
+
+\`\`\`python
+from statsmodels.tsa.seasonal import STL
+stl = STL(series, period=12, robust=True)
+result = stl.fit()
+# result.trend, result.seasonal, result.resid
+\`\`\``,
+
+    tryGuidance: "Explore the time series decomposition visualization. Toggle between additive and multiplicative models and observe the residual pattern.",
+
+    interviewGraph: {
+      initialStageId: "sp_t1_stage1",
+      artifactDimensions: [
+        { label: "Stationarity Tests", recoveryStageId: "sp_t1_rec1" },
+        { label: "Differencing", recoveryStageId: "sp_t1_rec2", passLabel: "Time Series Foundation" },
+      ],
+      stages: {
+        sp_t1_stage1: {
+          id: "sp_t1_stage1",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · Diagnosing Stationarity",
+          prompt: "You run an ADF test on monthly sales data and get p = 0.42. You run a KPSS test and get p = 0.03. What does this tell you?",
+          choices: [
+            { id: "a", label: "Both tests agree: the series is non-stationary", description: "ADF fails to reject non-stationary; KPSS rejects stationary" },
+            { id: "b", label: "ADF says stationary; KPSS says stationary — you're fine", description: "ADF p=0.42 means FAIL to reject non-stationarity" },
+            { id: "c", label: "Both tests disagree — run more tests to break the tie", description: "The tests actually agree here — read the hypotheses carefully" },
+            { id: "d", label: "Only ADF matters; ignore KPSS", description: "KPSS catches different types of non-stationarity" },
+          ],
+          branches: { a: "sp_t1_stage2", b: "sp_t1_rec1", c: "sp_t1_rec1", d: "sp_t1_rec1" },
+          rationale: "ADF H₀ = non-stationary. p=0.42 means fail to reject → series is likely non-stationary. KPSS H₀ = stationary. p=0.03 means reject → non-stationary. Both tests agree: the series is non-stationary. Apply differencing before modeling.",
+        },
+        sp_t1_rec1: {
+          id: "sp_t1_rec1",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Stationarity Tests",
+          prompt: "ADF test result: statistic = -4.2, p-value = 0.001. What does this mean?",
+          choices: [
+            { id: "a", label: "Reject H₀ → series is stationary (no unit root)", description: "p < 0.05 → reject the null hypothesis of a unit root" },
+            { id: "b", label: "Fail to reject H₀ → series is non-stationary", description: "p = 0.001 is very small — that means rejecting H₀" },
+            { id: "c", label: "The series has strong seasonality", description: "ADF tests for unit root, not seasonality" },
+            { id: "d", label: "The statistic must be positive to indicate stationarity", description: "ADF statistics are typically negative; more negative = more evidence of stationarity" },
+          ],
+          branches: { a: "sp_t1_stage2", b: "sp_t1_stage2", c: "sp_t1_stage2", d: "sp_t1_stage2" },
+          rationale: "ADF H₀ = unit root (non-stationary). p=0.001 << 0.05 means strong evidence against H₀ → reject it → the series IS stationary. A very negative ADF statistic (like -4.2) also suggests stationarity — the critical value is typically around -2.9 at 5% significance.",
+        },
+        sp_t1_stage2: {
+          id: "sp_t1_stage2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Choosing a Transformation",
+          prompt: "Weekly revenue data shows: (1) an upward linear trend, (2) annual seasonality, (3) variance that grows proportionally with the level. Which transformations address all three?",
+          choices: [
+            { id: "a", label: "Log transform + seasonal differencing (lag 52)", description: "Log stabilizes growing variance; seasonal diff removes seasonality" },
+            { id: "b", label: "First differencing only", description: "Removes linear trend but not seasonality or heteroscedasticity" },
+            { id: "c", label: "Standardize (subtract mean, divide by std)", description: "Standardization doesn't remove trend or seasonality" },
+            { id: "d", label: "Moving average smoothing", description: "Smoothing removes noise but doesn't make the series stationary" },
+          ],
+          branches: { a: "sp_t1_end", b: "sp_t1_rec2", c: "sp_t1_rec2", d: "sp_t1_rec2" },
+          rationale: "Three problems → three fixes: log transform stabilizes multiplicative variance, seasonal differencing (y_t - y_{t-52}) removes annual seasonality, and first differencing (if still needed after log) removes linear trend. In practice: log → seasonal diff → check ADF → first diff if still needed.",
+        },
+        sp_t1_rec2: {
+          id: "sp_t1_rec2",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Differencing",
+          prompt: "After first differencing a series, the ADF test still shows non-stationarity. What should you try next?",
+          choices: [
+            { id: "a", label: "Second differencing (difference the already-differenced series)", description: "Handles quadratic trend; most series need d ≤ 2" },
+            { id: "b", label: "Apply the same first difference again without checking", description: "Over-differencing introduces unnecessary noise" },
+            { id: "c", label: "Conclude the series can never be stationary", description: "Most economic time series are I(1) or I(2) — first or second order integration" },
+            { id: "d", label: "Switch immediately to a neural network model", description: "Don't abandon classical methods without understanding the data" },
+          ],
+          branches: { a: "sp_t1_end", b: "sp_t1_end", c: "sp_t1_end", d: "sp_t1_end" },
+          rationale: "If first differencing doesn't achieve stationarity, try second differencing. In ARIMA notation, this means d=2. Beyond d=2 is rare and may indicate you need a different transformation (log, Box-Cox) first. Also check: did you account for seasonality? Seasonal differencing may be needed separately.",
+        },
+        sp_t1_end: {
+          id: "sp_t1_end",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Stationarity Mastered",
+          prompt: "In additive vs multiplicative decomposition: y(t) = T + S + R vs y(t) = T × S × R. When do you choose multiplicative?",
+          choices: [
+            { id: "a", label: "When seasonal swings grow proportionally with the trend level", description: "Multiplicative seasonality: amplitude scales with the trend" },
+            { id: "b", label: "When the series has negative values", description: "Multiplicative decomp with negative values is undefined (log transform fails)" },
+            { id: "c", label: "Always — multiplicative is more general", description: "Log-transforming for multiplicative = additive on log scale; both are valid" },
+            { id: "d", label: "When the trend is decreasing", description: "Trend direction doesn't determine the composition type" },
+          ],
+          branches: { a: "sp_t1_end", b: "sp_t1_end", c: "sp_t1_end", d: "sp_t1_end" },
+          terminal: true,
+          rationale: "Multiplicative decomposition: use when seasonal amplitude grows/shrinks with the level (e.g., a 10% seasonal effect on $100 revenue = $10, but on $1000 = $100). Additive: use when seasonal amplitude is constant regardless of level. Log-transforming and then using additive decomposition is equivalent to multiplicative.",
+        },
+      },
+    },
+
+    knowledgeCheck: [
+      {
+        question: "A time series has ACF that decays slowly (still significant at lag 20) and PACF that cuts off sharply after lag 1. What model does this suggest?",
+        options: [
+          "AR(1) — autoregressive model with one lag",
+          "MA(1) — moving average model with one lag",
+          "ARIMA(0,1,1) — first difference with one MA term",
+          "Seasonal ARIMA with period 20",
+        ],
+        correctIndex: 0,
+        explanation: "ACF decaying slowly + PACF cutting off at lag 1 is the signature of an AR(1) process. The rule: if PACF cuts off at lag p → AR(p); if ACF cuts off at lag q → MA(q). Slowly decaying ACF alone indicates an AR component.",
+      },
+      {
+        question: "You difference a stationary time series that doesn't need differencing. What problem does this cause?",
+        options: [
+          "The series becomes non-stationary",
+          "Over-differencing: introduces a moving average unit root, making the series harder to model",
+          "The ADF test statistic becomes more negative",
+          "No problem — extra differencing is always harmless",
+        ],
+        correctIndex: 1,
+        explanation: "Over-differencing a stationary series introduces a non-invertible MA unit root — the differenced series has an ACF that looks like an MA(1) with coefficient -1. This makes estimation unstable. Always check whether the series actually needs differencing with ADF/KPSS before applying it.",
+      },
+    ],
+  },
+
+  "sp-t2": {
+    durationLabel: "17 min",
+    outcomes: [
+      "Interpret AR, MA, and ARIMA parameters (p, d, q)",
+      "Use ACF/PACF plots to identify ARIMA order",
+      "Extend ARIMA to seasonal data with SARIMA",
+    ],
+    learnMarkdown: `## ARIMA Family Models
+
+ARIMA (AutoRegressive Integrated Moving Average) is the workhorse of classical time series forecasting.
+
+### ARIMA(p, d, q) Components
+- **AR(p)**: current value depends on p past values: y_t = Σᵢ φᵢ y_{t-i} + ε_t
+- **I(d)**: integrated of order d → apply d-th differencing to achieve stationarity
+- **MA(q)**: current value depends on q past errors: y_t = ε_t + Σⱼ θⱼ ε_{t-j}
+
+\`\`\`python
+from statsmodels.tsa.arima.model import ARIMA
+
+model = ARIMA(series, order=(2, 1, 1))  # AR(2), 1 difference, MA(1)
+fit = model.fit()
+forecast = fit.forecast(steps=12)
+print(fit.summary())
+\`\`\`
+
+### Identifying Order with ACF/PACF
+| Pattern | Model |
+|---------|-------|
+| PACF cuts off at lag p, ACF decays | AR(p) |
+| ACF cuts off at lag q, PACF decays | MA(q) |
+| Both decay gradually | ARMA(p,q) — try information criteria |
+| After differencing: both cut off | ARMA after differencing = ARIMA |
+
+### Model Selection
+\`\`\`python
+import pmdarima as pm
+auto_model = pm.auto_arima(series, seasonal=True, m=12,
+                            information_criterion='aic',
+                            stepwise=True)
+\`\`\`
+
+**AIC** (Akaike): -2×log-likelihood + 2k → prefer lower AIC
+**BIC** (Bayesian): -2×log-likelihood + k×log(n) → penalizes complexity more
+
+### SARIMA(p,d,q)(P,D,Q)[m]
+Extends ARIMA with seasonal AR, differencing, and MA terms at lag m:
+\`\`\`
+SARIMA(1,1,1)(1,1,1)[12] for monthly data with annual seasonality
+\`\`\``,
+
+    video: null,
+    videoFallbackMarkdown: `## ARIMAX and Transfer Functions
+
+ARIMAX adds exogenous variables (X) to ARIMA:
+\`\`\`python
+model = ARIMA(y, exog=X, order=(1,1,1))
+\`\`\`
+Use cases: forecasting sales with known promotions, demand with weather data.
+
+**VAR (Vector AR)**: multivariate ARIMA for multiple related time series simultaneously. Models Granger causality between series.`,
+
+    tryGuidance: "No interactive visualization for this lesson. Study the ACF/PACF interpretation table and work through the knowledge check.",
+
+    interviewGraph: {
+      initialStageId: "sp_t2_stage1",
+      artifactDimensions: [
+        { label: "ARIMA Parameters", recoveryStageId: "sp_t2_rec1" },
+        { label: "Model Selection", recoveryStageId: "sp_t2_rec2", passLabel: "ARIMA Expert" },
+      ],
+      stages: {
+        sp_t2_stage1: {
+          id: "sp_t2_stage1",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · ARIMA Order Identification",
+          prompt: "ACF plot: significant spikes at lags 1 and 2, then cuts off. PACF: decays slowly with alternating signs. What ARIMA order is suggested?",
+          choices: [
+            { id: "a", label: "MA(2) — ACF cuts off at lag 2, PACF decays", description: "MA(q) signature: ACF cuts off at q, PACF tails off" },
+            { id: "b", label: "AR(2) — PACF cuts off at lag 2", description: "PACF decays (not cuts off) → this isn't AR" },
+            { id: "c", label: "ARMA(2,2) — both have spikes at lag 2", description: "ARMA when both taper off gradually — not when ACF cuts sharply" },
+            { id: "d", label: "I(2) — needs second differencing", description: "I(d) refers to differencing order, not autocorrelation pattern" },
+          ],
+          branches: { a: "sp_t2_stage2", b: "sp_t2_rec1", c: "sp_t2_rec1", d: "sp_t2_rec1" },
+          rationale: "MA(q) signature: ACF cuts off sharply after lag q, PACF tails off with decaying pattern. Here ACF cuts off after lag 2 and PACF decays → ARIMA(0, d, 2). AR(p) is the opposite: PACF cuts off at p, ACF tails off.",
+        },
+        sp_t2_rec1: {
+          id: "sp_t2_rec1",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · ARIMA Parameters",
+          prompt: "What does the 'd' in ARIMA(p,d,q) control?",
+          choices: [
+            { id: "a", label: "The number of times the series is differenced to achieve stationarity", description: "d=1: first difference; d=2: second difference" },
+            { id: "b", label: "The number of MA lag terms", description: "That's 'q'" },
+            { id: "c", label: "The seasonal period", description: "Seasonal period is 'm' in SARIMA notation" },
+            { id: "d", label: "The depth of the neural network layers", description: "ARIMA is a classical statistical model, not neural" },
+          ],
+          branches: { a: "sp_t2_stage2", b: "sp_t2_stage2", c: "sp_t2_stage2", d: "sp_t2_stage2" },
+          rationale: "d = integration order. ARIMA(1,1,1): take first differences of the series (d=1), then fit an ARMA(1,1) to the differenced series. d=0 means the original series is already stationary. Most economic series need d=1.",
+        },
+        sp_t2_stage2: {
+          id: "sp_t2_stage2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · AIC vs BIC for Model Selection",
+          prompt: "You fit three ARIMA models. AIC scores: AR(1)=450, AR(2)=445, AR(3)=444. BIC scores: AR(1)=455, AR(2)=457, AR(3)=462. Which model do you choose?",
+          choices: [
+            { id: "a", label: "AR(1) — minimizes BIC, which penalizes complexity more strongly", description: "BIC penalizes extra parameters more — AR(1) wins on BIC" },
+            { id: "b", label: "AR(3) — minimizes AIC regardless of BIC", description: "A 1-point AIC improvement at the cost of 7 BIC points is usually not worth it" },
+            { id: "c", label: "AR(2) — middle ground between AIC and BIC optima", description: "AR(2) isn't optimal on either metric" },
+            { id: "d", label: "Run them all in production and average predictions", description: "Ensembling is valid but the question asks about model selection" },
+          ],
+          branches: { a: "sp_t2_end", b: "sp_t2_rec2", c: "sp_t2_rec2", d: "sp_t2_rec2" },
+          rationale: "When AIC and BIC disagree, BIC is preferred for parsimony — it penalizes extra parameters by log(n) vs 2. Here AR(1) wins on BIC; AIC would choose AR(3) but the improvement is tiny (1 point). For forecasting, simpler models often generalize better. Choose AR(1) or validate both on a holdout set.",
+        },
+        sp_t2_rec2: {
+          id: "sp_t2_rec2",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Model Selection",
+          prompt: "Monthly airline passenger data has a clear 12-month seasonal cycle and an upward trend. Standard ARIMA struggles. What extension handles this?",
+          choices: [
+            { id: "a", label: "SARIMA(p,d,q)(P,D,Q)[12] with seasonal terms at lag 12", description: "SARIMA explicitly models seasonal AR and MA at the seasonal period" },
+            { id: "b", label: "ARIMA with p=12 to capture 12-month autocorrelation", description: "High AR order overfits; seasonal differencing is more parsimonious" },
+            { id: "c", label: "Remove the trend first, then apply standard ARIMA", description: "Trend removal alone doesn't handle seasonal patterns" },
+            { id: "d", label: "ARMA(12,12) on the raw series", description: "12 AR + 12 MA = 24 parameters for a simpler seasonal structure" },
+          ],
+          branches: { a: "sp_t2_end", b: "sp_t2_end", c: "sp_t2_end", d: "sp_t2_end" },
+          rationale: "SARIMA extends ARIMA with seasonal components: (P,D,Q)[m] where P=seasonal AR, D=seasonal differencing, Q=seasonal MA, m=seasonal period. For monthly data with annual seasonality: SARIMA(1,1,1)(1,1,1)[12] is a common starting point — the Box-Jenkins airline model.",
+        },
+        sp_t2_end: {
+          id: "sp_t2_end",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "ARIMA Mastered",
+          prompt: "Residuals from a fitted ARIMA model show significant autocorrelation at lag 7. What does this indicate?",
+          choices: [
+            { id: "a", label: "The model is misspecified — residuals should be white noise", description: "Autocorrelated residuals mean the model left predictable structure in the data" },
+            { id: "b", label: "The model has too many parameters — overfitting", description: "Overfitting causes small residuals, not autocorrelated ones" },
+            { id: "c", label: "This is expected — some autocorrelation in residuals is normal", description: "Ideally residuals are white noise (no autocorrelation)" },
+            { id: "d", label: "The forecast horizon should be extended to 7 days", description: "Residual autocorrelation is about model fit, not forecast horizon" },
+          ],
+          branches: { a: "sp_t2_end", b: "sp_t2_end", c: "sp_t2_end", d: "sp_t2_end" },
+          terminal: true,
+          rationale: "ARIMA residuals should be white noise — no autocorrelation, no pattern. Significant ACF at lag 7 means predictable weekly structure wasn't captured. Fix: add a weekly seasonal component (SARIMA with m=7), add MA(7), or use a different model. Use Ljung-Box test for formal residual diagnostics.",
+        },
+      },
+    },
+
+    knowledgeCheck: [
+      {
+        question: "An ARIMA(2,1,0) model is fit to daily temperature data. What does this mean in plain language?",
+        options: [
+          "Predict today's temperature using yesterday's and the day-before's temperatures, after removing trend via differencing",
+          "Predict temperature using 2 MA terms and no AR terms",
+          "The model uses 2 seasonal periods and 1 outlier correction",
+          "Temperature is integrated twice and has no AR structure",
+        ],
+        correctIndex: 0,
+        explanation: "ARIMA(2,1,0): AR(2) — uses 2 past values; I(1) — first differencing applied; MA(0) — no moving average terms. The model predicts the differenced series (today minus yesterday) as a linear function of the two previous differences. In plain terms: change in temperature today depends on changes over the past two days.",
+      },
+      {
+        question: "Why is the Ljung-Box test applied to ARIMA residuals?",
+        options: [
+          "To check if the original series is stationary before fitting",
+          "To test whether residual autocorrelations are jointly zero (white noise test)",
+          "To select the optimal ARIMA order using information criteria",
+          "To detect outliers in the training data",
+        ],
+        correctIndex: 1,
+        explanation: "The Ljung-Box test jointly tests whether autocorrelations at multiple lags are all zero. A significant p-value (p < 0.05) means residuals have structure — the model is missing something. A non-significant p-value supports the white noise assumption, indicating a well-specified model.",
+      },
+    ],
+  },
+
+  "sp-t3": {
+    durationLabel: "15 min",
+    outcomes: [
+      "Explain how Prophet decomposes trend, seasonality, and holidays",
+      "Compare Prophet to ARIMA for different use cases",
+      "Identify when modern ML-based forecasting outperforms classical methods",
+    ],
+    learnMarkdown: `## Prophet & Modern Forecasting
+
+Facebook's Prophet (2017) made production-grade time series forecasting accessible to non-specialists. It's designed for business time series with strong seasonal patterns and irregular holidays.
+
+### Prophet's Decomposition
+\`\`\`python
+from prophet import Prophet
+
+model = Prophet(
+    seasonality_mode='multiplicative',
+    holidays=holiday_df,
+    changepoint_prior_scale=0.05  # flexibility of trend changes
+)
+model.fit(df[['ds', 'y']])  # ds=date, y=value
+future = model.make_future_dataframe(periods=365)
+forecast = model.predict(future)
+\`\`\`
+
+### Prophet Components
+\`\`\`
+y(t) = trend(t) + seasonality(t) + holidays(t) + error(t)
+\`\`\`
+
+**Trend**: piecewise linear or logistic growth with automatic changepoint detection
+
+**Seasonality**: Fourier series approximation — flexible, handles multiple periods:
+\`\`\`python
+model.add_seasonality(name='monthly', period=30.5, fourier_order=5)
+\`\`\`
+
+**Holidays**: explicit event effects with optional windows (before/after the holiday)
+
+### Prophet vs ARIMA
+| Aspect | ARIMA | Prophet |
+|--------|-------|---------|
+| Seasonality | Single, fixed period | Multiple, flexible periods |
+| Missing data | Requires imputation | Handles natively |
+| Holidays/events | Manual exogenous vars | Built-in holiday modeling |
+| Tuning | Requires ACF/PACF expertise | Few interpretable parameters |
+| Short series | Works well | Needs enough data for seasonality |
+
+### When Modern ML Beats Classical
+- **LightGBM/XGBoost**: When many external features (weather, promotions, prices) matter
+- **N-BEATS / N-HiTS**: Pure DL models that outperform ARIMA on M4/M5 competition benchmarks
+- **Temporal Fusion Transformer**: Multi-horizon with interpretable attention weights
+- Classical still wins on: very short series, high interpretability requirements, low data regimes`,
+
+    video: null,
+    videoFallbackMarkdown: `## Global vs Local Forecasting Models
+
+**Local models** (ARIMA, Prophet): one model per time series. Great for series with idiosyncratic patterns. Doesn't share information across series.
+
+**Global models** (LightGBM, DeepAR): one model trained on many series simultaneously. Learns common patterns; handles new series with cold-start. Requires feature engineering (lags, rolling stats, calendar features) for ML approaches.
+
+The M5 Accuracy competition (Walmart sales) was won by LightGBM ensembles using 1000+ features — demonstrating the power of global tree models at scale.`,
+
+    tryGuidance: "No interactive visualization for this lesson. Focus on understanding when to choose Prophet vs ARIMA vs ML approaches.",
+
+    interviewGraph: {
+      initialStageId: "sp_t3_stage1",
+      artifactDimensions: [
+        { label: "Prophet Mechanics", recoveryStageId: "sp_t3_rec1" },
+        { label: "Model Selection", recoveryStageId: "sp_t3_rec2", passLabel: "Forecasting Strategist" },
+      ],
+      stages: {
+        sp_t3_stage1: {
+          id: "sp_t3_stage1",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · Prophet Configuration",
+          prompt: "You're forecasting daily website traffic. Traffic spikes during product launches and drops during major holidays. The trend shows exponential growth with a known saturation cap. Which Prophet settings matter most?",
+          choices: [
+            { id: "a", label: "growth='logistic', cap=saturation_value, holidays=event_df", description: "Logistic growth for saturation; holidays for irregular events" },
+            { id: "b", label: "changepoint_prior_scale=0.001 (very rigid trend)", description: "Rigid trend would miss the exponential growth pattern" },
+            { id: "c", label: "seasonality_mode='additive' with no holidays", description: "Missing the saturation cap and holiday effects" },
+            { id: "d", label: "fourier_order=1 for simplicity", description: "Low Fourier order underfits complex seasonal patterns" },
+          ],
+          branches: { a: "sp_t3_stage2", b: "sp_t3_rec1", c: "sp_t3_rec1", d: "sp_t3_rec1" },
+          rationale: "For exponential growth with a ceiling: use logistic growth with a cap. Product launches and holidays are irregular events that don't fit Fourier seasonality — add them as custom holidays. changepoint_prior_scale controls trend flexibility (default 0.05 is usually good for startup growth curves).",
+        },
+        sp_t3_rec1: {
+          id: "sp_t3_rec1",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Prophet Mechanics",
+          prompt: "Prophet's seasonality uses Fourier series. What does increasing the fourier_order parameter do?",
+          choices: [
+            { id: "a", label: "Allows more flexible (complex) seasonal shapes at the risk of overfitting", description: "More Fourier terms = more wiggles = more flexibility" },
+            { id: "b", label: "Extends the forecast horizon", description: "Fourier order controls shape, not horizon" },
+            { id: "c", label: "Forces the seasonal pattern to be the same each period", description: "Same effect regardless of order" },
+            { id: "d", label: "Makes seasonality additive instead of multiplicative", description: "seasonality_mode controls additive vs multiplicative" },
+          ],
+          branches: { a: "sp_t3_stage2", b: "sp_t3_stage2", c: "sp_t3_stage2", d: "sp_t3_stage2" },
+          rationale: "Fourier series approximates any periodic function as a sum of sine and cosine waves. Higher fourier_order = more terms = more complex seasonal shapes. Default is 10 for yearly, 3 for weekly. Too high → overfitting to noise in seasonal pattern.",
+        },
+        sp_t3_stage2: {
+          id: "sp_t3_stage2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Prophet vs ML",
+          prompt: "Forecasting 50,000 retail SKU-store combinations for 28-day horizon. You have rich features: price history, promotions, holidays, local weather, and neighboring store sales. What approach wins?",
+          choices: [
+            { id: "a", label: "LightGBM global model with lag + rolling features", description: "ML handles many series + rich features; won the M5 competition" },
+            { id: "b", label: "Run 50,000 separate Prophet models", description: "Doesn't use cross-series patterns; extremely slow; ignores feature interactions" },
+            { id: "c", label: "ARIMA for each SKU-store combination", description: "50,000 ARIMA models × automated fitting = days of compute, no feature usage" },
+            { id: "d", label: "Simple moving average of last 28 days", description: "Ignores promotions, seasonality, and all external features" },
+          ],
+          branches: { a: "sp_t3_end", b: "sp_t3_rec2", c: "sp_t3_rec2", d: "sp_t3_rec2" },
+          rationale: "At 50K series with rich feature sets, global ML (LightGBM/XGBoost) dominates: (1) shares information across series, (2) naturally incorporates external features, (3) scales efficiently. The M5 Walmart competition winner used ~2000 LightGBM features. Prophet and ARIMA work per-series and can't use cross-series signals.",
+        },
+        sp_t3_rec2: {
+          id: "sp_t3_rec2",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Model Selection",
+          prompt: "A small bakery wants to forecast daily bread sales for next month using 2 years of daily data. No external features. What's the best approach?",
+          choices: [
+            { id: "a", label: "Prophet — handles daily + weekly + yearly seasonality with holidays out of the box", description: "Exactly the use case Prophet was designed for" },
+            { id: "b", label: "Transformer model — state of the art for time series", description: "Transformers need large datasets; 2 years of daily = 730 points — not enough" },
+            { id: "c", label: "LightGBM with engineered lag features", description: "Valid but overkill for a single series with no external features" },
+            { id: "d", label: "LSTM with 100 epochs", description: "Deep learning needs more data and is harder to tune for this simple case" },
+          ],
+          branches: { a: "sp_t3_end", b: "sp_t3_end", c: "sp_t3_end", d: "sp_t3_end" },
+          rationale: "Prophet is ideal here: ~730 data points, strong weekly and yearly seasonality (bakery sales), interpretable output, and easy holiday integration. Transformers and LSTMs need more data. LightGBM would work but Prophet requires less feature engineering for a single series.",
+        },
+        sp_t3_end: {
+          id: "sp_t3_end",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Modern Forecasting Mastered",
+          prompt: "Your Prophet model performs well in backtesting but poorly in live production. Traffic in the last 3 months is structurally different from the training period (post-pandemic normalization). What do you do?",
+          choices: [
+            { id: "a", label: "Set a cutoff date and retrain only on recent data, or use change-point detection", description: "Structural breaks require either retraining from the break or explicit changepoints" },
+            { id: "b", label: "Increase the forecast horizon to smooth out the anomaly", description: "Longer horizon doesn't fix a structural break in the training data" },
+            { id: "c", label: "Add more Fourier terms to capture the new pattern", description: "More Fourier terms address seasonal shape, not structural level shifts" },
+            { id: "d", label: "Switch to ARIMA which handles structural breaks automatically", description: "ARIMA doesn't automatically handle structural breaks either" },
+          ],
+          branches: { a: "sp_t3_end", b: "sp_t3_end", c: "sp_t3_end", d: "sp_t3_end" },
+          terminal: true,
+          rationale: "Structural breaks invalidate historical patterns. Solutions: (1) retrain on post-break data only, (2) add the break as a changepoint in Prophet (changepoints parameter), (3) use robust models with rolling windows. Monitoring for distribution shift and automatic retraining are essential MLOps practices for forecasting in production.",
+        },
+      },
+    },
+
+    knowledgeCheck: [
+      {
+        question: "Prophet uses 'changepoints' in its trend model. What are changepoints?",
+        options: [
+          "Dates when the seasonal pattern resets to zero",
+          "Points in time where the trend growth rate is allowed to change",
+          "Outlier dates that are excluded from the model",
+          "The future dates for which forecasts are generated",
+        ],
+        correctIndex: 1,
+        explanation: "Changepoints are dates where the trend slope is allowed to change abruptly — e.g., a new product launch changes the growth rate. Prophet automatically detects likely changepoints from the training data. changepoint_prior_scale controls how flexible the trend is: higher values = more changepoints = more flexible but potentially overfit trend.",
+      },
+      {
+        question: "What is cross-validation in the context of time series, and why can't you use standard k-fold CV?",
+        options: [
+          "Standard k-fold is fine for time series; temporal ordering doesn't matter",
+          "Time series CV uses expanding or sliding windows to preserve temporal order; k-fold would let future data train past predictions",
+          "Cross-validation isn't applicable to time series — use AIC instead",
+          "You must hold out the last 20% as a test set; no CV needed",
+        ],
+        correctIndex: 1,
+        explanation: "Standard k-fold randomly assigns data to folds, so future values can appear in the training set — creating data leakage. Time series CV uses walk-forward validation: train on data up to time t, test on t+1 to t+h, then expand the window. Prophet has built-in cross_validation() that implements this correctly.",
+      },
+    ],
+  },
+
+  "sp-t4": {
+    durationLabel: "16 min",
+    outcomes: [
+      "Explain how LSTMs handle sequence memory via gates",
+      "Frame a time series problem as a supervised learning problem for LSTM",
+      "Compare LSTM to classical methods for time series forecasting",
+    ],
+    learnMarkdown: `## LSTM for Sequence Prediction
+
+LSTMs (Long Short-Term Memory) are recurrent neural networks designed to learn long-range dependencies in sequential data.
+
+### Why Vanilla RNNs Fail
+Simple RNNs suffer from **vanishing gradients**: gradients decay exponentially through time during backpropagation, making it impossible to learn long-range patterns (>10-20 steps back).
+
+### LSTM Gates
+\`\`\`
+Forget gate: f_t = σ(W_f · [h_{t-1}, x_t] + b_f)    # what to discard
+Input gate:  i_t = σ(W_i · [h_{t-1}, x_t] + b_i)    # what to write
+Cell update: C̃_t = tanh(W_C · [h_{t-1}, x_t] + b_C) # candidate values
+Cell state:  C_t = f_t * C_{t-1} + i_t * C̃_t        # updated memory
+Output gate: o_t = σ(W_o · [h_{t-1}, x_t] + b_o)    # what to output
+Hidden:      h_t = o_t * tanh(C_t)
+\`\`\`
+
+### Framing as Supervised Learning
+\`\`\`python
+import numpy as np
+
+def create_sequences(data, seq_len=30, horizon=1):
+    X, y = [], []
+    for i in range(len(data) - seq_len - horizon + 1):
+        X.append(data[i:i+seq_len])
+        y.append(data[i+seq_len:i+seq_len+horizon])
+    return np.array(X), np.array(y)
+
+X, y = create_sequences(scaled_series, seq_len=60, horizon=7)
+# X shape: (n_samples, 60, n_features)
+# y shape: (n_samples, 7)
+\`\`\`
+
+### PyTorch LSTM Example
+\`\`\`python
+import torch.nn as nn
+
+class LSTMForecaster(nn.Module):
+    def __init__(self, input_size, hidden_size, horizon):
+        super().__init__()
+        self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)
+        self.linear = nn.Linear(hidden_size, horizon)
+
+    def forward(self, x):
+        out, _ = self.lstm(x)
+        return self.linear(out[:, -1, :])  # last timestep
+\`\`\`
+
+### LSTM vs Classical for Time Series
+| Aspect | LSTM | ARIMA/Prophet |
+|--------|------|---------------|
+| Long-range dependencies | Excellent | Limited |
+| Small datasets (<1000 pts) | Often overfits | Better |
+| External features | Easy multivariate input | Requires ARIMAX/regressors |
+| Interpretability | Low | High |
+| Training cost | High | Low |
+| Uncertainty quantification | Difficult | Confidence intervals native |`,
+
+    video: null,
+    videoFallbackMarkdown: `## Seq2Seq and Attention for Time Series
+
+Beyond basic LSTMs, sequence-to-sequence (Seq2Seq) models use encoder-decoder architectures for multi-step forecasting:
+- **Encoder**: processes the history → context vector
+- **Decoder**: generates forecast one step at a time, attending to encoder states
+
+**Temporal Fusion Transformer (TFT)**: the state of the art for interpretable multi-horizon forecasting. Uses multi-head attention across time + gating layers. Provides variable importance scores.`,
+
+    tryGuidance: "No interactive visualization for this lesson. Focus on the sequence windowing pattern and the LSTM architecture.",
+
+    interviewGraph: {
+      initialStageId: "sp_t4_stage1",
+      artifactDimensions: [
+        { label: "LSTM Mechanics", recoveryStageId: "sp_t4_rec1" },
+        { label: "Practical Tradeoffs", recoveryStageId: "sp_t4_rec2", passLabel: "Deep TS Expert" },
+      ],
+      stages: {
+        sp_t4_stage1: {
+          id: "sp_t4_stage1",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · LSTM Gate Intuition",
+          prompt: "An LSTM is reading a long patient health record sequence. Early in the sequence, a 'diabetes diagnosis' event occurs. The LSTM must remember this when predicting outcomes 200 timesteps later. Which gate makes this possible?",
+          choices: [
+            { id: "a", label: "The cell state with a near-1 forget gate (retain the diabetes flag)", description: "Cell state carries information long-term; forget gate ≈1 means don't discard" },
+            { id: "b", label: "The output gate alone decides long-range memory", description: "Output gate selects what to expose from the cell, but doesn't retain information" },
+            { id: "c", label: "The input gate replaces old memory with new at each step", description: "Input gate writes new info but forget gate decides what to keep" },
+            { id: "d", label: "Vanilla RNN hidden state — LSTMs don't improve on this", description: "This is exactly the vanishing gradient problem LSTMs solve" },
+          ],
+          branches: { a: "sp_t4_stage2", b: "sp_t4_rec1", c: "sp_t4_rec1", d: "sp_t4_rec1" },
+          rationale: "The cell state C_t is the LSTM's long-term memory highway. When the forget gate f_t ≈ 1, the cell state is passed through unchanged across timesteps. The LSTM learns to write the diabetes flag into the cell state with a high input gate, then keep it alive by learning forget gate ≈ 1 for those subsequent timesteps.",
+        },
+        sp_t4_rec1: {
+          id: "sp_t4_rec1",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · LSTM Mechanics",
+          prompt: "Why do vanilla RNNs suffer from the vanishing gradient problem when learning from long sequences?",
+          choices: [
+            { id: "a", label: "Gradients are multiplied by weights at each timestep; repeated multiplication of values <1 → exponential decay", description: "Backpropagation through time multiplies gradients across all timesteps" },
+            { id: "b", label: "RNNs use sigmoid activations which always output zero", description: "Sigmoid outputs (0,1), not zero — though saturation contributes to the problem" },
+            { id: "c", label: "The hidden state has too many parameters to train", description: "Parameter count is not the issue — gradient flow is" },
+            { id: "d", label: "Long sequences cause memory errors during forward pass", description: "Memory usage is a practical concern but not the gradient problem" },
+          ],
+          branches: { a: "sp_t4_stage2", b: "sp_t4_stage2", c: "sp_t4_stage2", d: "sp_t4_stage2" },
+          rationale: "BPTT (Backpropagation Through Time) multiplies the recurrent weight matrix at each timestep. If the largest eigenvalue of W < 1, gradients shrink exponentially with sequence length. LSTM's additive cell state update (C_t = f_t*C_{t-1} + i_t*C̃_t) allows gradients to flow unchanged when the forget gate ≈ 1.",
+        },
+        sp_t4_stage2: {
+          id: "sp_t4_stage2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Sequence Windowing",
+          prompt: "You have 5 years of hourly electricity consumption (43,800 points). You want to predict the next 24 hours. What sequence length (lookback window) is most appropriate?",
+          choices: [
+            { id: "a", label: "168 hours (1 week) — captures daily and weekly seasonality", description: "A week covers daily patterns (24h) and weekly periodicity" },
+            { id: "b", label: "1 hour — use only the immediately previous value", description: "Loses all seasonal context" },
+            { id: "c", label: "43,776 hours — use all history as the context window", description: "Impractical; LSTM memory saturates and training is extremely slow" },
+            { id: "d", label: "24 hours — exactly the forecast horizon", description: "Lookback of 24h misses weekly patterns that repeat every 168 hours" },
+          ],
+          branches: { a: "sp_t4_end", b: "sp_t4_rec2", c: "sp_t4_rec2", d: "sp_t4_rec2" },
+          rationale: "For electricity forecasting, 168-hour (1 week) lookback captures both daily cycles (24h) and the Monday-vs-Saturday pattern (weekly). Common practice: lookback = at least one full seasonal cycle, often 2-4 cycles. For daily data with annual seasonality, a 365-day lookback or Fourier features work better than a 365-step LSTM.",
+        },
+        sp_t4_rec2: {
+          id: "sp_t4_rec2",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Practical Tradeoffs",
+          prompt: "You compare LSTM (RMSE=45) vs SARIMA (RMSE=48) on 2 years of monthly sales data (24 data points). Which do you deploy?",
+          choices: [
+            { id: "a", label: "SARIMA — LSTM likely overfit with only 24 training points", description: "24 points for an LSTM is extremely small; SARIMA is more appropriate" },
+            { id: "b", label: "LSTM — lower RMSE wins always", description: "Lower RMSE on 24-point training data means little; likely overfitting" },
+            { id: "c", label: "Ensemble both — average their predictions", description: "Ensembling an overfit model dilutes rather than helps" },
+            { id: "d", label: "Deploy neither — only neural ODEs work for monthly data", description: "SARIMA is a well-established choice for monthly data" },
+          ],
+          branches: { a: "sp_t4_end", b: "sp_t4_end", c: "sp_t4_end", d: "sp_t4_end" },
+          rationale: "24 monthly data points is far too few for an LSTM (typically needs 1000+). The LSTM's lower RMSE likely reflects overfitting. SARIMA is the right tool here — classical models with few parameters outperform deep learning on small datasets. Reserve LSTM for cases with thousands of data points or complex multivariate inputs.",
+        },
+        sp_t4_end: {
+          id: "sp_t4_end",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "LSTM Forecasting Mastered",
+          prompt: "Before feeding raw time series data into an LSTM, what preprocessing step is critical and why?",
+          choices: [
+            { id: "a", label: "Normalize to [0,1] or standardize — LSTMs are sensitive to input scale via tanh/sigmoid activations", description: "Saturated activations cause vanishing gradients during training" },
+            { id: "b", label: "Apply seasonal differencing — LSTMs cannot model seasonality", description: "LSTMs can learn seasonal patterns given enough lookback" },
+            { id: "c", label: "Remove all outliers — a single outlier breaks LSTM training", description: "LSTMs are somewhat robust to outliers; this is overstated" },
+            { id: "d", label: "Convert to stationary — LSTMs require stationarity like ARIMA", description: "LSTMs don't require stationarity; they can model non-stationary series" },
+          ],
+          branches: { a: "sp_t4_end", b: "sp_t4_end", c: "sp_t4_end", d: "sp_t4_end" },
+          terminal: true,
+          rationale: "Normalization is essential for LSTMs: tanh activation outputs (−1, 1) and sigmoid outputs (0, 1). Large raw values push activations into saturation zones where gradients → 0. Always normalize (MinMax or StandardScaler) per feature, fit on training data only, and inverse-transform predictions back to original scale.",
+        },
+      },
+    },
+
+    knowledgeCheck: [
+      {
+        question: "What is 'teacher forcing' in LSTM training for multi-step forecasting?",
+        options: [
+          "Forcing the LSTM to attend to the teacher's annotations at each step",
+          "Using ground truth previous outputs as decoder inputs during training, instead of the model's own predictions",
+          "A regularization technique that forces forget gates to be near 1",
+          "Constraining the loss function to penalize large prediction errors more",
+        ],
+        correctIndex: 1,
+        explanation: "Teacher forcing: during training, the decoder receives the true previous value (ground truth) as input, not its own previous prediction. This stabilizes training by preventing error accumulation. At inference time, the model uses its own predictions — creating a train/test mismatch (exposure bias). Scheduled sampling gradually reduces teacher forcing to mitigate this.",
+      },
+      {
+        question: "How should you handle the 'inverse transform' step when an LSTM is trained on normalized data?",
+        options: [
+          "Apply the scaler's inverse_transform() to the model outputs using the same scaler fitted on training data",
+          "Multiply predictions by the training set standard deviation only",
+          "The LSTM automatically rescales outputs — no inverse transform needed",
+          "Apply inverse_transform to inputs before feeding to the model at test time",
+        ],
+        correctIndex: 0,
+        explanation: "You must inverse-transform LSTM outputs back to the original scale using the same scaler object fitted on training data. Critical mistake to avoid: fitting the scaler on the full dataset (including test) — this leaks test statistics into training. Fit scaler on train only, transform train and test, then inverse-transform predictions.",
+      },
+    ],
+  },
+
+  "sp-n1": {
+    durationLabel: "15 min",
+    outcomes: [
+      "Apply standard text preprocessing steps: tokenization, stemming, lemmatization",
+      "Explain subword tokenization (BPE, WordPiece) and why transformers use it",
+      "Contrast bag-of-words, TF-IDF, and contextual representations",
+    ],
+    learnMarkdown: `## Text Preprocessing & Tokenization
+
+Before any NLP model can process text, raw text must be converted into a structured numerical representation.
+
+### Classical Preprocessing Pipeline
+\`\`\`python
+import re
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+
+def preprocess(text):
+    text = text.lower()
+    text = re.sub(r'[^a-z\\s]', '', text)          # remove punctuation
+    tokens = word_tokenize(text)
+    tokens = [t for t in tokens if t not in stopwords.words('english')]
+    lemmatizer = WordNetLemmatizer()
+    tokens = [lemmatizer.lemmatize(t) for t in tokens]
+    return tokens
+\`\`\`
+
+### Stemming vs Lemmatization
+| | Stemming | Lemmatization |
+|--|---------|--------------|
+| Method | Chop suffix heuristically | Dictionary-based, uses POS |
+| "running" → | "run" | "run" |
+| "better" → | "better" | "good" |
+| Speed | Fast | Slower |
+| Use case | Search/IR | High-quality NLP |
+
+### From Tokens to Vectors
+**Bag of Words (BoW)**: count of each token in a fixed vocabulary
+- High-dimensional, sparse, no word order, no semantics
+
+**TF-IDF**: BoW weighted by inverse document frequency
+- Highlights distinctive terms, still sparse and positional-ignorant
+
+**Word embeddings** (Word2Vec, GloVe): dense semantic vectors — see sp-n2
+
+### Subword Tokenization (Transformers)
+\`\`\`python
+from transformers import AutoTokenizer
+tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+tokens = tokenizer("unhappiness")  # → ['un', '##happi', '##ness']
+\`\`\`
+
+**Byte-Pair Encoding (BPE)**: starts with characters, merges frequent pairs iteratively. Used by GPT models.
+**WordPiece**: similar but merges based on likelihood. Used by BERT.
+
+Advantages: handles OOV words gracefully, fixed vocabulary size regardless of language`,
+
+    video: null,
+    videoFallbackMarkdown: `## Text Normalization Pitfalls
+
+- **Stopword removal**: useful for IR/BoW, harmful for sentiment ("not good" → "good")
+- **Lowercasing**: useful generally, harmful for NER ("Apple" company vs "apple" fruit)
+- **Aggressive stemming**: "organization" → "organ" — loses meaning
+
+Modern transformers often apply minimal preprocessing (just subword tokenization + normalization) because they learn contextual representations that handle capitalization, morphology, etc. internally.`,
+
+    tryGuidance: "No interactive visualization. Focus on the tokenization examples and preprocessing decision rules.",
+
+    interviewGraph: {
+      initialStageId: "sp_n1_stage1",
+      artifactDimensions: [
+        { label: "Tokenization", recoveryStageId: "sp_n1_rec1" },
+        { label: "Text Representations", recoveryStageId: "sp_n1_rec2", passLabel: "NLP Preprocessor" },
+      ],
+      stages: {
+        sp_n1_stage1: {
+          id: "sp_n1_stage1",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · Preprocessing Decisions",
+          prompt: "You're building a sentiment analysis model for tweets. Tweets contain emojis, slang, and abbreviations like 'lol', 'imo', 'brb'. Which preprocessing approach is best?",
+          choices: [
+            { id: "a", label: "Use a transformer with tweet-specific tokenizer (e.g., BERTweet)", description: "Pre-trained on tweets — handles slang, emojis, abbreviations natively" },
+            { id: "b", label: "Remove all emojis and lowercase + lemmatize", description: "Emojis carry strong sentiment signal — removing them loses information" },
+            { id: "c", label: "Replace all slang with formal equivalents before modeling", description: "Slang dictionaries are incomplete and can't keep up with new terms" },
+            { id: "d", label: "Split on spaces only — no further processing", description: "Space tokenization misses punctuation attachment and subword structure" },
+          ],
+          branches: { a: "sp_n1_stage2", b: "sp_n1_rec1", c: "sp_n1_rec1", d: "sp_n1_rec1" },
+          rationale: "Domain-specific pretrained tokenizers and models (BERTweet, roBERTa-base) outperform generic preprocessing on noisy social media text. They were trained on millions of tweets and learned to handle emoji sentiment, abbreviations, and hashtags. Removing emojis is particularly harmful — 😊 is a strong positive signal.",
+        },
+        sp_n1_rec1: {
+          id: "sp_n1_rec1",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Tokenization",
+          prompt: "BPE tokenization splits 'unhappiness' into ['un', '##happi', '##ness']. A previously unseen word 'unthinkability' appears at inference. How does BPE handle it?",
+          choices: [
+            { id: "a", label: "Splits into known subwords: ['un', '##think', '##ability'] — no OOV issue", description: "BPE falls back to known subword pieces, never truly OOV" },
+            { id: "b", label: "Replaces the entire word with [UNK] token", description: "Character-level fallback prevents full OOV in BPE" },
+            { id: "c", label: "The model crashes — it can't handle words not in training vocabulary", description: "BPE was specifically designed to avoid this" },
+            { id: "d", label: "The word is ignored and removed from the sequence", description: "BPE decomposes — it doesn't ignore unknown words" },
+          ],
+          branches: { a: "sp_n1_stage2", b: "sp_n1_stage2", c: "sp_n1_stage2", d: "sp_n1_stage2" },
+          rationale: "BPE's key advantage: no true out-of-vocabulary (OOV) words because it decomposes into known subwords, down to individual characters if needed. This makes it excellent for morphologically rich languages and technical domains with novel terminology.",
+        },
+        sp_n1_stage2: {
+          id: "sp_n1_stage2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · BoW vs TF-IDF vs Embeddings",
+          prompt: "You're building a document similarity search for 10,000 legal contracts. Documents are long (~10,000 words). Which representation would you choose?",
+          choices: [
+            { id: "a", label: "Sentence-BERT embeddings averaged over document chunks", description: "Dense semantic embeddings capture meaning; chunking handles length limits" },
+            { id: "b", label: "Bag of Words with cosine similarity", description: "BoW misses synonyms, legal jargon context, and word order" },
+            { id: "c", label: "TF-IDF vectors with a 50,000-word vocabulary", description: "Sparse, high-dimensional; misses semantics ('indemnify' ≠ 'compensate' in BoW)" },
+            { id: "d", label: "Character n-grams of length 3", description: "Character n-grams are good for spelling/typo similarity, not semantic legal similarity" },
+          ],
+          branches: { a: "sp_n1_end", b: "sp_n1_rec2", c: "sp_n1_rec2", d: "sp_n1_rec2" },
+          rationale: "Legal contract similarity requires semantic understanding — 'indemnify', 'compensate', 'hold harmless' are related legal concepts that BoW/TF-IDF treats as completely different. Sentence-BERT embeddings (or legal-specific BERT variants like LegalBERT) capture these relationships. Chunk long docs and aggregate embeddings.",
+        },
+        sp_n1_rec2: {
+          id: "sp_n1_rec2",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Text Representations",
+          prompt: "TF-IDF gives the word 'the' a near-zero weight in most documents. Why?",
+          choices: [
+            { id: "a", label: "IDF is low because 'the' appears in almost every document — common words are penalized", description: "IDF = log(N / df); if df ≈ N, IDF → 0" },
+            { id: "b", label: "'The' is filtered by the stopword list before TF-IDF is computed", description: "TF-IDF itself penalizes common words; stopword filtering is separate" },
+            { id: "c", label: "TF is low because 'the' appears rarely within any single document", description: "The opposite — 'the' has high TF; it's the IDF that tanks the score" },
+            { id: "d", label: "TF-IDF uses character counts, not word counts", description: "TF-IDF uses word (or n-gram) counts" },
+          ],
+          branches: { a: "sp_n1_end", b: "sp_n1_end", c: "sp_n1_end", d: "sp_n1_end" },
+          rationale: "IDF = log(N / df_t). For 'the': df_t ≈ N (appears in almost all documents) → IDF ≈ log(1) = 0. TF × IDF ≈ 0 regardless of how often 'the' appears in a single document. TF-IDF inherently implements the stopword concept mathematically — though explicit stopword removal is often still applied for efficiency.",
+        },
+        sp_n1_end: {
+          id: "sp_n1_end",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "NLP Preprocessing Mastered",
+          prompt: "For a multilingual NLP application (English, Spanish, German, Chinese), which tokenization approach works best?",
+          choices: [
+            { id: "a", label: "Multilingual BPE (mBERT, XLM-R tokenizer) trained on all languages jointly", description: "Shared subword vocabulary handles all languages without per-language preprocessing" },
+            { id: "b", label: "Separate tokenizers per language, then concatenate", description: "Vocabulary mismatch and different sequence lengths cause problems" },
+            { id: "c", label: "Translate everything to English first, then use English tokenizer", description: "Translation adds error and latency; not scalable" },
+            { id: "d", label: "Character-level tokenization for all languages", description: "Very long sequences for logographic languages (Chinese); inefficient" },
+          ],
+          branches: { a: "sp_n1_end", b: "sp_n1_end", c: "sp_n1_end", d: "sp_n1_end" },
+          terminal: true,
+          rationale: "Multilingual BPE (used by mBERT, XLM-RoBERTa) learns a shared vocabulary across 100+ languages. It handles Chinese characters, German compound words, and Spanish morphology in a single unified tokenizer. XLM-R with its 250K vocabulary is the current standard for multilingual NLP tasks.",
+        },
+      },
+    },
+
+    knowledgeCheck: [
+      {
+        question: "Why might removing stopwords harm a sentiment analysis model?",
+        options: [
+          "Stopwords contain important frequency information",
+          "Negation words like 'not', 'never', 'hardly' are often in stopword lists and reverse sentiment",
+          "Stopword removal creates out-of-vocabulary issues for transformers",
+          "Removing stopwords increases dimensionality",
+        ],
+        correctIndex: 1,
+        explanation: "'Not good', 'never satisfied', 'hardly worth it' — removing 'not', 'never', 'hardly' from these phrases completely reverses the sentiment. Stopword lists were designed for information retrieval (find documents about 'X') not sentiment analysis. For sentiment, preserve negation words or use a transformer that handles them contextually.",
+      },
+      {
+        question: "What is the vocabulary size trade-off in BPE tokenization?",
+        options: [
+          "Larger vocabulary = faster training, smaller vocabulary = slower training",
+          "Smaller vocabulary = shorter token sequences (efficient); larger vocabulary = longer sequences but closer to word-level",
+          "Larger vocabulary = more OOV tokens; smaller = fewer OOV tokens",
+          "Vocabulary size doesn't affect sequence length or model behavior",
+        ],
+        correctIndex: 1,
+        explanation: "Smaller BPE vocab: more aggressive splitting → longer sequences (more subword pieces per word) → slower attention in transformers. Larger vocab: words kept intact more often → shorter sequences → faster attention but larger embedding matrix. GPT-2 uses 50K vocab; mBERT uses 30K for 104 languages — a tight compression.",
+      },
+    ],
+  },
+
+  "sp-n2": {
+    durationLabel: "18 min",
+    outcomes: [
+      "Explain Word2Vec skip-gram training objective",
+      "Contrast static (Word2Vec/GloVe) vs contextual (BERT) embeddings",
+      "Describe how BERT uses masked language modeling for pretraining",
+    ],
+    learnMarkdown: `## Word Embeddings: Word2Vec to BERT
+
+Word embeddings map tokens to dense vectors in a semantic space where similar words are close together.
+
+### Word2Vec: Skip-Gram
+Predict surrounding words given a center word:
+\`\`\`
+Objective: maximize Σ Σ log P(w_c | w_t)
+            t  c ∈ context(t)
+\`\`\`
+
+\`\`\`python
+from gensim.models import Word2Vec
+
+model = Word2Vec(sentences, vector_size=100, window=5,
+                 min_count=5, sg=1)  # sg=1: skip-gram
+vector = model.wv['king']            # (100,) vector
+similar = model.wv.most_similar('king', topn=5)
+# Classic result: king - man + woman ≈ queen
+\`\`\`
+
+### GloVe: Global Vectors
+Factorize the word co-occurrence matrix directly:
+\`\`\`
+Objective: Σᵢⱼ f(X_ij)(wᵢᵀw̃ⱼ + bᵢ + b̃ⱼ - log Xᵢⱼ)²
+\`\`\`
+GloVe captures global statistical structure; Word2Vec captures local context windows.
+
+### Problem with Static Embeddings
+"bank" has one vector regardless of context:
+- "river bank" → same embedding as "bank account" ❌
+
+### BERT: Contextual Embeddings
+\`\`\`python
+from transformers import AutoModel, AutoTokenizer
+tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
+model = AutoModel.from_pretrained('bert-base-uncased')
+
+inputs = tokenizer("The bank is by the river", return_tensors='pt')
+outputs = model(**inputs)
+# outputs.last_hidden_state: (1, seq_len, 768) — contextual embeddings
+# 'bank' embedding differs based on surrounding context
+\`\`\`
+
+### BERT Pretraining
+1. **Masked Language Modeling (MLM)**: Mask 15% of tokens, predict masked tokens from context
+2. **Next Sentence Prediction (NSP)**: Predict if sentence B follows sentence A
+
+### Embedding Comparison
+| Method | Dim | Contextual | OOV | Training |
+|--------|-----|-----------|-----|---------|
+| Word2Vec | 50-300 | No | UNK | Yours |
+| GloVe | 50-300 | No | UNK | Pre-trained |
+| BERT | 768 | Yes | Subwords | Fine-tune |
+| GPT | 768-12288 | Yes | BPE | Prompt/fine-tune |`,
+
+    video: null,
+    videoFallbackMarkdown: `## Sentence Embeddings
+
+For downstream tasks like semantic search and clustering:
+- **Sentence-BERT (SBERT)**: Fine-tuned BERT with siamese network for sentence-level similarity
+- **OpenAI text-embedding-ada-002**: 1536-dim embeddings; good general-purpose retrieval
+- **E5, GTE, BGE**: Open-source embedding models competitive with OpenAI for RAG pipelines
+
+For cosine similarity in high dimensions: normalize embeddings to unit vectors first (dot product = cosine similarity after normalization).`,
+
+    tryGuidance: "Explore the word embeddings visualization. See how words cluster in 2D and observe analogical reasoning (king - man + woman).",
+
+    interviewGraph: {
+      initialStageId: "sp_n2_stage1",
+      artifactDimensions: [
+        { label: "Word2Vec Intuition", recoveryStageId: "sp_n2_rec1" },
+        { label: "BERT vs Static", recoveryStageId: "sp_n2_rec2", passLabel: "Embeddings Expert" },
+      ],
+      stages: {
+        sp_n2_stage1: {
+          id: "sp_n2_stage1",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · Word2Vec Training",
+          prompt: "Word2Vec skip-gram is trained on the sentence 'The cat sat on the mat'. Center word = 'sat', window = 2. What are the positive training pairs?",
+          choices: [
+            { id: "a", label: "(sat, cat), (sat, on) — 2 words left and right of 'sat'", description: "Window=2 means 2 words each side: [cat, sat, on, the]" },
+            { id: "b", label: "(sat, The), (sat, cat), (sat, on), (sat, the) — all words in sentence", description: "Window=2 limits context to 2 words each direction from center" },
+            { id: "c", label: "Only (sat, on) — only immediately adjacent word", description: "Window=2 means 2 positions each direction, not 1" },
+            { id: "d", label: "No pairs — skip-gram predicts the center word from context", description: "Skip-gram predicts CONTEXT from center; CBOW predicts center from context" },
+          ],
+          branches: { a: "sp_n2_stage2", b: "sp_n2_rec1", c: "sp_n2_rec1", d: "sp_n2_rec1" },
+          rationale: "Skip-gram center='sat', window=2: context = 2 words left ['cat'] + 2 words right ['on', 'the'] (limited by sentence boundaries on left). Positive pairs: (sat, cat), (sat, on), (sat, the). Skip-gram predicts context given center — the opposite of CBOW (predicts center from context).",
+        },
+        sp_n2_rec1: {
+          id: "sp_n2_rec1",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Word2Vec Intuition",
+          prompt: "Word2Vec learns that king - man + woman ≈ queen. What property of the embedding space makes this analogy work?",
+          choices: [
+            { id: "a", label: "Linear structure: the gender direction is consistent across royalty pairs", description: "Vector(king) - Vector(man) ≈ Vector(queen) - Vector(woman) — a consistent offset" },
+            { id: "b", label: "The model was explicitly trained on analogy pairs", description: "Word2Vec learns from co-occurrence only — analogies emerge implicitly" },
+            { id: "c", label: "King and queen share exactly 50% of their embedding dimensions", description: "No such constraint exists; similarity is measured by cosine, not shared dimensions" },
+            { id: "d", label: "The vocabulary is sorted alphabetically, placing similar words close", description: "Vocabulary ordering has no effect on embedding geometry" },
+          ],
+          branches: { a: "sp_n2_stage2", b: "sp_n2_stage2", c: "sp_n2_stage2", d: "sp_n2_stage2" },
+          rationale: "Word2Vec learns a linear geometry where semantic relationships correspond to vector offsets. The gender direction (man→woman) is a consistent vector offset that applies across many pairs: king→queen, actor→actress, uncle→aunt. This parallelogram structure emerges from co-occurrence patterns in the training corpus.",
+        },
+        sp_n2_stage2: {
+          id: "sp_n2_stage2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Static vs Contextual",
+          prompt: "Your NLP system must classify legal contract clauses. 'Party' means 'contracting entity' in legal text but 'celebration event' in social media. Static Word2Vec embeddings give both uses the same vector. What's the fix?",
+          choices: [
+            { id: "a", label: "Use BERT — it produces different 'party' embeddings based on surrounding context", description: "Contextual embeddings solve polysemy by encoding the full sentence context" },
+            { id: "b", label: "Train separate Word2Vec models on legal vs social text", description: "Still produces a single static 'party' vector per model — no disambiguation at inference" },
+            { id: "c", label: "Increase Word2Vec dimension from 100 to 1000", description: "Larger dimensions don't add contextual disambiguation" },
+            { id: "d", label: "Add 'legal_party' and 'social_party' as separate vocabulary entries", description: "This requires pre-disambiguated training data — defeats the purpose" },
+          ],
+          branches: { a: "sp_n2_end", b: "sp_n2_rec2", c: "sp_n2_rec2", d: "sp_n2_rec2" },
+          rationale: "BERT's contextual embeddings produce a different vector for 'party' depending on surrounding words: 'party of the first part' (legal context) gets a different embedding than 'party on Saturday' (social context). This polysemy resolution is the core advantage of contextual embeddings over static ones.",
+        },
+        sp_n2_rec2: {
+          id: "sp_n2_rec2",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · BERT Pretraining",
+          prompt: "In BERT's Masked Language Model pretraining, 15% of tokens are masked. Of these, what happens to each masked token?",
+          choices: [
+            { id: "a", label: "80% [MASK], 10% random token, 10% unchanged — to prevent [MASK]-only exposure bias", description: "BERT uses this 80/10/10 split to make the model robust" },
+            { id: "b", label: "100% replaced with [MASK] token for consistency", description: "[MASK] never appears at inference — models trained this way see a train/test mismatch" },
+            { id: "c", label: "50% [MASK], 50% random token", description: "Not the BERT split — too much random replacement adds noise" },
+            { id: "d", label: "The token is simply deleted from the sequence", description: "Deletion changes sequence length; BERT keeps length constant" },
+          ],
+          branches: { a: "sp_n2_end", b: "sp_n2_end", c: "sp_n2_end", d: "sp_n2_end" },
+          rationale: "BERT's masking strategy: of the 15% selected tokens, 80% get [MASK], 10% get a random token, 10% stay unchanged. This prevents the model from learning 'if I see [MASK] I need to predict something' — a bias that hurts fine-tuning since [MASK] doesn't appear in real text.",
+        },
+        sp_n2_end: {
+          id: "sp_n2_end",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Embeddings Mastered",
+          prompt: "For semantic search over 1M product descriptions, you need to find the most similar items to a query in <50ms. What's the production architecture?",
+          choices: [
+            { id: "a", label: "Precompute all product embeddings → index in FAISS → ANN search at query time", description: "Offline embedding + fast ANN retrieval is the standard production pattern" },
+            { id: "b", label: "Compute cosine similarity between query and all 1M products at query time", description: "1M × 768-dim cosines at 50ms = ~7 billion operations — not feasible" },
+            { id: "c", label: "Use BM25 keyword search — embeddings are too slow for 1M items", description: "Precomputed embeddings + FAISS are fast; BM25 misses semantic similarity" },
+            { id: "d", label: "Fine-tune BERT on every query for personalized embeddings", description: "Fine-tuning at query time is seconds to minutes per request" },
+          ],
+          branches: { a: "sp_n2_end", b: "sp_n2_end", c: "sp_n2_end", d: "sp_n2_end" },
+          terminal: true,
+          rationale: "Production semantic search: (1) embed all products offline with a sentence transformer; (2) index embeddings in FAISS (Flat, HNSW, or IVF indexes); (3) at query time, embed the query (~10ms) and run ANN search (~5ms) → total <20ms for 1M items. FAISS with HNSW index achieves ~95% recall vs brute force.",
+        },
+      },
+    },
+
+    knowledgeCheck: [
+      {
+        question: "Negative sampling in Word2Vec training speeds up training. What does it do?",
+        options: [
+          "Randomly samples negative (non-context) words to contrast against positive context words during training",
+          "Removes negative sentiment words from the training corpus",
+          "Samples words with negative TF-IDF scores as training examples",
+          "Reduces the learning rate when loss is negative",
+        ],
+        correctIndex: 0,
+        explanation: "The full softmax over the entire vocabulary (50K+ words) at each training step is expensive. Negative sampling replaces this with k (typically 5-20) randomly sampled non-context words. The model learns to distinguish true context words from random 'noise' words. This reduces computational complexity from O(V) to O(k) per update.",
+      },
+      {
+        question: "You extract the [CLS] token embedding from BERT for document classification. What does [CLS] represent?",
+        options: [
+          "The embedding of the first real word in the sentence",
+          "A special classification token whose final-layer embedding aggregates sequence-level information",
+          "The average of all token embeddings in the sequence",
+          "A mask token used to indicate the start of classification",
+        ],
+        correctIndex: 1,
+        explanation: "[CLS] is prepended to every BERT input. The model learns (through NSP pretraining and fine-tuning) to pack sequence-level information into the [CLS] token's final hidden state. This makes it useful as a fixed-size representation for classification tasks. Note: for sentence similarity tasks, mean-pooling over all tokens often outperforms [CLS] alone.",
+      },
+    ],
+  },
+
+  "sp-n3": {
+    durationLabel: "15 min",
+    outcomes: [
+      "Build a text classification pipeline using BERT fine-tuning",
+      "Explain aspect-based sentiment analysis vs document-level sentiment",
+      "Handle class imbalance in sentiment datasets",
+    ],
+    learnMarkdown: `## Sentiment Analysis & Text Classification
+
+Sentiment analysis is the most applied NLP task — from product reviews to social media monitoring.
+
+### Document-Level Sentiment
+\`\`\`python
+from transformers import pipeline
+
+classifier = pipeline("sentiment-analysis",
+                       model="distilbert-base-uncased-finetuned-sst-2-english")
+result = classifier("The product works great but delivery was awful")
+# → [{'label': 'POSITIVE', 'score': 0.71}]  ← misses the nuance!
+\`\`\`
+
+### Aspect-Based Sentiment Analysis (ABSA)
+Document-level misses: "The **food** was excellent but the **service** was terrible"
+- Extract aspects: food (positive), service (negative)
+- Models: sequence tagging (BIO scheme) or span extraction
+
+### Fine-tuning BERT for Classification
+\`\`\`python
+from transformers import AutoModelForSequenceClassification, Trainer, TrainingArguments
+
+model = AutoModelForSequenceClassification.from_pretrained(
+    "bert-base-uncased", num_labels=3  # neg/neutral/pos
+)
+
+training_args = TrainingArguments(
+    output_dir="./results",
+    num_train_epochs=3,
+    per_device_train_batch_size=16,
+    warmup_steps=500,
+    weight_decay=0.01,
+    evaluation_strategy="epoch",
+)
+
+trainer = Trainer(model=model, args=training_args,
+                  train_dataset=train_data, eval_dataset=val_data)
+trainer.train()
+\`\`\`
+
+### Handling Class Imbalance
+\`\`\`python
+# Weighted loss
+from torch.nn import CrossEntropyLoss
+class_weights = torch.tensor([1.0, 3.0, 2.0])  # weight minority classes more
+loss_fn = CrossEntropyLoss(weight=class_weights)
+
+# Or: oversample minority class with WeightedRandomSampler
+# Or: use macro F1 as evaluation metric (not accuracy)
+\`\`\`
+
+### Evaluation Metrics for Imbalanced Classes
+- **Accuracy**: misleading when 90% of reviews are positive
+- **Macro F1**: average F1 across all classes equally → reflects minority class performance
+- **Confusion matrix**: reveals which classes are confused`,
+
+    video: null,
+    videoFallbackMarkdown: `## Prompt-Based Classification (Zero/Few-Shot)
+
+For low-resource scenarios, LLMs enable classification without fine-tuning:
+\`\`\`python
+response = client.messages.create(
+    model="claude-sonnet-4-6",
+    max_tokens=10,
+    messages=[{"role": "user", "content":
+        f"Classify as positive, negative, or neutral:\\n\\n{review}\\n\\nSentiment:"}]
+)
+\`\`\`
+Few-shot prompting with 5-10 labeled examples often matches fine-tuned small BERT models. Cost vs. latency vs. accuracy trade-off determines which to use in production.`,
+
+    tryGuidance: "No interactive visualization. Work through the fine-tuning code pattern and focus on the class imbalance discussion.",
+
+    interviewGraph: {
+      initialStageId: "sp_n3_stage1",
+      artifactDimensions: [
+        { label: "Sentiment Modeling", recoveryStageId: "sp_n3_rec1" },
+        { label: "Evaluation & Imbalance", recoveryStageId: "sp_n3_rec2", passLabel: "NLP Practitioner" },
+      ],
+      stages: {
+        sp_n3_stage1: {
+          id: "sp_n3_stage1",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · Choosing the Right Approach",
+          prompt: "A hotel chain wants to monitor reviews and identify: (1) which specific aspects (room, food, staff, location) are mentioned negatively, and (2) the overall hotel rating. Which approach handles BOTH needs?",
+          choices: [
+            { id: "a", label: "ABSA model for aspects + document-level classifier for overall rating", description: "Two-model system: one for fine-grained aspects, one for document-level" },
+            { id: "b", label: "Document-level sentiment only — aggregate per aspect using keywords", description: "Keyword matching misses context: 'the room wasn't dirty' would incorrectly flag negative" },
+            { id: "c", label: "Count negative words near each aspect keyword", description: "Lexicon-based approaches miss negation, sarcasm, and contextual sentiment" },
+            { id: "d", label: "Summarize each review with an LLM and extract sentiment from summary", description: "Summaries lose granular aspect-level information" },
+          ],
+          branches: { a: "sp_n3_stage2", b: "sp_n3_rec1", c: "sp_n3_rec1", d: "sp_n3_rec1" },
+          rationale: "ABSA handles fine-grained aspect-level sentiment ('room: negative, staff: positive'); document-level BERT handles the overall rating. A unified model (like SentiBERT or LLM prompting with structured output) can do both, but the two-model approach is more controllable and interpretable.",
+        },
+        sp_n3_rec1: {
+          id: "sp_n3_rec1",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Sentiment Modeling",
+          prompt: "A rule-based sentiment system assigns +1 to positive words and -1 to negative words, then sums the score. It fails on: 'I wouldn't say the service was bad.' Why?",
+          choices: [
+            { id: "a", label: "Negation scope: 'wouldn't say ... was bad' means positive, but rule counts 'bad' as -1", description: "Double negation and negation scope are invisible to simple lexicon counts" },
+            { id: "b", label: "The sentence is too long for the rule system", description: "Length is not the issue — it's linguistic negation handling" },
+            { id: "c", label: "The word 'service' is not in the sentiment lexicon", description: "Neutral nouns don't affect lexicon scores" },
+            { id: "d", label: "The rule system assigns 0 to all sentences without exclamation marks", description: "Not a standard rule — lexicon systems don't use punctuation this way" },
+          ],
+          branches: { a: "sp_n3_stage2", b: "sp_n3_stage2", c: "sp_n3_stage2", d: "sp_n3_stage2" },
+          rationale: "Lexicon-based systems fail at negation scope, irony, and complex grammatical constructions. 'Wouldn't say ... was bad' is positive but contains 'bad'. ML models (fine-tuned BERT) learn these patterns from data. Negation handling is a major motivation for sequence models over bag-of-words approaches.",
+        },
+        sp_n3_stage2: {
+          id: "sp_n3_stage2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Class Imbalance",
+          prompt: "Your sentiment training set: 10,000 positive, 2,000 neutral, 500 negative reviews. The model achieves 89% accuracy but recall for 'negative' class is only 12%. What went wrong?",
+          choices: [
+            { id: "a", label: "The model learned to predict 'positive' for most inputs — optimizing accuracy at the cost of minority classes", description: "89% accuracy ≈ predicting positive for 89% of samples — ignoring negative class" },
+            { id: "b", label: "Negative reviews are harder to write so the model is confused by them", description: "Writing difficulty is not the issue — training distribution is" },
+            { id: "c", label: "The model overfits to neutral examples", description: "Overfitting to neutral would hurt positive class recall more" },
+            { id: "d", label: "BERT's maximum sequence length cuts off negative reviews", description: "Sequence length affects all classes equally" },
+          ],
+          branches: { a: "sp_n3_end", b: "sp_n3_rec2", c: "sp_n3_rec2", d: "sp_n3_rec2" },
+          rationale: "Classic class imbalance failure: the model learns that predicting 'positive' is correct 80% of the time, so negative class recall collapses. Fix: class-weighted loss (weight negative class ~20x), oversample negative reviews, undersample positive, or use macro F1 as the training metric to penalize ignoring minority classes.",
+        },
+        sp_n3_rec2: {
+          id: "sp_n3_rec2",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Evaluation & Imbalance",
+          prompt: "Why is macro F1 preferred over accuracy for imbalanced multi-class sentiment classification?",
+          choices: [
+            { id: "a", label: "Macro F1 averages F1 per class equally, so poor minority class performance directly lowers the score", description: "Macro averaging gives equal weight to each class regardless of support" },
+            { id: "b", label: "Macro F1 is always higher than accuracy, making results look better", description: "Macro F1 can be lower than accuracy when minority classes have low F1" },
+            { id: "c", label: "Macro F1 only considers the majority class", description: "That's weighted F1; macro gives equal weight to ALL classes" },
+            { id: "d", label: "Accuracy is not computable for multi-class problems", description: "Accuracy is computable but misleading when classes are imbalanced" },
+          ],
+          branches: { a: "sp_n3_end", b: "sp_n3_end", c: "sp_n3_end", d: "sp_n3_end" },
+          rationale: "Macro F1 = mean(F1_negative, F1_neutral, F1_positive). If F1_negative = 0.12, the macro F1 can't hide this — it directly pulls the average down. Accuracy of 89% hides the 12% negative recall because 80% of data is positive. Use macro F1 (or per-class F1 table) to evaluate imbalanced classifiers.",
+        },
+        sp_n3_end: {
+          id: "sp_n3_end",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Sentiment Analysis Mastered",
+          prompt: "You need to classify customer support tickets into 8 categories with only 50 labeled examples per category. What's the best approach?",
+          choices: [
+            { id: "a", label: "Few-shot prompting with an LLM or zero-shot with a NLI classifier", description: "400 total examples is too few for fine-tuning; LLMs excel at few-shot classification" },
+            { id: "b", label: "Fine-tune BERT from scratch on the 400 examples", description: "BERT needs thousands of examples per class to fine-tune reliably from scratch" },
+            { id: "c", label: "Use TF-IDF + logistic regression for speed", description: "Better than BERT-from-scratch on tiny data, but LLM few-shot typically wins" },
+            { id: "d", label: "Collect more data before attempting any modeling", description: "Valid advice, but LLMs enable modeling even at this scale today" },
+          ],
+          branches: { a: "sp_n3_end", b: "sp_n3_end", c: "sp_n3_end", d: "sp_n3_end" },
+          terminal: true,
+          rationale: "With 50 examples/class, LLM few-shot prompting (pass 5-10 labeled examples in the prompt) or zero-shot NLI (using a model like cross-encoder/nli-deberta-v3-large) is most practical. Fine-tuning BERT on 400 total examples typically overfits. If you must fine-tune, use parameter-efficient methods (LoRA) or a smaller model.",
+        },
+      },
+    },
+
+    knowledgeCheck: [
+      {
+        question: "What is the difference between 'fine-tuning' and 'prompt engineering' for text classification?",
+        options: [
+          "Fine-tuning updates model weights on task-specific data; prompt engineering uses a frozen model with carefully crafted inputs",
+          "Fine-tuning only works for BERT; prompt engineering only works for GPT",
+          "Fine-tuning requires more data but always outperforms prompting",
+          "They are the same technique described with different terminology",
+        ],
+        correctIndex: 0,
+        explanation: "Fine-tuning: update all (or some) model weights on labeled training data → creates a specialized model. Prompt engineering: keep model frozen, craft the input text to guide behavior → no weight updates. Prompting is faster and requires no labeled data; fine-tuning typically wins with sufficient data (1000+ examples) and needs consistent performance.",
+      },
+    ],
+  },
+
+  "sp-n4": {
+    durationLabel: "15 min",
+    outcomes: [
+      "Define the NER task and explain BIO/BIOES tagging schemes",
+      "Compare rule-based, CRF, and transformer-based NER approaches",
+      "Evaluate NER with entity-level F1 metrics",
+    ],
+    learnMarkdown: `## Named Entity Recognition
+
+NER identifies and classifies named entities in text: people (PER), organizations (ORG), locations (LOC), dates (DATE), products, etc.
+
+### BIO Tagging Scheme
+\`\`\`
+"Apple Inc. was founded in Cupertino"
+ B-ORG I-ORG  O   O       O  B-LOC
+
+B = Beginning of entity
+I = Inside (continuation) of entity
+O = Outside (not an entity)
+\`\`\`
+
+**BIOES** extends BIO with:
+- **S** = Single-token entity ("Apple" alone)
+- **E** = End of multi-token entity
+
+### NER Approaches
+\`\`\`python
+# spaCy rule-based + statistical
+import spacy
+nlp = spacy.load("en_core_web_trf")  # transformer-based
+doc = nlp("Tim Cook joined Apple in 1998 in California")
+for ent in doc.ents:
+    print(ent.text, ent.label_)
+# → Tim Cook PERSON, Apple ORG, 1998 DATE, California GPE
+
+# HuggingFace fine-tuned NER
+from transformers import pipeline
+ner = pipeline("ner", model="dslim/bert-base-NER", aggregation_strategy="simple")
+results = ner("Elon Musk founded SpaceX in 2002")
+\`\`\`
+
+### CRF for Sequence Labeling
+Conditional Random Fields model label dependencies:
+\`\`\`
+P(y|x) ∝ exp(Σₜ Σₖ λₖ fₖ(y_{t-1}, y_t, x, t))
+\`\`\`
+Key advantage: knows that B-PER → I-ORG is impossible; enforces valid tag transitions.
+
+BERT + CRF head is a common architecture: BERT encodes context → CRF ensures valid tag sequences.
+
+### Evaluation
+\`\`\`
+Entity-level F1 (not token-level):
+- "Tim Cook" must be correctly labeled AS A WHOLE to count as correct
+- Correctly labeling "Tim" but not "Cook" = incorrect entity
+
+Precision = correct entities / predicted entities
+Recall    = correct entities / gold entities
+F1        = harmonic mean
+\`\`\`
+
+### Domain-Specific NER Challenges
+- **Medical NER**: drug names, dosages, symptoms — use BioBERT
+- **Legal NER**: clause types, parties — use LegalBERT
+- **Nested NER**: "Bank of [America] → ORG and [Bank of America] → ORG overlap
+- **Low-resource**: few labeled examples → use LLM-based few-shot NER`,
+
+    video: null,
+    videoFallbackMarkdown: `## Relation Extraction Beyond NER
+
+NER identifies entities; Relation Extraction (RE) links them:
+- "[Apple] **acquired** [Beats Electronics]" → (Apple, acquired, Beats Electronics)
+
+Combined Information Extraction pipeline:
+1. NER: identify entities
+2. Coreference resolution: "Apple...it...the company" → all refer to Apple
+3. Relation extraction: classify relationships between entity pairs
+4. Knowledge graph population: store as (subject, predicate, object) triples
+
+Modern end-to-end models (REBEL, TANL) do NER + RE simultaneously.`,
+
+    tryGuidance: "No interactive visualization. Practice the BIO tagging exercise in the knowledge check.",
+
+    interviewGraph: {
+      initialStageId: "sp_n4_stage1",
+      artifactDimensions: [
+        { label: "NER Mechanics", recoveryStageId: "sp_n4_rec1" },
+        { label: "Evaluation & Edge Cases", recoveryStageId: "sp_n4_rec2", passLabel: "NLP Engineer" },
+      ],
+      stages: {
+        sp_n4_stage1: {
+          id: "sp_n4_stage1",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · BIO Tagging",
+          prompt: "Label the entities in: 'Microsoft acquired GitHub for $7.5 billion in 2018.' The entities are Microsoft (ORG), GitHub (ORG), $7.5 billion (MONEY), 2018 (DATE). What is the BIO tag for '$7.5'?",
+          choices: [
+            { id: "a", label: "B-MONEY — it's the beginning of the money entity '$7.5 billion'", description: "'$7.5' starts the multi-token money span" },
+            { id: "b", label: "I-MONEY — it continues a money entity", description: "There's no prior B-MONEY token — 'I' can't start an entity" },
+            { id: "c", label: "O — numbers are not named entities", description: "Money amounts are a named entity type in many NER schemas" },
+            { id: "d", label: "B-DATE — currency and dates are often confused", description: "DATE applies to time expressions; '$7.5 billion' is monetary" },
+          ],
+          branches: { a: "sp_n4_stage2", b: "sp_n4_rec1", c: "sp_n4_rec1", d: "sp_n4_rec1" },
+          rationale: "Full BIO labels: Microsoft(B-ORG) acquired(O) GitHub(B-ORG) for(O) $(B-MONEY) 7.5(I-MONEY) billion(I-MONEY) in(O) 2018(B-DATE). '$7.5 billion' is a 3-token MONEY entity: B-MONEY, I-MONEY, I-MONEY. The 'B' always marks the first token of any entity regardless of type.",
+        },
+        sp_n4_rec1: {
+          id: "sp_n4_rec1",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · NER Mechanics",
+          prompt: "Why does a CRF layer on top of BERT improve NER performance compared to BERT with a simple softmax classification head?",
+          choices: [
+            { id: "a", label: "CRF models transition probabilities between tags, preventing invalid sequences like B-PER → I-ORG", description: "CRF enforces globally consistent label sequences" },
+            { id: "b", label: "CRF is faster at inference than softmax", description: "CRF adds Viterbi decoding overhead — it's slightly slower" },
+            { id: "c", label: "CRF requires less training data than a softmax head", description: "CRF doesn't significantly reduce data requirements" },
+            { id: "d", label: "CRF allows the model to process bidirectional context", description: "BERT already provides bidirectional context; CRF handles label dependencies" },
+          ],
+          branches: { a: "sp_n4_stage2", b: "sp_n4_stage2", c: "sp_n4_stage2", d: "sp_n4_stage2" },
+          rationale: "A softmax head predicts each token's tag independently — it might output B-PER, B-ORG, I-PER (a valid sequence starts with I before B). The CRF transition matrix learns P(y_t | y_{t-1}) and via Viterbi decoding finds the globally optimal valid tag sequence. This is especially important for the B/I/O constraints.",
+        },
+        sp_n4_stage2: {
+          id: "sp_n4_stage2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Entity-Level Evaluation",
+          prompt: "NER system predicts 'New York City' as B-LOC I-LOC O (tagging 'City' as O). The gold label is B-LOC I-LOC I-LOC. How does this affect entity-level evaluation?",
+          choices: [
+            { id: "a", label: "Entire entity is counted as incorrect — partial matches don't count at entity level", description: "Entity-level F1: the full span 'New York City' must be correctly labeled" },
+            { id: "b", label: "2/3 tokens correct → 67% partial credit", description: "Entity-level evaluation uses exact span matching, not token-level credit" },
+            { id: "c", label: "Token-level: 2 of 3 tokens correct — system gets 0.67 credit", description: "Token-level F1 gives partial credit; entity-level does not" },
+            { id: "d", label: "Only the first token matters — getting B-LOC right is sufficient", description: "The entire span must match for entity-level evaluation" },
+          ],
+          branches: { a: "sp_n4_end", b: "sp_n4_rec2", c: "sp_n4_rec2", d: "sp_n4_rec2" },
+          rationale: "Entity-level F1 (the standard NER metric) requires exact boundary AND type match. 'New York City' predicted as [New York] = wrong. This is stricter than token-level F1 (which would give 2/3 credit). Entity-level is preferred because it reflects actual usability — extracting 'New York' when the entity is 'New York City' is often wrong downstream.",
+        },
+        sp_n4_rec2: {
+          id: "sp_n4_rec2",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Edge Cases",
+          prompt: "Your NER system is deployed for a pharmaceutical company. It struggles with drug names like 'Enbrel', 'Humira', and new drug names it has never seen. What's the best fix?",
+          choices: [
+            { id: "a", label: "Fine-tune on medical text (BioBERT) + add drug name dictionary as features or post-processing", description: "Domain pretraining + gazetteer (drug name list) handles known and new drugs" },
+            { id: "b", label: "Add more general BERT pretraining data", description: "General pretraining won't help with rare pharmaceutical terms" },
+            { id: "c", label: "Switch to character-level n-grams — drug names have distinctive subword patterns", description: "Useful signal but insufficient alone without domain context" },
+            { id: "d", label: "Use larger BERT-large instead of BERT-base", description: "Scale alone doesn't solve domain vocabulary gaps" },
+          ],
+          branches: { a: "sp_n4_end", b: "sp_n4_end", c: "sp_n4_end", d: "sp_n4_end" },
+          rationale: "Medical NER requires: (1) domain-pretrained model (BioBERT, PubMedBERT) that has seen drug names in context, (2) a drug name gazetteer (list of all known drugs) as features or post-processing correction layer. New drugs can be caught by the gazetteer even if the model hasn't seen them. This hybrid approach is the production standard.",
+        },
+        sp_n4_end: {
+          id: "sp_n4_end",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "NER Mastered",
+          prompt: "You want to build an NER system for a new language (Swahili) with no labeled data. What is the most practical starting point?",
+          choices: [
+            { id: "a", label: "Use multilingual BERT (mBERT) or XLM-R with cross-lingual transfer from English NER data", description: "mBERT/XLM-R transfers NER patterns across languages; zero-shot cross-lingual NER works surprisingly well" },
+            { id: "b", label: "Collect 10,000 labeled Swahili NER examples before starting", description: "Valid but slow; cross-lingual transfer can bootstrap before data collection" },
+            { id: "c", label: "Translate Swahili text to English, apply English NER, back-translate entities", description: "Translation errors compound; 'Nairobi' might get lost in translation" },
+            { id: "d", label: "Rule-based NER using capitalization (proper nouns are capitalized)", description: "Swahili capitalization rules differ from English; many entities won't be capitalized" },
+          ],
+          branches: { a: "sp_n4_end", b: "sp_n4_end", c: "sp_n4_end", d: "sp_n4_end" },
+          terminal: true,
+          rationale: "XLM-RoBERTa (trained on 100 languages) enables zero-shot cross-lingual NER transfer: train on English CoNLL-2003, evaluate on Swahili WikiAnn. It works because XLM-R learns language-agnostic representations. Fine-tuning on even 100-200 Swahili labeled examples dramatically improves performance over zero-shot.",
+        },
+      },
+    },
+
+    knowledgeCheck: [
+      {
+        question: "What is the seqeval library commonly used for in NLP?",
+        options: [
+          "Tokenizing sequences for transformer models",
+          "Computing entity-level precision, recall, and F1 for sequence labeling tasks like NER",
+          "Evaluating language model perplexity on text sequences",
+          "Sequentially splitting datasets for time series cross-validation",
+        ],
+        correctIndex: 1,
+        explanation: "seqeval is the standard Python library for evaluating sequence labeling tasks (NER, POS tagging, chunking). It computes entity-level precision, recall, and F1 from lists of BIO-tagged predictions and gold labels. It correctly handles multi-token entities and enforces exact span matching.",
+      },
+      {
+        question: "In NER for legal documents, 'Bank of America' appears as an organization. The same text contains 'bank' as a common noun ('visit your local bank'). What challenge does this illustrate?",
+        options: [
+          "Ambiguity: the same surface form can be an entity or a common noun depending on context",
+          "Nested entities: 'Bank' is nested inside 'Bank of America'",
+          "Class imbalance: ORG entities are rarer than common nouns",
+          "Tokenization: 'Bank of America' tokenizes differently from 'bank'",
+        ],
+        correctIndex: 0,
+        explanation: "NER must resolve named entity ambiguity: 'Apple' (company) vs 'apple' (fruit), 'Bank of America' (ORG) vs 'local bank' (common noun). This is why capitalization alone isn't sufficient and why contextual models (BERT) outperform rule-based systems — the surrounding context disambiguates the entity status.",
+      },
+    ],
+  },
+
 };
 
 
