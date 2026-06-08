@@ -31018,772 +31018,1314 @@ print(classification_report(y_test_res, model.predict(X_test_res)))`,
   },
 
 "sd-p1": {
-    durationLabel: "20 min",
-    outcomes: [
-      "Explain batch vs streaming trade-offs including latency, throughput, and operational complexity",
-      "Describe lambda and kappa architectures and when each makes sense",
-      "Identify the right processing model given a latency SLA and reprocessing requirement",
-    ],
-    learnMarkdown: `## Batch vs Streaming: When & Why
+  durationLabel: "20 min",
+  outcomes: [
+    "Explain batch vs streaming trade-offs including latency, throughput, and operational complexity",
+    "Describe the Lambda and Kappa architectures and when to choose each",
+    "Identify which pipeline pattern fits a given business requirement",
+  ],
+  learnMarkdown: `## What Is Batch Processing?
 
-Every data pipeline must answer one foundational question: **can we afford to wait?** Batch processing accumulates data over a window—minutes, hours, or a day—then processes it all at once. Streaming processes each event (or micro-batch) as it arrives, targeting sub-second latency.
+Batch processing runs a job over a **bounded, finite dataset** at a scheduled interval — hourly, nightly, or on-demand. Instead of reacting to each event as it arrives, a batch job waits, accumulates data, then processes the whole chunk at once.
 
-### Batch Processing
+**Key characteristics:**
+- Latency measured in **minutes to hours** (or even days for large ETL jobs)
+- Extremely high throughput — scanning terabytes in a single pass is routine
+- Simple failure semantics: if the job fails, re-run it from the checkpoint
+- Low operational overhead once the pipeline is stable
 
-Batch jobs run on a schedule. Tools like **Apache Spark** excel here: you can read petabytes from S3, apply complex transformations, and write results to a warehouse. Advantages:
+**Canonical examples:** overnight ETL into a data warehouse, weekly model retraining, daily billing aggregations, end-of-month compliance reports. If the business question is "what happened yesterday?" batch is almost always the right tool.
 
-- **High throughput** — process large volumes with simple horizontal scaling
-- **Easy debugging** — re-run the same job on the same static dataset
-- **Simple reprocessing** — backfill historical data by re-running jobs over a date range
-- **Mature tooling** — Spark, Hadoop, dbt all work well
+A typical batch pipeline looks like:
 
-Latency ranges from minutes (micro-batch) to hours (nightly jobs). Acceptable for: daily reports, offline model training, historical feature backfills.
+\`\`\`python
+# Spark batch job — runs at 02:00 UTC daily
+df = spark.read.parquet("s3://events/dt=2024-06-07/")
+summary = df.groupBy("user_id").agg(F.sum("revenue").alias("daily_revenue"))
+summary.write.mode("overwrite").parquet("s3://warehouse/daily_revenue/dt=2024-06-07/")
+\`\`\`
 
-### Streaming Processing
+The job is idempotent, predictable, and easy to debug.
 
-Streaming pipelines process events as they arrive. **Apache Kafka** acts as the durable event log (not a queue—messages are retained for hours/days, consumer groups read at their own pace). **Apache Flink** or **Spark Structured Streaming** process those events.
+---
 
-- **Sub-second latency** — fraud detection, live dashboards, real-time personalization
-- **Stateful operators** — count events in a 5-minute sliding window, join streams
-- **Harder to debug** — distributed state, late-arriving events, exactly-once semantics add complexity
-- **Kafka guarantees** — exactly-once via idempotent producers + transactions
+## What Is Streaming Processing?
 
-### Lambda Architecture
+Streaming processes events **one at a time (or in micro-batches)** as they arrive, with end-to-end latency in the **sub-second to low-seconds** range. The pipeline never "finishes" — it runs continuously, maintaining state across an infinite sequence of events.
 
-Coined by Nathan Marz: run **both** a batch layer (accurate, slow) and a speed layer (approximate, fast). A serving layer merges results. The batch layer periodically overwrites the speed layer's approximations. Problem: you maintain two codebases that must produce the same logical output. Complexity overhead is significant.
+**Key characteristics:**
+- Latency in **milliseconds to seconds**
+- Stateful operations: sliding windows, session detection, running aggregates
+- Higher operational complexity — you must handle late data, out-of-order events, and exactly-once guarantees
+- Frameworks: Apache Kafka + Flink, Spark Structured Streaming, Google Dataflow, AWS Kinesis
 
-### Kappa Architecture
+**Canonical examples:** real-time fraud detection, live dashboard metrics, IoT sensor anomaly alerts, dynamic pricing, clickstream personalization. If the business question is "what is happening *right now*?" streaming is required.
 
-Jay Kreps' response: eliminate the batch layer. Use streaming only. If you need to reprocess historical data, replay from Kafka (with its long retention). Simpler to operate, but correctness guarantees are harder—you must handle late data, schema evolution, and exactly-once carefully.
+---
 
-### Decision Criteria
+## Lambda Architecture
 
-| Factor | Choose Batch | Choose Streaming |
+Lambda was popularized by Nathan Marz around 2011 as a way to get **both** high throughput and low latency from a single system. It splits into three layers:
+
+| Layer | Role | Technology |
 |---|---|---|
-| Latency SLA | Minutes–hours OK | Sub-second required |
-| Event ordering | Not critical | Critical (watermarks) |
-| Reprocessing | Simple date-range backfill | Replay from Kafka |
-| Team expertise | Spark-fluent team | Flink/Kafka experts |
-| Operational budget | Minimal infra | Dedicated streaming cluster |
+| **Batch layer** | Reprocesses all historical data; produces accurate, complete views | Spark, Hive |
+| **Speed layer** | Processes new events in real time; compensates for batch latency | Flink, Kafka Streams |
+| **Serving layer** | Merges batch and speed layer results for queries | Cassandra, Druid, HBase |
 
-**Rule of thumb**: start with batch unless you have a concrete latency requirement that batch cannot meet.`,
-    video: null,
-    videoFallbackMarkdown: `## Deep Dive: Streaming Internals
+**Pros:** Fault-tolerant, historically accurate views, speed layer covers the "recent gap."
 
-### Kafka Partitions and Consumer Groups
+**Cons:** You maintain **two separate codebases** — one batch, one streaming — for the same business logic. Bugs fixed in the batch layer must be ported to the speed layer. Operational complexity is high.
 
-Each Kafka topic is split into partitions—the unit of parallelism. A consumer group assigns each partition to exactly one consumer, so adding consumers scales throughput up to the number of partitions. Increasing partition count after creation is possible but requires careful rebalancing.
+---
 
-### Watermarks and Late Data
+## Kappa Architecture
 
-Flink uses **event-time watermarks** to know when a time window is complete. A watermark of W(t) says "I believe all events with timestamp ≤ t have arrived." Late events (arriving after the watermark) are either dropped or handled by a side output. Configuring the right watermark delay is a key tuning decision.
+Kappa (Jay Kreps, 2014) asks: *why do we need the batch layer at all?* If your streaming framework is powerful enough to reprocess historical data by **replaying a log** (e.g., Kafka with long retention), you can use a **single streaming pipeline** for both real-time and historical workloads.
 
-### Exactly-Once Semantics
+**How reprocessing works:** spin up a new version of the streaming job, replay the Kafka topic from offset 0, write to a new output table, then swap the serving alias once it's caught up.
 
-Achieving exactly-once requires coordination between the source (Kafka offset commits), the processing engine (Flink checkpoints), and the sink (idempotent writes or transactional sinks). "At-least-once + idempotent sink" is often a practical substitute.`,
-    tryGuidance: "Use the interactive diagram to compare batch and streaming architectures side-by-side.",
-    interviewGraph: {
-      initialStageId: "sd_p1_s1",
-      artifactDimensions: [
-        { label: "Architecture Selection", recoveryStageId: "sd_p1_r1" },
-        { label: "Trade-off Reasoning", recoveryStageId: "sd_p1_r2" },
-      ],
-      stages: {
-        sd_p1_s1: {
-          id: "sd_p1_s1",
-          type: "scenario_choice",
-          badge: "Stage 1",
-          title: "Stage 1 · Architecture Selection",
-          prompt: "You're designing a pipeline for a ride-sharing app. The product team wants drivers to see surge pricing update within 30 seconds of demand spikes. Your current pipeline runs Spark jobs every 15 minutes. How do you approach this?",
-          choices: [
-            { id: "a", label: "Switch to streaming", description: "Migrate to Kafka + Flink to process demand events in real time and update surge prices within seconds." },
-            { id: "b", label: "Reduce batch interval", description: "Shorten the Spark job schedule from 15 minutes to 1 minute to get closer to real time." },
-            { id: "c", label: "Cache last result", description: "Cache the last batch result in Redis and return it for all requests until the next batch runs." },
-          ],
-          branches: { a: "sd_p1_s2", b: "sd_p1_r1", c: "sd_p1_r1" },
-          rationale: "30-second latency is a streaming problem. Reducing batch interval to 1 minute still misses the SLA and creates operational overhead of many small jobs. Streaming with Kafka + Flink directly addresses the latency requirement.",
+**Pros:** One codebase, lower operational overhead, easier to reason about.
+
+**Cons:** Requires a high-retention, replayable log (Kafka, Kinesis). Reprocessing can be slower than a dedicated batch job scanning columnar storage. Not every team has the streaming expertise to operate it reliably.
+
+---
+
+## Decision Framework
+
+| Requirement | Use Batch | Use Streaming |
+|---|---|---|
+| Latency SLA | > 5 minutes | < 5 seconds |
+| Dataset boundedness | Historical, bounded | Unbounded, continuous |
+| Throughput priority | Very high (TB+) | Moderate |
+| Operational maturity | Lower | Higher |
+| Business use case | Reports, training data, ETL | Fraud, alerts, live metrics |
+
+**Rule of thumb:** default to batch unless you have a concrete sub-second or near-real-time SLA. Streaming systems are significantly harder to operate, test, and debug.
+
+---
+
+## Real-World Examples
+
+- **Batch:** Airbnb runs nightly Spark jobs to compute host quality scores, then loads results into their data warehouse for analyst queries next morning.
+- **Streaming:** Stripe processes every card authorization event through a Flink pipeline to score fraud risk in under 100ms before the transaction is approved or declined.
+- **Lambda hybrid:** A ride-sharing app uses batch Spark for end-of-day driver earnings reconciliation (accuracy matters), plus a Kafka Streams speed layer to update the in-app earnings widget in real time.
+
+---
+
+## Interview-Ready Summary
+
+- **Batch** = periodic, high-throughput, minutes-to-hours latency; ideal for ETL, reporting, and model training
+- **Streaming** = continuous, event-by-event, sub-second latency; required for fraud detection, real-time dashboards, and live alerting
+- **Lambda architecture** solves the latency gap with separate batch and speed layers, but forces you to maintain two codebases
+- **Kappa architecture** collapses both paths into a single streaming pipeline using log replay for reprocessing
+- Choose **Lambda** when your batch processing is complex and your team isn't confident the streaming layer can handle full historical reprocessing at scale
+- Choose **Kappa** when you have a replayable log, a mature streaming framework, and want to minimize logic duplication
+`,
+  video: null,
+  videoFallbackMarkdown: `## Lambda vs Kappa: The Interview Battleground
+
+When interviewers ask about batch vs streaming, they're testing whether you understand the **operational reality**, not just the theory. Here's what separates strong answers from weak ones.
+
+### The Core Lambda Tension
+
+Lambda's dual-codebase problem is more expensive than it sounds. Imagine you discover a bug in your revenue aggregation logic. You fix it in the Spark batch job — straightforward. But the speed layer (Flink or Kafka Streams) has its own implementation of the same logic. You now have to:
+
+1. Patch and test the streaming job separately
+2. Decide whether to recompute the historical speed-layer results
+3. Coordinate the deployment of both jobs without introducing a data gap
+
+At scale, companies like LinkedIn and Netflix have moved **away** from Lambda specifically because of this burden. The two-codebase problem compounds with team size: two codebases means two sets of tests, two deployment pipelines, two on-call runbooks.
+
+### When Lambda Is Still the Right Answer
+
+Lambda remains defensible when your batch layer does something that is genuinely hard to replicate in streaming:
+
+- **Complex multi-pass algorithms** — graph computations, iterative ML training loops, joins across multiple large tables with shuffle-heavy operations
+- **Columnar compression advantages** — scanning 10TB of Parquet with predicate pushdown is faster than replaying a Kafka topic of the equivalent raw events
+- **Team skill boundary** — if your team has deep Spark expertise but limited Flink experience, Lambda lets you keep the streaming portion minimal (just a thin approximation) while batch carries the accuracy burden
+
+### When Kappa Falls Short
+
+Kappa assumes your streaming framework can reprocess historical data quickly enough to be practical. This breaks down when:
+
+- Kafka retention is expensive — storing months of raw events at full fidelity costs significantly more than columnar storage
+- Reprocessing speed — a Flink job replaying 6 months of events event-by-event will be slower than a Spark batch job reading compressed Parquet, even at the same cluster size
+- Stateful complexity — some business logic (slowly-changing dimensions, complex sessionization) is genuinely easier to express in batch SQL than in streaming window functions
+
+### The Interviewer's Hidden Question
+
+When an interviewer gives you a scenario like "we need reports by 9am and process 10TB/day," they want to hear you **justify batch** confidently rather than defaulting to "we should use streaming because it's more modern." Over-engineering a solution with real-time infrastructure when a nightly Spark job suffices is a red flag in senior interviews.
+
+**Strong answer pattern:** "Given the latency SLA is end-of-night reporting, batch is the appropriate choice. It gives us higher throughput, simpler failure recovery, and lower operational cost. Streaming would add complexity without business value here."
+`,
+  tryGuidance: "Use the interactive diagram to trace how an event flows through Lambda architecture (batch layer → speed layer → serving layer merge) versus Kappa architecture (single streaming path with log replay). Toggle between a fraud detection use case (streaming) and a daily ETL use case (batch) to see how the pipeline shape changes.",
+  interviewGraph: {
+    initialStageId: "click_bug",
+    artifactDimensions: [
+      { label: "Architecture Judgment", recoveryStageId: "arch_recovery" },
+      { label: "Latency/Throughput Trade-offs", recoveryStageId: "latency_recovery" },
+    ],
+    stages: {
+      click_bug: {
+        id: "click_bug",
+        type: "click_target",
+        badge: "Stage 1",
+        title: "Stage 1 · Spot the config bug",
+        prompt: "A new data engineer committed this pipeline config. There is one critical error — the configuration is internally contradictory. Click the line that contains the bug.",
+        code_snippet: `pipeline_config = {
+    "type": "batch",           # -- ds-target:batch_type
+    "schedule": "0 * * * *",   # run hourly
+    "latency_sla": "500ms",    # -- ds-target:latency_conflict
+    "sink": "data_warehouse",  # -- ds-target:sink_line
+    "window_size": "1h",
+}`,
+        validationCopy: {
+          batch_type: "Close — the type is batch, which contributes to the problem, but the root contradiction is the SLA value. Batch pipelines run on schedules and accumulate data; they cannot deliver results within 500ms. Click the line that makes that impossible.",
+          latency_conflict: "Exactly right. A batch pipeline runs on a schedule (here, hourly) and processes accumulated data. End-to-end latency will be measured in minutes, not milliseconds. A 500ms SLA requires a streaming architecture. This config is contradictory.",
+          sink_line: "The sink is a data warehouse, which is fine for batch pipelines. The bug is elsewhere — look at what the latency SLA is promising versus what batch processing can actually deliver.",
         },
-        sd_p1_r1: {
-          id: "sd_p1_r1",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Latency SLA",
-          prompt: "Sub-minute latency requirements are the primary driver for streaming. Batch jobs—even at 1-minute intervals—add job startup, shuffle, and write overhead that typically pushes end-to-end latency to 3–5 minutes. Which statement correctly identifies when streaming is justified?",
-          choices: [
-            { id: "a", label: "When latency SLA < ~1 minute", description: "Streaming is justified when batch's inherent overhead can't meet the latency requirement." },
-            { id: "b", label: "Whenever data arrives continuously", description: "Continuous data arrival alone doesn't require streaming—batch can consume continuous data on a schedule." },
-          ],
-          branches: { a: "sd_p1_s2", b: "sd_p1_s2" },
-          rationale: "Continuous data arrival is necessary but not sufficient. The decision turns on the latency SLA: if batch's startup and shuffle overhead can meet it, batch is simpler.",
+        branches: {
+          batch_type: "latency_recovery",
+          latency_conflict: "batch_guarantee",
+          sink_line: "latency_recovery",
         },
-        sd_p1_s2: {
-          id: "sd_p1_s2",
-          type: "scenario_choice",
-          badge: "Stage 2",
-          title: "Stage 2 · Lambda vs Kappa",
-          prompt: "Your team decides on streaming for real-time surge pricing. However, the analytics team also needs accurate daily surge reports for accounting. A colleague suggests a lambda architecture. Another suggests kappa. Which do you recommend?",
-          choices: [
-            { id: "a", label: "Kappa — streaming only", description: "Use Kafka with long retention. The same streaming job handles both real-time pricing and historical replay for reports." },
-            { id: "b", label: "Lambda — batch + stream", description: "Run a nightly Spark batch job for accurate reports and a Flink job for real-time pricing. Merge at serving time." },
-            { id: "c", label: "Keep batch for both", description: "The analytics team's daily reports don't need streaming. Keep everything in batch and accept 15-minute pricing lag." },
-          ],
-          branches: { a: "sd_p1_t", b: "sd_p1_r2", c: "sd_p1_r2" },
-          rationale: "Kappa is preferred when you can replay from Kafka. You avoid maintaining two separate codebases (batch + stream) that must produce identical results. Lambda is justified only when the streaming path genuinely can't achieve batch-level accuracy.",
-        },
-        sd_p1_r2: {
-          id: "sd_p1_r2",
-          type: "scenario_choice",
-          badge: "Recovery 2",
-          title: "Recovery 2 · Lambda Complexity",
-          prompt: "Lambda architecture's core problem is that you must maintain two codebases producing the same logical output. When teams update the business logic (say, a new surge formula), they must update both the batch and streaming jobs and keep them synchronized. What's the kappa solution to this?",
-          choices: [
-            { id: "a", label: "Replay from Kafka for historical accuracy", description: "Kafka retains events for days/weeks. For accurate historical reports, replay the stream with the updated logic." },
-            { id: "b", label: "Use a separate database for each layer", description: "Store batch and stream results in different databases and query both at serve time." },
-          ],
-          branches: { a: "sd_p1_t", b: "sd_p1_t" },
-          rationale: "Kafka's retention is the key that makes kappa work. You can reprocess any historical window by replaying from the beginning of the topic, eliminating the need for a separate batch layer.",
-        },
-        sd_p1_t: {
-          id: "sd_p1_t",
-          type: "scenario_choice",
-          badge: "Complete",
-          title: "Complete · Architecture Decision",
-          prompt: "You've walked through batch vs streaming and lambda vs kappa. What's the single most important question to ask before choosing streaming?",
-          choices: [
-            { id: "a", label: "What is the latency SLA?", description: "If batch can meet it, streaming's operational complexity isn't worth it. Only stream when you must." },
-          ],
-          branches: { a: "sd_p1_t" },
-          terminal: true,
-          rationale: "Streaming solves real problems but adds real complexity: stateful operators, watermarks, exactly-once semantics, and distributed debugging. Reserve it for genuine latency requirements.",
-        },
+      },
+
+      latency_recovery: {
+        id: "latency_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Batch latency fundamentals",
+        prompt: "Let's ground the concept. What does batch processing actually guarantee about latency and throughput?",
+        choices: [
+          { id: "a", label: "Sub-second latency with very high throughput", description: "Batch systems are optimized for both speed and volume." },
+          { id: "b", label: "High throughput with latency measured in minutes to hours", description: "Batch accumulates data over time before processing." },
+          { id: "c", label: "Exactly-once semantics with real-time sliding windows", description: "Exactly-once is a streaming concern; windows don't apply to batch." },
+        ],
+        branches: { a: "latency_recovery", b: "batch_guarantee", c: "latency_recovery" },
+        rationale: "Batch processing trades latency for throughput. Jobs run on a schedule (hourly, nightly), accumulate data, then process it all at once. This means you get very high throughput and simple failure semantics, but latency is inherently tied to the schedule interval — always minutes to hours, never milliseconds.",
+      },
+
+      batch_guarantee: {
+        id: "batch_guarantee",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Lambda speed layer",
+        prompt: "A team adopts Lambda architecture for their analytics platform. What is the primary job of the **speed layer** in Lambda?",
+        choices: [
+          { id: "a", label: "Reprocess all historical data nightly to produce accurate views", description: "That's the batch layer's job." },
+          { id: "b", label: "Merge the batch and speed results before serving queries", description: "That's the serving layer's job." },
+          { id: "c", label: "Process incoming events in real time to cover the gap until the next batch run", description: "The speed layer compensates for batch latency." },
+          { id: "d", label: "Store raw events in a replayable log for future reprocessing", description: "Log retention is a Kappa concern, not a Lambda speed layer responsibility." },
+        ],
+        branches: { a: "arch_recovery", b: "arch_recovery", c: "kappa_choice", d: "arch_recovery" },
+        rationale: "In Lambda, the batch layer is the source of truth but runs infrequently. The speed layer fills the gap: it processes new events in real time so that the serving layer can merge recent data with the latest batch view. Once the next batch run completes and catches up, the speed layer results for that window are discarded.",
+      },
+
+      arch_recovery: {
+        id: "arch_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Lambda architecture layers",
+        prompt: "Lambda has three layers. Match them correctly: which layer merges batch and speed results for query serving?",
+        choices: [
+          { id: "a", label: "The batch layer", description: "The batch layer reprocesses historical data — it doesn't serve queries directly." },
+          { id: "b", label: "The speed layer", description: "The speed layer handles real-time ingestion, not query merging." },
+          { id: "c", label: "The serving layer", description: "The serving layer merges and indexes the outputs of both layers for low-latency queries." },
+        ],
+        branches: { a: "arch_recovery", b: "arch_recovery", c: "kappa_choice" },
+        rationale: "Lambda's serving layer (e.g., Druid, Cassandra, HBase) indexes and merges results from both the batch layer (accurate, complete) and the speed layer (recent, approximate). Queries hit the serving layer, which combines both views transparently.",
+      },
+
+      kappa_choice: {
+        id: "kappa_choice",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · When to choose Kappa",
+        prompt: "Your team finds Lambda's dual-codebase overhead unsustainable. Under which conditions is Kappa architecture the better choice?",
+        choices: [
+          { id: "a", label: "When your batch SQL logic is too complex to express as streaming window functions", description: "This is a reason Lambda might be preferable." },
+          { id: "b", label: "When you have a high-retention replayable log and a mature streaming framework", description: "Kappa relies on replaying the log for historical reprocessing." },
+          { id: "c", label: "When you need to join multiple very large tables with complex shuffle operations", description: "Shuffle-heavy joins favor batch's columnar optimizations." },
+          { id: "d", label: "When your team lacks streaming expertise and wants to minimize operational risk", description: "Streaming systems require more operational maturity, not less." },
+        ],
+        branches: { a: "arch_recovery", b: "fraud_scenario", c: "arch_recovery", d: "arch_recovery" },
+        rationale: "Kappa collapses Lambda's two paths into one streaming pipeline. Its viability depends entirely on your ability to replay historical events through that same pipeline. That requires a durable, replayable log (Kafka with sufficient retention) and a streaming framework mature enough to handle both real-time and backfill workloads with acceptable performance.",
+      },
+
+      fraud_scenario: {
+        id: "fraud_scenario",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Fraud detection architecture",
+        prompt: "The payments team tells you: 'We need to detect fraudulent transactions within 200ms of the authorization request.' Which pipeline architecture is required?",
+        choices: [
+          { id: "a", label: "Batch — run the fraud model every 5 minutes on new transactions", description: "5-minute batch cadence means up to 5 minutes of exposure before detection." },
+          { id: "b", label: "Streaming — process each transaction event as it arrives through a continuous pipeline", description: "Sub-second latency requires event-by-event processing." },
+          { id: "c", label: "Lambda — use batch for model training and a speed layer for approximate scores", description: "Lambda can help, but the serving architecture still needs a streaming path for sub-200ms response." },
+          { id: "d", label: "Either — both can achieve 200ms with the right hardware", description: "Batch by definition accumulates data before processing; it cannot achieve sub-second latency." },
+        ],
+        branches: { a: "latency_recovery", b: "lambda_downside", c: "lambda_downside", d: "latency_recovery" },
+        rationale: "A 200ms SLA eliminates batch entirely — batch pipelines accumulate data and process it on a schedule, inherently adding minutes of latency. Streaming is mandatory here: each authorization event must flow through the fraud scoring pipeline individually, in real time, before the transaction response is returned.",
+      },
+
+      lambda_downside: {
+        id: "lambda_downside",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Lambda's main operational cost",
+        prompt: "Your team has run Lambda architecture in production for 6 months. The engineering manager says it's harder to maintain than expected. What is the primary operational downside of Lambda?",
+        choices: [
+          { id: "a", label: "Lambda requires more storage than Kappa because it keeps two copies of all data", description: "Storage is a concern but not the primary pain point teams report." },
+          { id: "b", label: "Lambda forces you to maintain two separate codebases — one batch and one streaming — for the same business logic", description: "Bug fixes and feature changes must be applied twice." },
+          { id: "c", label: "Lambda's serving layer is too slow for interactive queries", description: "Druid and similar serving layers are designed for fast queries; this is not the core complaint." },
+          { id: "d", label: "Lambda cannot handle late-arriving data from the speed layer", description: "Lambda actually handles late data reasonably well — batch eventually corrects speed-layer approximations." },
+        ],
+        branches: { a: "arch_recovery", b: "cto_scenario", c: "arch_recovery", d: "arch_recovery" },
+        rationale: "The two-codebase problem is Lambda's most cited operational cost. Every business logic change must be implemented and tested in both the batch layer (typically Spark SQL) and the speed layer (typically Flink or Kafka Streams). These are different frameworks with different APIs, testing approaches, and failure modes. Teams consistently underestimate how quickly this doubles maintenance burden.",
+      },
+
+      cto_scenario: {
+        id: "cto_scenario",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · Choosing the right architecture",
+        prompt: "In your system design interview, the CTO says: 'We process 10TB of event data per day and stakeholders need summary reports ready by 9am each morning.' Which architecture do you recommend?",
+        choices: [
+          { id: "a", label: "Streaming with Kafka and Flink — to ensure the data is always up to date", description: "Real-time infrastructure adds cost and complexity with no benefit when the SLA is end-of-night reporting." },
+          { id: "b", label: "Batch — a nightly Spark job processes the day's data and writes to the warehouse before 9am", description: "The latency SLA is hours, not milliseconds. Batch is the correct and cost-effective choice." },
+          { id: "c", label: "Lambda — use batch for accuracy and a speed layer to keep dashboards current during the day", description: "Lambda overhead is unnecessary if stakeholders only need the 9am report." },
+          { id: "d", label: "Kappa — replay all 10TB through a streaming job each night to produce the reports", description: "Replaying 10TB event-by-event through a streaming framework is slower and more expensive than a columnar batch scan." },
+        ],
+        branches: { a: "arch_recovery", b: "terminal_summary", c: "arch_recovery", d: "arch_recovery" },
+        rationale: "When the latency SLA is 'reports by 9am,' batch is the architecturally correct answer. A nightly Spark job scanning 10TB of Parquet is extremely efficient. Streaming would add real-time infrastructure, higher operational burden, and cost — with zero business value since nobody needs the data before morning. Strong candidates justify batch confidently here rather than defaulting to streaming.",
+      },
+
+      terminal_summary: {
+        id: "terminal_summary",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · Architecture decision mastered",
+        prompt: "Excellent work. You correctly diagnosed the batch/streaming mismatch, identified Lambda's dual-codebase problem, and chose the right architecture for a given SLA. Which principle best summarizes the batch vs streaming decision?",
+        terminal: true,
+        choices: [
+          { id: "a", label: "Always choose streaming — it handles both real-time and batch workloads", description: "Streaming is not a superset; it is more complex and not always appropriate." },
+          { id: "b", label: "Default to batch unless you have a concrete sub-second or near-real-time SLA that justifies streaming complexity", description: "This is the correct engineering default." },
+          { id: "c", label: "Always choose Lambda — it gives you both batch accuracy and real-time speed", description: "Lambda's operational cost is only justified when both layers are genuinely needed." },
+        ],
+        branches: { a: "terminal_summary", b: "terminal_summary", c: "terminal_summary" },
+        rationale: "The correct default is batch. Streaming systems are harder to develop, test, deploy, and operate. They require expertise in stateful processing, watermarks, late data, and exactly-once semantics. Only reach for streaming when a business requirement genuinely demands sub-second or near-real-time latency — not because it sounds more impressive.",
       },
     },
-    knowledgeCheck: [
-      {
-        question: "A data team needs to generate monthly financial reports from 3 TB of transaction data. Which processing model is most appropriate?",
-        options: ["Kafka + Flink streaming pipeline", "Scheduled Spark batch job", "Lambda architecture with both batch and stream"],
-        correctIndex: 1,
-        explanation: "Monthly reports have no real-time latency requirement. A scheduled Spark batch job is simpler, cheaper, and easier to debug than streaming. Lambda adds unnecessary complexity.",
-      },
-      {
-        question: "What is the primary operational disadvantage of the lambda architecture?",
-        options: ["It cannot handle high-throughput data", "Two codebases (batch + stream) must produce identical results and stay synchronized", "It requires Kafka, which is expensive to operate"],
-        correctIndex: 1,
-        explanation: "Lambda runs parallel batch and speed layers. Any business logic change must be applied to both. Keeping them in sync is the main pain point that led to the kappa architecture.",
-      },
-      {
-        question: "In Kafka, what is the unit of parallelism for consumer groups?",
-        options: ["Topic", "Partition", "Consumer group"],
-        correctIndex: 1,
-        explanation: "Each partition is assigned to exactly one consumer within a consumer group. You can scale consumers up to the number of partitions—adding more consumers than partitions results in idle consumers.",
-      },
-    ],
   },
+  knowledgeCheck: [
+    {
+      question: "A data pipeline has a latency SLA of 300ms end-to-end. Which processing model is required?",
+      options: [
+        "Batch processing with a 5-minute schedule",
+        "Streaming processing with event-by-event handling",
+        "Batch processing with a 1-minute micro-batch schedule",
+        "Either — latency depends on hardware, not architecture",
+      ],
+      correctIndex: 1,
+      explanation: "Batch processing accumulates data before processing it, so even a 1-minute schedule results in ~60 seconds of latency plus processing time. A 300ms SLA requires streaming, where each event is processed as it arrives.",
+    },
+    {
+      question: "In Lambda architecture, what is the role of the serving layer?",
+      options: [
+        "It processes incoming events in real time to minimize latency",
+        "It stores raw events in a replayable log for the batch layer",
+        "It merges the outputs of the batch and speed layers to answer queries",
+        "It runs the nightly Spark job that reprocesses all historical data",
+      ],
+      correctIndex: 2,
+      explanation: "The serving layer (e.g., Druid, HBase) indexes and merges results from both the batch layer (accurate historical views) and the speed layer (recent real-time updates). Client queries hit the serving layer, which combines both transparently.",
+    },
+    {
+      question: "A team is moving from Lambda to Kappa architecture. Which condition is most critical for Kappa to succeed?",
+      options: [
+        "The team must have more data engineers than the Lambda setup required",
+        "The business must accept eventual consistency across all reports",
+        "A durable, high-retention, replayable event log must exist to support historical reprocessing",
+        "All queries must be converted from SQL to a streaming DSL before migration",
+      ],
+      correctIndex: 2,
+      explanation: "Kappa replaces Lambda's batch layer by replaying the event log through the streaming pipeline. This only works if events are durably stored in a replayable log (like Kafka with sufficient retention) long enough to reprocess the desired history window.",
+    },
+  ],
+},
 
   "sd-p2": {
-    durationLabel: "18 min",
-    outcomes: [
-      "Distinguish ETL from ELT and articulate when each pattern is appropriate",
-      "Explain how dbt fits into the modern data stack as a transformation layer",
-      "Describe the data mesh philosophy and its trade-offs versus centralized architectures",
+  durationLabel: "18 min",
+  outcomes: [
+    "Distinguish ETL from ELT and articulate when each pattern is appropriate",
+    "Explain how dbt fits into the modern data stack",
+    "Identify anti-patterns in transformation pipelines",
+  ],
+  learnMarkdown: `## ETL: Transform Before You Load
+
+The traditional approach is **Extract, Transform, Load** (ETL): raw data is pulled from source systems, transformed by a dedicated external processing layer, and only the clean result lands in the destination database.
+
+ETL made sense when storage was expensive and schemas were rigid. You didn't want to store raw, messy event logs, and your destination database required normalized data *before* it arrived. Transformation layers were built with tools like Informatica, SSIS, or custom Java jobs.
+
+The tradeoffs are real. ETL requires maintaining compute infrastructure *outside* the warehouse. When business logic changes, you must rebuild and redeploy that external pipeline. Worse, raw data is often discarded after transformation — if a bug slips through, you may need to re-extract from source systems to fix history.
+
+## ELT: Load Raw, Transform Inside
+
+**Extract, Load, Transform** (ELT) flips the order: raw data lands in the warehouse first, and all transformations happen *inside* the warehouse using SQL.
+
+This shift was made possible by cloud-native columnar warehouses — Snowflake, BigQuery, and Amazon Redshift — that offer near-infinite, elastic compute at low cost. Running a complex aggregation over a billion rows no longer requires a dedicated Hadoop cluster; you simply write a SQL query and let the warehouse scale horizontally.
+
+ELT advantages are substantial:
+
+- **Raw data is preserved.** Because source data lands unchanged, you can re-run or update transformations at any time without touching source systems.
+- **Fewer moving parts.** There's no separate ETL server to provision, monitor, or patch. The warehouse is both storage and compute.
+- **SQL is the lingua franca.** Most analysts and analytics engineers already know SQL — ELT puts transformation in a language the whole team can read and review.
+- **Lineage becomes tractable.** When all transformations are SQL models in a warehouse, it's far easier to trace how a metric was derived.
+
+## Why ELT Won
+
+The cost curves crossed around 2015–2018. Cloud storage became so cheap that storing raw events costs pennies per GB, and cloud warehouses offer serverless scaling — a complex aggregation that once required hours on Hadoop now completes in seconds.
+
+ETL still has legitimate niches: HIPAA-regulated data that must be anonymized before touching any cloud system, or legacy on-premises warehouses that can't store raw data. But for most analytics workloads, ELT is the default.
+
+## dbt: The T in ELT
+
+**dbt** (data build tool) is an open-source framework that manages the transformation layer in an ELT architecture. At its core, a dbt model is just a \`SELECT\` statement saved as a \`.sql\` file. dbt compiles that \`SELECT\` into a \`CREATE TABLE AS\` or \`CREATE VIEW AS\` statement and runs it in your warehouse.
+
+Key dbt concepts:
+
+- **\`ref()\` macro**: Instead of hardcoding table names, models reference each other with \`{{ ref('model_name') }}\`. This builds a dependency graph (DAG) so dbt can run models in the correct order and enables automatic lineage documentation.
+- **Sources**: Raw tables are declared as \`sources\` so dbt can track freshness and generate lineage back to the origin.
+- **Schema tests**: dbt ships with built-in data quality assertions — \`not_null\`, \`unique\`, \`accepted_values\`, \`relationships\`. These run after transformations and fail the pipeline if data violates expectations.
+- **Materialization strategies**: \`view\` (recomputed on query), \`table\` (fully rebuilt each run), \`incremental\` (only new/changed rows since last run), or \`ephemeral\` (compiled as a CTE into downstream models).
+
+## The Modern Data Stack
+
+The modern data stack is the ecosystem that has grown around ELT:
+
+| Layer | Tools |
+|-------|-------|
+| Extract + Load | Fivetran, Airbyte, Stitch |
+| Warehouse | Snowflake, BigQuery, Redshift |
+| Transform | dbt |
+| BI / Visualization | Looker, Tableau, Metabase |
+
+Each layer has a clear responsibility: ingestion tools handle connectors and scheduling; the warehouse handles storage and compute; dbt handles business logic and data quality; BI tools handle visualization. This separation makes each layer independently replaceable.
+
+## Anti-Patterns to Avoid
+
+- **Transforming in the ingestion layer**: Fivetran and Airbyte move data — they shouldn't contain business logic. Adding transforms to ingestion scripts makes pipelines fragile and untestable.
+- **One giant SQL file**: A 2,000-line SQL monolith is impossible to test, debug, or reuse. dbt models should follow staging → intermediate → mart layers, each focused and independently testable.
+- **No data quality tests**: Silent failures propagate to dashboards. Every critical column needs at minimum a \`not_null\` and \`unique\` test.
+- **Compute outside the warehouse**: Using Pandas to aggregate data that lives in a cloud warehouse defeats ELT — you're running two compute systems and losing warehouse-native lineage.
+
+## Interview-Ready Summary
+
+- **ETL** transforms data before loading; required when the destination can't handle raw data or when data must be anonymized pre-cloud.
+- **ELT** loads raw data first and transforms inside the warehouse using SQL; preferred for cloud-native analytics because storage is cheap and compute is elastic.
+- **dbt** is the standard transformation framework for ELT — SQL models, \`ref()\` for dependency graphs, schema tests for data quality, and multiple materialization strategies.
+- **Modern data stack**: Fivetran/Airbyte → Snowflake/BigQuery → dbt → Looker/Tableau.
+- **Incremental materialization** processes only new or changed rows, making large fact table refreshes fast and cost-efficient.
+- **Red flags interviewers watch for**: no tests, monolithic SQL, transformation logic in ingestion scripts, or using Pandas for aggregations that the warehouse can handle natively.
+`,
+  video: null,
+  videoFallbackMarkdown: `## Why the Industry Shifted from ETL to ELT
+
+For most of the 2000s, ETL was the only viable option. On-premises data warehouses like Teradata and Oracle charged per-core licensing fees, so you didn't want to store raw, unprocessed data. You also didn't want to run heavy compute on an expensive appliance — it was cheaper to clean data in a separate processing layer before it touched the warehouse at all.
+
+Cloud warehouses broke this model. When Snowflake launched its pay-per-second compute separated from storage, and BigQuery offered serverless query pricing, the economics flipped. Storing a full snapshot of raw events now costs a few dollars a month. Running a complex aggregation query costs fractions of a cent. There was no longer any reason to discard raw data or transform outside the warehouse.
+
+## What Interviewers Actually Test
+
+In a data engineering or analytics engineering interview, the ETL/ELT distinction is almost always a setup for a deeper question. Be prepared for:
+
+**"Walk me through how you'd rebuild a broken metric."** The right answer in an ELT world is: fix the dbt model, run \`dbt run --select model_name\`, and the corrected table is rebuilt from raw data that was never discarded. In ETL, you might need to re-extract from source — which may no longer be possible.
+
+**"How do you handle late-arriving data?"** In dbt, incremental models can be configured with a \`lookback window\` to reprocess recent partitions. Understanding when to use \`is_incremental()\` with a \`WHERE\` clause versus a full table refresh signals senior-level dbt knowledge.
+
+**"Why not just do everything in Spark/Pandas?"** The answer isn't that Python is slower — sometimes Pandas *is* faster for certain operations. The answer is that Python transformations outside the warehouse break lineage, can't be tested with dbt schema tests, require separate infrastructure, and aren't visible to BI tools' data governance layers.
+
+## dbt Concepts That Come Up in Interviews
+
+The \`ref()\` macro is the most commonly misunderstood dbt feature. Candidates often describe it as "just a table reference" but the deeper answer is that \`ref()\` enables dbt's DAG compilation — it's what allows dbt to determine execution order, generate lineage graphs, and substitute the correct schema name across development and production environments.
+
+Materialization strategy choices signal architectural maturity. Choosing \`view\` for everything is lazy — heavily queried views recompute on every hit. Choosing \`table\` for everything is wasteful — billion-row fact tables don't need to be fully rebuilt every hour. \`Incremental\` models require careful \`unique_key\` configuration to handle upserts correctly.
+
+Data quality tests are a differentiator. Many candidates know dbt has tests; fewer can describe how \`accepted_values\`, \`relationships\`, and custom generic tests work together to form a data contract between producers and consumers.
+`,
+  tryGuidance: "Step through each stage of the interview simulation. In the code stage, click the highlighted line that represents the core anti-pattern — where transformation is happening outside the warehouse. In the scenario stages, pick the answer you'd give in a real interview and read the rationale carefully. The artifact dimensions track your ETL/ELT pattern judgment and your dbt modeling knowledge separately.",
+  interviewGraph: {
+    initialStageId: "intro_scenario",
+    artifactDimensions: [
+      { label: "ETL/ELT Pattern Judgment", recoveryStageId: "elt_recovery" },
+      { label: "dbt Modeling Skills", recoveryStageId: "dbt_recovery" },
     ],
-    learnMarkdown: `## ETL vs ELT & the Modern Data Stack
+    stages: {
+      intro_scenario: {
+        id: "intro_scenario",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · ETL vs ELT",
+        prompt: "Your company is migrating from an on-premises Informatica ETL pipeline to a cloud-native stack using Snowflake. A colleague argues you should keep the Informatica transformations and just point them at Snowflake as the destination. What is the strongest counter-argument?",
+        choices: [
+          { id: "a", label: "Informatica is too expensive", description: "The cost of Informatica licensing is the main reason to migrate." },
+          { id: "b", label: "ELT uses the warehouse's compute for transforms, preserving raw data and eliminating external infrastructure", description: "Load raw data into Snowflake first, then transform using SQL/dbt inside the warehouse." },
+          { id: "c", label: "SQL is easier to write than Informatica mappings", description: "Developer ergonomics are the primary motivation for changing the architecture." },
+          { id: "d", label: "Snowflake doesn't support incoming connections from Informatica", description: "There's a technical incompatibility between the two systems." },
+        ],
+        branches: { a: "elt_recovery", b: "code_bug_stage", c: "elt_recovery", d: "elt_recovery" },
+        rationale: "The strongest architectural argument is that ELT leverages the warehouse's own elastic compute for transformations, keeps raw data intact for re-processing, and eliminates a separate transformation server. Cost and ergonomics are real benefits but they're secondary to the architectural principle.",
+      },
+      elt_recovery: {
+        id: "elt_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · ELT Core Principle",
+        prompt: "Let's reinforce the core ELT principle. In an ELT architecture, when does data transformation happen, and where does the compute run?",
+        choices: [
+          { id: "a", label: "Transformation happens before loading, using an external compute cluster", description: "Data is cleaned and shaped before it enters the destination system." },
+          { id: "b", label: "Transformation happens after loading, using the warehouse's own compute engine", description: "Raw data lands first, then SQL queries run inside the warehouse to build transformed tables." },
+          { id: "c", label: "Transformation and loading happen simultaneously in a streaming pipeline", description: "Data is transformed in-flight as it moves to the warehouse." },
+        ],
+        branches: { a: "code_bug_stage", b: "code_bug_stage", c: "code_bug_stage" },
+        rationale: "ELT means: Extract raw data, Load it into the warehouse unchanged, then Transform it inside the warehouse using SQL. The warehouse's compute engine — not an external cluster — does all the heavy lifting.",
+      },
+      code_bug_stage: {
+        id: "code_bug_stage",
+        type: "click_target",
+        badge: "Stage 2",
+        title: "Stage 2 · Spot the Anti-Pattern",
+        prompt: "A data engineer has written this Python script to build the 'mart_user_revenue' table. One line represents the core architectural anti-pattern for a cloud warehouse environment. Click the line that is the biggest problem.",
+        code_snippet: `# transform.py
+import pandas as pd
 
-How data moves from source systems to analytics is one of the most consequential architectural decisions a data team makes. The shift from ETL to ELT reflects a fundamental change in where compute lives.
+def run_transformation():
+    raw = pd.read_sql("SELECT * FROM raw.events", engine)  # -- ds-target:extract_all
+    # Apply business logic
+    result = raw.groupby('user_id').agg({'revenue': 'sum'})  # -- ds-target:compute_outside
+    result.to_sql('mart_user_revenue', engine, if_exists='replace')
 
-### ETL (Extract → Transform → Load)
-
-The classic pattern: extract raw data, transform it in a dedicated ETL tool (Informatica, Talend, custom Python), then load clean, structured data into the destination. This was necessary when warehouses (Oracle, Teradata) charged heavily per compute hour.
-
-**ETL is appropriate when:**
-- Loading into a legacy on-premise warehouse with limited compute
-- Data must be masked, encrypted, or anonymized before it ever enters the warehouse
-- The destination system cannot store raw/unstructured data
-- Transformation errors should block loading (fail fast before persisting bad data)
-
-### ELT (Extract → Load → Transform)
-
-Load raw data first, then transform it inside the warehouse using SQL. Cloud warehouses like **Snowflake**, **BigQuery**, and **Databricks** offer near-infinite compute at low marginal cost, making it economical to store raw data and transform it on demand.
-
-**ELT advantages:**
-- **Raw data always available** — re-transform with updated logic without re-extracting from source
-- **Cheaper at scale** — warehouse compute is cheaper than ETL tool licensing
-- **SQL-first** — most analysts already know SQL; no Scala/Java required
-- **Audit trail** — raw layer enables debugging what the source actually sent
-
-### dbt: The Transformation Layer
-
-**dbt (data build tool)** is the standard ELT transformation layer. It lets analysts write SELECT statements; dbt handles the CREATE TABLE / INSERT / REPLACE logic.
-
-Key features:
-- **Version-controlled SQL** — transformations live in Git, reviewed in PRs
-- **Tests** — \`not_null\`, \`unique\`, \`accepted_values\`, \`relationships\` tests run against every model
-- **Documentation** — auto-generated from \`description:\` fields in YAML
-- **Lineage graph** — visual DAG of how every table depends on others
-- **Ref function** — \`{{ ref('stg_orders') }}\` creates compile-time dependencies so dbt runs in the right order
-
-### The Modern Data Stack
-
-A typical 2024 stack:
-
-\`\`\`
-Sources → Fivetran/Airbyte → Snowflake/BigQuery (raw) → dbt → Looker/Tableau
-\`\`\`
-
-- **Fivetran/Airbyte**: managed connectors that sync source data (Salesforce, Postgres, Stripe) into the warehouse on a schedule
-- **Snowflake/BigQuery**: cloud warehouse — separation of storage and compute, pay-per-query
-- **dbt**: SQL transformations with testing and documentation
-- **Looker/Tableau**: BI layer — semantic models or drag-and-drop dashboards
-
-### Data Mesh
-
-Data mesh (Zhamak Dehghani) reacts to the bottleneck of centralized data teams owning all pipelines. Core principles:
-1. **Domain ownership** — the team that owns the Orders microservice owns the orders data product
-2. **Data as a product** — each domain produces SLA-backed, documented datasets for other teams
-3. **Self-serve infrastructure** — central platform team provides tooling; domain teams use it autonomously
-4. **Federated governance** — global policies (PII handling, access control) enforced centrally; domain-specific decisions made locally
-
-Trade-off: decentralized ownership reduces the central team bottleneck but creates consistency challenges across domains.`,
-    video: null,
-    videoFallbackMarkdown: `## Deep Dive: dbt Project Structure
-
-### Folder Conventions
-
-\`\`\`
-models/
-  staging/       # 1:1 with source tables, light renaming + casting
-  intermediate/  # joins, business logic
-  marts/         # final analytics-ready tables (dim_, fct_ prefix)
-\`\`\`
-
-### Testing Example
-
-\`\`\`yaml
-models:
-  - name: fct_orders
-    columns:
-      - name: order_id
-        tests:
-          - unique
-          - not_null
-      - name: status
-        tests:
-          - accepted_values:
-              values: ['placed', 'shipped', 'delivered', 'cancelled']
-\`\`\`
-
-### Incremental Models
-
-For large tables, dbt incremental models only process new/changed rows:
-
-\`\`\`sql
-{{ config(materialized='incremental', unique_key='order_id') }}
-
-SELECT * FROM {{ ref('stg_orders') }}
-{% if is_incremental() %}
-  WHERE updated_at > (SELECT MAX(updated_at) FROM {{ this }})
-{% endif %}
-\`\`\``,
-    tryGuidance: "Walk through the ETL and ELT pipeline diagrams to see where transformation happens.",
-    interviewGraph: {
-      initialStageId: "sd_p2_s1",
-      artifactDimensions: [
-        { label: "ETL vs ELT Selection", recoveryStageId: "sd_p2_r1" },
-        { label: "dbt Knowledge", recoveryStageId: "sd_p2_r2" },
-      ],
-      stages: {
-        sd_p2_s1: {
-          id: "sd_p2_s1",
-          type: "scenario_choice",
-          badge: "Stage 1",
-          title: "Stage 1 · Pattern Selection",
-          prompt: "A healthcare company wants to move patient records from 10 source databases into a Snowflake warehouse. PII must be de-identified before any storage in the cloud. Which pattern is required?",
-          choices: [
-            { id: "a", label: "ETL — transform before loading", description: "De-identify PII in the ETL tool before the data reaches Snowflake, ensuring raw PII never touches the cloud." },
-            { id: "b", label: "ELT — load raw then transform", description: "Load raw records including PII into Snowflake, then run dbt models to de-identify." },
-            { id: "c", label: "Either works equally", description: "Both patterns can handle PII de-identification, so choose based on team preference." },
-          ],
-          branches: { a: "sd_p2_s2", b: "sd_p2_r1", c: "sd_p2_r1" },
-          rationale: "When PII must never enter the destination system, ETL is required. ELT loads raw data first—PII would exist in Snowflake during that window, violating HIPAA/GDPR requirements. ETL transforms (and masks) before loading.",
+run_transformation()`,
+        validationCopy: {
+          extract_all: "Pulling the full raw table into Pandas is wasteful, but the deeper issue is on the next line — that's where the compute actually leaves the warehouse.",
+          compute_outside: "Correct. This line performs the heavy aggregation in Pandas on external compute, pulling data out of the warehouse entirely. In a cloud warehouse environment this defeats ELT — you lose scalability, lineage, and the ability to test the logic with dbt schema tests.",
         },
-        sd_p2_r1: {
-          id: "sd_p2_r1",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · When ETL is Required",
-          prompt: "The key distinction: ETL transforms data BEFORE it reaches the destination. ELT stores raw data first. For regulated data (PII, PHI, PCI), which step must happen before cloud storage?",
-          choices: [
-            { id: "a", label: "Masking/de-identification must happen before load", description: "Regulated fields must be anonymized or tokenized in the extraction/transform phase, before the data is persisted anywhere in the cloud." },
-            { id: "b", label: "Encryption at rest satisfies PII requirements", description: "Storing encrypted PII in Snowflake and de-identifying in dbt is sufficient for HIPAA." },
-          ],
-          branches: { a: "sd_p2_s2", b: "sd_p2_s2" },
-          rationale: "Encryption at rest is necessary but not sufficient. HIPAA requires that PHI be de-identified (Safe Harbor or Expert Determination method) before use in analytics contexts. Storing encrypted PII and 'de-identifying later' still means raw PHI sits in your warehouse.",
+        branches: {
+          extract_all: "pandas_recovery",
+          compute_outside: "ref_macro_scenario",
         },
-        sd_p2_s2: {
-          id: "sd_p2_s2",
-          type: "scenario_choice",
-          badge: "Stage 2",
-          title: "Stage 2 · dbt Role",
-          prompt: "Your team has adopted ELT for a SaaS analytics product using BigQuery. A data analyst wants to join orders and customers tables, add a derived 'days_to_ship' column, and expose the result as a table for the BI team. What is the correct dbt approach?",
-          choices: [
-            { id: "a", label: "Write a dbt model with {{ ref() }} and materialize as table", description: "Create a SQL file in models/marts/, reference staging models with {{ ref() }}, configure materialized='table'." },
-            { id: "b", label: "Write a Python script that runs the join and writes back to BigQuery", description: "A scheduled Python script handles the join and INSERT INTO the result table." },
-            { id: "c", label: "Build a view directly in BigQuery UI", description: "Create a saved view in the BigQuery console that the BI team can query." },
-          ],
-          branches: { a: "sd_p2_t", b: "sd_p2_r2", c: "sd_p2_r2" },
-          rationale: "dbt is purpose-built for this: version-controlled SQL, automatic lineage via {{ ref() }}, built-in tests, and documentation. Python scripts and manual views lack testability, lineage, and version control.",
-        },
-        sd_p2_r2: {
-          id: "sd_p2_r2",
-          type: "scenario_choice",
-          badge: "Recovery 2",
-          title: "Recovery 2 · dbt Value Proposition",
-          prompt: "The core value of dbt over ad-hoc SQL scripts or manual views is: version control + testing + lineage. If a colleague asks why dbt is worth adopting, which benefit is most unique to dbt?",
-          choices: [
-            { id: "a", label: "Automatic dependency ordering via {{ ref() }}", description: "dbt builds a DAG from ref() calls and runs models in the correct order, with lineage visible in the docs site." },
-            { id: "b", label: "It runs SQL faster than direct BigQuery queries", description: "dbt doesn't change query execution speed—it's a transformation framework, not a query optimizer." },
-          ],
-          branches: { a: "sd_p2_t", b: "sd_p2_t" },
-          rationale: "dbt's ref() function is what makes it powerful: it creates compile-time dependencies, enabling automatic ordering, impact analysis ('what breaks if I change this model?'), and auto-generated lineage docs.",
-        },
-        sd_p2_t: {
-          id: "sd_p2_t",
-          type: "scenario_choice",
-          badge: "Complete",
-          title: "Complete · Modern Stack Summary",
-          prompt: "Summarize the modern data stack. Where does each tool sit in the pipeline?",
-          choices: [
-            { id: "a", label: "Fivetran → Warehouse → dbt → BI", description: "Fivetran extracts/loads; the warehouse stores raw + transformed data; dbt transforms; BI queries marts." },
-          ],
-          branches: { a: "sd_p2_t" },
-          terminal: true,
-          rationale: "The modern data stack separates ingestion (Fivetran/Airbyte), storage (Snowflake/BigQuery), transformation (dbt), and consumption (Looker/Tableau) into best-of-breed tools connected by SQL and APIs.",
-        },
+      },
+      pandas_recovery: {
+        id: "pandas_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Compute Outside the Warehouse",
+        prompt: "Why is performing aggregations in Pandas (outside the warehouse) an anti-pattern in a cloud warehouse environment?",
+        choices: [
+          { id: "a", label: "Pandas doesn't support groupby or aggregation operations", description: "Pandas lacks the functionality to perform this type of transformation." },
+          { id: "b", label: "It moves data out of the warehouse for compute, losing scalability, lineage, and testability", description: "The warehouse can scale horizontally to handle the aggregation; Pandas runs on a single machine and produces no lineage." },
+          { id: "c", label: "Python is always slower than SQL for aggregation workloads", description: "Performance is the primary concern with this approach." },
+        ],
+        branches: { a: "ref_macro_scenario", b: "ref_macro_scenario", c: "ref_macro_scenario" },
+        rationale: "The core problem isn't performance — it's architecture. When you pull data into Pandas for transformation, you lose the warehouse's elastic compute, dbt's lineage graph, schema test coverage, and the ability for BI tools to trace data provenance. The warehouse is designed to do this work at scale.",
+      },
+      ref_macro_scenario: {
+        id: "ref_macro_scenario",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · dbt ref() Macro",
+        prompt: "In a dbt project, a model references another model using {{ ref('stg_orders') }} instead of hardcoding the schema and table name. Beyond simple table referencing, what is the most important thing the ref() macro enables?",
+        choices: [
+          { id: "a", label: "It automatically caches query results for faster performance", description: "ref() provides query caching so downstream models run faster." },
+          { id: "b", label: "It builds a dependency DAG so dbt runs models in the correct order and generates lineage documentation", description: "dbt compiles ref() calls into a directed acyclic graph that controls execution order and powers the lineage graph." },
+          { id: "c", label: "It allows models to run in parallel across multiple warehouses", description: "ref() enables multi-warehouse federation." },
+          { id: "d", label: "It replaces the need for schema tests by validating column types automatically", description: "ref() handles data quality validation implicitly." },
+        ],
+        branches: { a: "dbt_recovery", b: "incremental_scenario", c: "dbt_recovery", d: "dbt_recovery" },
+        rationale: "ref() is the cornerstone of dbt's DAG compilation. When dbt sees ref('stg_orders'), it records that the current model depends on stg_orders. After parsing all models, dbt has a complete dependency graph — it can determine execution order, run independent models in parallel, and produce the lineage documentation visible in dbt docs.",
+      },
+      dbt_recovery: {
+        id: "dbt_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · dbt Fundamentals",
+        prompt: "A junior engineer asks: 'If ref() is just a way to reference another table, why not just write the schema and table name directly?' What is the correct explanation?",
+        choices: [
+          { id: "a", label: "Hardcoded schema names break when switching between dev and prod environments, and dbt can't build the lineage graph without ref()", description: "ref() resolves the correct schema per environment and registers the dependency in the DAG." },
+          { id: "b", label: "ref() is required syntax — dbt will throw a compilation error if you use a hardcoded name", description: "dbt enforces ref() usage at the syntax level." },
+          { id: "c", label: "Direct table names work fine; ref() is just a stylistic convention for readability", description: "The choice between ref() and direct names is purely aesthetic." },
+        ],
+        branches: { a: "incremental_scenario", b: "incremental_scenario", c: "incremental_scenario" },
+        rationale: "Hardcoded schema names break environment switching (dev vs. prod have different schema names) and — critically — dbt can't register the dependency without ref(). Without the dependency registered, dbt might run the downstream model before the upstream model finishes, producing stale or missing data.",
+      },
+      incremental_scenario: {
+        id: "incremental_scenario",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Materialization Strategy",
+        prompt: "You have a dbt model that builds a fact table from 500 million rows of raw events. The source adds roughly 2 million new rows per day and historical rows never change. Which materialization strategy is most appropriate and why?",
+        choices: [
+          { id: "a", label: "view — recompute the full 500M rows on every query for freshness", description: "Views guarantee the freshest data by recomputing on every access." },
+          { id: "b", label: "table — rebuild all 500M rows on every dbt run to ensure accuracy", description: "Full table rebuilds are the safest way to keep the fact table correct." },
+          { id: "c", label: "incremental — process only new rows since the last run, using a timestamp filter", description: "Incremental materializations append only new data, making runs fast and cost-efficient when history is immutable." },
+          { id: "d", label: "ephemeral — compile the logic as a CTE into every downstream model", description: "Ephemeral models avoid materialization entirely, keeping compute at the downstream layer." },
+        ],
+        branches: { a: "dbt_recovery", b: "dbt_recovery", c: "rerun_scenario", d: "dbt_recovery" },
+        rationale: "Incremental is the right choice here. Since historical rows never change and 2M new rows arrive daily, there's no reason to reprocess the entire 500M-row history on every run. An incremental model with a WHERE clause on a timestamp column processes only the new rows, reducing both runtime and cost by orders of magnitude. Ephemeral would be wrong — you want the fact table materialized so BI tools can query it efficiently.",
+      },
+      rerun_scenario: {
+        id: "rerun_scenario",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Re-running History",
+        prompt: "An interviewer asks: 'We discovered a bug in our revenue attribution logic last month. We need to reprocess 90 days of data with the corrected logic. Which architecture makes this straightforward — ETL or ELT — and why?'",
+        choices: [
+          { id: "a", label: "ETL, because the external transformation layer can be restarted independently of the warehouse", description: "ETL's separate transformation server can be re-run without touching the warehouse." },
+          { id: "b", label: "ELT, because raw data is preserved in the warehouse — fix the dbt model and re-run it against the stored raw data", description: "Since raw data was never discarded, correcting the transformation logic and re-materializing produces the right output without touching source systems." },
+          { id: "c", label: "Neither — you always need to re-extract from source systems to fix historical data", description: "Re-extracting from source is always required regardless of architecture." },
+          { id: "d", label: "ELT, but only if you have a full backup of the raw warehouse tables from 90 days ago", description: "ELT requires maintaining explicit backups to support historical reprocessing." },
+        ],
+        branches: { a: "elt_recovery", b: "monolith_scenario", c: "elt_recovery", d: "elt_recovery" },
+        rationale: "This is one of ELT's clearest wins over ETL. Because raw data landed in the warehouse unchanged and was never discarded, you simply fix the dbt SQL model, run dbt run --full-refresh for the affected models, and the corrected tables are rebuilt from the preserved raw data. In ETL, the raw data was often transformed and discarded — requiring a full re-extraction from source systems, which may be unavailable or rate-limited.",
+      },
+      monolith_scenario: {
+        id: "monolith_scenario",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · Monolithic SQL Anti-Pattern",
+        prompt: "You're reviewing a data team's dbt project. They have one model called 'final_analytics.sql' that is 2,400 lines long and contains all business logic: joins across 12 source tables, revenue calculations, cohort logic, churn flags, and marketing attribution — all in a single file. What is the primary architectural risk?",
+        choices: [
+          { id: "a", label: "The file will exceed Snowflake's SQL query size limit and fail at runtime", description: "Cloud warehouses have hard limits on SQL query length that this file will hit." },
+          { id: "b", label: "It creates an untestable, unreusable monolith — a bug in any sub-logic affects everything, and no intermediate result can be independently validated or reused", description: "Without modular models, there's no way to test individual transformations, isolate failures, or share logic across reports." },
+          { id: "c", label: "Large SQL files are slower to compile in dbt and will increase transformation costs", description: "File size directly correlates with compilation time and warehouse cost." },
+          { id: "d", label: "Version control systems like git struggle to diff large SQL files, making code review impossible", description: "The technical limitation is in git's ability to handle large text files." },
+        ],
+        branches: { a: "dbt_recovery", b: "terminal_summary", c: "dbt_recovery", d: "dbt_recovery" },
+        rationale: "The monolith anti-pattern is a testability and maintainability problem. With no intermediate models, you can't run dbt test against individual layers, you can't reuse the cohort logic in a different report, and when something breaks you must debug 2,400 lines to find the failure. The dbt convention is staging → intermediate → mart layers, where each layer is small, focused, testable, and reusable.",
+      },
+      terminal_summary: {
+        id: "terminal_summary",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · Modern Data Stack Mastery",
+        prompt: "Final check: A startup asks you to design their analytics stack from scratch. They use Postgres as their production database, want to track user events, and need weekly executive dashboards. Which stack reflects modern best practices?",
+        choices: [
+          { id: "a", label: "Fivetran (replicate Postgres) + Airbyte (events) → Snowflake → dbt → Looker", description: "Dedicated ingestion tools load raw data into a cloud warehouse; dbt handles transformation; BI layer handles dashboards." },
+          { id: "b", label: "Custom Python ETL scripts → Postgres replica → direct SQL dashboard queries", description: "Keep everything in Postgres with custom transformation scripts." },
+          { id: "c", label: "Spark cluster for all ingestion, transformation, and serving", description: "A unified Spark platform handles the full data lifecycle." },
+          { id: "d", label: "dbt alone handles extraction, loading, and transformation into the warehouse", description: "dbt is a full-stack data platform that covers all three layers." },
+        ],
+        branches: { a: "terminal_summary", b: "terminal_summary", c: "terminal_summary", d: "terminal_summary" },
+        rationale: "The modern data stack separates concerns cleanly: dedicated connectors (Fivetran, Airbyte) handle extraction and loading; a cloud warehouse (Snowflake, BigQuery) handles storage and compute; dbt handles transformation and data quality; a BI tool handles visualization. dbt alone cannot extract or load — it only handles the T in ELT.",
+        terminal: true,
       },
     },
-    knowledgeCheck: [
-      {
-        question: "Which scenario strictly requires ETL (transform before load) rather than ELT?",
-        options: ["A startup loading Stripe payments into BigQuery for revenue analytics", "A hospital de-identifying patient records before storing in a cloud warehouse", "A retailer loading clickstream data for funnel analysis"],
-        correctIndex: 1,
-        explanation: "When regulated data (PHI/PII) must never enter the cloud system in raw form, ETL is required. The other scenarios involve non-regulated data where ELT's raw-first approach is fine.",
-      },
-      {
-        question: "In dbt, what does the {{ ref('model_name') }} function do?",
-        options: ["Executes a SQL query and returns the result as a Python dataframe", "Creates a compile-time dependency between models, enabling correct ordering and lineage tracking", "Generates documentation for the referenced model"],
-        correctIndex: 1,
-        explanation: "ref() tells dbt that the current model depends on another model. dbt builds a DAG from all ref() calls and runs models in topological order. It also powers the lineage graph in dbt docs.",
-      },
-      {
-        question: "What is the core philosophy of the data mesh architecture?",
-        options: ["Centralize all data pipelines into a single platform team for consistency", "Domain teams own their data as products, with a central platform providing self-serve tooling", "Replace all batch pipelines with real-time streaming"],
-        correctIndex: 1,
-        explanation: "Data mesh decentralizes ownership: the team that builds the Orders service also owns the orders data product, with SLAs and documentation. A central platform team provides infrastructure, but domains make their own data decisions.",
-      },
-    ],
   },
+  knowledgeCheck: [
+    {
+      question: "A company stores 10 years of raw clickstream data in BigQuery and wants to add a new attribution model retroactively. Which architecture makes this straightforward without touching source systems?",
+      options: [
+        "ETL — the transformation layer can be repointed at historical source exports",
+        "ELT — raw data is already in the warehouse; write a new dbt model and run it against preserved raw data",
+        "Streaming ETL — real-time pipelines can backfill historical data automatically",
+        "Neither — retroactive attribution always requires re-extraction from source systems",
+      ],
+      correctIndex: 1,
+      explanation: "ELT preserves raw data in the warehouse unchanged. Adding new transformation logic (a new dbt model) against existing raw data is a core ELT advantage — no re-extraction from source systems is needed. ETL pipelines typically discard raw data after transformation, making retroactive changes much harder.",
+    },
+    {
+      question: "In dbt, you have a 1-billion-row fact table where only new rows are appended daily and historical rows are never updated. Which materialization type is most appropriate?",
+      options: [
+        "view — ensures freshest data on every query",
+        "ephemeral — avoids materializing the large table entirely",
+        "incremental — processes only new rows each run using a timestamp filter",
+        "table — rebuilds the full billion rows on every dbt run for accuracy",
+      ],
+      correctIndex: 2,
+      explanation: "Incremental materialization is designed for exactly this use case: append-only data where history is immutable. By filtering for rows newer than the last run timestamp, dbt processes only the new rows, reducing runtime from hours to minutes and cutting warehouse costs dramatically. A full table rebuild would be expensive and unnecessary.",
+    },
+    {
+      question: "Which of the following correctly describes the role of each component in the modern data stack?",
+      options: [
+        "dbt extracts data from sources, Snowflake transforms it, Fivetran loads it into dashboards",
+        "Fivetran/Airbyte handle Extract+Load → Snowflake/BigQuery stores and computes → dbt transforms → Looker/Tableau visualizes",
+        "Airflow replaces dbt for transformation, while Fivetran handles both extraction and visualization",
+        "Snowflake handles all four layers: extraction, loading, transformation, and visualization",
+      ],
+      correctIndex: 1,
+      explanation: "The modern data stack has clear separation of concerns: ingestion tools (Fivetran, Airbyte) handle Extract and Load; the cloud warehouse (Snowflake, BigQuery, Redshift) provides storage and compute; dbt manages SQL-based transformation, lineage, and data quality tests; and BI tools (Looker, Tableau, Metabase) handle visualization and reporting. Each layer is independently maintainable and replaceable.",
+    },
+  ],
+},
 
   "sd-p3": {
-    durationLabel: "22 min",
-    outcomes: [
-      "Explain Kafka's log-based architecture and why it differs from traditional message queues",
-      "Compare Spark Structured Streaming and Flink on latency, state management, and use cases",
-      "Design a streaming pipeline using Kafka as the backbone with an appropriate processing engine",
+  durationLabel: "22 min",
+  outcomes: [
+    "Explain Kafka's log-based architecture and why it differs from traditional message queues",
+    "Compare Spark Structured Streaming with Flink for stream processing workloads",
+    "Design a pub/sub event pipeline for a real-time analytics use case",
+  ],
+  learnMarkdown: `## Traditional Message Queues
+
+Before Kafka, teams reached for message brokers like **RabbitMQ** or cloud-managed queues like **Amazon SQS**. These systems follow a classic point-to-point or pub/sub model where the broker holds a message until a consumer picks it up — and then the message is gone.
+
+Key traits of traditional queues:
+- **Message deletion after consumption**: once a consumer acknowledges a message, it is removed from the queue. No other service can read it.
+- **Push-based delivery**: the broker pushes messages to consumers, which can overwhelm slow consumers unless prefetch limits are tuned carefully.
+- **Ideal for task queues**: sending an email, resizing an image, or triggering a one-off job. Each unit of work needs exactly one worker.
+- **Limited replay**: if a consumer crashed and lost messages, you cannot re-read them. They are gone.
+
+This works well for task-oriented workloads. It breaks down the moment multiple independent services need to consume the same event stream — for example, a payments event that must be read by fraud detection, analytics, and audit logging simultaneously.
+
+## Kafka's Log-Based Architecture
+
+Apache Kafka reimagines messaging around a durable, ordered, **append-only log**. Instead of deleting messages after consumption, Kafka retains them for a configurable period (hours, days, or indefinitely by size).
+
+Key architectural concepts:
+
+- **Topics and Partitions**: a topic is a named stream of records. Each topic is split into one or more partitions — ordered, immutable sequences of records. Partitions enable horizontal scaling: multiple brokers can serve different partitions of the same topic.
+- **Offsets**: every record in a partition has a sequential integer called an offset. Consumers track their own offset, committing it to Kafka (or managing it themselves) after processing.
+- **Consumer Groups**: a group of consumers that collectively read a topic. Kafka ensures each partition is consumed by exactly one member of the group — enabling load distribution. Critically, multiple *different* consumer groups can read the same partitions independently, each maintaining its own offset.
+- **Retention**: records are kept on disk for a configured retention period regardless of whether they have been consumed. This enables replay.
+- **Producers and Consumers are decoupled**: producers write to Kafka without knowing who (or how many services) will read. Consumers read at their own pace.
+
+Why Kafka wins for analytics:
+1. **Replay capability** — reprocess historical events after deploying a bug fix or a new model.
+2. **Multiple consumers** — fraud, analytics, and audit all read the same topic independently.
+3. **High throughput** — Kafka handles millions of records per second through sequential disk writes and zero-copy network transfers.
+4. **Decoupling** — producers and consumers evolve independently; no tight coupling through a shared queue.
+
+## Spark Structured Streaming
+
+Spark Structured Streaming extends the familiar DataFrame API to unbounded data streams. Under the hood it uses a **micro-batch** execution model: Spark collects records for a short interval (e.g., 100 ms to a few seconds), then runs a mini-batch job.
+
+Strengths:
+- **Exactly-once semantics** through checkpointing to durable storage (HDFS, S3).
+- **Full Spark ecosystem integration** — join a stream against a static Delta Lake table, run MLlib models inline, write results to any Spark sink.
+- **Familiar API** for teams already using Spark for batch ETL.
+
+Limitations:
+- Inherent micro-batch latency: end-to-end latency is at minimum one trigger interval.
+- Less suited to true event-by-event processing at sub-100 ms requirements.
+
+## Apache Flink
+
+Apache Flink is a **true streaming engine**: it processes records one at a time as they arrive, not in micro-batches.
+
+Strengths:
+- **Native event time and watermarks**: Flink tracks the progression of event time (the timestamp embedded in the event itself) and uses watermarks to declare "we don't expect any more events older than T." This handles late and out-of-order data elegantly.
+- **Low latency**: end-to-end latency of single-digit to tens of milliseconds is achievable.
+- **Stateful computations**: Flink maintains keyed state (e.g., running totals per user) with exactly-once guarantees via distributed snapshots (Chandy-Lamport).
+
+When to choose Flink: sub-100 ms latency requirements, complex event-time windows, or workloads where per-event state updates are the norm.
+
+## Windowing Concepts
+
+Both systems support windowing — grouping an unbounded stream into finite chunks for aggregation:
+
+- **Tumbling window**: fixed-size, non-overlapping. Every 5 minutes, compute the count. Each event belongs to exactly one window.
+- **Sliding window**: fixed-size but overlapping. A 10-minute window that advances every 1 minute. One event can appear in multiple windows.
+- **Session window**: closes after a gap of inactivity. Useful for grouping user actions within a browsing session without a fixed duration.
+
+## Interview-Ready Summary
+
+- Traditional queues (RabbitMQ, SQS) delete messages after consumption; Kafka retains them — enabling replay and multiple independent consumers.
+- Kafka consumers track their own **offset**; committing offset *before* processing creates at-most-once delivery (messages lost on crash).
+- **Consumer groups** distribute partitions across workers; separate groups read the same topic independently.
+- Spark Structured Streaming uses micro-batches — great for Spark-familiar teams needing exactly-once with complex transformations.
+- Flink processes event-by-event with native watermark support — preferred for sub-100 ms latency and complex event-time logic.
+- Windowing strategies (tumbling, sliding, session) determine how streaming aggregations are scoped over time.
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Offset Management and Consumer Group Mechanics
+
+### Offset Commit Semantics
+
+The most common streaming interview trap is offset commit ordering. Kafka consumers control when they mark a message as "processed" by committing its offset. There are three delivery guarantees:
+
+**At-most-once**: commit the offset *before* processing. If the consumer crashes mid-processing, the offset is already committed — the message will not be re-delivered. Data loss is possible.
+
+**At-least-once**: commit the offset *after* processing and persisting the result. If the consumer crashes after processing but before committing, Kafka re-delivers the message. Duplicates are possible; data loss is not.
+
+**Exactly-once**: requires an idempotent consumer *and* transactional writes, or Kafka's own transactions API (Kafka 0.11+). The consumer and sink write atomically so re-delivery produces the same result.
+
+For analytics pipelines, at-least-once with idempotent sinks (e.g., upsert by event ID) is the practical sweet spot. Pure exactly-once via Kafka transactions adds latency.
+
+### Consumer Group Rebalancing
+
+When a consumer in a group joins or leaves, Kafka triggers a **rebalance** — partitions are redistributed across the group's active members. During a rebalance, consumption pauses. Long rebalances are a common production pain point.
+
+Mitigation strategies:
+- Use **static group membership** (\`group.instance.id\`) to avoid rebalances when consumers restart quickly.
+- Tune \`session.timeout.ms\` and \`heartbeat.interval.ms\` so Kafka doesn't prematurely evict slow consumers.
+- Use **incremental cooperative rebalancing** (introduced in Kafka 2.4) to only reassign partitions that changed, rather than stopping all consumers.
+
+### Flink vs. Spark: The Interviewer's Probe
+
+Interviewers often ask: "Your Spark Structured Streaming job is reading from Kafka — what is the minimum achievable latency?"
+
+The honest answer: the minimum latency equals one trigger interval (commonly 100 ms–1 s in production). Even in "continuous processing" mode (Spark 2.3+ experimental), overhead remains. Flink's pipeline model can deliver single-digit millisecond latency because records flow through operators immediately.
+
+The counterpoint: Spark wins on ecosystem breadth. If your pipeline needs a broadcast join against a 500 GB static table, MLlib inference, or Delta Lake writes, Spark's unified runtime is hard to beat. Flink's Table API is catching up, but Spark's SQL optimizer and connector ecosystem remain more mature for batch-heavy organizations.
+
+### Watermark Design in Flink
+
+A watermark at time T tells Flink: "all events with timestamp ≤ T have arrived." Windows whose end time is ≤ T are then safe to close and emit. Setting the watermark slack too tight discards late events; too loose delays output. In practice, a watermark lag of 10–30 seconds handles most out-of-order networks while keeping latency reasonable.
+`,
+  tryGuidance: "Work through the interview simulation below. In the code stage, carefully read the Kafka consumer loop and identify which line creates a reliability bug. In the scenario stages, think about Kafka's log semantics, consumer group mechanics, and the latency trade-offs between Spark and Flink before committing to an answer.",
+  interviewGraph: {
+    initialStageId: "intro",
+    artifactDimensions: [
+      { label: "Kafka Architecture", recoveryStageId: "kafka_recovery" },
+      { label: "Stream Processing Choice", recoveryStageId: "stream_recovery" },
     ],
-    learnMarkdown: `## Kafka, Spark, and Flink: The Streaming Trinity
+    stages: {
+      intro: {
+        id: "intro",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Kafka vs Traditional Queue",
+        prompt: "Your team needs five independent microservices to each consume every event from a user-activity stream. Which system is the better fit — and why?",
+        choices: [
+          { id: "a", label: "RabbitMQ with five queues, one per service", description: "Create a separate queue bound to the same exchange for each consumer." },
+          { id: "b", label: "Kafka topic with five consumer groups", description: "Each service has its own consumer group and reads the full topic independently." },
+          { id: "c", label: "Amazon SQS FIFO queue shared among all services", description: "All five services compete on one queue; each message is processed once." },
+          { id: "d", label: "Kafka topic with one consumer group of five members", description: "All five services join the same group; partitions are divided among them." },
+        ],
+        branches: { a: "kafka_recovery", b: "offset_concept", c: "kafka_recovery", d: "kafka_recovery" },
+        rationale: "Kafka's consumer group model lets multiple *independent* groups each read the full topic. RabbitMQ fan-out with five queues also works but requires manual topology management and loses replay. A single SQS queue or a single Kafka consumer group would split messages among workers, so each service would only see a fraction of events.",
+      },
+      kafka_recovery: {
+        id: "kafka_recovery",
+        type: "scenario_choice",
+        badge: "Recovery · Kafka Architecture",
+        title: "Recovery · Kafka Consumer Groups",
+        prompt: "Let's revisit the core concept. In Kafka, what does a consumer group offset represent, and what happens when two different groups read the same partition?",
+        choices: [
+          { id: "a", label: "Groups share one offset; the faster group blocks the slower one", description: "Only one group can own a partition offset at a time." },
+          { id: "b", label: "Each group maintains its own offset; both can read independently", description: "Kafka stores per-group offsets so groups never interfere." },
+          { id: "c", label: "Partitions are copied per group, doubling storage", description: "Kafka replicates partition data for each consumer group." },
+        ],
+        branches: { a: "offset_concept", b: "offset_concept", c: "offset_concept" },
+        rationale: "Each consumer group stores its own committed offset for every partition. Groups are fully independent — a slow analytics group does not block a fast alerting group reading the same partition.",
+      },
+      offset_concept: {
+        id: "offset_concept",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Offset Semantics",
+        prompt: "A colleague says: 'Our Kafka consumer commits the offset right when a message arrives, before any processing, to keep the committed position up-to-date.' What delivery guarantee does this create?",
+        choices: [
+          { id: "a", label: "Exactly-once — the offset is committed atomically with processing", description: "Atomic offset commit prevents duplicates and loss." },
+          { id: "b", label: "At-most-once — a crash after commit but before processing loses the message", description: "Committing first means a crash during processing will not re-deliver." },
+          { id: "c", label: "At-least-once — the message will always be reprocessed on failure", description: "Early commit ensures the consumer always retries." },
+          { id: "d", label: "It doesn't matter; Kafka guarantees delivery regardless of commit order", description: "Kafka's replication handles all failure scenarios." },
+        ],
+        branches: { a: "bug_stage", b: "bug_stage", c: "bug_stage", d: "bug_stage" },
+        rationale: "Committing the offset before processing creates at-most-once delivery. If the process crashes after commit but before saving the result, Kafka considers the message processed and will not re-deliver it — the message is silently lost. At-least-once requires committing only after the result is successfully persisted.",
+      },
+      bug_stage: {
+        id: "bug_stage",
+        type: "click_target",
+        badge: "Stage 3",
+        title: "Stage 3 · Spot the Bug",
+        prompt: "This Kafka consumer loop has a reliability bug that causes message loss under failures. Click the line that is the root cause.",
+        code_snippet: `from kafka import KafkaConsumer
 
-Modern streaming architectures almost universally combine these three technologies. Understanding each layer's role—and why they're separated—is essential for system design interviews.
+consumer = KafkaConsumer(
+    'user_events',
+    group_id='analytics_group',
+    enable_auto_commit=False,
+    bootstrap_servers=['kafka:9092'],
+)
 
-### Kafka: The Durable Event Log
-
-Kafka is commonly described as a message queue, but this framing is misleading. A traditional queue (RabbitMQ, SQS) **deletes messages after consumption**. Kafka is a **distributed commit log**—messages are retained for hours or days regardless of whether they've been read.
-
-**Why this matters:**
-- Multiple consumer groups can read the same topic independently at their own pace
-- A broken consumer can restart from its last committed offset without data loss
-- Historical data can be replayed for backfills, new consumers, or debugging
-- Kafka is the "source of truth" for the event stream
-
-**Key concepts:**
-- **Topic**: a named stream of records (e.g., \`user-clicks\`, \`order-events\`)
-- **Partition**: the unit of parallelism. A topic with 12 partitions can be consumed by up to 12 consumers in parallel
-- **Consumer group**: a set of consumers sharing a group ID. Each partition is assigned to exactly one consumer in the group
-- **Offset**: each message has a sequential integer offset within its partition. Consumers commit offsets to track progress
-- **Exactly-once**: achieved via idempotent producers (dedup by sequence number) + transactional APIs
-
-**Retention**: configure per-topic (e.g., \`retention.ms=604800000\` for 7 days) or by size.
-
-### Spark Structured Streaming
-
-Spark Structured Streaming uses a **micro-batch** model: internally, it runs many small batch jobs, typically every 100–500ms. The DataFrame/Dataset API is identical to batch Spark, so teams with Spark expertise can adopt it quickly.
-
-**Strengths:**
-- Familiar API for Spark shops
-- Excellent integration with Delta Lake, Hive, S3
-- Good for medium-latency use cases (seconds to minutes)
-- Stateful aggregations with checkpointing to S3/HDFS
-
-**Limitations:**
-- Micro-batch latency floor ~100ms even with trigger(continuous=True) experimental mode
-- State store performance degrades at very large state sizes
-- Less sophisticated watermarking than Flink
-
-### Apache Flink
-
-Flink is a **true event-time streaming engine**—it processes each event as it arrives without batching. End-to-end latency can be under 10ms.
-
-**Strengths:**
-- Lowest latency in the ecosystem
-- Rich stateful operators (keyed state, operator state, broadcast state)
-- Sophisticated **watermark** handling for out-of-order and late events
-- Session windows, tumbling windows, sliding windows with event-time semantics
-- Exactly-once end-to-end with Kafka source + stateful processing + transactional sinks
-
-**When to choose Flink over Spark Streaming:**
-- Latency < 100ms required
-- Complex stateful logic (e.g., user session tracking across irregular events)
-- Late data must be handled precisely (not approximated)
-- You can justify the steeper learning curve
-
-### The Architecture: Kafka as Backbone
-
-\`\`\`
-Source Systems
-     ↓
- Kafka Topics  ← durable, replayable, decoupled
-     ↓
-Flink / Spark  ← stateful processing, windowing
-     ↓
-Kafka Topics (results) or Direct Sink
-     ↓
-Redis / Postgres / Warehouse / Dashboard
-\`\`\`
-
-Kafka decouples producers from consumers. Even if the Flink cluster goes down for 2 hours, messages accumulate in Kafka—no data is lost. When Flink restarts, it resumes from its last checkpoint offset.
-
-### Interview Positioning
-
-When asked "why use Kafka instead of a traditional queue?":
-1. **Replayability** — you can re-read from offset 0
-2. **Multiple independent consumers** — analytics, fraud detection, and notification services all consume the same topic
-3. **Retention** — messages exist beyond consumption
-4. **High throughput** — millions of messages/second with horizontal scaling`,
-    video: null,
-    videoFallbackMarkdown: `## Deep Dive: Flink Windowing
-
-### Window Types
-
-- **Tumbling**: fixed, non-overlapping windows. Count events per 5-minute window.
-- **Sliding**: overlapping. A 10-min window sliding every 2 min gives 5× more windows, each overlapping.
-- **Session**: windows that close after a gap of inactivity (e.g., close a user session after 30 min of no clicks).
-
-### State Backends
-
-Flink stores window state in a **state backend**:
-- \`HashMapStateBackend\`: in-memory, fastest, lost on restart without checkpointing
-- \`EmbeddedRocksDBStateBackend\`: persisted to local RocksDB, checkpointed to S3. Supports state larger than RAM.
-
-For production, always use RocksDB + S3 checkpointing with exactly-once semantics.`,
-    tryGuidance: "Explore the streaming pipeline diagram to understand how Kafka, Spark, and Flink fit together.",
-    interviewGraph: {
-      initialStageId: "sd_p3_s1",
-      artifactDimensions: [
-        { label: "Kafka Architecture", recoveryStageId: "sd_p3_r1" },
-        { label: "Engine Selection", recoveryStageId: "sd_p3_r2" },
-      ],
-      stages: {
-        sd_p3_s1: {
-          id: "sd_p3_s1",
-          type: "scenario_choice",
-          badge: "Stage 1",
-          title: "Stage 1 · Kafka vs Queue",
-          prompt: "A payment processing company currently uses RabbitMQ to route transaction events to a fraud detection service. They want to add a second consumer: a real-time analytics dashboard. The RabbitMQ queue deletes messages after the fraud service consumes them. How do you solve this?",
-          choices: [
-            { id: "a", label: "Migrate to Kafka", description: "Kafka retains messages regardless of consumption. Both fraud detection and analytics can consume the same topic independently via separate consumer groups." },
-            { id: "b", label: "Add a second RabbitMQ queue", description: "Fan out transactions to two separate queues—one for fraud, one for analytics—using RabbitMQ exchange routing." },
-            { id: "c", label: "Have fraud service re-publish to analytics queue", description: "Fraud service consumes from RabbitMQ, then publishes a copy to a second queue for analytics." },
-          ],
-          branches: { a: "sd_p3_s2", b: "sd_p3_r1", c: "sd_p3_r1" },
-          rationale: "Kafka consumer groups are the clean solution: each service maintains its own offset and reads at its own pace. Duplicating queues or chaining consumers couples services and creates operational complexity.",
+for message in consumer:
+    consumer.commit()                       # -- ds-target:early_commit
+    result = process_event(message.value)   # -- ds-target:late_process
+    save_to_db(result)                      # -- ds-target:save_step`,
+        validationCopy: {
+          early_commit: "Correct. Committing before processing creates at-most-once delivery. If process_event() or save_to_db() raises an exception, the offset is already advanced — Kafka will not re-deliver this message, and the event is permanently lost.",
+          late_process: "Not quite. process_event() is where the work happens, but the bug is in what comes before it. Something earlier has already created the reliability problem by the time this line runs.",
+          save_step: "Close — save_to_db() is the last step that should precede the commit, but the root cause is the commit happening too early, not the position of save_to_db(). Click the line that commits prematurely.",
         },
-        sd_p3_r1: {
-          id: "sd_p3_r1",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Consumer Groups",
-          prompt: "In Kafka, a consumer group allows multiple services to read the same topic independently. Each group tracks its own offsets. If the analytics service is down for 2 hours, what happens to its messages?",
-          choices: [
-            { id: "a", label: "Messages are retained in Kafka; analytics catches up when it restarts", description: "Kafka's retention period (e.g., 7 days) means messages accumulate. The consumer resumes from its last committed offset." },
-            { id: "b", label: "Messages are lost after the retention window expires", description: "Messages older than the retention period are deleted, but recent messages within the retention window are safe." },
-          ],
-          branches: { a: "sd_p3_s2", b: "sd_p3_s2" },
-          rationale: "Both are partially correct: messages within the retention window are safe. The key insight is that Kafka's log retention—not consumption—determines data availability. A 2-hour outage within a 7-day retention window results in zero data loss.",
+        branches: {
+          early_commit: "commit_fix",
+          late_process: "commit_fix",
+          save_step: "commit_fix",
         },
-        sd_p3_s2: {
-          id: "sd_p3_s2",
-          type: "scenario_choice",
-          badge: "Stage 2",
-          title: "Stage 2 · Engine Selection",
-          prompt: "The fraud detection team needs to detect suspicious patterns across a user's last 10 transactions within a 5-minute sliding window. Latency must be under 50ms. The analytics team needs hourly aggregates with 30-second freshness. Which engine fits each use case?",
-          choices: [
-            { id: "a", label: "Flink for fraud (sub-50ms, stateful windows); Spark Streaming for analytics (hourly aggs, 30s freshness)", description: "Flink's true streaming handles sub-50ms with sophisticated stateful windows. Spark's micro-batch is fine for 30-second freshness." },
-            { id: "b", label: "Spark Streaming for both — same API, simpler ops", description: "Use Spark Structured Streaming for both. The micro-batch model can handle both use cases." },
-            { id: "c", label: "Flink for both — always choose the lower latency tool", description: "Flink handles both requirements; no need for two engines." },
-          ],
-          branches: { a: "sd_p3_t", b: "sd_p3_r2", c: "sd_p3_r2" },
-          rationale: "Match tools to requirements. Fraud detection's 50ms SLA and complex stateful windows justify Flink's complexity. Analytics at 30-second freshness fits Spark's micro-batch perfectly—no need for Flink's operational overhead.",
-        },
-        sd_p3_r2: {
-          id: "sd_p3_r2",
-          type: "scenario_choice",
-          badge: "Recovery 2",
-          title: "Recovery 2 · Flink vs Spark Tradeoff",
-          prompt: "Flink's true event-time streaming achieves sub-10ms latency but requires managing RocksDB state backends, watermark strategies, and more complex operators. When is this complexity justified?",
-          choices: [
-            { id: "a", label: "When latency SLA < ~100ms or state logic is highly complex", description: "Flink is warranted for genuine low-latency requirements or sophisticated stateful patterns that Spark's micro-batch can't handle cleanly." },
-            { id: "b", label: "Always use Flink for any streaming workload", description: "Flink is strictly better than Spark Streaming, so always choose it." },
-          ],
-          branches: { a: "sd_p3_t", b: "sd_p3_t" },
-          rationale: "Operational complexity has a cost. Spark Streaming's familiarity and simpler state model make it the right default for latency > 100ms. Reserve Flink for when you genuinely need its capabilities.",
-        },
-        sd_p3_t: {
-          id: "sd_p3_t",
-          type: "scenario_choice",
-          badge: "Complete",
-          title: "Complete · Streaming Architecture",
-          prompt: "In a canonical streaming architecture, what role does Kafka play relative to the processing engine (Flink/Spark)?",
-          choices: [
-            { id: "a", label: "Kafka is the durable backbone; processing engines are stateful compute layers", description: "Kafka persists and distributes events; Flink/Spark process, aggregate, and enrich them. They're complementary, not competing." },
-          ],
-          branches: { a: "sd_p3_t" },
-          terminal: true,
-          rationale: "The separation of concerns is key: Kafka handles durable storage, replay, and fan-out. Processing engines focus on stateful computation. This decoupling means you can swap processing engines without changing the event backbone.",
-        },
+      },
+      commit_fix: {
+        id: "commit_fix",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Fixing the Commit Order",
+        prompt: "How should the consumer loop be fixed to achieve at-least-once delivery?",
+        choices: [
+          { id: "a", label: "Move consumer.commit() to after save_to_db()", description: "Commit only after the result is durably stored." },
+          { id: "b", label: "Enable enable_auto_commit=True and remove the manual commit", description: "Auto-commit commits on a time interval regardless of processing state." },
+          { id: "c", label: "Wrap consumer.commit() in a try/except block", description: "Catching commit errors doesn't fix the ordering problem." },
+        ],
+        branches: { a: "spark_vs_flink", b: "stream_recovery", c: "stream_recovery" },
+        rationale: "Moving the commit after save_to_db() ensures the offset advances only when the result is durable. If the consumer crashes, Kafka re-delivers from the last committed offset — at-least-once. Auto-commit commits on a wall-clock interval, which is still before processing completes if the interval fires mid-loop.",
+      },
+      stream_recovery: {
+        id: "stream_recovery",
+        type: "scenario_choice",
+        badge: "Recovery · Stream Processing",
+        title: "Recovery · Delivery Guarantees",
+        prompt: "To ensure a Kafka consumer never loses a message (at-least-once), when should the offset be committed?",
+        choices: [
+          { id: "a", label: "Immediately when the message is received, before any work", description: "Earliest possible commit point." },
+          { id: "b", label: "After the result has been successfully written to the sink", description: "Commit only after durable persistence." },
+          { id: "c", label: "On a fixed timer every 5 seconds regardless of processing", description: "Time-based auto-commit." },
+        ],
+        branches: { a: "spark_vs_flink", b: "spark_vs_flink", c: "spark_vs_flink" },
+        rationale: "At-least-once delivery requires committing after the result is durably written. Any earlier commit risks losing the message if a crash occurs before the write completes.",
+      },
+      spark_vs_flink: {
+        id: "spark_vs_flink",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Spark Streaming vs Flink",
+        prompt: "A fraud detection system requires end-to-end latency under 50 ms from event ingestion to alert generation. Your current stack uses Spark for batch ETL. Which stream processor should you choose?",
+        choices: [
+          { id: "a", label: "Spark Structured Streaming — the team already knows Spark", description: "Leverage existing expertise; micro-batch latency is acceptable." },
+          { id: "b", label: "Apache Flink — true per-event streaming achieves sub-50 ms latency", description: "Flink's pipeline model avoids micro-batch overhead." },
+          { id: "c", label: "Either — Spark continuous processing mode removes latency differences", description: "Spark's experimental continuous mode matches Flink." },
+          { id: "d", label: "Neither — use a dedicated CEP engine like Esper", description: "Complex event processing engines are better for fraud detection." },
+        ],
+        branches: { a: "watermark_stage", b: "watermark_stage", c: "watermark_stage", d: "watermark_stage" },
+        rationale: "For sub-50 ms latency, Flink is the correct answer. Spark Structured Streaming's micro-batch model has an inherent latency floor equal to the trigger interval (typically 100 ms–1 s in production). Flink processes events individually as they arrive. Spark's continuous processing mode is still experimental and carries caveats. CEP engines are specialized but rarely the expected answer in a data engineering interview.",
+      },
+      watermark_stage: {
+        id: "watermark_stage",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · Out-of-Order Events",
+        prompt: "Mobile app events arrive at your Kafka topic up to 30 seconds late due to network delays. You are aggregating event counts in 1-minute windows. What concept allows your stream processor to handle these late events correctly?",
+        choices: [
+          { id: "a", label: "Increasing the Kafka retention period to 24 hours", description: "Longer retention keeps messages available but doesn't address window correctness." },
+          { id: "b", label: "Watermarks with a 30-second allowed lateness", description: "A watermark tracks event-time progress and holds windows open for late arrivals." },
+          { id: "c", label: "Switching from event time to processing time", description: "Processing time ignores event timestamps, so late events land in the wrong window." },
+          { id: "d", label: "Using a tumbling window of 90 seconds instead of 60 seconds", description: "A larger window reduces window accuracy without solving late-arrival semantics." },
+        ],
+        branches: { a: "backpressure_stage", b: "backpressure_stage", c: "backpressure_stage", d: "backpressure_stage" },
+        rationale: "Watermarks define how far behind event time the stream processor is willing to wait. A 30-second watermark lag means the processor holds a window open until the watermark advances past the window's end time, allowing events up to 30 seconds late to be included. Switching to processing time would assign late events to a window based on when they arrived, not when they occurred — producing incorrect counts.",
+      },
+      backpressure_stage: {
+        id: "backpressure_stage",
+        type: "scenario_choice",
+        badge: "Stage 7",
+        title: "Stage 7 · Backpressure and Queue Full",
+        prompt: "Your monitoring shows that Kafka producer throughput has dropped to near zero and producers are reporting timeouts. The consumer lag metric is climbing. What is the most likely root cause?",
+        choices: [
+          { id: "a", label: "Consumers are processing faster than producers are publishing", description: "Consumer lag would decrease in this scenario, not increase." },
+          { id: "b", label: "Consumers are slow or stuck, causing partition lag to grow; producers eventually block waiting for broker acks", description: "Consumer lag accumulates when consumption can't keep up with production." },
+          { id: "c", label: "Kafka's log compaction is deleting messages before consumers read them", description: "Compaction removes superseded keys but doesn't block producers." },
+          { id: "d", label: "Network partition between producers and consumers only", description: "A pure network partition would affect both sides equally." },
+        ],
+        branches: { a: "terminal", b: "terminal", c: "terminal", d: "terminal" },
+        rationale: "Rising consumer lag means consumers cannot keep up with the incoming message rate. This exhausts available disk space on the broker (if retention is bounded by size) or causes producers to wait for acknowledgements as the broker becomes resource-constrained. The correct remediation is to scale consumers (add partitions + consumer instances) or reduce processing time per message.",
+      },
+      terminal: {
+        id: "terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Simulation Complete · Kafka & Stream Processing",
+        prompt: "You have worked through Kafka's log architecture, offset commit semantics, Spark vs Flink trade-offs, watermark handling, and backpressure. Which real-world scenario best matches Kafka's replay capability as its primary differentiator over SQS?",
+        terminal: true,
+        choices: [
+          { id: "a", label: "Reprocessing six months of clickstream events after fixing a sessionization bug", description: "Kafka's configurable retention lets you re-read historical partitions." },
+          { id: "b", label: "Sending a password reset email exactly once to a user", description: "Exactly-once task dispatch — a classic traditional queue use case." },
+          { id: "c", label: "Distributing a render job across a worker pool", description: "Load-balanced task queue — well suited to SQS or RabbitMQ." },
+        ],
+        branches: { a: "terminal", b: "terminal", c: "terminal" },
+        rationale: "Kafka's log retention and offset replay shine when you need to reprocess historical data — for example, re-running an analytics job after fixing a bug. SQS and RabbitMQ delete messages on acknowledgement, making replay impossible. Task queues (password reset, render jobs) are better served by traditional queues where each message needs exactly one worker.",
       },
     },
-    knowledgeCheck: [
-      {
-        question: "What is the fundamental architectural difference between Kafka and a traditional message queue like RabbitMQ?",
-        options: ["Kafka is faster and supports more connections", "Kafka retains messages after consumption (log-based); queues delete messages after delivery", "Kafka supports exactly-once semantics; queues do not"],
-        correctIndex: 1,
-        explanation: "Kafka's log retention is what enables replayability, multiple independent consumers, and crash recovery. Traditional queues are designed to delete messages once delivered—they're task dispatchers, not event logs.",
-      },
-      {
-        question: "What processing model does Spark Structured Streaming use internally?",
-        options: ["True event-time streaming (process each event individually)", "Micro-batch (runs small batch jobs at ~100ms intervals)", "Pull-based polling from Kafka at configurable intervals"],
-        correctIndex: 1,
-        explanation: "Spark Structured Streaming is a micro-batch engine. It achieves low latency by running very frequent small batch jobs. This gives it a latency floor of ~100ms, which is fine for most use cases but insufficient for sub-50ms requirements.",
-      },
-      {
-        question: "A Flink job processing user session events needs to handle late-arriving events (events that arrive up to 2 minutes after their event timestamp). What mechanism handles this?",
-        options: ["Consumer group offset management", "Watermarks with a 2-minute allowed lateness", "RocksDB state backend with TTL"],
-        correctIndex: 1,
-        explanation: "Watermarks define Flink's notion of event-time progress. A watermark W(t) means 'all events with timestamp ≤ t have arrived.' Configuring a 2-minute watermark delay tells Flink to wait 2 minutes past a window's end before closing it, accommodating late-arriving events.",
-      },
-    ],
   },
+  knowledgeCheck: [
+    {
+      question: "What is the fundamental architectural difference between a traditional message queue (e.g., SQS) and Apache Kafka?",
+      options: [
+        "Traditional queues support higher throughput than Kafka",
+        "Traditional queues delete messages after consumption; Kafka retains messages in an append-only log for a configurable period",
+        "Kafka only supports at-most-once delivery; traditional queues support exactly-once",
+        "Traditional queues use partitions; Kafka uses a single ordered log per topic",
+      ],
+      correctIndex: 1,
+      explanation: "Traditional message queues are destructive: a message is removed once a consumer acknowledges it. Kafka writes to an append-only, durable log and retains messages for a configured retention period regardless of consumption. This enables replay and multiple independent consumer groups — capabilities traditional queues cannot provide without copying messages.",
+    },
+    {
+      question: "A Kafka consumer calls consumer.commit() immediately after receiving a message and before calling process_event(). What delivery guarantee does this produce?",
+      options: [
+        "Exactly-once — the commit is atomic with processing",
+        "At-least-once — Kafka will re-deliver the message on any failure",
+        "At-most-once — if the consumer crashes during processing, the message is lost because the offset is already committed",
+        "No guarantee — manual commits are ignored by Kafka",
+      ],
+      correctIndex: 2,
+      explanation: "Committing the offset before processing creates at-most-once delivery. Once the offset is committed, Kafka will not re-deliver that message to the same consumer group. If the consumer crashes between the commit and completing the processing, the message is silently lost. At-least-once delivery requires committing only after results are successfully persisted to the sink.",
+    },
+    {
+      question: "You are building a stream aggregation that counts events per user in 5-minute windows. Events can arrive up to 20 seconds late due to mobile network delays. Which windowing approach correctly handles late arrivals?",
+      options: [
+        "Tumbling windows based on processing time — assign events to windows as they arrive at the processor",
+        "Session windows with a 5-minute gap — close the window after 5 minutes of inactivity per user",
+        "Tumbling windows based on event time with a 20-second watermark — hold windows open until the watermark advances past their close time",
+        "Sliding windows with a 10-second slide interval — overlap ensures late events are counted",
+      ],
+      correctIndex: 2,
+      explanation: "Event-time tumbling windows with a watermark matching the maximum expected lateness (20 seconds) is the correct approach. The watermark tracks how far behind event time the processor is willing to wait. Windows are held open until the watermark passes their end time, allowing late events within the watermark bound to be included. Processing-time windows ignore event timestamps entirely, producing incorrect counts for late-arriving mobile events.",
+    },
+  ],
+},
 
-  "sd-p4": {
-    durationLabel: "20 min",
-    outcomes: [
-      "Design a star schema with appropriate fact and dimension tables for a given analytics use case",
-      "Explain SCD Type 1, 2, and 3 and choose the right type based on history requirements",
-      "Select appropriate partitioning and clustering strategies for a cloud warehouse",
-    ],
-    learnMarkdown: `## Data Warehouse Design Patterns
+  const mod = {
+"sd-p4": {
+  durationLabel: "20 min",
+  outcomes: [
+    "Design a star schema with appropriate fact and dimension tables for a given analytics use case",
+    "Explain SCD Type 1, 2, and 3 and choose the right type for a given requirement",
+    "Distinguish star schema from snowflake schema and explain the trade-offs",
+  ],
+  learnMarkdown: `## OLTP vs OLAP: Two Different Worlds
 
-Warehouse design decisions made early persist for years. Star schemas, SCD types, and partition strategies affect query performance, storage costs, and analytical correctness for the lifetime of the system.
+Relational databases originally optimized for **transactional workloads** (OLTP — Online Transaction Processing): many small reads and writes, fully normalized to reduce redundancy, strict ACID guarantees. An e-commerce site recording orders uses OLTP. But analytics teams need something different — they scan millions of rows to answer questions like *"What was total revenue by region last quarter?"* That need drives **OLAP** (Online Analytical Processing) design, where denormalization is a feature, not a flaw.
 
-### Star Schema
+The key insight: normalized schemas require many joins to reassemble data; analytical queries pay that cost millions of times. Denormalizing — accepting some redundancy — trades storage for query speed.
 
-The star schema places a **fact table** at the center, surrounded by **dimension tables**. The fact table stores measurable events (orders, pageviews, transactions) with foreign keys to dimensions. Dimensions store descriptive attributes (customer name, product category, store location).
+## Star Schema: The Workhorse of Data Warehousing
 
-\`\`\`
-        dim_customer
-             |
-dim_product — fct_orders — dim_date
-             |
-          dim_store
-\`\`\`
+A **star schema** has one central **fact table** surrounded by several **dimension tables**. Draw it on a whiteboard and it looks like a star. This is the most common pattern in production data warehouses (Redshift, BigQuery, Snowflake, Databricks).
 
-**Fact table** columns:
-- Foreign keys to all dimension tables
-- Additive measures: \`order_amount\`, \`quantity\`, \`shipping_cost\`
-- Non-additive measures: \`discount_rate\` (average meaningfully only with COUNT)
-- Degenerate dimensions: \`order_id\` (identifying, not a dimension table)
+The mental model: **fact tables record events; dimension tables describe the participants**.
 
-**Dimension table** properties:
-- Wide and flat — denormalized attributes (no joins needed from the dim)
-- Slowly changing — customer addresses, product categories
-- Surrogate keys — integer \`customer_sk\` rather than natural key \`customer_email\`
+A sales fact table records "Customer 42 bought Product 7 on 2024-03-15 for $99.00." The dimension tables answer the who/what/when/where: who is Customer 42? What is Product 7? The fact table stores only foreign keys and measures — it stays narrow and grows fast (billions of rows). Dimension tables stay small and wide (descriptive attributes, maybe millions of rows but rarely billions).
 
-**Why star over snowflake?** Fewer joins = faster queries. Storage cost of denormalization is trivial compared to query compute savings in cloud warehouses.
+## Fact Table Design
 
-### Snowflake Schema
+The most critical design decision is the **grain**: *one row represents exactly one ___*. Defining grain first is mandatory — everything else flows from it.
 
-Normalizes dimension tables into sub-dimensions. A \`dim_product\` might reference \`dim_category\` and \`dim_brand\` tables. This reduces storage redundancy but requires additional joins. Preferred only when dimension data is very large and changes frequently.
+Once grain is set, you add **measures**: numeric values you will aggregate. Good measures are **additive** — you can SUM them across any dimension. Revenue and quantity sold are additive. Profit margin (a ratio) is **non-additive** — summing it across products is meaningless. Ratios, percentages, and averages should be computed at query time from additive components, never stored as measures.
 
-### One Big Table (OBT)
+Also avoid **derived measures** like year-to-date revenue. These are redundant with what the query engine can compute and will drift out of sync.
 
-Fully denormalize everything into a single wide table. Fastest reads (no joins), but:
-- Difficult to update (change a customer's city → update millions of order rows)
-- Storage inefficient for high-cardinality dimensions
-- Often used in specific high-performance dashboards alongside a proper warehouse
+Every fact row holds **foreign keys** to its dimension tables (typically surrogate integer keys, not natural business keys).
 
-### Slowly Changing Dimensions (SCD)
+## Dimension Table Design
 
-Customer data changes over time. How do you handle history?
+Dimensions are wide and descriptive: customer name, address, segment, loyalty tier. They use a **surrogate key** (system-generated integer) as the primary key, distinct from the **natural key** (e.g. customer_email). Why surrogate keys? They insulate the warehouse from source-system key changes and are critical for tracking historical changes.
 
-**SCD Type 1 — Overwrite:**
-Simply update the current row. No history preserved. If a customer moves, their old address is gone. Use when history is irrelevant.
+Dimensions change over time — a customer moves cities, a product gets renamed — and that change management is called **Slowly Changing Dimensions (SCD)**.
 
-**SCD Type 2 — Add a Row (most common):**
-Insert a new row for each change with effective date tracking:
-\`\`\`
-customer_sk | customer_id | city      | effective_from | effective_to | is_current
-1001        | C-42        | New York  | 2022-01-01    | 2023-06-15   | false
-1002        | C-42        | Chicago   | 2023-06-15    | 9999-12-31   | true
-\`\`\`
-Enables **point-in-time queries**: join orders to the dim using the order date between effective_from and effective_to to get the city the customer lived in when they ordered.
+## SCD Type 1: Overwrite
 
-**SCD Type 3 — Add a Column:**
-Add a \`previous_city\` column to the current row. Retains only one version of history. Simple but limited.
+The simplest approach: just update the column in place. History is lost. Use this only when the change is a **correction** (wrong spelling, data entry error) and historical accuracy doesn't matter. Type 1 is appropriate for \`customer_name\` typo fixes where you don't need to know the old name.
 
-### Partition and Cluster Strategy
+## SCD Type 2: Full History (The Right Answer)
 
-**Partitioning** (eliminates full table scans):
-- Partition \`fct_orders\` by \`order_date\` (DATE type, daily or monthly granularity)
-- Queries filtering by date range skip irrelevant partitions entirely
-- BigQuery: \`PARTITION BY DATE(created_at)\`; Snowflake: \`CLUSTER BY (order_date)\`
+Add a **new row** for each change. The new row gets a new surrogate key. Both old and new rows share the same natural key. Track which row is current using:
+- \`is_current BOOLEAN\` flag
+- \`effective_date DATE\` and \`expiry_date DATE\` (NULL or far-future date for current row)
 
-**Clustering** (sorts rows within partitions):
-- Cluster by dimensions frequently in WHERE/JOIN clauses (e.g., \`region\`, \`product_category\`)
-- Reduces bytes scanned within a partition
-- In BigQuery, \`CLUSTER BY\` on up to 4 columns
+Now fact table rows that reference the old surrogate key still correctly reflect the city/segment/tier *at the time of purchase*. This is almost always what business users mean when they ask for historical accuracy.
 
-**Rule of thumb**: partition by the time column almost always; cluster by the most selective filter columns.`,
-    video: null,
-    videoFallbackMarkdown: `## Deep Dive: Point-in-Time Correctness
+Type 2 is the default answer in interviews. State it confidently.
 
-### Why SCD Type 2 Matters for ML
+## SCD Type 3: Previous Column
 
-When training ML models on historical warehouse data, you must join to the dimension value that was correct at the time of the event, not the current value. Using current dimension values is a form of **data leakage**.
+Add a column \`previous_value\` alongside the current value. Stores only one level of history. Rarely practical because it only handles one change and the schema must be altered each time a new "previous" is needed. Mention it to show breadth, but flag its limitations.
 
-Example: predicting customer churn. If a customer was in the "free tier" when they churned but you join to their current "paid tier" status, the model sees incorrect features. SCD Type 2 with effective date filtering solves this.
+## Snowflake Schema: Normalized Dimensions
 
-### The Point-in-Time Join
+A **snowflake schema** normalizes dimension tables further — a product dimension might link to a separate category table, which links to a department table. This reduces storage redundancy but introduces more joins. BI tools (Tableau, Looker) often struggle with deep snowflake schemas and auto-generate slow queries.
+
+**Trade-off summary**: star schema = faster queries, simpler BI, slightly more storage; snowflake = less storage, more normalized, slower and harder to use.
+
+## Interview-Ready Summary
+
+- Always **define grain first** before designing any fact or dimension table
+- Fact tables hold **additive measures and foreign keys** — non-additive ratios belong at query time
+- **SCD Type 2** (new row + surrogate key + effective date range) is the standard for preserving history
+- **SCD Type 1** is only for corrections where history is irrelevant
+- **Star schema** is preferred in most production warehouses; snowflake adds joins for marginal storage savings
+- Surrogate keys in dimension tables decouple the warehouse from upstream key changes and enable SCD Type 2
+`,
+  video: null,
+  videoFallbackMarkdown: `## SCD Type 2 in Depth: Implementation Patterns
+
+When a customer's city changes, SCD Type 2 inserts a new dimension row rather than updating the existing one. Here is the pattern in practice:
 
 \`\`\`sql
-SELECT
-  o.order_id,
-  o.order_amount,
-  c.city,          -- city at time of order
-  c.customer_tier  -- tier at time of order
-FROM fct_orders o
-JOIN dim_customer c
-  ON o.customer_id = c.customer_id
- AND o.order_date BETWEEN c.effective_from AND c.effective_to
+-- Original row (customer moved from Austin to Denver)
+INSERT INTO dim_customer (
+  customer_sk,   -- new surrogate key: 1002
+  customer_nk,   -- natural key stays same: 'C-00042'
+  customer_name,
+  city,
+  effective_date,
+  expiry_date,
+  is_current
+) VALUES (1002, 'C-00042', 'Alice Kim', 'Denver', '2024-06-01', NULL, TRUE);
+
+-- Expire the old row
+UPDATE dim_customer
+SET expiry_date = '2024-05-31', is_current = FALSE
+WHERE customer_sk = 501;
 \`\`\`
 
-This is the canonical SCD Type 2 join pattern. Feature stores automate this for ML training pipelines.`,
-    tryGuidance: "Compare the star and snowflake schema designs in the interactive diagram.",
-    interviewGraph: {
-      initialStageId: "sd_p4_s1",
-      artifactDimensions: [
-        { label: "Schema Design", recoveryStageId: "sd_p4_r1" },
-        { label: "SCD Knowledge", recoveryStageId: "sd_p4_r2" },
-      ],
-      stages: {
-        sd_p4_s1: {
-          id: "sd_p4_s1",
-          type: "scenario_choice",
-          badge: "Stage 1",
-          title: "Stage 1 · Schema Choice",
-          prompt: "You're designing a warehouse for an e-commerce company. The analytics team runs thousands of queries daily filtering by date, product category, and customer region. The schema will be queried in BigQuery. Which schema design do you recommend?",
-          choices: [
-            { id: "a", label: "Star schema — flat dimension tables, partitioned fact table", description: "Central fct_orders table with dim_customer, dim_product, dim_date. Partition fct_orders by order_date. Cluster by product_category and region." },
-            { id: "b", label: "Snowflake schema — normalized dimensions for storage savings", description: "Normalize dim_product into dim_product, dim_category, dim_brand to reduce redundancy." },
-            { id: "c", label: "One Big Table — fully denormalize for query speed", description: "Join everything into one wide table. Fastest reads, no joins needed." },
-          ],
-          branches: { a: "sd_p4_s2", b: "sd_p4_r1", c: "sd_p4_r1" },
-          rationale: "Star schema is the standard for analytics warehouses. In BigQuery, compute is cheap, storage is cheap, but query latency matters. Flat dimension tables eliminate joins. Partitioning by date and clustering by filter columns minimizes bytes scanned.",
+Now any fact row from before June 2024 that references surrogate key 501 correctly shows Austin. Rows after June 2024 reference key 1002 and show Denver. Historical accuracy is preserved automatically.
+
+## Surrogate Key Design Choices
+
+Options range from auto-increment integers (simplest, works in all databases) to hash keys (common in Data Vault modeling, deterministic but collision-prone) to UUIDs (globally unique but bulky for joins). For star schemas, **sequential integers** win on join performance — integer equality is the fastest predicate a columnar engine can evaluate.
+
+A common mistake is reusing the natural key as the fact table foreign key. When a SCD Type 2 change splits one customer into two dimension rows, fact rows need to point to the *right version* — only a surrogate key makes that unambiguous.
+
+## Star Schema and BI Tool Performance
+
+Columnar warehouses like BigQuery and Snowflake (the product) store each column separately, enabling them to read only the columns needed for a query. Wide, flat dimension tables play to this strength: a single scan of \`dim_customer\` reads all attributes without joins.
+
+In a snowflake schema, answering "total revenue by product category" requires joining \`fact_sales → dim_product → dim_category\`. Each join is a hash join over potentially hundreds of millions of rows. BI tools that auto-generate SQL (Looker, Power BI) will generate these joins for every report, and the cumulative latency adds up.
+
+Rule of thumb: **denormalize dimensions until joins disappear**. The storage cost of duplicating a category name across product rows is negligible compared to the query cost of repeated joins at scale.
+`,
+  tryGuidance: "Explore the interactive star schema builder. Drag measures into the fact table and see real-time feedback on whether each measure is additive. Then simulate SCD Type 2 by changing a customer attribute and watching the dimension table grow with a new versioned row.",
+  interviewGraph: {
+    initialStageId: "click_fact_bug",
+    artifactDimensions: [
+      { label: "Schema Design", recoveryStageId: "schema_recovery" },
+      { label: "SCD Type Selection", recoveryStageId: "scd_recovery" },
+    ],
+    stages: {
+      click_fact_bug: {
+        id: "click_fact_bug",
+        type: "click_target",
+        badge: "Stage 1",
+        title: "Stage 1 · Spot the Fact Table Bug",
+        prompt: "A data engineer hands you this fact table DDL for review. One column is a non-additive measure that does NOT belong in a fact table — click it.",
+        code_snippet: `CREATE TABLE fact_sales (
+    sale_id       BIGINT,
+    customer_id   INT,
+    product_id    INT,
+    date_id       INT,
+    revenue       DECIMAL(10,2),
+    quantity      INT,
+    profit_margin DECIMAL(5,4),   -- ds-target:non_additive
+    ytd_revenue   DECIMAL(10,2)   -- ds-target:derived_measure
+);`,
+        validationCopy: {
+          non_additive: "Correct! profit_margin is a ratio — summing it across rows is mathematically meaningless. Compute it at query time as SUM(revenue - cost) / SUM(revenue).",
+          derived_measure: "ytd_revenue is also problematic (it's a derived cumulative measure), but profit_margin is the clearest non-additive violation. Non-additive ratios are the most dangerous fact table anti-pattern.",
         },
-        sd_p4_r1: {
-          id: "sd_p4_r1",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Star vs Snowflake",
-          prompt: "In a cloud warehouse like BigQuery or Snowflake, storage is ~$20/TB/month and compute is billed per bytes scanned. Snowflake schema reduces storage via normalization but adds joins. Which factor dominates the cost model?",
-          choices: [
-            { id: "a", label: "Compute (bytes scanned per query) dominates — minimize joins", description: "Storage costs are negligible at modern cloud pricing. Extra joins in snowflake schema increase bytes scanned on every analytical query." },
-            { id: "b", label: "Storage dominates — normalize to reduce redundancy", description: "Storage savings from normalization justify the additional join overhead." },
-          ],
-          branches: { a: "sd_p4_s2", b: "sd_p4_s2" },
-          rationale: "Cloud warehouse economics favor star schema. Storage for denormalized dimensions is a one-time cost; query compute is charged for every analytical run. Fewer joins = less compute = lower cost and better performance.",
+        branches: {
+          non_additive: "scd_city_change",
+          derived_measure: "schema_recovery",
         },
-        sd_p4_s2: {
-          id: "sd_p4_s2",
-          type: "scenario_choice",
-          badge: "Stage 2",
-          title: "Stage 2 · SCD Type Selection",
-          prompt: "The marketing team wants to analyze customer behavior by the geographic region they were in when they made each purchase—not where they live today. Some customers have moved regions over the past 3 years. Which SCD type handles this requirement?",
-          choices: [
-            { id: "a", label: "SCD Type 2 with effective date range", description: "Insert a new dimension row on each address change with effective_from/effective_to dates. Join orders using point-in-time logic to get the region at order time." },
-            { id: "b", label: "SCD Type 1 — overwrite with current region", description: "Keep only the current region. It's always up to date for current customers." },
-            { id: "c", label: "SCD Type 3 — add a previous_region column", description: "Store current and previous region as columns. Simple to implement." },
-          ],
-          branches: { a: "sd_p4_t", b: "sd_p4_r2", c: "sd_p4_r2" },
-          rationale: "Type 2 is the only option that supports arbitrary point-in-time queries. Type 1 overwrites history (you lose where customers used to live). Type 3 stores only one version of history (can't track more than one move).",
+      },
+
+      schema_recovery: {
+        id: "schema_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Non-Additive Measures",
+        prompt: "Why is profit_margin a problem in a fact table, and what should you do instead?",
+        choices: [
+          { id: "a", label: "Ratios are non-additive", description: "Ratios and percentages can't be SUMmed across rows. Store revenue and cost as additive facts; compute margin at query time." },
+          { id: "b", label: "Store as integer to save space", description: "Cast profit_margin to INT (e.g. basis points) to save storage and the problem goes away." },
+          { id: "c", label: "Document the column and leave it", description: "Non-additive measures are fine if the BI team knows not to SUM them." },
+        ],
+        branches: {
+          a: "scd_city_change",
+          b: "scd_city_change",
+          c: "scd_city_change",
         },
-        sd_p4_r2: {
-          id: "sd_p4_r2",
-          type: "scenario_choice",
-          badge: "Recovery 2",
-          title: "Recovery 2 · SCD Type 2",
-          prompt: "SCD Type 2 stores a new row for every change, with effective_from and effective_to dates. The is_current flag marks the active row. To join an order to the customer's region AT ORDER TIME, which join condition is correct?",
-          choices: [
-            { id: "a", label: "JOIN ON customer_id AND order_date BETWEEN effective_from AND effective_to", description: "This selects the dimension row that was active when the order was placed." },
-            { id: "b", label: "JOIN ON customer_id AND is_current = true", description: "This always returns the current region, not the region at order time." },
-          ],
-          branches: { a: "sd_p4_t", b: "sd_p4_t" },
-          rationale: "The point-in-time join is the core SCD Type 2 pattern. Joining on is_current=true gives the current state, not historical state—this introduces leakage in ML training and incorrect analysis in reporting.",
+        rationale: "Ratios are non-additive — SUM(profit_margin) across 1000 rows has no meaning. The fix is to store additive components (revenue, cost) and let the BI layer compute the ratio. Casting to integer doesn't fix the mathematical problem, and documentation doesn't prevent incorrect aggregations in auto-generated dashboards.",
+      },
+
+      scd_city_change: {
+        id: "scd_city_change",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Customer City Change",
+        prompt: "A customer moves from Austin to Denver. Your analytics team needs to know which city the customer was in at the time of each past purchase. Which SCD type do you apply to dim_customer?",
+        choices: [
+          { id: "a", label: "SCD Type 1 — overwrite", description: "Update the city column in place. Past orders now show Denver even though the customer was in Austin then." },
+          { id: "b", label: "SCD Type 2 — new row", description: "Insert a new dimension row with the new city and effective date. Expire the old row. Past fact rows still reference the old surrogate key." },
+          { id: "c", label: "SCD Type 3 — previous column", description: "Add a previous_city column alongside current_city. Keeps one level of history in the same row." },
+          { id: "d", label: "No change needed", description: "City isn't a measure, so dimension changes don't affect the fact table accuracy." },
+        ],
+        branches: {
+          a: "scd_recovery",
+          b: "grain_definition",
+          c: "scd_recovery",
+          d: "scd_recovery",
         },
-        sd_p4_t: {
-          id: "sd_p4_t",
-          type: "scenario_choice",
-          badge: "Complete",
-          title: "Complete · Warehouse Design",
-          prompt: "You've designed a star schema with SCD Type 2. What partition column would you choose for a 10-billion-row fact table, and why?",
-          choices: [
-            { id: "a", label: "Partition by event/order date — nearly all analytical queries filter by date range", description: "Date partitioning eliminates full table scans for time-range queries, which is the dominant analytical access pattern." },
-          ],
-          branches: { a: "sd_p4_t" },
-          terminal: true,
-          rationale: "Date partitioning is almost always the right primary partition for fact tables. It aligns with analytical access patterns (last 30 days, Q3 2023), enables partition pruning, and supports efficient data lifecycle management (delete partitions older than 2 years).",
+        rationale: "SCD Type 2 is correct. By inserting a new dimension row with a new surrogate key and expiring the old row, existing fact rows continue to point to the Austin version of the customer. Type 1 rewrites history. Type 3 only stores one previous value and would break if the customer moves again. Type 2 is the standard answer for preserving full history.",
+      },
+
+      scd_recovery: {
+        id: "scd_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · SCD Type Selection",
+        prompt: "Which implementation correctly preserves full historical accuracy for a customer's city across unlimited future changes?",
+        choices: [
+          { id: "a", label: "SCD Type 2: new row per change", description: "Each change creates a new surrogate key row with effective_date/expiry_date. Fact rows reference the correct version via surrogate key." },
+          { id: "b", label: "SCD Type 3: add previous_city column", description: "Add a previous_city column. Works until the customer moves a second time." },
+          { id: "c", label: "SCD Type 1: overwrite in place", description: "Update the row. Simple but history is permanently lost." },
+        ],
+        branches: {
+          a: "grain_definition",
+          b: "grain_definition",
+          c: "grain_definition",
         },
+        rationale: "SCD Type 2 is the only pattern that handles unlimited future changes. Surrogate keys in fact rows point to the specific dimension version that was current at transaction time, so history is always correct regardless of how many times the attribute changes.",
+      },
+
+      grain_definition: {
+        id: "grain_definition",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Defining Fact Table Grain",
+        prompt: "An interviewer asks: 'What is the grain of a fact table and why must it be defined first?' Which answer is most complete and correct?",
+        choices: [
+          { id: "a", label: "Grain = the primary key of the fact table", description: "The grain is just about which column is the primary key — define it and move on." },
+          { id: "b", label: "Grain = one row represents one business event at a specific level of detail", description: "Grain defines what each row means (e.g. one line item per order). It must be set first because it determines which measures are valid, which dimensions are needed, and prevents double-counting." },
+          { id: "c", label: "Grain = the time period each row covers", description: "Grain is about what time granularity you use — daily, weekly, monthly." },
+          { id: "d", label: "Grain = the total number of rows in the fact table", description: "A fine-grained table has many rows and a coarse-grained one has fewer." },
+        ],
+        branches: {
+          a: "star_vs_snowflake",
+          b: "star_vs_snowflake",
+          c: "star_vs_snowflake",
+          d: "star_vs_snowflake",
+        },
+        rationale: "Grain is the precise definition of what one row represents — for example, 'one line item on one sales order.' It must be defined first because it constrains every other decision: which measures are additive at that level, which dimensions attach naturally, and whether queries will double-count. Primary keys and time granularity are consequences of grain, not definitions of it.",
+      },
+
+      star_vs_snowflake: {
+        id: "star_vs_snowflake",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Star vs Snowflake Performance",
+        prompt: "Your BI team reports that dashboards are slow because every query joins through 6 levels of normalized dimension tables (snowflake schema). What is your recommendation?",
+        choices: [
+          { id: "a", label: "Add indexes to every join column", description: "Index all foreign keys in the dimension tables to speed up joins." },
+          { id: "b", label: "Denormalize dimensions into a star schema", description: "Flatten the normalized dimension sub-tables into single wide dimension tables. Eliminates multi-level joins at the cost of some storage redundancy." },
+          { id: "c", label: "Increase warehouse cluster size", description: "Throw more compute at the problem. More nodes means faster joins regardless of schema." },
+          { id: "d", label: "Cache the query results in the BI tool", description: "Use materialized views or BI-layer caching so users never hit the raw joins." },
+        ],
+        branches: {
+          a: "scd_type1_correction",
+          b: "scd_type1_correction",
+          c: "scd_type1_correction",
+          d: "scd_type1_correction",
+        },
+        rationale: "Denormalizing to a star schema (B) is the correct structural fix. Columnar engines like BigQuery and Snowflake are optimized for scanning wide flat tables — each extra join in a snowflake schema is an additional hash join over potentially billions of rows. Indexes rarely help columnar stores. Scaling compute is expensive and treats symptoms. Caching helps but doesn't fix the root cause and becomes stale.",
+      },
+
+      scd_type1_correction: {
+        id: "scd_type1_correction",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · SCD Type for a Correction",
+        prompt: "A product in your warehouse has 'Wirelss Headphones' (typo). You need to fix it to 'Wireless Headphones'. Historical purchase reports should also show the corrected name. Which SCD type is appropriate?",
+        choices: [
+          { id: "a", label: "SCD Type 1 — overwrite in place", description: "UPDATE the product_name column. All historical and future queries will see the corrected name." },
+          { id: "b", label: "SCD Type 2 — insert new row", description: "Create a new product dimension row for the corrected spelling; past sales will still show the typo." },
+          { id: "c", label: "SCD Type 3 — add previous_name column", description: "Keep the old typo in previous_name and store the correction in current_name." },
+        ],
+        branches: {
+          a: "dimension_new_column",
+          b: "dimension_new_column",
+          c: "dimension_new_column",
+        },
+        rationale: "SCD Type 1 is correct here. A typo is a data quality correction, not a real-world change. You want all historical records to reflect the correct name — there is no meaningful business value in preserving the misspelling. SCD Type 2 would freeze the typo on old records. SCD Type 3 would keep a useless previous_name.",
+      },
+
+      dimension_new_column: {
+        id: "dimension_new_column",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · Adding a Date Attribute",
+        prompt: "Your fact_sales table has 500 million rows and dim_product has 10 columns. You need to add a 'product_launch_date' attribute. Where should this column live?",
+        choices: [
+          { id: "a", label: "Add it to fact_sales", description: "Put product_launch_date directly in the fact table so it is always available without a join." },
+          { id: "b", label: "Add it to dim_product", description: "product_launch_date is a descriptive attribute of the product, not a measure of the sale event. It belongs in the dimension table." },
+          { id: "c", label: "Create a new fact table for product launch dates", description: "Model product_launch_date as its own fact table since it is a date value." },
+          { id: "d", label: "Leave it out and compute from source at query time", description: "Join back to the source system at query time to avoid schema changes." },
+        ],
+        branches: {
+          a: "terminal",
+          b: "terminal",
+          c: "terminal",
+          d: "terminal",
+        },
+        rationale: "Add it to dim_product (B). product_launch_date is a property of the product, not of the sale event — it belongs in the dimension. Adding it to the 500M-row fact table would bloat storage enormously and violate the principle that fact tables contain only measures and foreign keys. Date attributes of entities always live in their dimension tables.",
+      },
+
+      terminal: {
+        id: "terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · Schema Design Expert",
+        prompt: "Excellent work! You've demonstrated mastery of star schema design, SCD types, and fact table best practices. Which principle best summarizes data warehouse schema design?",
+        terminal: true,
+        choices: [
+          { id: "a", label: "Define grain, keep facts additive, use SCD 2 for history", description: "The three core rules: grain first, additive measures only, SCD Type 2 for dimension history." },
+          { id: "b", label: "Normalize everything to avoid redundancy", description: "Minimize storage by normalizing all dimensions." },
+          { id: "c", label: "Store all precomputed metrics for speed", description: "Pre-aggregate everything so queries are instant." },
+        ],
+        branches: {
+          a: "terminal",
+          b: "terminal",
+          c: "terminal",
+        },
+        rationale: "The three core principles of warehouse schema design: (1) always define grain first, (2) only store additive measures in fact tables, (3) use SCD Type 2 when historical accuracy on dimension attributes matters. Everything else — star vs snowflake trade-offs, surrogate keys, SCD Type 1 for corrections — flows from applying these rules to specific requirements.",
       },
     },
-    knowledgeCheck: [
-      {
-        question: "What is the primary advantage of a star schema over a snowflake schema in a cloud analytical warehouse?",
-        options: ["Star schema uses less storage because dimensions are deduplicated", "Star schema requires fewer joins, reducing bytes scanned per query in compute-billed environments", "Star schema enforces referential integrity more strictly"],
-        correctIndex: 1,
-        explanation: "Cloud warehouses bill by bytes scanned. Snowflake schema's normalized dimensions require additional joins that scan more data. Star schema's denormalized flat dimensions eliminate these joins, reducing cost and improving query speed.",
-      },
-      {
-        question: "An e-commerce company wants to analyze refund rates by the product category that existed when the order was placed (categories are reorganized every 6 months). Which SCD type is required?",
-        options: ["SCD Type 1 — overwrite current category", "SCD Type 2 — new row per change with effective dates", "SCD Type 3 — add previous_category column"],
-        correctIndex: 1,
-        explanation: "SCD Type 2 is the only type that preserves full history with point-in-time query capability. Type 1 overwrites history. Type 3 stores only one previous value, which is insufficient for multi-year history with multiple reorganizations.",
-      },
-      {
-        question: "A fact table in BigQuery has 5 billion rows. Queries almost always filter by a date range and often filter by customer_region. What is the optimal storage strategy?",
-        options: ["Partition by customer_region, cluster by date", "Partition by date, cluster by customer_region", "No partitioning — BigQuery handles this automatically"],
-        correctIndex: 1,
-        explanation: "Partition by the primary filter dimension (date) to enable partition pruning on time-range queries. Cluster by the secondary filter (customer_region) to sort rows within partitions, further reducing bytes scanned. Date is the dominant analytical access pattern.",
-      },
-    ],
   },
+  knowledgeCheck: [
+    {
+      question: "Your BI team prefers simple SQL and needs fast query performance. A colleague suggests normalizing your product dimension into dim_product, dim_category, and dim_department tables. What is the main trade-off of this snowflake approach?",
+      options: [
+        "It reduces storage redundancy but requires more joins, which can slow analytical queries and complicate BI tool auto-generated SQL.",
+        "It increases storage consumption because each table has its own indexes.",
+        "It makes SCD Type 2 impossible because surrogate keys can't span multiple tables.",
+        "It is strictly better than a star schema because normalized data is always more accurate.",
+      ],
+      correctIndex: 0,
+      explanation: "Snowflake schemas normalize dimensions into sub-dimensions, saving storage but adding joins. Analytical queries — especially those auto-generated by BI tools — pay the join cost at scale. For most analytics workloads, the star schema's flat, wide dimensions produce faster queries and simpler SQL.",
+    },
+    {
+      question: "A customer's loyalty tier changes from Silver to Gold. Your business requires that historical purchase analysis reflects the tier the customer held at time of purchase. Which SCD type is appropriate, and why?",
+      options: [
+        "SCD Type 1 — overwrite the tier; historical accuracy is not important for loyalty tier.",
+        "SCD Type 2 — insert a new dimension row with a new surrogate key and effective date range, so past fact rows still reference the Silver-tier version.",
+        "SCD Type 3 — add a previous_tier column alongside current_tier in dim_customer.",
+        "No SCD needed — store the tier directly in the fact table at transaction time.",
+      ],
+      correctIndex: 1,
+      explanation: "SCD Type 2 is correct. Inserting a new dimension row with a new surrogate key allows existing fact rows to continue referencing the Silver version of the customer while new transactions reference the Gold version. Type 1 would rewrite history. Type 3 breaks after a second tier change. Storing tier in the fact table violates fact table design (it's a dimension attribute, not a measure).",
+    },
+    {
+      question: "Which of the following best defines the 'grain' of a fact table?",
+      options: [
+        "The time granularity of the data — whether it is stored at the daily, weekly, or monthly level.",
+        "The number of rows in the fact table; finer grain means more rows.",
+        "The precise definition of what one row in the fact table represents — for example, one line item on one sales order.",
+        "The primary key column used to uniquely identify each fact row.",
+      ],
+      correctIndex: 2,
+      explanation: "Grain is the semantic definition of one row: 'one line item on one sales order,' 'one daily snapshot per customer,' etc. It must be defined before any other design decision because it determines which measures are valid at that level, which dimensions attach naturally, and whether aggregations will double-count. Time granularity and row counts are consequences of grain, not its definition.",
+    },
+  ],
+},
+};,
 
   "sd-m1": {
     durationLabel: "25 min",
