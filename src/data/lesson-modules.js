@@ -32612,667 +32612,1424 @@ Production systems combine both: content features initialize embeddings (cold st
   },
 
 "ps-m1": {
-  durationLabel: "18 min",
-  outcomes: [
-    "Define a North Star metric and explain why it must be user-centric, not business-centric",
-    "Evaluate candidate metrics against the four criteria: leading indicator, actionable, measurable, value-predictive",
-    "Cite canonical examples: Airbnb nights booked, Spotify time listening, Slack messages sent",
-    "Identify vanity metrics that look good but don't predict long-term value",
-  ],
-  learnMarkdown: `## North Star Metrics
+    durationLabel: "18 min",
+    outcomes: [
+      "Define a North Star metric and explain why it must be a leading indicator of user value, not a lagging business KPI",
+      "Evaluate candidate metrics against four criteria: leading, actionable, sensitive, and non-gameable",
+      "Cite canonical examples with precise definitions: Airbnb nights booked, Spotify monthly active listeners, Slack daily active users who send at least one message",
+      "Construct a three-level metric tree: North Star → supporting metrics → guardrail metrics",
+      "Identify Goodhart's Law failure modes and explain how counter-metrics prevent them",
+      "Deliver a 90-second structured answer to 'how would you pick a North Star metric for X?'",
+    ],
+    learnMarkdown: `## The Core Tension
 
-A North Star metric is the **single number** that best captures the core value your product delivers to users — and predicts long-term business success. It is not the same as a business KPI. Revenue is a lagging outcome; a North Star metric is a leading signal of whether users are getting value.
+A North Star metric is the one number that, if it goes up, you're confident the business is getting healthier — and if it goes down, you know something is wrong, even before the revenue line moves. Revenue is a lagging signal: by the time it drops, the damage was done weeks or months ago. A North Star lives upstream of revenue, measuring whether users are getting the core value your product promises. The goal is to find the one number that bridges user success and business success — when it rises, users are winning, and when users win, the business eventually wins too.
 
 ---
 
-## The Four Criteria
+## What Makes a Good North Star
 
-A good North Star metric must be:
+Four criteria separate a genuine North Star from a metric that merely looks good on a dashboard.
 
-1. **User-centric** — measures value delivered to users, not business extraction from users
-2. **Leading indicator** — predicts future retention and revenue, weeks or months ahead
-3. **Actionable** — teams can actually move it with product decisions
-4. **Measurable** — can be tracked reliably with available instrumentation
+**1. Leading, not lagging.** It should predict future retention and revenue. Revenue reflects decisions made 30–90 days ago. A strong North Star responds to product changes within days or weeks, giving you time to course-correct before revenue moves.
+
+**2. Actionable.** Teams must be able to run experiments that plausibly move it. "Brand sentiment" is not actionable. "Messages sent per daily active user" is — you can test onboarding flows, notification cadences, and editor improvements and see the metric respond.
+
+**3. Sensitive.** It should move detectably when the product meaningfully improves or degrades. A metric that barely shifts when you ship a major feature is too broad to steer by. "Daily active users who complete the core action" is more sensitive than "total time on platform."
+
+**4. Non-gameable.** The metric should be hard to inflate without actually delivering user value. If teams can move the number without helping users, they will eventually be tempted to. This is Goodhart's Law: *when a measure becomes a target, it ceases to be a good measure.*
 
 ---
 
 ## Canonical Examples
 
-| Company | North Star Metric | Why it works |
-|---------|------------------|--------------|
-| Airbnb | Nights booked | Captures value for both hosts and guests; predicts revenue |
-| Spotify | Time spent listening | Direct measure of music value delivery |
-| Slack | Messages sent in first 30 days | Early engagement predicts retention |
-| Facebook | 10 friends in 10 days | Social graph density predicts long-term retention |
-| Medium | Total reading time | Captures content value, not just clicks |
+**Airbnb — Nights Booked.** Captures value for both marketplace sides simultaneously: a host earns only when a guest books; a guest gets value only when they stay. Leading (predicts LTV and host retention), actionable (search ranking, photography, pricing tools all move it), and non-gameable (fake bookings surface as chargebacks).
+
+**Spotify — Monthly Active Listeners.** Notice *listeners*, not *users*. A user who opens the app and immediately closes it counts as DAU but contributes nothing to listener count. That specificity forces the metric to measure music heard — the core value — not mere presence.
+
+**Slack — Daily Active Users Who Send at Least One Message.** The qualifier "who send at least one message" encodes Slack's hypothesis: teams that communicate daily are embedded in their workflow and will not churn. Passive presence does not make that prediction; active communication does.
+
+**Facebook (early) — 10 Friends in 10 Days.** Users who connected with 10+ people in their first 10 days retained at dramatically higher rates. Leading, actionable (friend-suggestion algorithms, contact import), and sensitive enough that small onboarding changes shifted it measurably.
 
 ---
 
-## Common Vanity Metrics to Avoid
+## Why DAU Alone Fails
 
-- **Sign-ups**: anyone can sign up; tells you nothing about value delivered
-- **Page views**: doesn't distinguish useful visits from accidental clicks
-- **App installs**: install ≠ use
-- **Revenue** (as North Star): lags reality by weeks; you can't steer by it in real time
+Three reasons raw DAU fails as a North Star:
+
+- **No depth signal.** A user who opens the app and stares at a loading spinner counts the same as one who completes ten transactions.
+- **Passive presence conflated with value.** Autoplay and dark patterns inflate DAU without improving the product.
+- **Easily gamed.** Aggressive re-engagement notifications boost opens while destroying user trust.
+
+The fix is to qualify it: *DAU who complete the core action* is far more predictive than raw DAU.
 
 ---
 
-## Metric Tree Structure
+## The Metric Tree Structure
 
-The North Star metric sits at the top of a tree. Below it are **leading indicators** — components that feed into it. Below those are **lever metrics** — things individual teams can directly influence.
+The North Star sits at the top of a **metric tree** that translates company strategy into team-level goals.
 
 \`\`\`
-North Star: Nights Booked
-├── Supply: Active listings
-├── Demand: Search-to-book conversion
-│   ├── Search quality score
-│   └── Listing photo quality
-└── Repeat bookings per guest
+North Star:  Monthly Active Listeners
+             │
+             ├── Supporting:  L7 Active Users  (weekly engagement funnel)
+             │                │
+             │                ├── Lever:  Conversation started per new user
+             │                └── Lever:  Messages sent per active thread
+             │
+             ├── Supporting:  Content Completion Rate (finish vs. skip)
+             │
+             └── Guardrail:   Premium Churn Rate  (must not rise)
 \`\`\`
 
-Teams own specific nodes in the tree. When the North Star drops, you trace the tree to find which node is responsible.
-`,
-  video: null,
-  videoFallbackMarkdown: `## Deep Dive: Pitfalls in North Star Selection
+**Supporting metrics** are the one or two inputs that most directly drive the North Star — these are the actual OKR targets for individual teams. **Guardrail metrics** define what you will *not* sacrifice: if the NSM goes up but churn spikes, you have optimized a proxy, not the outcome.
 
-**Optimizing the metric vs. the underlying value**: once a metric becomes a target, it ceases to be a good measure. Teams find ways to inflate messages sent (automated bots), time on site (autoplay loops), or nights booked (fake listings). A good North Star should be hard to game because gaming it would require actually delivering value.
+---
 
-**Single metric vs. metric tree**: a North Star is a communication and alignment tool — one number everyone rallies around. But operational decisions use the full metric tree. Never mistake simplicity at the top for simplicity in measurement.
+## Common Traps
+
+**Vanity metrics in disguise.** Sign-ups, page views, app installs measure the top of the funnel, not value delivery. A company with 10M installs and 5% DAU/MAU has a value problem, not a growth problem.
+
+**Two North Stars.** Rallying around "revenue AND engagement" splits teams. Pick one; put the other in the guardrail layer.
+
+---
+
+## Interview-Ready Summary
+
+When asked "how would you pick a North Star metric for X?", use this three-step structure:
+
+**Step 1 — Core value exchange.** What does the product promise to do for users, and when does the user feel that promise was kept? That moment is what the North Star should measure. For a navigation app: "routes completed." For a B2B analytics tool: "dashboards viewed by decision-makers."
+
+**Step 2 — Four criteria test.** Leading or lagging? Can teams move it with experiments? Sensitive enough to detect product changes? Hard to game without delivering real value?
+
+**Step 3 — Metric tree.** Name two or three supporting metrics that feed into it, and at least one guardrail that prevents gaming.
+
+This structure turns a vague question into a systems answer that signals senior product thinking.
 `,
-  tryGuidance: "No interactive viz for this lesson — focus on the learn content and the interview simulation below.",
-  interviewGraph: {
-    initialStageId: "ps_m1_stage1",
-    artifactDimensions: [
-      { label: "Metric Criteria", recoveryStageId: "ps_m1_rec1" },
-      { label: "North Star Design", recoveryStageId: "ps_m1_rec2", passLabel: "Metric Framing" },
+    video: null,
+    videoFallbackMarkdown: `## Deep Dive: Counter-Metrics, Guardrails, and Goodhart's Law
+
+### Why You Always Need Counter-Metrics
+
+Every metric can be gamed. When a measure becomes a target, the people responsible for it will — intentionally or not — find ways to move the number without corresponding real improvements. This is Goodhart's Law, and it is not hypothetical; it has degraded the reliability of metrics at every major tech company.
+
+Counter-metrics (guardrail metrics) are the defense. They measure the dimension of quality your North Star leaves implicit. If the North Star is "messages sent," the counter-metric is "thread response rate" — if messages rise but replies fall, you are generating noise, not communication. Commit *before* a launch: "we will accept the NSM rising only if these guardrails hold."
+
+### Metric Sensitivity in Practice
+
+Sensitivity determines how useful a metric is for iteration. A metric that needs three months to show a statistically significant response cannot drive two-week sprints. When evaluating a candidate, ask: if we doubled core experience quality tomorrow, how quickly would this metric reflect it?
+
+High-sensitivity metrics (D1 retention, same-session task completion) respond fast — good for experimentation, but noisy. Low-sensitivity metrics (annual churn, NPS) suit quarterly health checks, not steering. A well-designed system uses high-sensitivity supporting metrics for experiments and low-sensitivity metrics to confirm strategic health.
+
+### Metric Trees in Practice
+
+Consider a North Star of "weekly active users who complete a meaningful action." The L7 active rate is the first level. Below it:
+
+- *Conversation started* — did a new user reach the core feature in session 1?
+- *Messages sent per active thread* — are engaged users getting deeper value?
+- *Return visits within 7 days* — does the experience pull users back?
+
+Each node is owned by a specific team: onboarding owns "conversation started," core product owns "messages per thread," growth owns "return visits." When the NSM drops, trace the tree to find which node moved and which team should respond.
+
+### Goodhart's Law: The Pattern Always Looks the Same
+
+- **Engagement time** → teams add autoplay; time rises, satisfaction falls
+- **DAU** → aggressive push notifications drive opens; uninstalls follow within weeks
+- **NPS** → teams survey only satisfied users post-positive-interaction; score climbs, quality stays flat
+
+The structure is always the same: the proxy rises while the underlying outcome stays flat or degrades. Counter-metrics surface this divergence before it compounds into a crisis.
+`,
+    tryGuidance: "Work through each interview stage as you would in a real PM or data science interview. For scenario choices, commit to an answer before reading the rationale — the reasoning is more valuable than the correct option. For the SQL stage, read the query carefully and identify the specific line that contains the measurement error.",
+    interviewGraph: {
+      initialStageId: "ps_m1_stage1",
+      artifactDimensions: [
+        { label: "Metric Criteria", recoveryStageId: "ps_m1_rec2_hint" },
+        { label: "North Star Design", recoveryStageId: "ps_m1_rec2", passLabel: "Metric Framing" },
+        { label: "Guardrail Thinking", recoveryStageId: "ps_m1_rec3", passLabel: "Counter-Metric Design" },
+      ],
+      stages: {
+        ps_m1_stage1: {
+          id: "ps_m1_stage1",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · The DAU Pushback",
+          prompt: "Spotify's PM proposes DAU as the North Star metric for the app. A senior PM immediately pushes back. What is the strongest reason to reject DAU as Spotify's North Star?",
+          choices: [
+            { id: "a", label: "DAU is too hard to measure accurately across devices", description: "Measurement difficulty is a real concern, but it is not the core problem with DAU as a North Star." },
+            { id: "b", label: "DAU doesn't distinguish users who listened to music from users who merely opened the app — it doesn't measure whether Spotify delivered its core value", description: "A user who opens the app and immediately closes it counts the same as someone who listened to two hours of music. DAU measures presence, not the value exchange Spotify exists to provide." },
+            { id: "c", label: "DAU is a vanity metric because it is too easy to drive with marketing spend", description: "Paid acquisition can inflate DAU, which is a problem, but the deeper issue is that even organic DAU doesn't reflect value delivered." },
+            { id: "d", label: "DAU makes it impossible to compare performance across different days of the week", description: "Day-of-week seasonality is a data modeling problem, not a reason to reject DAU as a North Star." },
+          ],
+          branches: { a: "ps_m1_rec2_hint", b: "ps_m1_stage2", c: "ps_m1_rec2_hint", d: "ps_m1_rec2_hint" },
+          rationale: "B is correct. The core failure of DAU for Spotify is specificity: it measures app presence, not music enjoyment. A user who opens the app and stares at a buffering spinner is indistinguishable from a user who completed a three-hour listening session. Spotify's actual North Star is Monthly Active Listeners — the qualifier 'listener' ensures the metric only counts users who completed the core value exchange (heard music). This distinction — presence vs. value delivery — is the first thing a senior interviewer will probe.",
+        },
+        ps_m1_stage2: {
+          id: "ps_m1_stage2",
+          type: "click_target",
+          badge: "Stage 2",
+          title: "Stage 2 · Find the Measurement Bug",
+          prompt: "An analytics engineer has written a SQL definition for Spotify's new North Star: 'Weekly Active Listeners.' A data scientist flags that the query is measuring the wrong thing. Click the part of the query that contains the measurement error.",
+          code_snippet: `-- North Star definition: Weekly Active Listeners
+-- Proposed by analytics team, v1
+
+SELECT
+    DATE_TRUNC('week', event_date)  AS week,
+    COUNT(DISTINCT user_id)         AS north_star_users   -- ds-target:ps_m1_denominator
+FROM events
+WHERE event_type = 'app_open'       -- ds-target:ps_m1_filter
+GROUP BY 1
+ORDER BY 1`,
+          validationCopy: {
+            ps_m1_denominator: "The column name says 'north_star_users' but look at the WHERE clause — the filter is 'app_open', not a listening event. The alias is aspirational; the actual count is active openers, not active listeners.",
+            ps_m1_filter: "Correct — this is the bug. 'app_open' measures logins, not listening engagement. A user who opens the app and immediately closes it is counted as a Weekly Active Listener. The filter should be an event like 'track_played_30s' or 'stream_completed' — something that confirms the user actually consumed music content.",
+          },
+          branches: {
+            ps_m1_denominator: "ps_m1_rec2_hint",
+            ps_m1_filter: "ps_m1_stage3",
+          },
+        },
+        ps_m1_rec2_hint: {
+          id: "ps_m1_rec2_hint",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Alias vs. Filter",
+          prompt: "You clicked the COUNT alias. The column is named 'north_star_users' — is the column name the problem, or is the problem somewhere else in the query?",
+          choices: [
+            { id: "a", label: "The column name is misleading, but the real bug is in the WHERE clause — 'app_open' counts logins, not listeners", description: "The alias is aspirational but the filter determines what actually gets counted. Change the WHERE clause to a listening event like 'track_played_30s'." },
+            { id: "b", label: "The column name is the bug — renaming it to 'active_openers' would fix the metric", description: "Renaming the column would make the mismatch explicit, but it would not fix the underlying measurement problem. You still wouldn't be tracking listening." },
+            { id: "c", label: "Both the column name and the WHERE clause are equally wrong — you need to fix both", description: "The WHERE clause is the structural bug. The alias mismatch is a documentation issue, not a measurement error." },
+          ],
+          branches: { a: "ps_m1_stage3", b: "ps_m1_rec2", c: "ps_m1_rec2" },
+          rationale: "A is correct. The WHERE clause determines what gets counted. 'app_open' events capture anyone who launched the app — including users who immediately hit back. The metric needs a filter on an event that confirms listening engagement, such as 'track_played_30s' (a stream where the user listened for at least 30 seconds). The column alias is misleading documentation, but fixing only the name would leave you measuring opens while believing you are measuring listeners.",
+        },
+        ps_m1_rec2: {
+          id: "ps_m1_rec2",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery 2 · What event should the filter use?",
+          prompt: "The WHERE clause currently filters on 'app_open'. What event type would correctly identify a Weekly Active Listener?",
+          choices: [
+            { id: "a", label: "'session_start' — any session proves the user was active", description: "A session can start and end in seconds without any music playing. Same problem as app_open." },
+            { id: "b", label: "'track_played_30s' — a stream where the user listened for at least 30 seconds confirms genuine listening engagement", description: "A 30-second threshold filters out accidental plays and buffering errors while confirming intentional music consumption." },
+            { id: "c", label: "'playlist_viewed' — opening a playlist shows intent to listen", description: "Viewing a playlist without playing it is still passive browsing, not listening." },
+            { id: "d", label: "'search_query' — users who search are clearly engaged with the app", description: "Searching shows intent but not completion of the core value exchange — actually hearing music." },
+          ],
+          branches: { a: "ps_m1_stage3", b: "ps_m1_stage3", c: "ps_m1_stage3", d: "ps_m1_stage3" },
+          rationale: "B is the strongest answer. 'track_played_30s' (or a similar listening-completion event) ties the metric directly to the value Spotify delivers: music heard by the user. The 30-second threshold is deliberate — it filters accidental plays (tap, immediate skip) and confirms intentional listening. This is exactly the kind of metric-definition precision that distinguishes senior data scientists from junior ones in an interview.",
+        },
+        ps_m1_stage3: {
+          id: "ps_m1_stage3",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · The Metric Tree",
+          prompt: "Monthly Active Listeners is now Spotify's confirmed North Star. You are building the metric tree. Which of the following is the correct role for 'Premium Churn Rate' in the tree?",
+          choices: [
+            { id: "a", label: "It is a supporting metric — it directly drives Monthly Active Listeners upward", description: "Churn rate measures subscribers lost; it does not directly explain increases or decreases in listening activity." },
+            { id: "b", label: "It is a guardrail metric — Monthly Active Listeners must not rise in a way that accelerates premium churn", description: "You could inflate listener counts by degrading the free tier so users listen out of habit, not enjoyment, while premium subscribers cancel. Churn rate is the guardrail that catches this trade-off." },
+            { id: "c", label: "It is a lever metric — individual feature teams own churn rate and use it to steer their OKRs", description: "Churn rate is an output metric owned at the company or business-line level, not a lever individual teams pull directly." },
+            { id: "d", label: "It is the same level as the North Star — both should be co-equal company KPIs", description: "Two co-equal North Stars create alignment conflicts. Churn belongs in the guardrail layer, not alongside the NSM." },
+          ],
+          branches: { a: "ps_m1_rec3", b: "ps_m1_stage4", c: "ps_m1_rec3", d: "ps_m1_rec3" },
+          rationale: "B is correct. A guardrail metric defines what you will NOT sacrifice in pursuit of the North Star. If Monthly Active Listeners rises because you are pushing passive autoplay to users who are not enjoying the experience, premium churn will eventually spike. The guardrail catches the divergence before it becomes irreversible. Supporting metrics (like L7 active users, or completion rate per session) are the positive inputs that explain *why* the NSM is moving. Guardrails are the negative constraints that say 'this must not get worse.'",
+        },
+        ps_m1_rec3: {
+          id: "ps_m1_rec3",
+          type: "scenario_choice",
+          badge: "Recovery 3",
+          title: "Recovery 3 · Guardrails vs. Supporting Metrics",
+          prompt: "What is the structural difference between a guardrail metric and a supporting metric in a North Star metric tree?",
+          choices: [
+            { id: "a", label: "Supporting metrics explain why the North Star is moving (positive inputs); guardrails define what must not be sacrificed while chasing the North Star (constraints)", description: "The metric tree has both an 'engine' (supporting metrics that drive the NSM up) and 'brakes' (guardrails that prevent the NSM from rising for the wrong reasons)." },
+            { id: "b", label: "Supporting metrics are for growth teams; guardrail metrics are for the finance team", description: "Both types of metrics are owned by product and data teams. Organizational ownership is not the defining distinction." },
+            { id: "c", label: "Guardrails are the same as supporting metrics but tracked quarterly instead of weekly", description: "The distinction is structural role in the tree, not tracking cadence." },
+            { id: "d", label: "There is no meaningful difference — all metrics below the North Star serve the same function", description: "This conflates two fundamentally different roles in the metric architecture, which would lead to poor trade-off decisions." },
+          ],
+          branches: { a: "ps_m1_stage4", b: "ps_m1_stage4", c: "ps_m1_stage4", d: "ps_m1_stage4" },
+          rationale: "A is the precise answer. Supporting metrics are the levers — they explain the mechanism through which the North Star improves. Guardrails are the constraints — they prevent the organization from hitting the North Star target through shortcuts that harm long-term health. A metric tree without guardrails is an optimization function with no constraints: it will find the local maximum that looks good on the NSM while degrading something you care about.",
+        },
+        ps_m1_stage4: {
+          id: "ps_m1_stage4",
+          type: "scenario_choice",
+          badge: "Stage 4",
+          title: "Stage 4 · Goodhart's Law in the Wild",
+          prompt: "Six months after launch, the engagement team reports that Monthly Active Listeners has grown 18% QoQ. Investigation reveals the growth came primarily from auto-play features that replay the last track when users leave the app running idle. Listening events are being logged but users are not present. What has happened, and what is the fix?",
+          choices: [
+            { id: "a", label: "This is Goodhart's Law — the metric became a target, so teams found ways to inflate it without delivering the underlying value. Fix: add a counter-metric that requires an active user signal alongside the listening event.", description: "The 30-second play event is still firing, but the user is not there. The metric has decoupled from actual music enjoyment." },
+            { id: "b", label: "This is normal metric growth — autoplay is a valid product feature that increases listening time", description: "Autoplay that fires when the user is not present inflates the metric without delivering value. This is precisely the Goodhart failure mode." },
+            { id: "c", label: "The solution is to increase the listening threshold from 30 seconds to 5 minutes to filter out auto-plays", description: "Raising the threshold helps but does not address the structural problem — that any passive event can be inflated by system behavior rather than user intent." },
+            { id: "d", label: "The NSM definition was wrong from the start — replace it with revenue, which cannot be gamed this way", description: "Revenue has its own gaming risks (discount-driven spikes, annual billing distortions) and is a lagging metric. Switching to revenue does not solve the proxy problem, it just moves it." },
+          ],
+          branches: { a: "ps_m1_terminal", b: "ps_m1_rec3", c: "ps_m1_terminal", d: "ps_m1_rec3" },
+          rationale: "A is the most precise answer. This is a textbook Goodhart's Law failure: the metric (tracks played 30s) was a good proxy for listening engagement, but once it became a target, the system found a way to generate 'track_played_30s' events without user presence. The fix is a counter-metric: something that can only fire if the user is actively present (screen-on signal, interaction event within the session, or an active-session qualifier on the listening event). C is partially right (threshold hardening helps) but does not address the root cause. The general principle is: when you suspect proxy inflation, add an orthogonal signal that is harder to fake.",
+        },
+        ps_m1_terminal: {
+          id: "ps_m1_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · North Star Mastered",
+          prompt: "You've worked through metric selection, SQL definition review, metric tree architecture, and Goodhart's Law failure modes. What is the single most important principle for North Star metric design?",
+          choices: [
+            { id: "a", label: "The North Star must measure the moment value is delivered to the user — specific enough to resist gaming, sensitive enough to steer product decisions, and upstream of revenue by weeks or months", description: "This captures all four criteria and the leading-indicator principle in one sentence." },
+            { id: "b", label: "The North Star must be the easiest metric to explain to a non-technical executive", description: "Simplicity matters, but it is a secondary criterion. Simplicity that sacrifices specificity produces vanity metrics." },
+            { id: "c", label: "The North Star must be the metric with the highest correlation to revenue in historical data", description: "Historical correlation is useful for validation, but it does not make a metric a good North Star. Inflated engagement metrics can correlate with revenue historically while causing future churn." },
+          ],
+          branches: { a: "ps_m1_terminal", b: "ps_m1_terminal", c: "ps_m1_terminal" },
+          terminal: true,
+          rationale: "A captures the full picture. A great North Star is specific to the core value exchange (not just presence), measures the moment value is delivered (not a proxy), leads revenue by enough time to steer (not a lagging outcome), and is sensitive and non-gameable. Everything else in the metric system — the tree, the guardrails, the counter-metrics — is in service of making this one number trustworthy enough to align the company around.",
+        },
+      },
+    },
+    knowledgeCheck: [
+      {
+        question: "Slack's North Star is 'daily active users who send at least one message' rather than simply DAU. What is the specific reason for the 'send at least one message' qualifier?",
+        options: [
+          "It makes the metric easier to query in SQL because send events have lower cardinality than session events",
+          "Sending a message captures the core value exchange — Slack's hypothesis is that teams who communicate daily are embedded in their workflow and will not churn, whereas passive openers may never return",
+          "It filters out mobile users who have lower engagement than desktop users, producing a cleaner baseline",
+        ],
+        correctIndex: 1,
+        explanation: "The qualifier 'send at least one message' ties the metric directly to communication — the core value Slack delivers. A user who opens the app to check a notification and closes it contributes to DAU but not to Slack's actual mission of replacing email for team communication. The send event is the moment the value exchange is complete. This specificity also makes the metric harder to inflate through notifications or passive re-engagement tactics, because those behaviors cannot generate send events without genuine user action.",
+      },
+      {
+        question: "A data team proposes that 'total app sessions per day' would be a better North Star than 'daily active users who complete the core action' because it captures intensity of use. What is the strongest counterargument?",
+        options: [
+          "Sessions are harder to define consistently across iOS, Android, and web clients",
+          "Total sessions can be inflated by crashes, error retries, and background refreshes — it measures system activity, not user value, making it gameable without product improvement",
+          "Sessions cannot be broken down by user segment, limiting its usefulness for diagnostic root-cause analysis",
+        ],
+        correctIndex: 1,
+        explanation: "The core problem with 'total sessions' is that the session count is easily inflated by events that have nothing to do with value delivery: app crashes that force restarts, network errors that trigger retries, background sync processes, and aggressive re-engagement notifications. The metric can rise while the real user experience degrades. 'Users who complete the core action' ties the count to an intentional user behavior, making it much harder to inflate without genuinely improving the product. This is the non-gameable criterion in action.",
+      },
+      {
+        question: "Your team's North Star (weekly active users who complete a purchase) increases 12% after a new feature launch. Simultaneously, customer support tickets increase 30% and average order value drops 20%. What do these guardrail signals tell you?",
+        options: [
+          "The North Star increase is real and valid — guardrail degradation is expected during growth phases and will self-correct",
+          "The guardrail signals indicate the North Star may be inflating via users who are completing low-quality purchases driven by confusion — the feature may be pushing users to transact before they are ready",
+          "The support ticket and AOV changes are unrelated to the feature launch and should be investigated by a separate team",
+        ],
+        correctIndex: 1,
+        explanation: "When the North Star rises while guardrails degrade, it is almost always a signal that the NSM is being inflated through a path that compromises user value. In this case: more purchases (NSM up), more confusion/complaints (support up), and smaller transactions (AOV down) together suggest the feature may be creating urgency or confusion that drives impulsive low-value purchases. Users are completing the 'purchase' event without receiving the underlying value, which will surface as returns, negative reviews, or churn in subsequent periods. This is precisely the scenario guardrail metrics are designed to catch before the damage becomes irreversible.",
+      },
     ],
-    stages: {
-      ps_m1_stage1: {
-        id: "ps_m1_stage1",
-        type: "scenario_choice",
-        badge: "Stage 1",
-        title: "Stage 1 · New streaming feature",
-        prompt: "You're the DS on a new video streaming feature. The PM proposes 'number of new sign-ups' as the North Star metric. What's your response?",
-        choices: [
-          { id: "a", label: "Agree — sign-ups measure top-of-funnel growth", description: "Sign-ups are a vanity metric — they don't measure value delivered." },
-          { id: "b", label: "Push back — sign-ups don't measure if users got value; propose hours of content watched per active user instead", description: "Hours watched captures actual value delivery and predicts retention." },
-          { id: "c", label: "Accept but add revenue as a secondary North Star", description: "Revenue is lagging and business-centric, not user-centric." },
-        ],
-        branches: { a: "ps_m1_rec1", b: "ps_m1_stage2", c: "ps_m1_rec1" },
-        rationale: "B is correct. Sign-ups measure acquisition, not value. A user who signs up and never watches anything has the same sign-up count as a daily user. Hours of content watched per active user is user-centric (captures value delivered), leading (predicts retention), and actionable.",
-      },
-      ps_m1_rec1: {
-        id: "ps_m1_rec1",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · What makes a bad North Star?",
-        prompt: "Why is 'number of sign-ups' a bad North Star metric?",
-        choices: [
-          { id: "a", label: "It's a vanity metric — it doesn't measure whether users got value from the product", description: "Sign-ups measure acquisition volume, not engagement or retention." },
-        ],
-        branches: { a: "ps_m1_stage2" },
-        rationale: "Sign-ups are easy to drive with paid acquisition and don't predict whether users stay or get value. A North Star must reflect actual value delivered.",
-      },
-      ps_m1_stage2: {
-        id: "ps_m1_stage2",
-        type: "scenario_choice",
-        badge: "Stage 2",
-        title: "Stage 2 · North Star vs revenue",
-        prompt: "A VP argues that revenue should be the North Star because 'it's what the business cares about.' How do you respond?",
-        choices: [
-          { id: "a", label: "Agree — revenue is the most important metric for any business", description: "Revenue is a lagging outcome, not a leading signal." },
-          { id: "b", label: "Revenue lags user behavior by weeks or months — it tells you what happened, not what will happen; a user-value metric is a leading indicator that lets you course-correct faster", description: "If engagement drops now, revenue drops in 30 days. You want to catch that early." },
-          { id: "c", label: "Use both revenue and user value as co-equal North Stars", description: "Two North Stars cause alignment conflicts — teams optimize for different things." },
-        ],
-        branches: { a: "ps_m1_rec2", b: "ps_m1_terminal", c: "ps_m1_rec2" },
-        rationale: "B is correct. Revenue reflects decisions made weeks or months ago — by the time revenue drops, the problem is severe and recovery is slow. A user-value North Star (watch time, active nights booked) is a leading indicator: when it drops, you can intervene before revenue is affected.",
-      },
-      ps_m1_rec2: {
-        id: "ps_m1_rec2",
-        type: "scenario_choice",
-        badge: "Recovery 2",
-        title: "Recovery 2 · Leading vs lagging",
-        prompt: "What is the key distinction between a North Star metric and revenue?",
-        choices: [
-          { id: "a", label: "A North Star is a leading indicator of user value delivered; revenue is a lagging outcome that reflects past decisions", description: "Leading indicators let you steer proactively." },
-        ],
-        branches: { a: "ps_m1_terminal" },
-        rationale: "North Star metrics are leading — they move before revenue does, giving you time to react. Revenue is lagging — useful for accountability but not for steering.",
-      },
-      ps_m1_terminal: {
-        id: "ps_m1_terminal",
-        type: "scenario_choice",
-        badge: "Complete",
-        title: "Complete · North Star mastered",
-        prompt: "You've worked through North Star metric selection. What's the core principle?",
-        choices: [
-          { id: "a", label: "A North Star captures user value delivered and predicts long-term retention — it leads revenue, not lags it", description: "User-centric, leading, actionable, measurable." },
-        ],
-        branches: { a: "ps_m1_terminal" },
-        terminal: true,
-        rationale: "The best North Star metrics align user success with business success — when users get more value, the business wins. Revenue is a consequence, not a North Star.",
-      },
-    },
   },
-  knowledgeCheck: [
-    {
-      question: "Which of the following best qualifies as a North Star metric for a B2B project management tool?",
-      options: [
-        "Monthly recurring revenue",
-        "Number of projects created per active team in the first 30 days",
-        "Number of new account sign-ups per month",
-      ],
-      correctIndex: 1,
-      explanation: "Projects created per active team measures actual product usage and value delivery (teams are using the tool for real work). MRR is a lagging business metric. Sign-ups are a vanity metric that don't reflect engagement or value.",
-    },
-    {
-      question: "Facebook's early North Star was '10 friends in 10 days.' Why is this an effective North Star?",
-      options: [
-        "It's easy to measure and doesn't require any user surveys",
-        "Having 10 friends in 10 days strongly predicts long-term retention — users who reach this threshold are far more likely to stay active because the social graph delivers continuous value",
-        "It measures acquisition cost efficiency",
-      ],
-      correctIndex: 1,
-      explanation: "Facebook discovered empirically that users who connected with 10+ friends in their first 10 days had dramatically higher retention. This makes it a leading indicator of the core value proposition (social connection). It's user-centric and predictive — exactly what a North Star should be.",
-    },
-    {
-      question: "What is the relationship between a North Star metric and a metric tree?",
-      options: [
-        "They are the same thing — a North Star metric is just another name for a metric tree",
-        "The North Star sits at the top of the metric tree; below it are leading indicators and lever metrics that teams can directly influence",
-        "A metric tree is used for SQL queries; a North Star is used for stakeholder reporting",
-      ],
-      correctIndex: 1,
-      explanation: "The North Star provides a single alignment point for the whole company. The metric tree decomposes it into actionable components — sub-metrics owned by different teams. When the North Star drops, the tree tells you which component is responsible and which team should act.",
-    },
-  ],
-},
 
 "ps-m2": {
-  durationLabel: "12 min",
-  outcomes: [
-    "Distinguish leading indicators (predict future outcomes) from lagging indicators (confirm past outcomes)",
-    "Give concrete examples for B2B and B2C products",
-    "Explain the feedback loop delay and why lagging metrics can't steer real-time decisions",
-    "Build a balanced dashboard: lagging for accountability, leading for decision-making",
-  ],
-  learnMarkdown: `## Leading vs Lagging Indicators
-
-**Lagging indicators** confirm what happened. **Leading indicators** predict what will happen. The distinction is critical for building dashboards and making real-time product decisions.
-
----
-
-## Definitions
-
-| Type | Definition | Characteristic |
-|------|-----------|----------------|
-| **Lagging** | Measures outcomes after they occur | High confidence, low actionability |
-| **Leading** | Predicts future outcomes before they crystallize | Lower confidence, high actionability |
-
----
-
-## Examples
-
-**For a B2B SaaS product:**
-- Lagging: Monthly Recurring Revenue (MRR), customer churn rate, Net Promoter Score
-- Leading: Daily active users per seat, feature adoption rate, support ticket volume trend, login frequency in first 30 days
-
-**For a consumer app:**
-- Lagging: Revenue, 30-day retention rate, annual churn
-- Leading: D1/D7 retention, session length, notification open rate, social share rate
-
----
-
-## The Feedback Loop Delay
-
-Lagging metrics reflect decisions made **weeks or months ago**. Revenue this month reflects acquisition and engagement decisions from last quarter. By the time revenue drops, the product problem is already severe.
-
-\`\`\`
-Engagement drops today
-    → D7 retention drops in 7 days  (leading signal)
-    → D30 retention drops in 30 days  (leading signal)
-    → Revenue drops in 60-90 days  (lagging signal)
-\`\`\`
-
-If you only watch revenue, you're steering by looking in the rearview mirror.
-
----
-
-## Balanced Dashboard Design
-
-A good dashboard layer:
-1. **Hero KPIs** — lagging metrics for accountability (revenue, active users, NPS). These tell stakeholders how the business is doing.
-2. **Leading indicators** — predict next month's hero KPIs. These tell the team what to act on now.
-3. **Lever metrics** — the specific actions teams take that move the leading indicators.
-
-Never replace lagging metrics with leading ones — you need both. Revenue is the ultimate accountability metric. But day-to-day, you steer by leading indicators.
-`,
-  video: null,
-  videoFallbackMarkdown: `## Deep Dive: Compound Leading Metrics
-
-Some leading indicators are **compound**: they combine two signals into one. Daily Active Users × Average Session Length = total engagement minutes. This compound metric can drop even when DAU is stable (if sessions shorten) or when session length is stable (if fewer users engage daily).
-
-Decomposing compound metrics on drop is essential: a 10% drop in engagement minutes could be a 10% DAU drop (top-of-funnel problem) or a 10% session length drop (in-product value problem). These require completely different interventions.
-`,
-  tryGuidance: "Use the interactive leading/lagging indicator visualization to trace how leading indicator changes propagate to lagging outcomes over time.",
-  interviewGraph: {
-    initialStageId: "ps_m2_stage1",
-    artifactDimensions: [
-      { label: "Lead/Lag Distinction", recoveryStageId: "ps_m2_rec1" },
-      { label: "Dashboard Balance", recoveryStageId: "ps_m2_terminal", passLabel: "Indicator Design" },
+    durationLabel: "18 min",
+    outcomes: [
+      "Distinguish leading indicators from lagging indicators and explain the causal chain linking them",
+      "Identify the 4–8 week feedback loop delay and why lagging-only dashboards cause late interventions",
+      "Validate a leading indicator using correlation analysis and Granger causality",
+      "Recognize metric decay — when a leading indicator becomes lagging over time — and how to refresh the signal",
+      "Build a three-tier dashboard: lagging accountability metrics, leading predictive signals, and lever metrics",
     ],
-    stages: {
-      ps_m2_stage1: {
-        id: "ps_m2_stage1",
-        type: "scenario_choice",
-        badge: "Stage 1",
-        title: "Stage 1 · B2B SaaS indicators",
-        prompt: "Give two leading and two lagging indicators for a B2B project management SaaS. Which set would you use to detect a churn risk three months early?",
-        choices: [
-          { id: "a", label: "Leading: daily active seats, feature adoption rate. Lagging: MRR, churn rate. Use leading indicators for early warning.", description: "Seat activity and feature adoption drop before churn. MRR and churn confirm it after." },
-          { id: "b", label: "Use MRR as both leading and lagging — it's the most important metric", description: "MRR is always lagging — it reflects past decisions." },
-          { id: "c", label: "Leading: NPS, revenue. Lagging: login frequency, feature usage.", description: "NPS and revenue are lagging; login frequency and feature usage are leading." },
-        ],
-        branches: { a: "ps_m2_stage2", b: "ps_m2_rec1", c: "ps_m2_rec1" },
-        rationale: "A is correct. Login frequency and feature adoption are observable before churn happens. A customer who stops using features but is still paying is a churn risk — you can intervene now. MRR and churn rate only confirm the problem after it's happened.",
-      },
-      ps_m2_rec1: {
-        id: "ps_m2_rec1",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · Which direction?",
-        prompt: "A customer's login frequency dropped 70% last week. Is this a leading or lagging signal of churn?",
-        choices: [
-          { id: "a", label: "Leading — it predicts future churn before it appears in revenue or contract renewal metrics", description: "Behavioral signals precede business outcomes by weeks or months." },
-        ],
-        branches: { a: "ps_m2_stage2" },
-        rationale: "Login frequency is a leading indicator. The customer is disengaging before they cancel. This is exactly the signal to act on.",
-      },
-      ps_m2_stage2: {
-        id: "ps_m2_stage2",
-        type: "scenario_choice",
-        badge: "Stage 2",
-        title: "Stage 2 · Lagging drop response",
-        prompt: "Revenue dropped 8% this month. What does this tell you about the timing of intervention?",
-        choices: [
-          { id: "a", label: "Intervene now — the revenue drop is the signal to act", description: "The revenue drop is already the lagging outcome. You're weeks behind." },
-          { id: "b", label: "The revenue drop reflects decisions and user behavior from 1-3 months ago — the best intervention was earlier; now check leading indicators to see if further decline is coming", description: "Revenue lags behavior. If leading indicators are also declining, more drops are coming." },
-        ],
-        branches: { a: "ps_m2_rec1", b: "ps_m2_terminal" },
-        rationale: "B is correct. Revenue this month reflects engagement from 1-3 months ago. The best response: (1) check leading indicators now to see if more decline is in the pipeline, (2) diagnose what caused the engagement drop months ago, (3) intervene in the leading indicators to stop further deterioration.",
-      },
-      ps_m2_terminal: {
-        id: "ps_m2_terminal",
-        type: "scenario_choice",
-        badge: "Complete",
-        title: "Complete · Dashboard balance",
-        prompt: "How should a product dashboard balance leading and lagging metrics?",
-        choices: [
-          { id: "a", label: "Lagging metrics for accountability (revenue, churn), leading indicators for daily decision-making (engagement, feature adoption)", description: "You need both — lagging for outcome accountability, leading for proactive steering." },
-        ],
-        branches: { a: "ps_m2_terminal" },
-        terminal: true,
-        rationale: "A balanced dashboard shows both: lagging metrics anchor accountability to business outcomes, leading indicators give teams actionable signals for real-time steering.",
+    learnMarkdown: `## Leading vs Lagging Indicators
+
+Here is the most important sentence in product analytics:
+
+> **Revenue is the ultimate lagging indicator — by the time it drops, the problem is 3 months old. Leading indicators let you steer while you can still turn.**
+
+This is not a technicality. It is the difference between being a reactive reporter of outcomes and being a proactive operator who can prevent problems before they crystalize in numbers that matter to the CFO.
+
+## Definitions and the Core Distinction
+
+A **lagging indicator** measures an outcome that has already happened. It is high-confidence, auditable, and directly tied to business value — but it arrives late. By the time you see it move, the causal chain that drove the change is already complete.
+
+A **leading indicator** predicts a future outcome before it is locked in. It is observable earlier, more actionable, but noisier — correlation with the lagging outcome is rarely 1.0.
+
+| Type | Characteristic | Actionability |
+|------|---------------|---------------|
+| **Lagging** | High confidence, reflects past decisions | Low — the window to intervene has closed |
+| **Leading** | Noisier, reflects present behavior | High — you can still change the trajectory |
+
+## The Causal Chain: How Leading Becomes Lagging
+
+Product outcomes are not random. They flow through a causal chain where early behavioral signals accumulate into business outcomes over weeks and months:
+
+\`\`\`
+Feature adoption drops today
+    → D7 retention drops in 7 days       (early leading signal)
+    → D30 retention drops in 30 days     (intermediate leading signal)
+    → Monthly churn increases at day 60  (lagging signal — just visible)
+    → Revenue drops in 60–90 days        (ultimate lagging signal)
+\`\`\`
+
+Each step in this chain is a metric. The further left you measure, the more lead time you have to intervene. The further right you measure, the more certainty you have — but the less you can do about it.
+
+**Concrete examples across product types:**
+
+For a **B2B SaaS product** (e.g., a project management tool):
+- Leading: daily active seats per license, feature adoption rate within first 30 days, support ticket volume trend, login frequency decline in any account
+- Intermediate: quarterly expansion revenue likelihood score, health score
+- Lagging: Monthly Recurring Revenue, net revenue retention, annual churn rate
+
+For a **consumer subscription app** (e.g., a fitness app):
+- Leading: D1/D7 retention rate, notification open rate, workout completion rate, social share rate
+- Intermediate: 30-day active user rate, streak continuation rate
+- Lagging: Monthly revenue, 90-day churn, lifetime value
+
+## The Pitfall: Steering by Rearview Mirror
+
+When a company's dashboard shows only lagging metrics, the organization operates on a systematic delay. Revenue this month reflects acquisition quality, activation success, and engagement decisions from 8–12 weeks ago. When revenue drops 8%, you are looking at the outcome of a problem that was detectable — and treatable — three months earlier.
+
+The operational cost is compounding: a problem caught at the leading indicator stage (feature adoption dropping) requires a product change or a targeted outreach campaign. The same problem caught at the lagging stage (revenue down 8%) requires a company-wide response, often with uncertain attribution, expensive firefighting, and no guarantee of recovery within the quarter.
+
+**Lagging metrics are not useless** — they provide accountability, financial auditability, and a ground truth against which to calibrate leading indicators. The failure mode is dashboards that have only lagging metrics because they're "clean" and defensible. Clean and defensible means late.
+
+## Validating a Leading Indicator
+
+Not every early-stage metric is a genuine leading indicator. There are two methods to validate the relationship:
+
+**1. Correlation analysis with lag offset**
+
+Plot the leading candidate at time T against the lagging outcome at time T+k (where k is your hypothesized lead time). If the correlation is strong and consistent across cohorts, the signal is predictive.
+
+\`\`\`python
+import pandas as pd
+
+# feature_adoption_rate at day 14, churn at day 90
+corr = df['feature_adoption_d14'].corr(df['churned_d90'])
+# If |corr| > 0.4 and consistent across acquisition cohorts → promising signal
+\`\`\`
+
+**2. Granger causality**
+
+Granger causality tests whether past values of series X improve prediction of future values of series Y, beyond what Y's own history predicts. It does not prove causal mechanism, but it establishes directional predictive power — which is exactly what you need to justify using X to anticipate Y.
+
+\`\`\`python
+from statsmodels.tsa.stattools import grangercausalitytests
+
+# Does D7_retention Granger-cause revenue_4wk_ahead?
+results = grangercausalitytests(df[['revenue_4wk', 'D7_retention']], maxlag=4)
+\`\`\`
+
+A leading indicator passes validation when: (a) the correlation with the lagging outcome is significant and consistent across cohorts, and (b) Granger causality confirms directionality (leading → lagging, not the reverse).
+
+## Metric Decay: When Leading Becomes Lagging
+
+A subtle problem that experienced practitioners watch for: **leading indicators become lagging over time**.
+
+When a metric becomes widely tracked and optimized, teams learn to hit the number without improving the underlying behavior. A classic example: "logged in within 7 days of signup" starts as a genuine leading indicator of 90-day retention. Product teams optimize onboarding to force a second login within 7 days. The D7 login rate improves — but 90-day retention does not follow. The leading indicator decayed into a gameable proxy.
+
+This is Goodhart's Law in product analytics: "When a measure becomes a target, it ceases to be a good measure."
+
+The solution is to **refresh your leading indicators periodically**: re-run the correlation and Granger causality analysis against your current user cohorts. If the predictive power has degraded, either find a deeper behavioral signal or reset the metric definition to one that is harder to game.
+
+## Three-Tier Dashboard Design
+
+A well-designed product dashboard has three layers:
+
+1. **Accountability tier (lagging)** — Revenue, active users, churn, NPS. These are reported to leadership and investors. They define whether the business is healthy. Updated weekly or monthly.
+
+2. **Prediction tier (leading)** — D7 retention, feature adoption rate within 30 days of signup, support ticket volume trend, login frequency by account. These predict next quarter's accountability metrics. Updated daily or weekly.
+
+3. **Lever tier** — The specific actions teams take that move the leading indicators: notification send rate, onboarding step completion, A/B test variants. Updated in real time. These are the knobs the team controls.
+
+The insight: you **steer by leading indicators and you are accountable to lagging indicators**. Never replace one with the other — you need both.
+
+## Interview-Ready Summary
+
+When an interviewer asks "how do you know your metrics are the right ones?":
+
+> "I distinguish between leading and lagging indicators and build a causal chain connecting them. Lagging metrics like revenue and churn confirm outcomes but arrive with a 60–90 day delay — they're for accountability, not steering. Leading metrics like feature adoption and D7 retention let you catch problems while you can still intervene. I validate leading indicators with correlation analysis at the appropriate lag offset and Granger causality tests. And I watch for metric decay — once a metric is widely optimized, teams can hit the number without moving the underlying outcome, so I re-validate predictive power quarterly."
+`,
+
+    video: null,
+    videoFallbackMarkdown: `## Deep Dive: Proxy Metric Failure Modes
+
+A leading indicator is only valuable if it genuinely predicts the lagging outcome. When it doesn't, but the team acts as if it does, you have a **proxy metric failure**. The metric looks good; the business outcome is bad.
+
+### Goodhart's Law in Action
+
+Goodhart's Law: "When a measure becomes a target, it ceases to be a good measure." The mechanism is gaming — intentional or unintentional.
+
+**YouTube watch time → misinformation.** YouTube optimized its recommendation algorithm for watch time as the leading indicator of engagement and retention. Watch time increased. But the content that maximized watch time was emotionally activating — outrage, conspiracy, and sensationalist content. The metric was healthy; the downstream outcomes (advertiser trust, regulatory scrutiny, platform safety) deteriorated. YouTube eventually added explicit guardrail metrics for content quality, but the damage accumulated over years of treating watch time as a sufficient proxy.
+
+**Wells Fargo account openings → fraud.** Management tracked account openings as the leading indicator of growth. Frontline employees, under pressure to hit the number, opened fraudulent accounts without customer knowledge. The leading metric hit record highs. The lagging outcome — customer trust and regulatory standing — was catastrophic. The proxy metric perfectly predicted a lagging metric it was never supposed to optimize.
+
+**Daily Active Users → engagement theater.** Teams push daily notification campaigns that force opens without creating genuine value. DAU increases. Session length decreases. Seven-day retention drops. The "leading indicator" for revenue was itself being gamed at the expense of the actual causal chain.
+
+### How to Set Guardrails That Prevent Gaming
+
+The standard architecture for metric safety:
+
+1. **Define directional guardrails alongside primary metrics.** For every leading indicator you optimize, name 1–2 downstream signals that must not degrade. If you optimize D7 login rate, add a guardrail on D30 retention and average session length. You cannot game both simultaneously.
+
+2. **Decompose compound metrics before acting.** "Engagement minutes = DAU × session length." Before declaring a win on engagement minutes, always check which factor moved. DAU up, session length down is a different problem than both up.
+
+3. **Audit the causal claim quarterly.** Re-run correlation and Granger causality against recent cohorts. If your leading indicator has degraded in predictive power, rotate to a deeper behavioral signal before the team continues optimizing a broken proxy.
+
+4. **Triangulate across independent signals.** No single metric is fully game-proof. If D7 retention, feature adoption rate, and support ticket volume all point the same direction, the signal is real. If only the metric you're actively optimizing improved, treat it as suspect.
+`,
+
+    tryGuidance:
+      "Use the interactive leading/lagging visualization to trace how leading indicator changes propagate through the causal chain to lagging outcomes. Adjust the simulated engagement drop and observe the 4–8 week delay before revenue reflects the change.",
+
+    interviewGraph: {
+      initialStageId: "ps_m2_stage1",
+      artifactDimensions: [
+        { label: "Lead/Lag Distinction", recoveryStageId: "ps_m2_rec1" },
+        { label: "Causal Chain Reasoning", recoveryStageId: "ps_m2_rec2" },
+        { label: "Indicator Validation", recoveryStageId: "ps_m2_rec3", passLabel: "Metric Design" },
+      ],
+      stages: {
+        ps_m2_stage1: {
+          id: "ps_m2_stage1",
+          type: "click_target",
+          badge: "Stage 1",
+          title: "Stage 1 · Spot the early warning gap",
+          prompt:
+            "A VP of Product shares this executive dashboard and says 'this tells us everything we need to know.' Click the line that reveals why this dashboard will always deliver bad news too late.",
+          code_snippet: `-- Weekly Executive Dashboard Query
+-- "This tells us everything we need to know" — VP of Product
+
+SELECT
+    DATE_TRUNC('week', created_at)  AS week,
+    SUM(revenue_usd)                AS revenue,          -- ds-target:ps_m2_lagging_only
+    COUNT(new_subscriptions)        AS new_subs,
+    AVG(contract_value)             AS acv
+FROM orders
+WHERE status = 'completed'
+GROUP BY 1`,
+          validationCopy: {
+            ps_m2_lagging_only:
+              "Correct. Every metric here is an outcome metric with a 4–8 week lag. Revenue, new subscriptions, and ACV reflect decisions and user behavior from weeks ago. There are no engagement, feature adoption, or satisfaction signals — no early warning system exists. By the time any of these drop, the problem is already months old.",
+          },
+          branches: {
+            ps_m2_lagging_only: "ps_m2_stage2",
+          },
+        },
+
+        ps_m2_stage2: {
+          id: "ps_m2_stage2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Build the causal chain",
+          prompt:
+            "Feature adoption in onboarding dropped 25% four weeks ago. Revenue has not moved yet. Which best describes what is happening in the causal chain — and what should you do right now?",
+          choices: [
+            {
+              id: "a",
+              label: "Wait for revenue to confirm the signal before acting — one metric isn't enough evidence",
+              description: "Revenue confirmation means you've already lost 4–8 weeks of intervention window.",
+            },
+            {
+              id: "b",
+              label: "Feature adoption is a leading indicator; it predicts a D30/D60 retention drop, which will hit revenue in 6–10 weeks — intervene now on activation",
+              description: "The causal chain is: adoption → retention → revenue. You are at the earliest actionable stage.",
+            },
+            {
+              id: "c",
+              label: "Feature adoption is a lagging indicator of onboarding quality — fix the onboarding flow and the revenue issue will self-correct",
+              description: "Feature adoption is a leading indicator of retention, not a lagging one. And while fixing onboarding is correct, framing it as lagging misses the urgency.",
+            },
+            {
+              id: "d",
+              label: "Run an A/B test on pricing — the revenue drop is probably due to price sensitivity",
+              description: "No revenue drop has been observed yet. A pricing test addresses the wrong problem at the wrong stage.",
+            },
+          ],
+          branches: {
+            a: "ps_m2_rec1",
+            b: "ps_m2_stage3",
+            c: "ps_m2_rec1",
+            d: "ps_m2_rec1",
+          },
+          rationale:
+            "B is the correct framing. Feature adoption is a leading indicator that sits early in the causal chain: adoption → D30 retention → D60 revenue. You have a 6–10 week window to intervene before the downstream lagging metrics reflect the problem. Waiting for revenue confirmation means you've already burned that window.",
+        },
+
+        ps_m2_rec1: {
+          id: "ps_m2_rec1",
+          type: "scenario_choice",
+          badge: "Recovery 1",
+          title: "Recovery · The feedback loop delay",
+          prompt:
+            "Revenue dropped 10% this month. The CEO asks what caused it. Which response shows the strongest mental model of lead/lag dynamics?",
+          choices: [
+            {
+              id: "a",
+              label: "This month's revenue reflects user behavior and acquisition quality from 6–10 weeks ago — check leading indicators from that period to identify root cause, and check current leading indicators to see if further decline is in the pipeline",
+              description: "Lag-adjusted root cause analysis: correct. Revenue is the outcome; you need to look upstream to find the cause.",
+            },
+            {
+              id: "b",
+              label: "Investigate this month's campaigns — a revenue drop means something changed in acquisition this month",
+              description: "This month's acquisition will show up in revenue in 6–10 weeks, not now. The cause is in the past.",
+            },
+            {
+              id: "c",
+              label: "Revenue is a lagging metric, so it's not useful for diagnosis — switch to leading metrics only",
+              description: "Lagging metrics are still useful — they confirm the outcome and set the urgency level. The error is using them alone.",
+            },
+          ],
+          branches: {
+            a: "ps_m2_stage3",
+            b: "ps_m2_rec1",
+            c: "ps_m2_rec1",
+          },
+          rationale:
+            "A is correct. Revenue this month is the crystallized outcome of decisions and behaviors from 6–10 weeks ago. The diagnostic process: (1) trace back to what was happening with leading indicators 6–10 weeks ago, (2) check current leading indicators to forecast whether more decline is coming. This is what lag-adjusted analysis looks like.",
+        },
+
+        ps_m2_stage3: {
+          id: "ps_m2_stage3",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · Validate the leading indicator",
+          prompt:
+            "You want to propose D14 feature adoption rate as the new leading KPI in your weekly review. The VP asks: 'How do we know this actually predicts revenue and not just correlates by coincidence?' What's your answer?",
+          choices: [
+            {
+              id: "a",
+              label: "Plot D14 adoption against 90-day revenue at the same lag offset across 6 cohorts — if r > 0.5 consistently, it's predictive. Then run Granger causality to confirm the direction is adoption → revenue, not reverse.",
+              description: "Correct: cross-cohort correlation at the right lag offset + Granger causality for directional validation.",
+            },
+            {
+              id: "b",
+              label: "Show that D14 adoption and revenue move together in the same week — high correlation proves the relationship",
+              description: "Same-week correlation doesn't establish a lag relationship and is susceptible to confounders (both may respond to a third factor like a seasonal campaign).",
+            },
+            {
+              id: "c",
+              label: "It's intuitive that adoption predicts retention — no statistical validation is needed for obvious leading indicators",
+              description: "Intuition is how teams end up optimizing broken proxies for years. Validation is necessary.",
+            },
+            {
+              id: "d",
+              label: "Track it for one cohort for 90 days and then revisit — a single data point will tell us if it's predictive",
+              description: "One cohort is susceptible to seasonality and outliers. Multi-cohort validation is required for a stable signal.",
+            },
+          ],
+          branches: {
+            a: "ps_m2_stage4",
+            b: "ps_m2_rec2",
+            c: "ps_m2_rec2",
+            d: "ps_m2_rec2",
+          },
+          rationale:
+            "A is the correct methodology. Lag-offset correlation across multiple cohorts establishes predictive strength. Granger causality tests confirm the directional relationship — that adoption predicts revenue, not that revenue predicts adoption. These two together give you the justification to use a leading indicator as a primary KPI in reviews.",
+        },
+
+        ps_m2_rec2: {
+          id: "ps_m2_rec2",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery · Granger causality basics",
+          prompt:
+            "What does it mean for metric A to 'Granger-cause' metric B — and why is this useful for leading indicator validation?",
+          choices: [
+            {
+              id: "a",
+              label: "Past values of A improve predictions of future B beyond what B's own history predicts alone — this confirms A is directionally predictive of B, not just correlated",
+              description: "Correct: Granger causality establishes predictive direction, which is precisely what leading indicator validation requires.",
+            },
+            {
+              id: "b",
+              label: "A physically causes B through a mechanism we have identified — Granger causality proves causal mechanism",
+              description: "Granger causality is about predictive direction, not causal mechanism. It does not prove that A causes B in a physical or structural sense.",
+            },
+            {
+              id: "c",
+              label: "A and B have a correlation coefficient above 0.7 — strong correlation is Granger causality",
+              description: "Correlation does not test direction or predictive improvement. Granger causality is a specific time-series test, not a correlation threshold.",
+            },
+          ],
+          branches: {
+            a: "ps_m2_stage4",
+            b: "ps_m2_rec2",
+            c: "ps_m2_rec2",
+          },
+          rationale:
+            "Granger causality tests whether including past values of A as a predictor significantly reduces the forecast error for B, relative to using only B's own history. This establishes directional predictive power — exactly what you need to justify calling A a leading indicator of B.",
+        },
+
+        ps_m2_stage4: {
+          id: "ps_m2_stage4",
+          type: "scenario_choice",
+          badge: "Stage 4",
+          title: "Stage 4 · Metric decay",
+          prompt:
+            "Eighteen months ago, 'logged in within 7 days of signup' had a 0.62 correlation with 90-day retention. The team optimized onboarding to push a second login. D7 login rate is now 92%. Re-running the analysis, the correlation with 90-day retention has dropped to 0.18. What happened and what should you do?",
+          choices: [
+            {
+              id: "a",
+              label: "The metric decayed — optimization pressure caused teams to hit the number without improving the underlying behavior. Rotate to a deeper behavioral signal (e.g., core feature completion) and re-validate.",
+              description: "Classic Goodhart's Law metric decay. The leading indicator became gameable and lost predictive power.",
+            },
+            {
+              id: "b",
+              label: "The correlation dropped because of seasonality — run the analysis on a seasonal cohort to restore confidence",
+              description: "Seasonality affects magnitude, not the systematic collapse of predictive power across all recent cohorts. A 0.62 → 0.18 drop is structural, not seasonal.",
+            },
+            {
+              id: "c",
+              label: "The product has fundamentally changed, so the original metric never applied — go back to lagging metrics only",
+              description: "Product change can reduce predictive power, but the response is to find a better leading indicator, not to revert to lagging-only dashboards.",
+            },
+            {
+              id: "d",
+              label: "Raise the D7 login threshold from 1 login to 3 logins to restore signal quality",
+              description: "If the team optimized forced logins, raising the threshold will produce forced 3-login events. The gaming pattern follows the threshold.",
+            },
+          ],
+          branches: {
+            a: "ps_m2_stage5",
+            b: "ps_m2_rec3",
+            c: "ps_m2_rec3",
+            d: "ps_m2_rec3",
+          },
+          rationale:
+            "This is Goodhart's Law in action: the team optimized D7 login rate and achieved it through mechanisms that did not improve genuine engagement. The correlation with 90-day retention collapsed because the metric no longer measures what it once measured. The correct response is to find a deeper behavioral proxy — something harder to game, like completing a core workflow, creating a document, or inviting a collaborator — and re-validate.",
+        },
+
+        ps_m2_rec3: {
+          id: "ps_m2_rec3",
+          type: "scenario_choice",
+          badge: "Recovery 3",
+          title: "Recovery · Goodhart's Law",
+          prompt:
+            "Goodhart's Law: 'When a measure becomes a target, it ceases to be a good measure.' Which of the following is the best real-world application of this principle for dashboard design?",
+          choices: [
+            {
+              id: "a",
+              label: "Pair every optimized leading metric with a guardrail on the downstream lagging outcome it is supposed to predict — if the leading metric rises but the lagging outcome doesn't follow, the proxy has decayed",
+              description: "Correct: the guardrail on the downstream outcome is what catches metric decay before it becomes strategic misdirection.",
+            },
+            {
+              id: "b",
+              label: "Use only lagging metrics to avoid gaming — they can't be manipulated because they reflect real revenue",
+              description: "Lagging metrics can also be gamed (e.g., pulling forward revenue with discounts). The answer is guardrails, not abandoning leading indicators.",
+            },
+            {
+              id: "c",
+              label: "Rotate metrics every quarter regardless of predictive performance to prevent teams from optimizing them",
+              description: "Arbitrary rotation destroys signal continuity. Rotation should happen when predictive power degrades, not on a fixed schedule.",
+            },
+          ],
+          branches: {
+            a: "ps_m2_stage5",
+            b: "ps_m2_rec3",
+            c: "ps_m2_rec3",
+          },
+          rationale:
+            "The guardrail on the lagging outcome is the correct defense against Goodhart's Law. If D7 login rate is your leading indicator and 90-day retention is its downstream lagging outcome, you monitor both. A team can hit D7 login rate through forced logins, but they cannot simultaneously fake a 90-day retention improvement. The guardrail catches the gaming.",
+        },
+
+        ps_m2_stage5: {
+          id: "ps_m2_stage5",
+          type: "scenario_choice",
+          badge: "Stage 5",
+          title: "Stage 5 · Dashboard design decision",
+          prompt:
+            "You are redesigning the weekly product review dashboard. The current dashboard has only revenue, new subscriptions, and ACV. A PM says 'we should replace the revenue line with D7 retention — it's more actionable.' How do you respond?",
+          choices: [
+            {
+              id: "a",
+              label: "Keep both: revenue for accountability to leadership and investors, D7 retention as a predictive leading indicator. Add a lever tier showing the specific onboarding actions the team controls.",
+              description: "Three-tier design: accountability (lagging) + prediction (leading) + levers. Neither replaces the other.",
+            },
+            {
+              id: "b",
+              label: "Replace revenue with D7 retention — leading metrics are more actionable, so they should be the primary KPI",
+              description: "Leading metrics cannot replace lagging accountability metrics. Revenue and churn are the ground truth the business is accountable to.",
+            },
+            {
+              id: "c",
+              label: "Keep only revenue — D7 retention is a lower-level metric that shouldn't be in the executive view",
+              description: "This restores the original problem. Without leading indicators in the review, decisions are made on data that is 6–10 weeks stale.",
+            },
+            {
+              id: "d",
+              label: "Replace both with a composite health score that blends leading and lagging metrics",
+              description: "Composite scores obscure which component moved. Decomposed metrics are more actionable and auditable.",
+            },
+          ],
+          branches: {
+            a: "ps_m2_terminal",
+            b: "ps_m2_rec3",
+            c: "ps_m2_rec3",
+            d: "ps_m2_rec3",
+          },
+          rationale:
+            "A is the correct architecture. The three-tier dashboard design keeps lagging metrics for accountability (revenue is not optional — leadership and investors require it), adds leading indicators for predictive steering (D7 retention), and adds lever metrics for team-level action (onboarding step completion, notification send rate). The key insight: leading and lagging metrics serve different audiences and different purposes. Replacing one with the other always loses something important.",
+        },
+
+        ps_m2_terminal: {
+          id: "ps_m2_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · Full framework",
+          prompt:
+            "Final check: an interviewer asks 'revenue dropped this quarter, how do you diagnose this and what would your dashboard look like going forward?' What is the strongest answer?",
+          choices: [
+            {
+              id: "a",
+              label: "Diagnose using the lagging→leading causal chain; build a three-tier dashboard going forward",
+              description: "Revenue this quarter reflects behavior from 6–10 weeks ago. Diagnose by examining leading indicators (retention, feature adoption) from that period, check current leading indicators to forecast if more decline is coming, then build a three-tier dashboard: lagging for accountability, validated leading for early warning, lever metrics for team action.",
+            },
+            {
+              id: "b",
+              label: "Check last quarter's revenue breakdown by segment first, then decide on metrics",
+              description: "Segment analysis is useful but starts in the wrong place — segment breakdown is still a lagging investigation. The temporal gap and causal chain come first.",
+            },
+            {
+              id: "c",
+              label: "Present the raw revenue chart to leadership and wait for their hypothesis",
+              description: "This abdicates the analytical responsibility — a strong DS brings a structured framework, not a chart and a shrug.",
+            },
+          ],
+          branches: { a: "ps_m2_terminal", b: "ps_m2_terminal", c: "ps_m2_terminal" },
+          terminal: true,
+          rationale:
+            "The strongest answer demonstrates three things: (1) temporal lag awareness — revenue is not a present-tense metric; (2) causal chain diagnosis — using the lagging outcome to trigger investigation of historical leading indicators from 6–10 weeks prior; (3) forward-looking dashboard design — a three-tier system that prevents the same blind spot from recurring.",
+        },
       },
     },
+
+    knowledgeCheck: [
+      {
+        question:
+          "A B2B SaaS company notices that customers who complete 3+ integrations within the first 30 days have 85% 12-month retention, versus 42% for customers who complete fewer than 3. Is '30-day integration count' a leading or lagging indicator of retention — and what makes it valid?",
+        options: [
+          "Lagging — it measures behavior that already happened, so it only confirms past outcomes",
+          "Leading — it is observable before 12-month retention crystallizes, and its correlation with the downstream outcome is empirically validated across cohorts",
+          "Neither — it is a proxy metric, not a true leading or lagging indicator",
+        ],
+        correctIndex: 1,
+        explanation:
+          "30-day integration count is a leading indicator of 12-month retention. It satisfies both validation criteria: (1) it is observable at day 30, before the 12-month retention outcome is determined; (2) it has a validated correlation with the downstream lagging outcome. The fact that it measures past behavior (integrations done) does not make it lagging — 'lagging' refers to the relationship with the outcome being predicted, not whether the behavior has occurred. A metric is leading when it predicts a future outcome; lagging when it confirms a past one.",
+      },
+      {
+        question:
+          "DAU dropped 12% and average session length dropped 8%. Approximately how much did total engagement minutes change — and why does the decomposition matter for diagnosis?",
+        options: [
+          "Dropped 12% — the DAU change dominates and session length is a secondary factor",
+          "Dropped approximately 19% — both factors compound multiplicatively (0.88 × 0.92 ≈ 0.81), and the decomposition identifies whether this is a top-of-funnel (acquisition/notification) problem or an in-product value problem",
+          "Dropped exactly 20% — the two percentages add linearly",
+        ],
+        correctIndex: 1,
+        explanation:
+          "Engagement minutes = DAU × session length. With DAU at 0.88 of baseline and session length at 0.92: 0.88 × 0.92 = 0.81, a ~19% drop. The decomposition is essential for routing the problem to the right team: a DAU drop is a top-of-funnel problem (acquisition quality, notification effectiveness, re-engagement) requiring growth or marketing action; a session length drop is an in-product value problem (features not delivering value, UX friction, content quality) requiring product action. The aggregate metric hides which team to engage.",
+      },
+      {
+        question:
+          "Six months ago, 'sent a message within 48 hours of signup' had a 0.58 correlation with 90-day retention in your messaging app. The growth team optimized the onboarding flow to prompt a message send. The metric is now at 94%. Re-analysis shows the correlation with 90-day retention has dropped to 0.14. What has occurred and what is the correct response?",
+        options: [
+          "The sample size increased, reducing the correlation coefficient — re-run with a smaller cohort to restore the original signal",
+          "The metric experienced Goodhart's Law decay — the leading indicator was optimized to the point where hitting the number no longer requires the genuine engagement it once proxied. Rotate to a deeper behavioral signal and re-validate.",
+          "The product has improved, so the leading indicator threshold should be raised from 1 message to 5 messages",
+        ],
+        correctIndex: 1,
+        explanation:
+          "This is a textbook Goodhart's Law metric decay. The team optimized 'sent a message within 48 hours' by building prompts that produced low-quality, one-off messages that didn't reflect genuine engagement intent. The metric hit 94% but no longer predicts whether users will stick around for 90 days. The correct response is to find a deeper behavioral proxy that is harder to game — for example, 'had a two-way conversation thread with 3+ exchanges within 14 days' — and re-validate its predictive power before promoting it as the leading KPI.",
+      },
+    ],
   },
-  knowledgeCheck: [
-    {
-      question: "Which of the following is a leading indicator for a consumer subscription app?",
-      options: [
-        "Monthly churn rate",
-        "Annual recurring revenue",
-        "Day-7 retention rate",
-      ],
-      correctIndex: 2,
-      explanation: "D7 retention predicts whether new users will become long-term active users — it's observable 7 days after acquisition and predicts 30/60/90-day retention. Monthly churn and ARR are lagging: they confirm outcomes that are already baked in from decisions made weeks earlier.",
-    },
-    {
-      question: "If you only monitor lagging metrics, what is the key operational risk?",
-      options: [
-        "Lagging metrics are too expensive to compute at scale",
-        "By the time a lagging metric drops, the root cause is weeks or months old — intervention is late and recovery is slow",
-        "Lagging metrics aren't auditable",
-      ],
-      correctIndex: 1,
-      explanation: "Lagging metrics (revenue, churn) reflect past decisions. When they drop, the underlying cause — engagement, satisfaction, acquisition quality — already deteriorated long before. Without leading indicators, you're steering by looking in the rearview mirror.",
-    },
-    {
-      question: "DAU dropped 10% and average session length dropped 10%. Total engagement minutes dropped how much — and why does this distinction matter?",
-      options: [
-        "Dropped 10% — only one factor caused the decline",
-        "Dropped approximately 19% — both factors compound multiplicatively, and diagnosing which component dropped guides which team acts",
-        "Dropped 20% — the two effects simply add together",
-      ],
-      correctIndex: 1,
-      explanation: "Engagement minutes = DAU × session length. With both down 10%: 0.9 × 0.9 = 0.81, so total is down ~19%. The diagnostic matters: a DAU drop is a top-of-funnel (acquisition/notification) problem; a session length drop is an in-product value problem. Same outcome metric, different root causes, different teams to engage.",
-    },
-  ],
-},
 
 "ps-m3": {
-  durationLabel: "10 min",
-  outcomes: [
-    "Define guardrail metrics as constraints that must not degrade, even when primary metrics improve",
-    "Give examples across latency, error rate, revenue cannibalization, and safety dimensions",
-    "Set thresholds using baseline ± acceptable degradation",
-    "Apply the multi-metric decision tree to ship/no-ship decisions",
-  ],
-  learnMarkdown: `## Guardrail Metrics
-
-A guardrail metric is a **constraint**, not an objective. While your experiment tries to improve the primary metric, guardrail metrics define what must not get worse. Shipping a feature that improves engagement but breaks something else is worse than not shipping at all.
-
----
-
-## Why Guardrails Exist
-
-Optimization is adversarial with respect to unmonitored dimensions. If you optimize only for click-through rate, you may inadvertently increase page load time, error rate, or user complaints. Guardrails prevent this.
-
----
-
-## Common Guardrail Metrics
-
-| Category | Example |
-|----------|---------|
-| Performance | p99 latency < 500ms; error rate < 0.1% |
-| Revenue | Revenue per user ≥ baseline (no cannibalization) |
-| Safety | Content moderation incident rate |
-| Accessibility | Screen reader compatibility score |
-| User health | Report-as-spam rate; unsubscribe rate |
-
----
-
-## Setting Thresholds
-
-Thresholds are set as: **baseline ± maximum acceptable degradation**.
-
-Baseline = the pre-experiment metric value. The maximum degradation is determined by business impact: "What does a 1% increase in error rate cost us?" For a $10M/year business, 1% error rate increase might represent $100K in support costs — define whether that's acceptable.
-
-Set thresholds **before** the experiment starts. Do not adjust thresholds after seeing results.
-
----
-
-## The Multi-Metric Decision Tree
-
-\`\`\`
-Primary metric ↑ AND all guardrails OK → Ship
-Primary metric ↑ BUT guardrail violated → Investigate trade-off → Stakeholder decision
-Primary metric flat or ↓ → Don't ship (unless reducing tech debt)
-\`\`\`
-
-The "investigate" case is the hardest. A 15% engagement improvement with a 30% support ticket increase is not obviously worth it — that's a business judgment call, not a data call.
-`,
-  video: null,
-  videoFallbackMarkdown: `## Deep Dive: Defining Guardrail Thresholds
-
-**Relative vs absolute thresholds**: a relative threshold ("latency doesn't increase by more than 10%") is independent of baseline. An absolute threshold ("latency stays below 500ms") is appropriate when there's a known SLA or user-experience cliff.
-
-**Statistical power for guardrails**: to detect a guardrail violation, your experiment must be powered to detect the minimum violation you care about, not just the primary metric effect size. Run a separate power analysis for each guardrail metric.
-`,
-  tryGuidance: "No interactive viz for this lesson — work through the decision tree scenarios in the interview simulation.",
-  interviewGraph: {
-    initialStageId: "ps_m3_stage1",
-    artifactDimensions: [
-      { label: "Guardrail Definition", recoveryStageId: "ps_m3_rec1" },
-      { label: "Trade-off Decision", recoveryStageId: "ps_m3_terminal", passLabel: "Ship Decision" },
+    durationLabel: "14 min",
+    outcomes: [
+      "Explain why guardrail metrics are constraints, not objectives, and how they differ from success metrics",
+      "Set guardrail thresholds using historical baseline plus business-meaningful degradation limits",
+      "Apply the multi-metric decision tree to real A/B test scenarios involving latency, revenue, and spam guardrails",
+      "Recognize post-hoc threshold manipulation as a form of HARKing that invalidates experimental results",
     ],
-    stages: {
-      ps_m3_stage1: {
-        id: "ps_m3_stage1",
-        type: "scenario_choice",
-        badge: "Stage 1",
-        title: "Stage 1 · Guardrail violation",
-        prompt: "Your experiment shows +15% engagement but support ticket volume increased +30%. The PM says 'the engagement win is too big to ignore — ship it.' What do you say?",
-        choices: [
-          { id: "a", label: "Agree — engagement is the primary metric and it improved", description: "Ignoring a 30% support ticket increase is expensive and harmful to users." },
-          { id: "b", label: "Support tickets are a guardrail metric — a 30% increase may cost more in support than the engagement gain is worth; need a cost-benefit analysis before deciding", description: "Quantify the cost: 30% more tickets × cost per ticket vs. revenue value of 15% engagement improvement." },
-          { id: "c", label: "Do nothing — ship the control, neither version is clearly better", description: "The primary metric clearly improved. The question is whether the guardrail violation is acceptable." },
-        ],
-        branches: { a: "ps_m3_rec1", b: "ps_m3_stage2", c: "ps_m3_rec1" },
-        rationale: "B is correct. This is a classic trade-off decision. The engagement improvement might generate $200K/year in revenue. The support ticket increase might cost $300K/year in ops. That's a net loss. Guardrail violations require stakeholder-level cost-benefit analysis — it's not just a data question.",
-      },
-      ps_m3_rec1: {
-        id: "ps_m3_rec1",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · Guardrail purpose",
-        prompt: "What is the purpose of a guardrail metric, and how is it different from a primary metric?",
-        choices: [
-          { id: "a", label: "A guardrail is a constraint that must not degrade — it doesn't need to improve, but it must not get worse by more than an agreed threshold", description: "Primary metrics are objectives to maximize; guardrails are constraints to satisfy." },
-        ],
-        branches: { a: "ps_m3_stage2" },
-        rationale: "Primary metrics are objectives; guardrails are constraints. You ship when the objective improves AND constraints are satisfied.",
-      },
-      ps_m3_stage2: {
-        id: "ps_m3_stage2",
-        type: "scenario_choice",
-        badge: "Stage 2",
-        title: "Stage 2 · Threshold timing",
-        prompt: "After running an experiment, you see the latency guardrail is borderline. Can you raise the threshold to allow the result through?",
-        choices: [
-          { id: "a", label: "Yes — you should use the data to set appropriate thresholds", description: "Changing thresholds after seeing results is post-hoc rationalization." },
-          { id: "b", label: "No — guardrail thresholds must be set before the experiment; changing them after seeing results is HARKing (Hypothesizing After Results are Known)", description: "Pre-registration of thresholds prevents rationalization of bad results." },
-        ],
-        branches: { a: "ps_m3_rec1", b: "ps_m3_terminal" },
-        rationale: "B is correct. Setting thresholds after seeing data introduces bias — you're retroactively justifying a ship decision. All guardrail thresholds must be pre-registered before experiment launch. This is a discipline issue, not a data issue.",
-      },
-      ps_m3_terminal: {
-        id: "ps_m3_terminal",
-        type: "scenario_choice",
-        badge: "Complete",
-        title: "Complete · Decision framework",
-        prompt: "Primary metric up, all guardrails OK. What's the decision?",
-        choices: [
-          { id: "a", label: "Ship — this is the clear case in the decision tree", description: "Both objective (primary metric improved) and constraints (guardrails satisfied) are met." },
-        ],
-        branches: { a: "ps_m3_terminal" },
-        terminal: true,
-        rationale: "The multi-metric decision tree is straightforward in this case: primary metric improved AND guardrails satisfied → ship.",
+    learnMarkdown: `## Guardrail Metrics: What Shouldn't Break
+
+There is a version of winning an experiment that is actually losing. Your North Star goes up. The PM is celebrating. And then you notice: app crash rate tripled. Notification opt-outs doubled. Support ticket volume is up 40%. You didn't win — you optimized one dimension while quietly destroying three others.
+
+Guardrail metrics are the constraints that stop you from winning the battle and losing the war. They are not metrics you try to improve. They are metrics you must not degrade. Their job is to bound the optimization space so that chasing your primary metric doesn't silently wreck user experience, business health, or legal and ethical commitments.
+
+---
+
+## What Guardrails Protect
+
+Guardrail metrics fall into three protection domains:
+
+**1. User experience health** — The product must remain usable and trustworthy. A feature that improves engagement but increases page load time from 300ms to 900ms has crossed a cliff in user tolerance. Guardrails here include p99 latency, error rate, crash rate, and accessibility score. These are often the easiest to instrument and the fastest to violate.
+
+**2. Business health** — Gains in one metric should not cannibalize others. An algorithm that increases clicks by 12% but reduces revenue per click by 15% produces a net revenue loss. The primary metric went up; the business got worse. Guardrails here include revenue per user, subscription cancellation rate, and ad revenue per session — cannibalization is invisible unless you measure it explicitly.
+
+**3. Legal, ethical, and policy constraints** — Some degradations are non-negotiable. Spam rate, content moderation incident rate, and bias metrics in hiring or lending systems are hard floors, not cost-benefit trade-offs. Crossing them triggers regulatory exposure, not merely operational cost.
+
+---
+
+## Guardrails vs Success Metrics
+
+The distinction is structural, not semantic:
+
+| | Success metric | Guardrail metric |
+|---|---|---|
+| **Goal** | Maximize | Do not degrade |
+| **Direction** | Higher is better | Must stay above floor |
+| **Threshold logic** | Did we exceed the MDE? | Did we breach the maximum degradation? |
+| **Ship condition** | Required to improve | Required to NOT worsen |
+
+You can ship if the success metric improves AND all guardrails are satisfied. A guardrail that merely stays flat is fine — it doesn't need to improve. A guardrail that degrades by even a small amount past the threshold is a violation, regardless of how large the primary metric improvement was.
+
+---
+
+## Setting Guardrail Thresholds
+
+Thresholds must be set **before the experiment launches**. The formula:
+
+\`\`\`
+guardrail_threshold = historical_baseline − maximum_acceptable_degradation
+\`\`\`
+
+**Statistical vs business-meaningful degradation**: the question is not "what change would be statistically significant?" — it's "what change would cause real business or user harm?"
+
+For a latency guardrail: if your baseline p99 is 420ms and user research shows satisfaction drops sharply above 500ms, your guardrail threshold is 500ms. Any experiment that pushes p99 past 500ms violates the guardrail — regardless of statistical significance.
+
+For a revenue guardrail: if you run $10M/year in ad revenue, a 2% degradation costs $200K. If the team has agreed that no single experiment should carry more than $500K in reversible risk, set the threshold at 5% degradation. These are business conversations, not statistical ones.
+
+For a spam/safety guardrail: hard absolute limits apply. "Spam rate must not exceed 0.3% of notifications sent" is an SLA with regulatory implications — crossing it triggers escalation regardless of DAU performance.
+
+---
+
+## Guardrails in A/B Testing
+
+Three canonical examples illustrate how guardrails are applied in practice:
+
+**Latency guardrail on a recommendation experiment**: a new ML ranking model might be slower at inference. If p99 latency crosses the threshold (say, 600ms), the experiment is a no-ship even if CTR improved 8%. Users will never notice 8% more relevant results — they will notice a 40% slower page load.
+
+**Revenue guardrail on engagement features**: session time increases often reduce ad impressions per session (users go deeper into fewer pages). A 10% session time gain that reduces ad RPM by 12% is a net revenue loss. Track revenue per session as a guardrail alongside engagement.
+
+**Spam rate guardrail on growth features**: aggressive notification experiments produce short-term DAU gains and long-term churn. Track opt-out rate, uninstall rate, and report-as-spam rate as guardrails. If any breach their threshold, the DAU lift is meaningless.
+
+---
+
+## The Decision Tree
+
+\`\`\`
+Primary metric ↑  AND  all guardrails OK      →  Ship
+Primary metric ↑  BUT  guardrail violated     →  Quantify cost-benefit → Stakeholder decision
+Primary metric ↓  OR   flat                  →  Do not ship
+\`\`\`
+
+The middle case is the hard one. Translate the guardrail degradation into business cost, compare it to the primary metric gain in business value, and escalate to stakeholders. It is a judgment call — but an *informed* one, not "the engagement number is too exciting to stop."
+
+---
+
+## Interview-Ready Summary
+
+Guardrail metrics are pre-registered constraints that bound what your experiment is allowed to do on dimensions other than the primary metric. They protect user experience (latency, crashes), business health (revenue cannibalization), and policy floors (spam, safety). Thresholds are set before launch using historical baselines plus the maximum degradation the business can absorb. Changing thresholds after seeing results is HARKing — it invalidates the experiment. When a guardrail is violated and the primary metric improved, you do not automatically ship or automatically block — you quantify the cost-benefit and escalate to stakeholders. The goal of guardrails is to ensure that when you win an experiment, you've actually won.
+`,
+    video: null,
+    videoFallbackMarkdown: `## Deep Dive: Organizational Guardrails and Threshold Decisions
+
+### Team-Level SLAs and Cross-Team Dependencies
+
+Guardrails are not just experiment constructs — they encode organizational commitments. An SRE team may have a service-level agreement that p99 API latency stays below 400ms across all features. That SLA becomes a hard guardrail for every data science experiment touching that service. Product teams do not get to negotiate it away because their CTR went up. These cross-team dependencies mean your guardrail list is partly inherited: you must consult infrastructure, legal, and finance teams during experiment design to surface commitments you didn't know existed.
+
+### How to Decide Guardrail Thresholds
+
+The process starts with the historical baseline — the 30- or 90-day pre-experiment average for each metric. Then you apply two filters:
+
+**Business impact threshold**: translate degradation into dollars. A 1% increase in support ticket volume costs roughly (tickets/month × cost per ticket × 0.01). If that number exceeds your acceptable operational overhead for a feature launch, that's your ceiling.
+
+**User experience cliff**: some metrics have non-linear impact curves. Latency below 500ms has low user sensitivity; above 500ms, satisfaction drops sharply and abandonment rates spike. Set thresholds just below these cliffs, not at arbitrary percentages of baseline.
+
+### The Asymmetry of Guardrails
+
+Hard, fast-moving metrics — crashes, latency, error rate — are easy to guard because violations appear immediately in the experiment window. Soft, slow-moving metrics — content quality degradation, long-term user trust, gradual increases in misleading content — are much harder. By the time they appear as statistically detectable guardrail violations, weeks of harm may have already occurred. This asymmetry means guardrails are strongest for engineering health metrics and weakest for long-term user wellbeing metrics, which is precisely where the most serious product harms tend to originate. Recognizing this gap is part of responsible experiment design.
+`,
+    tryGuidance: "No interactive viz for this lesson — work through the click-target and scenario stages in the interview simulation below.",
+    interviewGraph: {
+      initialStageId: "ps_m3_identify",
+      artifactDimensions: [
+        { label: "Guardrail Recognition", recoveryStageId: "ps_m3_rec1" },
+        { label: "Threshold & Trade-off", recoveryStageId: "ps_m3_rec2", passLabel: "Ship Decision" },
+      ],
+      stages: {
+        ps_m3_identify: {
+          id: "ps_m3_identify",
+          type: "click_target",
+          badge: "Stage 1",
+          title: "Stage 1 · Spot the missing guardrails",
+          prompt: "This experiment spec is missing something critical. Click on the part of the configuration that represents the gap that could allow a harmful ship.",
+          code_snippet: `# A/B Experiment Configuration
+# Feature: Aggressive push notification increase
+
+experiment = {
+    "name": "push_notif_volume_test",
+    "hypothesis": "More notifications → more DAU",
+    "primary_metric": "daily_active_users",       -- ds-target:ps_m3_no_guardrails
+    "success_threshold": "+2% DAU",
+    "duration_days": 14,
+    "traffic_split": 0.5,
+    # No guardrail metrics defined
+}`,
+          validationCopy: {
+            ps_m3_no_guardrails: "Correct — this experiment has a success metric but no guardrails. Without tracking notification opt-out rate, app uninstalls, and report-as-spam rate, a 2% DAU lift could be hiding a 50% increase in unsubscribes that will crater DAU in 30 days.",
+          },
+          branches: { ps_m3_no_guardrails: "ps_m3_stage2" },
+        },
+        ps_m3_stage2: {
+          id: "ps_m3_stage2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Choosing the right guardrails",
+          prompt: "You're designing guardrails for the push notification volume experiment. The primary metric is DAU. Which set of guardrail metrics is most appropriate?",
+          choices: [
+            { id: "a", label: "Notification open rate and click-through rate", description: "These are engagement metrics that move in the same direction as the hypothesis — they could increase even as users become annoyed. They measure interest, not harm." },
+            { id: "b", label: "Notification opt-out rate, app uninstall rate, and report-as-spam rate — with pre-registered maximum degradation thresholds for each", description: "These capture the harm pathways: users who are overloaded with notifications will opt out, uninstall, or mark as spam. All three are leading indicators of churn that precede DAU decline." },
+            { id: "c", label: "Daily revenue and session length", description: "Useful secondary metrics, but they don't capture the specific harm of notification fatigue. You need direct behavioral signals of user rejection." },
+            { id: "d", label: "Server-side notification delivery rate and push token validity", description: "These are infrastructure health metrics — useful for debugging but not guardrails against user harm from over-notification." },
+          ],
+          branches: { a: "ps_m3_rec1", b: "ps_m3_stage3", c: "ps_m3_rec1", d: "ps_m3_rec1" },
+          rationale: "B is correct. Guardrails must cover the specific harm pathways of your experiment. For push notification volume tests, the risk is notification fatigue — users opt out, uninstall, or report spam. These behaviors are the direct signal of crossing a user tolerance threshold, and they precede long-term DAU decline by weeks.",
+        },
+        ps_m3_rec1: {
+          id: "ps_m3_rec1",
+          type: "scenario_choice",
+          badge: "Recovery 1",
+          title: "Recovery 1 · What guardrails actually protect",
+          prompt: "Why must guardrail metrics cover the specific harm pathways of the experiment, rather than general product health metrics?",
+          choices: [
+            { id: "a", label: "Because general health metrics are too expensive to track", description: "Cost is not the reason — relevance is. You should track general health metrics too." },
+            { id: "b", label: "Because an experiment may improve general health while causing targeted harm — guardrails need to be sensitive to the mechanism by which this specific change could hurt users", description: "A notification experiment could push DAU and session length up while silently driving opt-outs. Only guardrails targeted at notification behavior will catch that." },
+            { id: "c", label: "Because guardrail metrics are only checked post-launch, not during the experiment", description: "Guardrails are monitored during the experiment and are grounds for early stopping if breached." },
+            { id: "d", label: "Because the primary metric already covers user experience harm", description: "Primary metrics measure improvement, not the side-effects that guardrails are designed to catch." },
+          ],
+          branches: { a: "ps_m3_stage3", b: "ps_m3_stage3", c: "ps_m3_stage3", d: "ps_m3_stage3" },
+          rationale: "B is correct. General health metrics average across many dimensions and can mask localized harm. If your experiment triples notification volume, general engagement metrics might improve while notification-specific harm accumulates. Guardrails must target the mechanism of potential harm, not just overall product health.",
+        },
+        ps_m3_stage3: {
+          id: "ps_m3_stage3",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · Setting the threshold",
+          prompt: "Historical baseline: notification opt-out rate is 1.2%. Your business analysis shows each 0.5pp increase in opt-out rate costs approximately $80K/year in lost engagement. The team has pre-agreed that no single experiment should carry more than $150K annualized risk. What should your guardrail threshold be?",
+          choices: [
+            { id: "a", label: "2.2% — a 1pp absolute increase, because round numbers are easier to track", description: "Threshold setting should be grounded in business impact, not rounding convenience." },
+            { id: "b", label: "1.2% — no degradation is acceptable under any circumstances", description: "This is too strict — experiment noise alone could trip this. Thresholds must account for acceptable degradation, not zero degradation." },
+            { id: "c", label: "2.1% — allowing ~0.9pp increase, just under the $150K risk ceiling (0.9 × $160K/pp ≈ $144K)", description: "This anchors the threshold to a business impact calculation: $150K ceiling ÷ $160K per pp ≈ 0.94pp maximum degradation, placing the threshold at approximately 2.1–2.15%." },
+            { id: "d", label: "Set no numerical threshold — just flag it as a metric to watch", description: "A guardrail without a pre-registered threshold is not a guardrail — it's a metric. The threshold is what makes it a constraint." },
+          ],
+          branches: { a: "ps_m3_rec2", b: "ps_m3_rec2", c: "ps_m3_stage4", d: "ps_m3_rec2" },
+          rationale: "C is correct. The threshold calculation is: $150K risk ceiling ÷ $160K cost per percentage point = 0.9375pp maximum allowed degradation. Baseline 1.2% + 0.94pp ≈ 2.14%, so a threshold of approximately 2.1% is appropriate. This is a business-meaningful threshold, not a statistical one. Option A uses an arbitrary round number. Option B sets a zero-tolerance threshold that experiment variance alone would trip.",
+        },
+        ps_m3_rec2: {
+          id: "ps_m3_rec2",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery 2 · Business-grounded thresholds",
+          prompt: "After the experiment, the team proposes raising the guardrail threshold because 'the opt-out increase was almost within bounds and the DAU gain was so strong.' What is wrong with this reasoning?",
+          choices: [
+            { id: "a", label: "Nothing — thresholds should be flexible to accommodate strong primary metric results", description: "This is precisely the dangerous pattern that pre-registration prevents." },
+            { id: "b", label: "Thresholds must be set before the experiment; adjusting them after seeing results is HARKing — you are retroactively choosing a threshold that lets the result pass, which is a form of selective reporting bias", description: "Pre-registered thresholds prevent p-hacking and rationalization. The moment you can move the threshold after seeing results, it stops being a constraint." },
+            { id: "c", label: "The DAU gain should be recalculated to ensure it offsets the threshold breach", description: "You can quantify the tradeoff, but you cannot retroactively move the threshold to make the breach disappear." },
+            { id: "d", label: "The threshold was wrong to begin with, so it should be corrected", description: "If the threshold calculation was wrong, you can document that for future experiments — but you cannot retroactively fix it for the current one, which was designed and run under the original threshold." },
+          ],
+          branches: { a: "ps_m3_stage4", b: "ps_m3_stage4", c: "ps_m3_stage4", d: "ps_m3_stage4" },
+          rationale: "B is correct. Changing thresholds after seeing results is HARKing (Hypothesizing After Results are Known). The entire value of pre-registration is that the decision rule was established before any results were visible. A threshold you can adjust after seeing the data is not a guardrail — it's theater. The right action when a guardrail is breached is to quantify the cost-benefit and escalate, not to move the threshold.",
+        },
+        ps_m3_stage4: {
+          id: "ps_m3_stage4",
+          type: "scenario_choice",
+          badge: "Stage 4",
+          title: "Stage 4 · The violated guardrail decision",
+          prompt: "Results are in. DAU improved +3.1% (above the +2% threshold — success). Opt-out rate reached 2.4% against a guardrail threshold of 2.1%. The PM says: 'The DAU win is worth it — ship.' What is the correct process?",
+          choices: [
+            { id: "a", label: "Agree — the primary metric cleared its threshold, which is the ship condition", description: "The ship condition is primary metric improved AND guardrails satisfied. Both conditions must hold." },
+            { id: "b", label: "Block the ship — any guardrail violation is an automatic rejection regardless of primary metric performance", description: "A guardrail violation escalates the decision, it does not automatically block it — but the decision must be made at the right level with quantified cost-benefit." },
+            { id: "c", label: "Quantify the annualized cost of the guardrail breach (~0.3pp × $160K/pp ≈ $48K/year), compare it to the annualized DAU gain value, and bring the cost-benefit to the relevant stakeholders for a business judgment decision", description: "This is the correct process: translate the guardrail degradation into business cost, compare to primary metric value, escalate to the stakeholders who own the business tradeoff." },
+            { id: "d", label: "Rerun the experiment with a smaller traffic split to see if the guardrail violation disappears", description: "The experiment has already run. Rerunning to fish for a result that clears guardrails is p-hacking." },
+          ],
+          branches: { a: "ps_m3_rec2", b: "ps_m3_stage5", c: "ps_m3_stage5", d: "ps_m3_rec2" },
+          rationale: "C is correct. A guardrail violation does not automatically block a ship — it escalates it. The data scientist's job is to quantify the cost: 0.3pp × $160K/pp ≈ $48K annualized loss from opt-out increase. Then the PM and finance stakeholders compare that to the annualized value of +3.1% DAU. If DAU is worth $2M/year and the guardrail cost is $48K, it may be worth shipping with a monitoring plan. If the values are closer, it may not be. That is a business judgment, not a data judgment.",
+        },
+        ps_m3_stage5: {
+          id: "ps_m3_stage5",
+          type: "scenario_choice",
+          badge: "Stage 5",
+          title: "Stage 5 · Revenue cannibalization guardrail",
+          prompt: "A new content recommendation engine increases average session time by 18% — a strong primary metric result. However, sessions that are longer but scroll deeper into older content generate fewer ad impressions than shorter sessions reading new content. Ad revenue per session dropped 11%. Is this a ship?",
+          choices: [
+            { id: "a", label: "Ship — session time is the primary metric and it improved substantially", description: "This ignores the revenue cannibalization. You need to calculate total revenue impact, not just the primary metric direction." },
+            { id: "b", label: "Calculate total revenue impact: if sessions × revenue/session determines total ad revenue, +18% session time × −11% revenue/session ≈ +5% total revenue — a net positive, so ship", description: "The math works here: 1.18 × 0.89 ≈ 1.05. But this only holds if the revenue-per-session guardrail was set with this tradeoff in mind. If the guardrail threshold was −5% (not −11%), the guardrail is still violated despite the net positive." },
+            { id: "c", label: "Revenue per session is a guardrail — an 11% decline exceeds any reasonable cannibalization threshold and is a no-ship regardless of session time improvement", description: "This depends entirely on where the guardrail threshold was set. A −11% revenue/session drop might or might not exceed the pre-agreed threshold." },
+            { id: "d", label: "The correct answer depends on the pre-registered guardrail threshold for revenue per session and the net revenue calculation — if total revenue is net positive and the threshold wasn't breached, ship; if the threshold was breached, escalate the cost-benefit", description: "The threshold was pre-registered. The question of whether to ship is determined by whether the actual degradation (−11%) exceeds the pre-agreed threshold, and then by the net business impact calculation." },
+          ],
+          branches: { a: "ps_m3_rec2", b: "ps_m3_terminal", c: "ps_m3_terminal", d: "ps_m3_terminal" },
+          rationale: "D is correct — and both B and C contain partial truths. The revenue cannibalization guardrail exists precisely because engagement features frequently reduce ad yield. Whether −11% breaches the pre-registered threshold depends on what the team agreed before launch. If the threshold was −5% degradation, the guardrail is violated despite a net positive total revenue. You cannot move the threshold post-hoc. You can quantify the cost-benefit and escalate. B's math is correct but ignores threshold breach. C assumes −11% is too much without knowing the threshold.",
+        },
+        ps_m3_terminal: {
+          id: "ps_m3_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · Guardrail framework mastered",
+          prompt: "You've navigated guardrail design, threshold setting, threshold integrity, and violation decision-making. What is the single most important discipline in guardrail metric practice?",
+          choices: [
+            { id: "a", label: "Always run a power analysis so your experiment can detect guardrail violations", description: "Important, but the more fundamental discipline is threshold pre-registration." },
+            { id: "b", label: "Pre-register all guardrail thresholds before the experiment launches — a threshold you can change after seeing results is not a guardrail, it is theater", description: "Pre-registration is what transforms a list of metrics to watch into actual constraints. Without it, every guardrail becomes negotiable, and the experiment framework loses its integrity." },
+            { id: "c", label: "Use absolute thresholds rather than relative thresholds for all guardrail metrics", description: "Both absolute and relative thresholds are valid depending on context. The discipline of pre-registration matters more than the form of the threshold." },
+          ],
+          branches: { a: "ps_m3_terminal", b: "ps_m3_terminal", c: "ps_m3_terminal" },
+          terminal: true,
+          rationale: "B is the core discipline. You can have perfect statistical power, perfectly chosen guardrail metrics, and thoughtful threshold calculations — and still undermine the entire framework by adjusting thresholds after results are visible. Pre-registration is the integrity mechanism that makes guardrails real constraints rather than post-hoc rationalizations.",
+        },
       },
     },
+    knowledgeCheck: [
+      {
+        question: "A growth experiment increases new user sign-ups by 9% but the spam complaint rate rises from 0.4% to 0.7% — a 75% relative increase. The pre-registered guardrail threshold was 0.6%. What is the correct decision?",
+        options: [
+          "Ship — the primary metric improvement outweighs a 0.1pp absolute increase in spam rate",
+          "The guardrail is violated; escalate to stakeholders with a quantified cost-benefit analysis — do not automatically ship or automatically block",
+          "Rerun the experiment for another two weeks to confirm the spam rate increase is real before making a decision",
+        ],
+        correctIndex: 1,
+        explanation: "The spam rate crossed the pre-registered threshold of 0.6%, making this a guardrail violation regardless of the primary metric result. The correct response is not automatic ship (ignores the violation) and not automatic block (overcorrects without analysis). The data scientist quantifies the annualized cost of the spam rate increase and compares it to the value of the sign-up lift, then escalates to the stakeholders who own the business tradeoff. Rerunning the experiment to fish for a cleaner result is p-hacking.",
+      },
+      {
+        question: "You set a guardrail threshold of p99 latency ≤ 480ms before your experiment launches. The results show p99 = 510ms. The PM argues the threshold was 'overly conservative' and proposes changing it to 550ms to allow the ship. What is this practice called, and why is it invalid?",
+        options: [
+          "This is threshold calibration — it is a valid practice when the original threshold was based on incomplete information",
+          "This is HARKing (Hypothesizing After Results are Known) — changing thresholds after seeing results retroactively justifies a ship decision and removes the constraint value of the guardrail",
+          "This is statistical power adjustment — it is valid when the experiment was underpowered to detect the true guardrail effect",
+        ],
+        correctIndex: 1,
+        explanation: "HARKing (Hypothesizing After Results are Known) describes the practice of defining or adjusting decision criteria after results are visible, which introduces selection bias. The threshold was 480ms. The result is 510ms. Moving the threshold to 550ms to accommodate the result is retroactive rationalization — you're choosing a threshold that makes your preferred outcome correct. If the original threshold was genuinely wrong for business reasons, document that learning and apply the corrected threshold to future experiments. Never move it post-hoc for a live result.",
+      },
+      {
+        question: "Which of the following best describes the difference between a guardrail metric and a success metric in an A/B test?",
+        options: [
+          "Success metrics are tracked by data scientists; guardrail metrics are tracked by engineers",
+          "A success metric is an objective to maximize — you ship if it improves past the MDE. A guardrail metric is a constraint to satisfy — you can ship only if it does not degrade past a pre-registered threshold",
+          "Guardrail metrics are more important than success metrics and should always be weighted more heavily in the ship decision",
+        ],
+        correctIndex: 1,
+        explanation: "The structural distinction is objective vs. constraint. A success metric defines the improvement you are trying to achieve — you ship when it clears the minimum detectable effect. A guardrail metric defines a floor that must be maintained — you can only ship when it has not breached the pre-registered degradation threshold. Neither is 'more important' in an absolute sense: ship conditions require the success metric to improve AND guardrails to be satisfied. Both conditions must hold simultaneously.",
+      },
+    ],
   },
-  knowledgeCheck: [
-    {
-      question: "A new recommendation algorithm increases clicks by 12% but decreases average revenue per click by 15%. Is this a success?",
-      options: [
-        "Yes — clicks improved, which is the primary metric",
-        "No — revenue per click is a guardrail metric; the net effect is negative revenue, making this a guardrail violation",
-        "It depends on whether the click increase compensates for the revenue drop",
-      ],
-      correctIndex: 1,
-      explanation: "Revenue per click is a guardrail (no cannibalization). If clicks × revenue/click = total revenue, and revenue/click dropped 15% while clicks increased 12%, total revenue is approximately 0.85 × 1.12 ≈ 0.95 — a net revenue decline. The primary metric won but the guardrail failed. This requires a cost-benefit discussion, not an automatic ship.",
-    },
-    {
-      question: "When should guardrail thresholds be set?",
-      options: [
-        "Before the experiment starts, based on pre-agreed acceptable degradation levels",
-        "After seeing results, calibrated to the actual observed metrics",
-        "At the end of each quarter during business review",
-      ],
-      correctIndex: 0,
-      explanation: "Pre-registration is essential. Setting thresholds after seeing results is HARKing (Hypothesizing After Results are Known) — you'll unconsciously set thresholds that justify the decision you wanted to make. Thresholds must be agreed upon before launch.",
-    },
-    {
-      question: "Primary metric improved but a guardrail metric degraded. What is the correct process?",
-      options: [
-        "Ship — primary metric improvement outweighs any guardrail concerns",
-        "Do not ship — any guardrail violation is an automatic rejection",
-        "Investigate the cost-benefit tradeoff and escalate to stakeholders for a business judgment decision",
-      ],
-      correctIndex: 2,
-      explanation: "A guardrail violation doesn't automatically block shipping — it escalates the decision. Quantify the cost of the guardrail degradation vs. the revenue value of the primary metric improvement. Some tradeoffs are worth it (small latency increase for massive engagement gain); others aren't (engagement gain but massive support cost increase). This is a stakeholder call.",
-    },
-  ],
-},
 
 "ps-m4": {
-  durationLabel: "15 min",
-  outcomes: [
-    "Decompose a metric multiplicatively and additively into component drivers",
-    "Apply segmentation to isolate which component caused a change",
-    "Walk through a revenue drop investigation using the decomposition framework",
-    "Recognize limiting cases where one component dominates",
-  ],
-  learnMarkdown: `## Metric Decomposition Trees
+    durationLabel: "18 min",
+    outcomes: [
+      "Build a multiplicative and additive decomposition tree from first principles for any metric",
+      "Use segment-level drilling to isolate which branch of the tree moved",
+      "Detect mix-shift effects and distinguish them from true performance changes",
+      "Walk through a metric drop investigation end-to-end in an interview setting",
+    ],
+    learnMarkdown: `## Metric Decomposition Trees
 
-When a metric moves, your first question should be: **which component caused this?** Metric decomposition gives you a structured way to answer.
+When a metric drops, the question is never "why did revenue fall?" — it's **which branch of the decomposition tree moved?** Revenue = users × conversion × ARPU. One of those three moved. Then drill into that one. This reframe is the difference between wandering through hypotheses and running a structured investigation.
 
 ---
 
 ## Multiplicative Decomposition
 
-Revenue = Users × Conversion Rate × Average Revenue Per User (ARPU)
-
-If revenue dropped 10%, exactly one (or more) of these components dropped. Segment each:
+Multiplicative decomposition rewrites a metric as a product of its drivers:
 
 \`\`\`
-Revenue dropped 10%
-├── Users: -2% (slight, not the main driver)
-├── Conversion Rate: -8% (significant — investigate this)
-└── ARPU: flat
-→ Root cause: conversion rate decline
+Revenue = Monthly Active Users × Conversion Rate × Average Order Value
 \`\`\`
+
+If revenue dropped 12% last week, exactly one or more of these components moved. Measure all three:
+
+\`\`\`
+Revenue:   $2.2M → $1.9M   (-12.5%)
+MAU:       410K  → 408K    (-0.5%)  ← nearly flat
+CVR:       3.8%  → 3.3%    (-13%)   ← THIS moved
+AOV:       $141  → $141    (flat)
+
+→ Root cause branch: Conversion Rate
+\`\`\`
+
+MAU and AOV did not move materially. CVR accounts for nearly the entire decline. Now decompose CVR — don't jump to causes yet.
+
+\`\`\`
+CVR by platform:
+  Desktop:  5.4% → 5.3%   (flat)
+  Mobile:   2.7% → 1.8%   (-33%)  ← THIS moved
+
+Mobile CVR collapsed. Now you investigate mobile-specific causes:
+new app version? payment flow change? carrier-level latency spike?
+\`\`\`
+
+The tree told you: don't look at acquisition (MAU was flat), don't look at pricing (AOV was flat), don't look at desktop. Look at the mobile checkout funnel. You eliminated 80% of the hypothesis space before writing a single SQL query.
 
 ---
 
 ## Additive Decomposition
 
-Total Latency = Server Processing Time + Client Rendering Time + Network Round-Trip
-
-A 200ms latency increase: if server time is flat, client time is flat, but network time increased 200ms → the root cause is network.
-
----
-
-## Recursive Decomposition
-
-Components can themselves be decomposed:
+Some metrics add rather than multiply:
 
 \`\`\`
-Conversion Rate = (Mobile Conversion × Mobile Traffic Share) + (Desktop Conversion × Desktop Traffic Share)
+Total Errors = API Errors + DB Errors + Timeout Errors
+
+Week:          API    DB     Timeout   Total
+W10:           420    180    40        640
+W11:           418    181    1,240     1,839
+Delta:         -2     +1     +1,200    +1,199
+
+→ Root cause: Timeouts. API and DB are flat.
 \`\`\`
 
-If mobile traffic share increased (more users on mobile) but mobile conversion is lower than desktop, overall conversion drops even if both per-platform rates are stable. This is Simpson's paradox — a mix shift masquerading as a performance drop.
+This is mechanical triage. You don't need to guess — you compute the contribution of each component to the total change.
 
 ---
 
-## Diagnostic Process
+## Building the Tree Systematically
 
-1. State the multiplicative formula for the metric
-2. Measure each component before and after
-3. Identify which component(s) changed materially
-4. Recursively decompose the changed component
-5. Identify the leaf-level driver
+**Step 1: Write the formula.** Before opening any dashboard, write out the metric as a formula. Revenue = ? What are its multiplicative components? Use × for rates, + for summed counts.
+
+**Step 2: Measure each component.** Pull before/after numbers for every leaf node at the first level. Don't skip this — don't assume.
+
+**Step 3: Identify material movers.** "Material" means: the component's % change × its weight in the formula is substantial. A component that's 5% of the total barely matters even if it moves 50%.
+
+**Step 4: Recurse.** Take the component(s) that moved and decompose them. CVR = mobile CVR × mobile share + desktop CVR × desktop share. Do it again.
+
+**Step 5: Segment at each level.** At every level of the tree, segment by platform, geography, user cohort (new vs returning), and acquisition channel. The pattern of which segments moved constrains the root cause.
 
 ---
 
-## Limiting Cases
+## Using Trees for Root-Cause Analysis
 
-When one component is 90%+ of the total, it dominates the decomposition. For a product with 95% mobile traffic, desktop conversion changes are almost irrelevant to overall conversion. Focus your decomposition energy on the largest component first — you'll find the driver faster.
-`,
-  video: null,
-  videoFallbackMarkdown: `## Deep Dive: Mix Shifts and Simpson's Paradox
+Decomposition trees constrain your hypothesis space. After the tree:
+- **Only one branch moved significantly** → the root cause lives in that branch's product surface area
+- **Multiple branches moved identically** → suggests a shared upstream cause (a bad deploy, a data pipeline outage, a macro event)
+- **The moved branch is geo-specific** → look at regional events, payment providers, CDN nodes
+- **The moved branch is cohort-specific** → look at what changed for that cohort (new user experience, a campaign targeting that segment)
 
-**Mix shifts** are a common source of confusion. If a new marketing campaign drives lower-quality traffic (lower intent, higher bounce rate), overall conversion drops even if conversion rate within each segment is stable. The denominator composition changed.
+Each segmentation step is a difference-in-differences comparison: the segment that moved vs the segment that didn't tells you what's different between them.
 
-**Simpson's Paradox**: a metric can improve in every segment while appearing to decline in aggregate, if segment sizes shift. Example: desktop conversion 5% → 6% (improved), mobile conversion 3% → 4% (improved), but mobile traffic share grew from 40% to 70%. Aggregate conversion: before = 0.4×5% + 0.6×3% = 3.8%, after = 0.7×4% + 0.3×6% = 4.6%. Wait — it actually improved here. Reverse the mix shift to demonstrate the paradox.
+---
 
-Always decompose by segment before concluding a metric declined.
-`,
-  tryGuidance: "Use the funnel analysis interactive to decompose a revenue metric into multiplicative components and identify which one is driving a simulated change.",
-  interviewGraph: {
-    initialStageId: "ps_m4_stage1",
-    artifactDimensions: [
-      { label: "Decomposition Framework", recoveryStageId: "ps_m4_rec1" },
-      { label: "Root Cause Isolation", recoveryStageId: "ps_m4_terminal", passLabel: "Diagnostic Skill" },
+## Decomposition in Practice: Difference-in-Differences
+
+When you find that iOS CVR dropped but Android CVR is flat, you implicitly have a natural experiment. What differs between iOS and Android in your product right now?
+
+- iOS app version shipped last Tuesday? Android didn't.
+- iOS payment sheet uses a different provider? Android uses Stripe.
+- iOS traffic is predominantly from the US? Android skews international.
+
+The diff-in-diff between segments narrows the causal candidate set to things that differ between those segments. This is why drilling into the decomposition tree before generating hypotheses is so powerful.
+
+---
+
+## Interview-Ready Summary
+
+When an interviewer gives you a metric drop question, walk through this framework out loud:
+
+1. **Clarify the metric's formula.** "Revenue = users × conversion × ARPU — is that the right decomposition for this product?"
+2. **Check each component.** "I'd pull a week-over-week table for each of the three: which one moved?"
+3. **Recurse on the mover.** "CVR dropped — I'd decompose CVR by platform, by funnel step (view → add-to-cart → purchase), by user cohort."
+4. **Segment to constrain.** "I'd check if the drop is isolated to a specific geo, platform, or user type. If it's iOS only, that changes the hypothesis set entirely."
+5. **State what you've ruled out.** "Since MAU and AOV are flat, I'm not looking at acquisition or pricing. The investigation is in the conversion funnel."
+6. **Generate hypotheses last.** Only after the tree do you say: "Given that it's mobile-only and started Tuesday, my hypotheses are: new app version, mobile payment provider issue, or a UI change in the mobile checkout flow."
+
+This framework earns senior-level responses because it's systematic, communicates clearly, and eliminates wasted investigation time.`,
+
+    video: null,
+
+    videoFallbackMarkdown: `## Deep Dive: Simpson's Paradox and Mix-Shift Effects
+
+### Simpson's Paradox
+
+Simpson's paradox occurs when an aggregated metric moves in one direction, but every individual segment moves in the opposite direction. This sounds impossible — but it happens whenever the composition of your population shifts.
+
+**Example:** A product runs two feature variants: Feature A (high engagement, lower conversion) and Feature B (lower engagement, higher conversion). In Q1, 70% of users see Feature A and 30% see B. In Q2, that mix flips: 30% A, 70% B.
+
+| Segment | Q1 CVR | Q2 CVR | Change |
+|---------|--------|--------|--------|
+| Feature A users | 3.0% | 3.4% | +13% |
+| Feature B users | 5.0% | 5.6% | +12% |
+| **Aggregate** | **3.6%** | **4.74%** | ... |
+
+Both segments improved. The aggregate also improved here — but flip the direction of the mix shift to construct the actual paradox: if Feature B users (higher CVR at 5%) shrink from 70% to 30% of the population while Feature A users (lower CVR at 3%) grow from 30% to 70%, aggregate CVR drops from 4.4% to 3.6% even though both per-segment rates held steady. Every segment improved its CVR over time, yet the aggregate dropped — because the composition tilted toward the lower-performing segment.
+
+**How to detect it:** always segment before concluding. When the aggregate moves one direction and the per-segment trends tell a different or even opposite story, you have a mix-shift or Simpson's paradox situation. The fix is to check the population weights (segment sizes) alongside the rates.
+
+### Mix-Shift Effects
+
+A mix-shift happens when the composition of your traffic or user base changes, not the metric itself within any segment. A new acquisition campaign drives lower-intent users: overall conversion drops even though the product hasn't changed and existing-user conversion is flat. The denominator composition changed.
+
+**Practical example:** Your search ad campaign drives a large influx of first-time visitors. These users convert at 1.2%, vs your baseline organic users at 4.5%. Overall CVR drops from 4.5% to 3.1% — a 31% apparent decline — even though nothing in your product changed. The "metric drop" is entirely a mix-shift artifact.
+
+**The fix:** segment new vs returning users in your decomposition tree at step one. Mix-shift effects become immediately visible when you look at the composition change alongside the within-segment rates.`,
+
+    tryGuidance: "Use the decomposition tree interactive to simulate a revenue drop. Adjust the sliders for Users, Conversion Rate, and AOV — observe how the tree attributes the change. Then try the platform segmentation view: set iOS CVR to drop 30% while Android stays flat and see how the aggregate moves.",
+
+    interviewGraph: {
+      initialStageId: "ps_m4_stage1",
+      artifactDimensions: [
+        { label: "Decomposition Framework", recoveryStageId: "ps_m4_rec1" },
+        { label: "Segment Drilling", recoveryStageId: "ps_m4_rec2" },
+        { label: "Mix-Shift Detection", recoveryStageId: "ps_m4_rec3", passLabel: "Root-Cause Diagnostic" },
+      ],
+      stages: {
+        ps_m4_stage1: {
+          id: "ps_m4_stage1",
+          type: "click_target",
+          badge: "Stage 1",
+          title: "Stage 1 · Spot the shallow decomposition",
+          prompt: "The team investigating a 12% revenue drop segmented by platform and stopped there. Click the part of the query that represents the failure to drill deep enough.",
+          code_snippet: `-- Revenue dropped 12% WoW. Team's investigation:
+
+SELECT
+    platform,
+    SUM(revenue)            AS revenue,
+    COUNT(orders)           AS orders,
+    AVG(order_value)        AS aov
+FROM orders
+WHERE week IN ('2024-W10', '2024-W11')  -- ds-target:ps_m4_no_drill
+GROUP BY platform`,
+          validationCopy: {
+            ps_m4_no_drill: "Correct. This query shows revenue, order count, and AOV by platform — but never decomposes conversion rate (orders / sessions), never segments new vs returning users, and never drills into geo or cohort. Segmenting by platform is the first level of the tree. The investigation stops there instead of recursing into the component that moved.",
+          },
+          branches: {
+            ps_m4_no_drill: "ps_m4_stage2",
+            default: "ps_m4_rec1",
+          },
+        },
+
+        ps_m4_rec1: {
+          id: "ps_m4_rec1",
+          type: "scenario_choice",
+          badge: "Recovery 1",
+          title: "Recovery · What's missing from a shallow decomposition",
+          prompt: "The team segmented revenue by platform (iOS / Android / Web) and found each platform dropped ~12%. Why isn't this sufficient as a root-cause investigation?",
+          choices: [
+            { id: "a", label: "Segmenting by platform is the first level of the tree. Each platform's revenue = sessions × CVR × AOV. The team hasn't determined which of the three components moved — they've just confirmed all platforms are affected", description: "Platform segmentation narrows geography but doesn't decompose the metric into its drivers. You still don't know if it's a traffic problem, a conversion problem, or a pricing problem." },
+            { id: "b", label: "The query is missing a date filter so the results are unreliable", description: "The query includes a WHERE week IN clause — dates are filtered correctly." },
+            { id: "c", label: "It is sufficient — if all platforms dropped equally, the root cause must be a global infrastructure issue", description: "Uniform drops across platforms could also indicate a shared product change, a supply issue, or a data problem. You still need to decompose the metric into drivers." },
+          ],
+          branches: { a: "ps_m4_stage2", b: "ps_m4_rec1", c: "ps_m4_rec1" },
+          rationale: "Segmenting by platform tells you where the change occurred geographically in the product, but not what changed. Revenue = sessions × CVR × AOV at every platform. You need to measure all three components within each platform segment to know if it's a traffic issue, a funnel issue, or a pricing issue.",
+        },
+
+        ps_m4_stage2: {
+          id: "ps_m4_stage2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Recurse into the right component",
+          prompt: "You pull week-over-week data: MAU is flat (-0.5%), AOV is flat (-0.3%), but CVR dropped from 3.8% to 3.3% (-13%). What do you do next?",
+          choices: [
+            { id: "a", label: "Immediately file a bug report — a 13% CVR drop always means a broken checkout flow", description: "A 13% CVR drop has many possible causes: a broken flow, a mix-shift in traffic quality, a new user cohort with different intent, a UX change. Filing a bug before decomposing further is premature." },
+            { id: "b", label: "Decompose CVR further: break it by platform, by funnel step (view → cart → purchase), and by new vs returning users. MAU and AOV are ruled out — the investigation lives in the conversion funnel now", description: "CVR is now the single component that moved. Recursing into CVR's sub-components — platform, funnel step, user cohort — will isolate the exact locus of the drop." },
+            { id: "c", label: "Report the finding as a conversion rate problem and ask the PM for context on recent product changes", description: "PM context is useful for hypothesis generation, but comes after the decomposition, not instead of it. You haven't yet determined which segment or funnel step is responsible." },
+            { id: "d", label: "Run an A/B test to understand the conversion drop before drawing any conclusions", description: "A/B tests measure the effect of a change you control. This is a diagnostic problem — something already changed and you need to find what. A retrospective investigation is the right tool, not a new experiment." },
+          ],
+          branches: { a: "ps_m4_rec2", b: "ps_m4_stage3", c: "ps_m4_rec2", d: "ps_m4_rec2" },
+          rationale: "Since MAU and AOV are flat, they're eliminated as root cause branches. CVR is the mover. Now recurse: decompose CVR by platform (is the drop iOS, Android, or Web?), by funnel step (where in the funnel did users drop off?), and by cohort (new vs returning). Each dimension further constrains the hypothesis space.",
+        },
+
+        ps_m4_rec2: {
+          id: "ps_m4_rec2",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery · The recursion principle",
+          prompt: "Why do you recurse into the component that moved rather than immediately generating hypotheses about root causes?",
+          choices: [
+            { id: "a", label: "Recursion forces precision: instead of generating 20 hypotheses about why CVR dropped, you narrow to the exact segment and funnel step first — then generate 2–3 targeted hypotheses about what changed in that specific area", description: "Hypothesis generation without decomposition produces broad, hard-to-test lists. Decomposition first means each hypothesis is specific enough to test with one query." },
+            { id: "b", label: "Because you should always look at mobile first — mobile is usually the source of conversion problems", description: "Mobile often has lower conversion, but that's because mobile users have different intent — not because mobile is always broken. You need data, not assumption." },
+            { id: "c", label: "Recursing is required by standard operating procedure but doesn't actually help narrow the problem", description: "Recursion dramatically constrains the investigation. Finding that iOS CVR dropped 30% while Android held flat is highly specific evidence about what changed and where to look." },
+          ],
+          branches: { a: "ps_m4_stage3", b: "ps_m4_rec2", c: "ps_m4_rec2" },
+          rationale: "The decomposition tree is a constraint engine. Each level you drill down eliminates large swaths of hypothesis space. By the time you reach the leaf node — e.g., 'iOS new-user CVR at the payment step dropped 30% starting Tuesday' — you have a pinpoint target and can generate highly specific hypotheses.",
+        },
+
+        ps_m4_stage3: {
+          id: "ps_m4_stage3",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · Interpret a segmented result",
+          prompt: "Conversion rate dropped 8% on iOS overall. You segment by new vs returning users: new users -15%, returning users -1%. What does this tell you and where do you look next?",
+          choices: [
+            { id: "a", label: "New user CVR dropped 15%, returning users are nearly flat. This points to the acquisition funnel (onboarding, App Store listing, ad targeting, first-session UX) — not a retention or existing-user issue. Look at: when did new-user CVR start dropping, which acquisition channels are driving new users, and what changed in onboarding or the first-purchase flow", description: "The diff-in-diff between new and returning users constrains the root cause to whatever is different about the new-user experience: acquisition source, onboarding flow, first-session funnel steps." },
+            { id: "b", label: "A 15% drop for new users and 1% for returning users means iOS is generally broken — both groups show decline", description: "A 1% decline in returning users is noise-level. The 15x difference in impact between new and returning users is the signal: new users are a qualitatively different experience, and something in that path changed." },
+            { id: "c", label: "The issue is in the payment step — new users tend to have fewer saved payment methods", description: "Payment method coverage is a plausible hypothesis, but it's a hypothesis, not an observation. The decomposition tells you which cohort is affected; the payment step hypothesis requires further data to validate." },
+            { id: "d", label: "Both segments dropped, so the issue must be in a shared part of the funnel — focus on the checkout page regardless of user type", description: "If the shared checkout page were broken, both segments would drop proportionally. The 15x difference between new and returning users rules out a purely shared-page issue." },
+          ],
+          branches: { a: "ps_m4_stage4", b: "ps_m4_rec3", c: "ps_m4_rec3", d: "ps_m4_rec3" },
+          rationale: "New users -15%, returning users -1% is a classic acquisition-funnel signal. Returning users know the product, have saved payment methods, and have demonstrated purchase intent before. New users are going through onboarding and first-purchase flows. The 15x difference means the problem is in the new-user path: acquisition source quality, App Store page, onboarding, or first-session UX.",
+        },
+
+        ps_m4_rec3: {
+          id: "ps_m4_rec3",
+          type: "scenario_choice",
+          badge: "Recovery 3",
+          title: "Recovery · Differential segment analysis",
+          prompt: "New users are down 15%, returning users are down 1%. An interviewer asks: 'What does the magnitude difference between these two cohorts tell you?'",
+          choices: [
+            { id: "a", label: "A 15x difference in impact between new and returning users is decisive evidence that the root cause is specific to the new-user experience — something changed in acquisition quality, onboarding, or the first-session purchase funnel", description: "If it were a shared issue (global checkout bug, payment provider down), both cohorts would be affected proportionally. The differential implicates specifically what's different about new users." },
+            { id: "b", label: "The difference is probably just noise — both groups technically declined", description: "1% vs 15% across large sample sizes (thousands of users each) is not noise. Statistical significance aside, the magnitude ratio is a strong signal about where to look." },
+            { id: "c", label: "New users are always lower quality, so a larger drop for them is expected and not diagnostic", description: "New users converting at lower rates than returning users is the baseline — but a sudden 15% decline in new-user CVR while returning-user CVR held is a change from baseline, and changes from baseline are what matter." },
+          ],
+          branches: { a: "ps_m4_stage4", b: "ps_m4_rec3", c: "ps_m4_rec3" },
+          rationale: "Differential segment impact is one of the most powerful signals in decomposition analysis. When one cohort drops 15x more than another, the root cause is almost certainly in what's different about that cohort's experience. New vs returning users have different acquisition sources, different onboarding flows, and different first-session funnels — one of those changed.",
+        },
+
+        ps_m4_stage4: {
+          id: "ps_m4_stage4",
+          type: "scenario_choice",
+          badge: "Stage 4",
+          title: "Stage 4 · Mix-shift vs real decline",
+          prompt: "Overall conversion rate dropped from 4.2% to 3.6%. Per-segment rates: desktop 5.3% → 5.3% (flat), mobile 2.6% → 2.6% (flat). What happened?",
+          choices: [
+            { id: "a", label: "A mix-shift: mobile traffic share grew (mobile has lower CVR than desktop), pulling down the blended rate even though per-platform performance is unchanged", description: "Blended CVR = desktop_share × 5.3% + mobile_share × 2.6%. If mobile share grew from 45% to 65%, the blend drops from ~4.0% to ~3.5% with zero performance change on either platform." },
+            { id: "b", label: "Both platforms show a hidden bug — the per-platform numbers are wrong", description: "The numbers could be wrong, but the logical answer given the data as presented is the mix-shift: if per-platform rates are truly flat, composition is the only explanation." },
+            { id: "c", label: "The overall CVR decline is real and per-platform data is being aggregated incorrectly", description: "Aggregation error is possible, but the correct analytical interpretation of this pattern is mix-shift first. Verify the numbers, but lead with the mix-shift hypothesis." },
+          ],
+          branches: { a: "ps_m4_terminal", b: "ps_m4_rec3", c: "ps_m4_rec3" },
+          rationale: "When aggregate CVR drops but all sub-segment CVRs are flat, the only explanation is composition change — a mix-shift. Blended rate = Σ (segment_share × segment_rate). If segment rates are flat but shares change, the blend changes. This is not a product performance problem; it's a traffic mix change. The implication: investigate what drove mobile traffic growth (a new campaign? an SEO shift? a referral source?), not the product funnel.",
+        },
+
+        ps_m4_terminal: {
+          id: "ps_m4_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · The decomposition framework",
+          terminal: true,
+          prompt: "Summarize the five-step decomposition framework you'd walk through in a metric drop interview question.",
+          choices: [
+            { id: "a", label: "Write the formula → measure each component → identify the mover → recurse into the mover → segment at each level to constrain hypotheses. Generate root-cause hypotheses only after reaching the leaf node.", description: "This is the complete framework: formula first, then measurement, then recursive drilling, then targeted hypothesis generation." },
+            { id: "b", label: "Ask the PM what changed → check recent deploys → look at the dashboard → file a bug if conversion dropped", description: "Stakeholder context and deploy checks are useful inputs, but without the decomposition framework they don't tell you which component caused the drop or where to look." },
+            { id: "c", label: "Segment by platform → check if mobile is the problem → if yes, look at the mobile app release notes", description: "Platform segmentation is one step in the tree, not the whole framework. This approach misses additive decomposition, funnel-step analysis, cohort segmentation, and mix-shift detection." },
+          ],
+          branches: { a: "ps_m4_terminal", b: "ps_m4_terminal", c: "ps_m4_terminal" },
+          rationale: "The full framework: (1) write the metric's multiplicative or additive formula, (2) measure every component before and after, (3) identify which component(s) moved materially, (4) recurse into the mover — decompose it by platform, funnel step, and cohort, (5) use differential segment analysis to constrain hypotheses. Only generate hypotheses after reaching the leaf node. This systematic approach is what separates senior-level answers from junior-level hypothesis fishing.",
+        },
+      },
+    },
+
+    knowledgeCheck: [
+      {
+        question: "Revenue = MAU × CVR × AOV. Revenue dropped 11%, MAU dropped 0.4%, AOV dropped 0.3%. Approximately how much did CVR change?",
+        options: [
+          "CVR dropped ~10% — it accounts for nearly all of the revenue decline since MAU and AOV are nearly flat",
+          "CVR dropped ~11% to match the total revenue decline exactly",
+          "CVR cannot be determined without knowing the absolute values",
+        ],
+        correctIndex: 0,
+        explanation: "In a multiplicative decomposition, if two components are flat (MAU -0.4%, AOV -0.3% are negligible), the third component accounts for nearly the entire change. Revenue ≈ flat × CVR × flat, so CVR ≈ -10% to -11%. The exact answer is ~10.4% when accounting for the small MAU and AOV changes, but the key insight is that CVR is the dominant mover and is the component to drill into next.",
+      },
+      {
+        question: "Overall conversion rate dropped from 4.0% to 3.4%. Desktop CVR: 5.2% → 5.2%. Mobile CVR: 2.5% → 2.5%. What is the most likely explanation?",
+        options: [
+          "A mix-shift: the proportion of lower-converting mobile traffic increased, pulling down the blended rate even though per-platform performance is unchanged",
+          "A tracking bug is selectively dropping conversion events in aggregate but not in the platform breakdown",
+          "The product's checkout flow degraded globally but the per-platform queries are not capturing it correctly",
+        ],
+        correctIndex: 0,
+        explanation: "When all per-segment rates are flat but the aggregate drops, composition is the only explanation. Blended CVR = desktop_share × 5.2% + mobile_share × 2.5%. If mobile traffic share grew from 40% to 65%, the blend drops from ~4.1% to ~3.5% — matching the observed decline. This is a mix-shift, not a product performance problem.",
+      },
+      {
+        question: "An interviewer asks why you generate hypotheses last, after building the full decomposition tree. What is the correct answer?",
+        options: [
+          "Hypothesis generation before decomposition produces broad, hard-to-test lists. The tree narrows to the exact segment and funnel step first, so each hypothesis is specific and testable with one or two queries",
+          "It is a convention, but experienced analysts generate hypotheses and decompose simultaneously",
+          "Hypotheses are only for presentations — the actual investigation follows a different process",
+        ],
+        correctIndex: 0,
+        explanation: "Generating hypotheses before decomposition means investigating all possible causes simultaneously — wasted work. The decomposition tree is a constraint engine: each level eliminates large portions of the hypothesis space. When you reach 'iOS new-user CVR at the payment step dropped 30% starting Tuesday,' your hypothesis list is two or three items long and each is testable immediately.",
+      },
     ],
-    stages: {
-      ps_m4_stage1: {
-        id: "ps_m4_stage1",
-        type: "scenario_choice",
-        badge: "Stage 1",
-        title: "Stage 1 · Revenue drop",
-        prompt: "Revenue dropped 10% last week. Walk me through your first diagnostic steps.",
-        choices: [
-          { id: "a", label: "Check if any engineers deployed something last week that could cause bugs", description: "Deployments are one possible cause, but you need a structured approach first." },
-          { id: "b", label: "Decompose: Revenue = Users × Conversion × ARPU. Measure each. Identify which component dropped. Then recursively decompose the one that changed.", description: "Structured multiplicative decomposition isolates the driver before you search for root causes." },
-          { id: "c", label: "Ask the PM what changed in the product", description: "PM context is useful later, but first you need to quantify which component of revenue changed." },
-        ],
-        branches: { a: "ps_m4_rec1", b: "ps_m4_stage2", c: "ps_m4_rec1" },
-        rationale: "B is correct. Before investigating causes, decompose the metric. Revenue = Users × Conversion × ARPU. If users are flat, conversion flat, ARPU down — the problem is pricing or product mix. If users down, conversion flat — the problem is acquisition or notification. The decomposition tells you which team to engage and which hypothesis to investigate.",
-      },
-      ps_m4_rec1: {
-        id: "ps_m4_rec1",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · Decomposition first",
-        prompt: "Why decompose the metric before investigating causes?",
-        choices: [
-          { id: "a", label: "Decomposition narrows the problem space — instead of investigating everything, you identify which one or two components changed and focus investigation there", description: "Structured decomposition is more efficient than hypothesis fishing." },
-        ],
-        branches: { a: "ps_m4_stage2" },
-        rationale: "Without decomposition, you're investigating all possible causes simultaneously. With decomposition, you know which component(s) changed and can focus hypothesis generation on that component.",
-      },
-      ps_m4_stage2: {
-        id: "ps_m4_stage2",
-        type: "scenario_choice",
-        badge: "Stage 2",
-        title: "Stage 2 · Mix shift",
-        prompt: "Conversion rate dropped from 4% to 3.2%. Per-platform rates are stable: desktop still 5%, mobile still 3%. What happened?",
-        choices: [
-          { id: "a", label: "A bug is causing the conversion drop despite stable per-platform rates", description: "If per-platform rates are stable, there's no bug in the conversion path." },
-          { id: "b", label: "A mix shift occurred — mobile traffic share grew, pulling down the blended rate since mobile conversion is lower", description: "Blended = desktop_share×5% + mobile_share×3%. If mobile share grew from 40% to 70%, blended drops even with no change in either rate." },
-        ],
-        branches: { a: "ps_m4_rec1", b: "ps_m4_terminal" },
-        rationale: "B is correct. This is a classic mix shift. If mobile traffic grew from 40% to 60% share, blended conversion: before = 0.4×5% + 0.6×3% = 3.8%, after = 0.4×5% + 0.6×3% = same... wait, if mobile grew from 40% to 70%: after = 0.3×5% + 0.7×3% = 3.6%. The conversion drop is driven by composition change, not performance degradation.",
-      },
-      ps_m4_terminal: {
-        id: "ps_m4_terminal",
-        type: "scenario_choice",
-        badge: "Complete",
-        title: "Complete · Decomposition principle",
-        prompt: "What is the core value of metric decomposition in diagnostics?",
-        choices: [
-          { id: "a", label: "It isolates which component of a metric changed, focusing investigation and ruling out unchanged components as causes", description: "Decomposition is diagnostic triage — eliminate what didn't change first." },
-        ],
-        branches: { a: "ps_m4_terminal" },
-        terminal: true,
-        rationale: "Metric decomposition is structured elimination — it tells you where to look and, equally importantly, where not to look. This dramatically reduces investigation time on complex metric movements.",
-      },
-    },
   },
-  knowledgeCheck: [
-    {
-      question: "Revenue = Users × Conversion Rate × ARPU. Revenue dropped 10%, users flat, ARPU flat. What dropped?",
-      options: [
-        "ARPU must have dropped since revenue dropped",
-        "Conversion rate — it's the only remaining component in the decomposition",
-        "Users must have declined — the other components can't explain a revenue drop",
-      ],
-      correctIndex: 1,
-      explanation: "In a multiplicative decomposition, if two of three components are flat, the third must account for the full change. Revenue = Users × CVR × ARPU. If Users and ARPU are flat, CVR must have dropped ~10% to produce a 10% revenue decline.",
-    },
-    {
-      question: "Conversion rate dropped from 4.0% to 3.5%, but desktop conversion (5.2% → 5.2%) and mobile conversion (2.8% → 2.8%) are both stable. What is the most likely explanation?",
-      options: [
-        "A tracking bug is causing conversion events to go unmeasured",
-        "A mix shift: the proportion of lower-converting mobile users increased",
-        "ARPU changed, affecting the conversion calculation",
-      ],
-      correctIndex: 1,
-      explanation: "If per-segment conversion rates are both stable but the blended rate dropped, the composition of traffic changed. More users are coming from mobile (lower conversion) relative to desktop. Blended rate = weighted average of per-segment rates — if lower-converting segments grow in share, the blend drops even with no degradation in performance.",
-    },
-    {
-      question: "What does 'limiting case' mean in metric decomposition, and why does it matter?",
-      options: [
-        "The maximum possible value of the metric under perfect conditions",
-        "When one component is 90%+ of the total, small changes in that component dominate — focus decomposition effort there first",
-        "The minimum threshold below which the metric is considered broken",
-      ],
-      correctIndex: 1,
-      explanation: "In decomposition, a 10% change in a component that's 90% of the total drives ~9% of the metric. A 10% change in a 5% component drives ~0.5%. Focusing on the dominant component first gets you to the root cause fastest — this is the limiting-case shortcut for large metrics like revenue.",
-    },
-  ],
-},
 
 "ps-e1": {
   durationLabel: "25 min",
