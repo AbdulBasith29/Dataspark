@@ -32327,622 +32327,1121 @@ Rule of thumb: **denormalize dimensions until joins disappear**. The storage cos
 
 
   "sd-m1": {
-    durationLabel: "25 min",
-    outcomes: [
-      "Apply a structured 5-step framework to scope an ML system design problem in an interview",
-      "Define appropriate online metrics aligned to business goals for common ML applications",
-      "Design a complete ML pipeline from problem framing through monitoring for a realistic scenario",
+  durationLabel: "25 min",
+  outcomes: [
+    "Apply the 5-step ML system design framework in interviews",
+    "Distinguish between offline and online metrics and explain when they diverge",
+    "Decide when rule-based heuristics beat ML for a given problem",
+    "Identify common scoping mistakes that signal junior thinking",
+  ],
+  learnMarkdown: `## Why ML System Design Interviews Are Different
+
+Most candidates walk into an ML system design interview expecting to be quizzed on model architectures — transformer attention, gradient boosting hyperparameters, regularization tricks. They're wrong. Interviewers at top tech companies use these rounds to evaluate **scoping instinct and trade-off reasoning**, not memorized algorithms.
+
+The underlying question is: *can you turn an ambiguous business problem into a rigorous ML system, while navigating real constraints like data availability, latency, explainability, and cold start?* A candidate who immediately reaches for a two-tower neural network before asking what data exists — or who never mentions monitoring — signals they have only academic experience, not production intuition.
+
+---
+
+## The 5-Step Framework
+
+**Step 1 — Clarify requirements.** Before writing a single equation, ask: What is the business objective? Who are the users? What is the scale (QPS, DAU)? What is the latency SLA? What data exists today? Forcing constraints into the open shows senior thinking and prevents wasted design work.
+
+**Step 2 — Define the ML task type.** Convert the business objective into a precise ML formulation: binary classification, multi-label ranking, regression, sequence-to-sequence, retrieval + ranking, etc. Getting this wrong cascades into every downstream choice.
+
+**Step 3 — Choose metrics — online vs. offline.** You need *both*. Offline metrics (AUC-ROC, Precision@k, NDCG, RMSE) measure model quality on held-out data. Online metrics (CTR, watch time per session, conversion rate, D7 retention) measure real business impact. They frequently diverge — a model with higher AUC can still hurt CTR if it optimizes a proxy that does not reflect what users actually click.
+
+**Step 4 — Design the data pipeline and features.** Where does training data come from? What labels do you have, and are they biased (click data has position bias)? What features are available at inference time with acceptable latency? Discuss retrieval candidates, feature engineering, and any feedback loops.
+
+**Step 5 — Deployment, monitoring, and iteration.** How is the model served? What does the shadow/canary rollout look like? What monitoring catches silent failures (data drift, label distribution shift, latency regression)? How do you iterate — champion/challenger tests, A/B experiments?
+
+---
+
+## Common Mistakes to Avoid
+
+- **Jumping to model architecture in the first 30 seconds.** Model choice is Step 5 of a 5-step process; making it Step 1 signals you lack production experience.
+- **Forgetting latency constraints.** A beautiful two-tower model that requires 800ms to score is unusable in a sub-100ms search SLA environment.
+- **Defining only offline metrics.** Offline metrics do not directly measure business impact. Omitting online metrics suggests you have never shipped a model to production.
+- **No monitoring plan.** Every model degrades. If you do not describe how you would detect and respond to degradation, the design is incomplete.
+- **Treating the first formulation as final.** Senior engineers iterate. Acknowledge that the first framing might change after analyzing data.
+
+---
+
+## Heuristics vs. ML: When Rule-Based Systems Win
+
+ML is not always the right tool. Prefer rule-based (heuristic) approaches when:
+
+- **Cold start / low data**: fewer than ~10k labeled examples rarely justify complex models.
+- **Explainability requirements**: regulatory environments (credit, healthcare) often mandate human-readable decision rules.
+- **High precision needed at near-zero recall cost**: spam filtering on a brand-new product is often better served by a blocklist than a model trained on zero historical spam.
+- **Fast iteration speed required**: deploying and A/B testing a rule change takes hours; retraining a model takes days.
+
+A mature engineer knows that a simple heuristic that ships in a week and can be explained to a PM often beats a model that ships in two months.
+
+---
+
+## Online vs. Offline Metrics: The Divergence Problem
+
+| Dimension | Offline Metrics | Online Metrics |
+|-----------|----------------|----------------|
+| Examples | AUC-ROC, NDCG@10, Precision@k, RMSE | CTR, conversion rate, watch time, D7 retention |
+| What they measure | Model quality vs. a held-out dataset | Real user behavior in production |
+| When computed | Before deployment (cheaper, faster) | After deployment (requires traffic) |
+
+They can diverge for several reasons: proxy label misalignment (optimizing clicks does not equal optimizing satisfaction), position bias in training data, novelty effects, or Simpson's paradox across user segments. Always design for both layers.
+
+---
+
+## Example Walkthrough: Video Recommendation System
+
+1. **Clarify**: 100M DAU, 300ms latency SLA, engagement goal, cold-start users exist.
+2. **Task type**: Multi-stage retrieval + ranking (candidate generation → scoring → re-ranking).
+3. **Metrics**: Offline — Recall@k on retrieval, NDCG@10 on ranking; Online — average watch time per session, skip rate.
+4. **Data + features**: Watch history, co-watch signals, video embeddings (title, tags), real-time context (time of day, device).
+5. **Deploy + monitor**: Shadow test on 1% traffic, canary rollout, monitor watch-time distribution drift weekly.
+
+---
+
+## Interview-Ready Summary
+
+- Always **clarify requirements** before touching any model design.
+- State **both** offline and online metrics — and acknowledge they can diverge.
+- Know when **heuristics beat ML**: cold start, low data, explainability mandates.
+- Model architecture is chosen **last**, not first.
+- A complete design includes a **monitoring and iteration plan**.
+- Senior answers show **trade-off awareness**, not just technical vocabulary.
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: The 5-Step Framework and Signaling Seniority
+
+### Why the Framework Matters
+
+Interviewers at FAANG-tier companies use ML system design rounds to filter for production instinct. The 5-step framework gives you a repeatable skeleton that prevents the most common failure modes: scoping too late, ignoring constraints, and over-indexing on model complexity.
+
+**Step 1 — Clarify** forces you to surface hidden constraints. Ask: What does success look like in 6 months? What data exists? What is the acceptable latency? Cold-start users — how many? These questions are not stalling; they are the interview.
+
+**Step 2 — Define the ML task** converts fuzzy business language into a crisp ML formulation. "Improve engagement" is not a task. "Binary classification of whether a user will watch more than 30 seconds of a recommended video" is a task.
+
+**Step 3 — Choose metrics (both layers)** is where many mid-level candidates stumble. Naming only offline metrics (AUC, NDCG) suggests academic thinking. Naming only online metrics (CTR) suggests you cannot evaluate a model before shipping it. Senior engineers define both and explain how they relate.
+
+### The Offline/Online Divergence Problem
+
+This divergence is more common than people think. Causes include:
+
+- **Proxy misalignment**: training on clicks, but users actually want to minimize regret (they click clickbait, hate it, churn).
+- **Position bias**: items ranked first get more clicks regardless of quality, poisoning future training data.
+- **Distribution shift**: offline test set is static; production traffic drifts seasonally and with product changes.
+
+The signal of seniority here: proactively name these risks and describe mitigation (debias training labels, use dwell time instead of clicks, schedule periodic retraining).
+
+### Steps 4 and 5 — Where Designs Fail Silently
+
+Candidates often sketch a feature set without asking: "Is this feature available at inference time?" Real-time user context (current session behavior) has latency costs that batch features do not. Features from a user's watch history require a feature store. These are not minor details — they determine whether a design is buildable.
+
+On deployment and monitoring: a good answer names *what* you monitor (prediction distribution drift, label drift, latency P99, business metrics), *how often* (daily dashboards, hourly alerts), and *what triggers a rollback* (online metric drops more than 5% relative).
+
+### Signaling Seniority in Your Answers
+
+- **Propose and then question your own framing.** "I would frame this as a ranking problem — though if cold-start is severe, retrieval quality matters more than ranking quality initially."
+- **Quantify trade-offs.** "A two-tower model reduces latency versus a cross-attention model, at some ranking quality cost."
+- **Bring in failure modes.** Mention feedback loops, training-serving skew, concept drift — not to show off, but because they are the real engineering challenges.
+
+The goal is not to impress with vocabulary. It is to demonstrate that you think about systems the way a staff engineer would: end-to-end, with constraints, with humility about what you do not yet know.
+`,
+  tryGuidance: "Step through each stage of the interview simulation. For the code stage, click the line that represents the most critical gap in the ML system specification. For scenario stages, choose the answer that best reflects production ML thinking — not just what is technically possible, but what a senior engineer would prioritize.",
+  interviewGraph: {
+    initialStageId: "click_metrics_gap",
+    artifactDimensions: [
+      { label: "System Design Scoping", recoveryStageId: "scope_recovery" },
+      { label: "Metrics Judgment", recoveryStageId: "metrics_recovery" },
     ],
-    learnMarkdown: `## ML System Design Framework
-
-ML system design interviews test whether you can translate a vague product requirement ("detect spam") into a complete, deployable system. The best candidates follow a structured framework rather than jumping straight to model architecture.
-
-### The 5-Step Framework
-
-**Step 1: Problem Framing**
-
-Before writing any code, clarify:
-- Is ML necessary, or will rules/heuristics suffice? (Content moderation may start with regex keyword lists)
-- What is the **north star metric**? The business goal (revenue, engagement, safety) must map to an ML metric (precision/recall trade-off, AUC, NDCG)
-- What is the prediction target? Binary classification, multi-class, regression, ranking?
-- What are the latency requirements? Real-time inference vs batch precomputation?
-
-**Step 2: Data Strategy**
-
-- What data is available? Historical logs, human labels, implicit signals (clicks, purchases)?
-- How are labels generated? Human annotation, programmatic labeling, user feedback?
-- What's the class imbalance? (Fraud: 0.1% positive rate — requires stratified sampling, precision/recall focus)
-- What's the data volume and freshness requirement?
-
-**Step 3: Feature Engineering**
-
-- **Offline features**: computed in batch and stored in the feature store for training
-- **Online features**: must be available at inference time with sub-10ms lookup (user's last 5 actions, account age)
-- **Point-in-time correctness**: when creating training data by joining event tables, only use feature values available at the time of the event — prevents future data leakage
-- Feature transformations: normalization, encoding, embeddings for high-cardinality categoricals
-
-**Step 4: Model Selection**
-
-Trade-offs to discuss:
-| Consideration | Simpler | More Complex |
-|---|---|---|
-| Interpretability | Logistic regression, decision tree | Neural networks |
-| Latency budget | Logistic regression (<1ms) | Large deep model (>100ms) |
-| Data volume | Any | Deep learning needs 100K+ |
-| Maintenance | Simple models are easier to debug | Complex models degrade silently |
-
-**Step 5: Serving + Monitoring**
-
-- **Real-time serving**: REST endpoint, model loaded in memory, <100ms SLA
-- **Batch serving**: precompute predictions, store in Redis/DynamoDB, serve via lookup
-- **Drift monitoring**: data drift (features shift) and concept drift (relationship changes)
-- **Feedback loop**: how do predictions influence future training data?
-
-### Template Scenarios
-
-**Spam detection (social network, 100M posts/day):**
-- Framing: binary classification, optimize recall (miss less spam) with acceptable precision
-- Data: labeled spam reports from users, content moderation team labels, previous model decisions
-- Features: text (TF-IDF or embedding), account age, posting frequency, network graph features
-- Model: LightGBM for structured features, then fine-tune BERT for text
-- Serving: batch score every post within 10 seconds of creation, flag score > 0.8
-
-**Ride surge pricing:**
-- Framing: regression on demand/supply ratio, real-time update every 30 seconds
-- Features: real-time driver location density, weather, events, historical demand at this location/time
-- Model: gradient boosting, updated daily, features served from Redis
-- Monitor: compare actual wait times vs predicted surge (business proxy for model quality)
-
-### Interview Tips
-
-- Always ask clarifying questions before designing (show structured thinking)
-- Explicitly state what success looks like with a metric before proposing architecture
-- Call out trade-offs rather than claiming one design is always best
-- End with monitoring: interviewers want to know you think about post-deployment health`,
-    video: null,
-    videoFallbackMarkdown: `## Deep Dive: Feedback Loops in ML Systems
-
-### The Feedback Loop Problem
-
-When a model influences what data is collected, training on that data amplifies the model's existing biases. Example: a content recommendation model promotes certain creators. Those creators get more engagement data. The next training cycle sees them as even more engaging, increasing their promotion further.
-
-### Breaking the Loop
-
-1. **Exploration**: randomly surface 10% of recommendations from outside the top-K to collect unbiased signal
-2. **Counterfactual logging**: log what was NOT shown alongside what was shown
-3. **Inverse propensity scoring**: weight training examples by the inverse probability they were shown
-4. **Human evaluation**: periodic human labels independent of the model's decisions
-
-### Bandit Algorithms
-
-Treat the feedback loop as an exploration/exploitation problem:
-- **Epsilon-greedy**: 90% exploit (best predicted), 10% explore (random)
-- **Thompson sampling**: sample from posterior over expected rewards — naturally balances exploration
-- **UCB (Upper Confidence Bound)**: exploit items with high upper bound on expected reward, forcing exploration of uncertain items`,
-    tryGuidance: "Walk through the full ML system pipeline — from problem framing to monitoring.",
-    interviewGraph: {
-      initialStageId: "sd_m1_s1",
-      artifactDimensions: [
-        { label: "Problem Framing", recoveryStageId: "sd_m1_r1" },
-        { label: "System Architecture", recoveryStageId: "sd_m1_r2" },
-      ],
-      stages: {
-        sd_m1_s1: {
-          id: "sd_m1_s1",
-          type: "scenario_choice",
-          badge: "Stage 1",
-          title: "Stage 1 · Problem Framing",
-          prompt: "You're asked to design an ML system to detect fraudulent transactions at a fintech company processing 1 million transactions per day (0.1% fraud rate). What do you clarify FIRST before discussing architecture?",
-          choices: [
-            { id: "a", label: "Define the success metric and latency requirement", description: "Ask: should we optimize precision (fewer false alarms) or recall (catch more fraud)? Do we need real-time decisions or can we review flagged transactions within hours?" },
-            { id: "b", label: "Pick the model architecture", description: "Start with XGBoost — it's the standard for fraud detection and handles class imbalance well." },
-            { id: "c", label: "Discuss feature engineering", description: "Ask about available transaction features: merchant category, amount, location, device fingerprint." },
-          ],
-          branches: { a: "sd_m1_s2", b: "sd_m1_r1", c: "sd_m1_r1" },
-          rationale: "Metric and latency requirements constrain every subsequent decision. If the answer is 'block the transaction in real time' (< 200ms), the architecture is completely different from 'flag for human review within 24 hours.' Never skip Step 1.",
+    stages: {
+      click_metrics_gap: {
+        id: "click_metrics_gap",
+        type: "click_target",
+        badge: "Stage 1",
+        title: "Stage 1 · Spot the Critical Gap",
+        prompt: "An engineer shared this ML system spec. One line represents the most critical missing element that would get flagged in a design review. Click it.",
+        code_snippet: `ml_system_spec = {
+    "task": "user_video_recommendation",
+    "objective": "maximize_watch_time",
+    "metrics": {
+        "offline": ["auc_roc", "precision_at_10"],  # -- ds-target:offline_only
+        "online": None,                              # -- ds-target:missing_online
+    },
+    "latency_sla": None,                             # -- ds-target:no_latency
+    "model_type": "two_tower_neural_net",
+}`,
+        validationCopy: {
+          missing_online: "Correct. Online metrics (CTR, watch-time-per-session, skip rate) measure real user behavior in production. Offline metrics alone cannot tell you if the model actually improves the business objective — they frequently diverge.",
+          offline_only: "Closer — you noticed the metrics section, but the specific issue is that online metrics are entirely absent (set to None). The offline metrics listed are reasonable. The gap is the missing online measurement layer.",
+          no_latency: "Latency SLA being None is a real concern, but it is a secondary gap. The more critical missing element is the online metrics — without them you have no way to measure business impact after deployment.",
         },
-        sd_m1_r1: {
-          id: "sd_m1_r1",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Clarify First",
-          prompt: "In ML system design, the biggest mistake is diving into model architecture before understanding the business requirement. The latency SLA alone changes the entire system design. If fraud decisions must happen in real time (<200ms) vs within 24 hours, what changes?",
-          choices: [
-            { id: "a", label: "Real-time: low-latency REST endpoint, simple features. Batch review: complex model with more features", description: "Real-time constraints force simpler models and pre-computed features. Batch review allows richer models and more feature computation time." },
-            { id: "b", label: "The model architecture doesn't change; only infrastructure differs", description: "You can use the same model for both; just deploy it differently." },
-          ],
-          branches: { a: "sd_m1_s2", b: "sd_m1_s2" },
-          rationale: "Architecture changes fundamentally: real-time demands sub-200ms with pre-computed features from Redis; batch allows running an expensive gradient-boosted model on all transaction features. Model choice follows from latency constraints.",
+        branches: {
+          missing_online: "ml_vs_rules",
+          offline_only: "metrics_recovery",
+          no_latency: "metrics_recovery",
         },
-        sd_m1_s2: {
-          id: "sd_m1_s2",
-          type: "scenario_choice",
-          badge: "Stage 2",
-          title: "Stage 2 · Training Data Strategy",
-          prompt: "The fraud model needs to be retrained weekly. However, true fraud labels arrive 2 weeks after the transaction (after customer disputes are resolved). How do you handle this in the training pipeline?",
-          choices: [
-            { id: "a", label: "Use a rolling 90-day window of confirmed labeled data, retrain weekly", description: "Accept the 2-week label delay. Train on confirmed labels from 14–104 days ago. Use proxy metrics (dispute rate) for near-real-time monitoring." },
-            { id: "b", label: "Use model predictions as pseudo-labels for recent transactions", description: "Label recent transactions using the current model's predictions to avoid the 2-week gap." },
-            { id: "c", label: "Retrain only when 90 days of new labels have accumulated", description: "Wait for a full 90-day window of fresh confirmed labels before retraining." },
-          ],
-          branches: { a: "sd_m1_t", b: "sd_m1_r2", c: "sd_m1_r2" },
-          rationale: "Using model predictions as pseudo-labels is circular — it reinforces existing model biases. Waiting 90 days is too slow. Rolling window with confirmed labels is the standard approach; proxy metrics bridge the monitoring gap.",
+      },
+
+      metrics_recovery: {
+        id: "metrics_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Why Online Metrics Are Essential",
+        prompt: "Why must an ML system design always include online metrics alongside offline metrics?",
+        choices: [
+          {
+            id: "a",
+            label: "Online metrics like CTR and watch-time-per-session measure real user behavior that offline proxies can miss",
+            description: "Offline metrics evaluate model quality on held-out data; online metrics validate that the model actually improves the business objective when real users interact with it.",
+          },
+          {
+            id: "b",
+            label: "AUC and Precision@10 are sufficient for a production evaluation plan",
+            description: "Offline metrics are fast and cheap to compute, so they should be the primary evaluation method throughout a model's lifecycle.",
+          },
+          {
+            id: "c",
+            label: "Online metrics only matter after deployment, not during the design phase",
+            description: "You can always add online measurement later once the model is live — the design phase should focus on model architecture.",
+          },
+        ],
+        branches: {
+          a: "ml_vs_rules",
+          b: "ml_vs_rules",
+          c: "ml_vs_rules",
         },
-        sd_m1_r2: {
-          id: "sd_m1_r2",
-          type: "scenario_choice",
-          badge: "Recovery 2",
-          title: "Recovery 2 · Label Delay",
-          prompt: "Using model predictions as training labels (pseudo-labels) creates a feedback loop: the model trains on its own past decisions, amplifying existing biases. What's the correct approach for delayed-label settings?",
-          choices: [
-            { id: "a", label: "Train on confirmed labels only; use proxy metrics for near-real-time monitoring", description: "Accept the delay. Train on true labels. Monitor using business proxies (dispute rate, chargeback rate) as leading indicators of model degradation." },
-            { id: "b", label: "Use semi-supervised learning to incorporate pseudo-labels safely", description: "Weight pseudo-labels lower than true labels to reduce the amplification effect." },
-          ],
-          branches: { a: "sd_m1_t", b: "sd_m1_t" },
-          rationale: "True labels are the ground truth. Proxy metrics are the monitoring solution for the delay gap. Semi-supervised approaches can work but add complexity; confirmed-labels-only is the safer default for high-stakes systems.",
+        rationale: "Online metrics must be designed upfront because they determine what you instrument, what events you log, and what your A/B test is measuring. Retrofitting online measurement after deployment is expensive and often inaccurate. Offline and online metrics frequently diverge — a model with higher AUC can still hurt CTR if it optimizes a proxy that does not reflect real user satisfaction.",
+      },
+
+      ml_vs_rules: {
+        id: "ml_vs_rules",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · ML vs. Heuristics",
+        prompt: "A product manager asks: 'We are launching a brand-new community forum with almost no historical data. Should we use ML or a rule-based system to detect spam?' What do you recommend?",
+        choices: [
+          {
+            id: "a",
+            label: "Rule-based system — cold start and low data make ML unreliable here",
+            description: "A blocklist, rate-limiting rules, and pattern matching can ship quickly and are fully explainable to trust-and-safety teams.",
+          },
+          {
+            id: "b",
+            label: "ML immediately — modern models can generalize from small datasets using transfer learning",
+            description: "Fine-tune a pre-trained transformer on even a few hundred labeled examples to get a spam classifier running on day one.",
+          },
+          {
+            id: "c",
+            label: "Neither — manually review all posts until you have enough data",
+            description: "Human review is the only trustworthy approach during cold start and generates clean labels for future ML.",
+          },
+          {
+            id: "d",
+            label: "A two-tower neural net trained on proxy signals like post length and account age",
+            description: "Behavioral signals are available even without content labels, so a feature-based model can operate from day one.",
+          },
+        ],
+        branches: {
+          a: "auc_vs_ctr",
+          b: "scope_recovery",
+          c: "scope_recovery",
+          d: "scope_recovery",
         },
-        sd_m1_t: {
-          id: "sd_m1_t",
-          type: "scenario_choice",
-          badge: "Complete",
-          title: "Complete · System Design",
-          prompt: "You've framed the problem, defined the metric, designed the training pipeline. What is the last critical component to discuss in any ML system design?",
-          choices: [
-            { id: "a", label: "Post-deployment monitoring: data drift, performance degradation, feedback loops", description: "Models degrade silently. Monitoring for input distribution shift, prediction distribution shift, and business metric degradation is non-negotiable." },
-          ],
-          branches: { a: "sd_m1_t" },
-          terminal: true,
-          rationale: "The 5-step framework ends with monitoring because ML systems degrade in ways software doesn't. Fraud patterns evolve, user behavior shifts, data pipelines break silently. A model without monitoring is a liability, not an asset.",
+        rationale: "With near-zero historical spam data, an ML model has nothing meaningful to learn from and will generalize poorly. Rule-based systems — blocklists, rate limits, regex patterns — ship faster, are explainable to ops teams, and can be iterated in hours. You transition to ML once you have accumulated labeled examples (typically 10k+). Choosing ML immediately signals you are optimizing for model sophistication over user safety and speed-to-value.",
+      },
+
+      scope_recovery: {
+        id: "scope_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · When Heuristics Beat ML",
+        prompt: "Which scenario most strongly favors a rule-based heuristic over an ML model?",
+        choices: [
+          {
+            id: "a",
+            label: "A credit-scoring product that must explain every decision to regulators",
+            description: "Interpretability and auditability are mandatory — rule-based scorecards are the standard approach in regulated lending.",
+          },
+          {
+            id: "b",
+            label: "A recommendation system with 500M user interactions per day",
+            description: "At this scale, the signal-to-noise ratio is favorable for ML and heuristics cannot capture complex preference patterns.",
+          },
+          {
+            id: "c",
+            label: "A fraud detection system with five years of labeled transaction history",
+            description: "Rich historical labels and complex non-linear patterns are exactly the conditions where ML outperforms hand-crafted rules.",
+          },
+        ],
+        branches: {
+          a: "auc_vs_ctr",
+          b: "auc_vs_ctr",
+          c: "auc_vs_ctr",
         },
+        rationale: "Heuristics beat ML under three conditions: low data (cold start), mandatory explainability (regulatory requirements), and fast iteration needs. A credit-scoring product with regulatory explainability mandates is the clearest case — not because ML cannot model it, but because the system must produce human-readable decision reasons. Scale and rich labels both favor ML.",
+      },
+
+      auc_vs_ctr: {
+        id: "auc_vs_ctr",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Diagnosing Metric Divergence",
+        prompt: "Your team ships a new ranking model. Offline AUC improved from 0.81 to 0.87. But the A/B test shows CTR dropped 3% relative. What is the MOST likely explanation?",
+        choices: [
+          {
+            id: "a",
+            label: "The model is optimizing a proxy label that does not match what users actually want",
+            description: "Training on historical clicks introduces position bias and optimizes for 'things that were clicked' rather than 'things users genuinely valued'.",
+          },
+          {
+            id: "b",
+            label: "The A/B test infrastructure must have a bug — AUC improvement always translates to CTR improvement",
+            description: "Offline and online metrics measure the same underlying quality signal, so a significant AUC lift should always produce CTR gains.",
+          },
+          {
+            id: "c",
+            label: "The offline test set was too small, making the AUC improvement statistically unreliable",
+            description: "With a larger test set the AUC improvement would disappear, explaining the CTR drop.",
+          },
+          {
+            id: "d",
+            label: "The model improved relevance but reduced novelty, causing users to disengage",
+            description: "Users want a mix of highly relevant and serendipitous content — maximizing relevance alone can hurt engagement.",
+          },
+        ],
+        branches: {
+          a: "first_question",
+          b: "metrics_recovery",
+          c: "metrics_recovery",
+          d: "first_question",
+        },
+        rationale: "Offline/online divergence is real and common. The most likely causes are proxy label misalignment (clicks encode position bias, not pure preference) or a relevance/novelty trade-off. Answer (a) is the textbook cause: if you train on clicks, the model learns to predict what users clicked, not what they valued — these diverge when clickbait is present. Answer (d) is also a valid senior observation. Answer (b) is false — offline and online metrics can and do diverge consistently.",
+      },
+
+      first_question: {
+        id: "first_question",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · The First Question",
+        prompt: "An interviewer says: 'Design a search ranking system for an e-commerce platform.' What is the FIRST question you ask?",
+        choices: [
+          {
+            id: "a",
+            label: "What is the primary business objective — conversion, revenue per session, or query satisfaction?",
+            description: "Understanding the business objective determines what you optimize, what your online metric is, and how you define a successful ranking.",
+          },
+          {
+            id: "b",
+            label: "Should we use a learning-to-rank model like LambdaMART or a neural re-ranker?",
+            description: "Model architecture is central to the design — choosing the right model class early prevents wasted work.",
+          },
+          {
+            id: "c",
+            label: "How large is the product catalog and what is the expected QPS?",
+            description: "Scale and latency constraints drive the architecture — you need these numbers before designing anything.",
+          },
+        ],
+        branches: {
+          a: "cold_start",
+          b: "scope_recovery",
+          c: "cold_start",
+        },
+        rationale: "Both (a) and (c) are senior instincts — clarifying the business objective and understanding scale constraints are both valid first questions. The key anti-pattern is (b): jumping to model architecture before understanding what you are optimizing or how big the problem is. Interviewers specifically watch for this. In practice, ask about objectives and constraints together before touching any model design.",
+      },
+
+      cold_start: {
+        id: "cold_start",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Handling Cold Start",
+        prompt: "Your recommendation system uses collaborative filtering. A new user has zero watch history. Which approach best handles this cold-start problem?",
+        choices: [
+          {
+            id: "a",
+            label: "Two-tower model with content-based features (demographics, device, onboarding preferences)",
+            description: "The two-tower architecture can encode user context from non-behavioral signals, producing useful embeddings even for brand-new users.",
+          },
+          {
+            id: "b",
+            label: "Fallback to global popularity ranking until behavioral data accumulates",
+            description: "Serve the most-watched videos universally for new users — simple, fast, and avoids embarrassing cold-start recommendations.",
+          },
+          {
+            id: "c",
+            label: "Force new users to rate 10 items during onboarding to bootstrap their preference profile",
+            description: "Explicit ratings solve cold start at the cost of onboarding friction — a trade-off worth discussing.",
+          },
+          {
+            id: "d",
+            label: "Run a brief A/B test to determine which fallback strategy works best before committing",
+            description: "Before committing to a cold-start architecture, validate empirically which approach maximizes early engagement.",
+          },
+        ],
+        branches: {
+          a: "architecture_step",
+          b: "architecture_step",
+          c: "architecture_step",
+          d: "architecture_step",
+        },
+        rationale: "All first three options reflect valid senior trade-offs. Two-tower with content features is the architecturally richest solution — it leverages non-behavioral signals while enabling gradual personalization as behavior accumulates. Popularity fallback is pragmatic and ships fast. Onboarding ratings increase data quality at the cost of conversion. A strong answer names the trade-off rather than treating one option as universally correct. Answer (d) is a reasonable process point but sidesteps the architectural question.",
+      },
+
+      architecture_step: {
+        id: "architecture_step",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · Placing Model Architecture",
+        prompt: "In the 5-step ML system design framework, at which step do you choose the model architecture (e.g., two-tower, gradient boosted trees, transformer)?",
+        choices: [
+          {
+            id: "a",
+            label: "Step 1 — immediately after hearing the problem, to anchor the design",
+            description: "Naming the model early shows technical depth and helps the interviewer understand your instincts.",
+          },
+          {
+            id: "b",
+            label: "Step 2 — after defining the ML task type",
+            description: "Once you know if it is ranking, classification, or retrieval, the model architecture follows naturally.",
+          },
+          {
+            id: "c",
+            label: "Step 4 or 5 — after clarifying requirements, defining the task, choosing metrics, and understanding the data pipeline",
+            description: "Model architecture is a downstream decision that depends on data availability, latency SLA, and the features you can actually build.",
+          },
+        ],
+        branches: {
+          a: "scope_recovery",
+          b: "terminal_summary",
+          c: "terminal_summary",
+        },
+        rationale: "Model architecture is correctly chosen in Step 4 (data pipeline design) or Step 5 (deployment considerations), after you understand what data you have, what latency you must hit, and what features are feasible. Choosing it in Step 1 is the single most common mistake in ML system design interviews — it signals you are pattern-matching on algorithm names rather than reasoning from constraints. Step 2 is acceptable: once the task type is clear, model class options narrow significantly.",
+      },
+
+      terminal_summary: {
+        id: "terminal_summary",
+        type: "scenario_choice",
+        badge: "Stage 7",
+        title: "Stage 7 · Closing with Seniority",
+        prompt: "You are wrapping up your ML system design answer. Which closing statement best signals seniority to the interviewer?",
+        terminal: true,
+        choices: [
+          {
+            id: "a",
+            label: "Summarize trade-offs, name your monitoring plan, and flag one open question you would resolve with data",
+            description: "Senior engineers close with uncertainty and iteration, not false confidence.",
+          },
+          {
+            id: "b",
+            label: "State that the two-tower model with FAISS retrieval is the optimal architecture for this problem",
+            description: "Committing to a specific final architecture shows decisiveness and technical conviction.",
+          },
+          {
+            id: "c",
+            label: "List all the model architectures you considered to demonstrate breadth of knowledge",
+            description: "Showing awareness of alternatives proves technical depth and signals you researched the problem space.",
+          },
+        ],
+        branches: {
+          a: "terminal_summary",
+          b: "terminal_summary",
+          c: "terminal_summary",
+        },
+        rationale: "Senior engineers close ML system design answers by acknowledging trade-offs, describing how the system evolves post-launch, and flagging what they would learn from the first production experiment. False certainty ('this is optimal') signals inexperience — real systems are iterative. Listing architectures without a decision framework is noise. The strongest signal of seniority is intellectual humility paired with a concrete iteration plan.",
       },
     },
-    knowledgeCheck: [
-      {
-        question: "In an ML system design interview, you're asked to design a recommendation system. What should you clarify BEFORE proposing any model architecture?",
-        options: ["Whether to use collaborative filtering or content-based filtering", "The success metric (CTR, watch time, conversion) and latency requirement (real-time vs batch)", "Whether the team has GPU infrastructure available"],
-        correctIndex: 1,
-        explanation: "Metric and latency constraints shape every architectural decision. A watch-time metric favors different models than a click-through metric. Real-time (<100ms) vs batch (precomputed) determines feature availability and model complexity.",
-      },
-      {
-        question: "What is 'point-in-time correctness' in ML feature engineering?",
-        options: ["Ensuring features are computed using only data available at the time of the training event, preventing future data leakage", "Caching feature values in a time-series database for fast lookup", "Running feature computation jobs at fixed time intervals"],
-        correctIndex: 0,
-        explanation: "Point-in-time correctness means: when creating a training example for an event at time T, only use features computed from data available before T. Using features computed after T (e.g., a user's total 2024 purchases when predicting a 2022 churn event) is data leakage.",
-      },
-      {
-        question: "A fraud model has 0.1% positive rate (fraud). The team evaluates it using accuracy and reports 99.9%. Is this a good model?",
-        options: ["Yes — 99.9% accuracy is excellent performance", "No — a model that always predicts 'not fraud' achieves 99.9% accuracy; use precision/recall or AUC instead", "It depends on the training data size"],
-        correctIndex: 1,
-        explanation: "With extreme class imbalance, accuracy is a misleading metric. A null model (always predicts negative) achieves 99.9% accuracy. Precision, recall, F1, and AUC-PR (area under precision-recall curve) are the appropriate metrics for imbalanced classification.",
-      },
-    ],
   },
+  knowledgeCheck: [
+    {
+      question: "What is the primary purpose of online metrics (CTR, watch time, conversion rate) in an ML system?",
+      options: [
+        "To evaluate model quality on a held-out test set before deployment",
+        "To measure real business impact by observing actual user behavior in production",
+        "To replace offline metrics like AUC once a model is deployed",
+        "To benchmark model inference latency under real traffic conditions",
+      ],
+      correctIndex: 1,
+      explanation: "Online metrics measure what users actually do when the model is live. Offline metrics (AUC, NDCG) evaluate model quality on static test data. They serve different purposes and can diverge significantly — a model with better AUC can still reduce CTR if it optimizes a proxy that does not reflect true user preferences.",
+    },
+    {
+      question: "Which situation most strongly favors a rule-based heuristic over an ML model?",
+      options: [
+        "A recommendation system with 1 billion user interactions in its training dataset",
+        "A fraud detection system with 5 years of labeled transaction history",
+        "A spam classifier for a brand-new product with fewer than 1,000 historical examples",
+        "An ad ranking system where slight latency increases are acceptable",
+      ],
+      correctIndex: 2,
+      explanation: "Cold start and low data are the clearest cases where heuristics beat ML. With fewer than ~10k labeled examples, a model has insufficient signal to generalize reliably. A rule-based blocklist or pattern-matching approach ships faster, is fully explainable, and avoids the risk of a poorly-calibrated model harming user trust. The other options all describe conditions that favor ML.",
+    },
+    {
+      question: "According to the 5-step ML system design framework, what is the FIRST step?",
+      options: [
+        "Choose the model architecture based on the problem domain",
+        "Define offline evaluation metrics like AUC or NDCG",
+        "Clarify business requirements, constraints, and success criteria",
+        "Design the feature engineering and data pipeline",
+      ],
+      correctIndex: 2,
+      explanation: "Step 1 is always clarification: What is the business objective? What are the latency constraints? What data exists? Who are the users? Jumping to model architecture (Step 1 mistake) or metrics before understanding requirements is the most common signal of junior thinking in ML system design interviews. Requirements drive every downstream decision.",
+    },
+  ],
+},
 
   "sd-m2": {
-    durationLabel: "18 min",
-    outcomes: [
-      "Explain training-serving skew and describe how a feature store prevents it",
-      "Distinguish the offline store from the online store and explain when each is used",
-      "Articulate point-in-time correctness and why it prevents data leakage in ML training",
+  durationLabel: "18 min",
+  outcomes: [
+    "Explain training-serving skew and why it silently degrades model accuracy",
+    "Identify root causes: different codebases, future data leakage, mismatched aggregations",
+    "Describe feature store architecture: offline store, online store, and feature registry",
+    "Explain how point-in-time correct joins prevent leakage in historical training data",
+    "Name real-world feature store tools: Feast, Tecton, Hopsworks, Vertex AI Feature Store",
+  ],
+  learnMarkdown: `## What Is Training-Serving Skew?
+
+Training-serving skew occurs when the features fed to a model during training are computed differently from the features computed at serving time. The model learns a function of one distribution, but at inference it receives a different distribution — and it has no way to signal the mismatch. Accuracy silently degrades.
+
+A classic example: during training you compute \`avg_spend_30d\` as a 30-day rolling mean over historical transactions. At serving, an engineer writes a separate microservice that fetches the last 7 events from Redis and averages them. Both columns are named identically. The model ships, offline metrics look excellent, and then production conversion rates quietly drop.
+
+## Root Causes
+
+**Different codebases.** Training pipelines are often written by data scientists in notebooks or batch Spark jobs, while serving pipelines are written by ML engineers in low-latency microservices. Two teams, two implementations, subtle divergence.
+
+**Future data leakage during training.** If your training query joins user activity *as of today* rather than *as of the label timestamp*, the model sees information from the future. In production that data doesn't exist, so the feature distribution shifts.
+
+**Aggregation and null-handling differences.** A Spark groupBy may handle NULLs differently from a Redis fallback. Timezone handling in Python may differ from SQL. Even floating-point rounding can compound over millions of rows.
+
+**Schema drift over time.** The training dataset was frozen in Q1. By Q3 the upstream table schema changed, but the serving pipeline was updated and the training pipeline was not. The two now compute subtly different things.
+
+## Why It's Insidious
+
+Offline evaluation looks flawless because you're testing on data generated by the *same* training pipeline. Only when real traffic hits the serving pipeline does the distribution mismatch appear. By then the model has often been in production for weeks, and the degradation is mistaken for concept drift, seasonality, or data quality issues.
+
+## Feature Store Architecture
+
+A **feature store** is a central system that owns the transform logic for every feature and serves it consistently to both training and production.
+
+**Offline store** (e.g., S3, BigQuery, Delta Lake): stores historical snapshots of every feature, keyed by entity and timestamp. The training pipeline reads from here. The offline store enables *point-in-time correct* training datasets without re-running expensive transforms.
+
+**Online store** (e.g., Redis, DynamoDB, Bigtable): stores the *latest* feature values for each entity at very low latency (single-digit milliseconds). The serving pipeline reads from here at inference time.
+
+**Feature registry**: a catalog of every feature — its name, owner, transform logic, data type, and the location of its offline and online materialization. A single source of truth prevents two teams from independently reimplementing the same feature.
+
+## How Feature Stores Solve Skew
+
+Because both the offline and online stores are populated by *the same transform job*, the model trained on offline data will receive features computed by the same logic at serving time. The pipeline that writes to BigQuery and the pipeline that writes to Redis are one codebase, not two.
+
+## Point-in-Time Correct Features
+
+Historical training data must respect the temporal boundary of each label. If you're predicting churn as of 2024-01-15, your feature values must reflect the world as it existed on 2024-01-15 — not later snapshots.
+
+Feature stores perform **point-in-time joins** (also called "time-travel joins"): for each training row, the store looks up the feature snapshot whose timestamp is the largest value ≤ the label timestamp. This prevents any future data from leaking into the training set and ensures that offline evaluation is a faithful simulation of production.
+
+## Real-World Feature Store Tools
+
+- **Feast** (open source, originally by Gojek): define features in Python, materialize to offline (BigQuery, Parquet) and online (Redis, DynamoDB) stores.
+- **Tecton**: managed enterprise feature platform with streaming + batch pipelines, monitoring, and a feature registry.
+- **Hopsworks**: open-source platform with an integrated feature store, model registry, and serving layer.
+- **Vertex AI Feature Store** (Google Cloud): managed, serverless, integrates natively with BigQuery and Vertex AI training jobs.
+
+## Interview-Ready Summary
+
+- Training-serving skew = same feature name, different computation — model silently degrades in production.
+- Root causes: separate codebases, future data leakage, different null/aggregation handling.
+- The offline store serves training; the online store serves inference; both are populated by the same transform logic.
+- Point-in-time correct joins ensure training features only use data available at the label's historical timestamp.
+- A feature registry is the shared contract that prevents independent re-implementations.
+- Diagnosing skew: log feature distributions at serving time and compare to training set statistics using tools like EvidentlyAI or custom drift monitors.`,
+
+  video: null,
+
+  videoFallbackMarkdown: `## Deep Dive: Point-in-Time Joins, Store Choice, and Skew Diagnosis
+
+### Point-in-Time Correct Joins in Practice
+
+Imagine you have a user-level feature \`purchase_count_7d\` and a training dataset with rows labeled at various historical dates. A naive query like \`SELECT * FROM features JOIN labels USING (user_id)\` always picks up the *current* feature snapshot, leaking future purchases into past labels.
+
+A point-in-time join instead says: for each label row with timestamp \`t\`, find the feature row for that \`user_id\` where \`feature_timestamp <= t\` and \`feature_timestamp\` is maximized. This requires your feature store to retain historical snapshots — not just the latest value — in the offline store.
+
+Feast implements this as \`get_historical_features(entity_df, feature_refs)\` where \`entity_df\` carries the entity key plus an \`event_timestamp\` column. The framework handles the time-travel join internally, shielding data scientists from writing custom SQL window functions.
+
+### Online vs Offline Store Selection
+
+The offline store is optimized for *throughput*: batch reads of millions of rows for training, backfills, and offline evaluation. Object storage formats (Parquet on S3, BigQuery tables) excel here because columnar scans are cheap.
+
+The online store is optimized for *latency*: single-entity lookups in under 10 ms at p99. Redis and DynamoDB are common choices. The trade-off is that only the *latest* value is stored — there is no history. This is sufficient for inference but cannot support point-in-time training retrieval.
+
+Streaming features (e.g., "events in the last 5 minutes") require a streaming ingestion path — Kafka to Flink or Spark Streaming to the online store — running continuously. Batch features can be materialized on a schedule.
+
+### Diagnosing Training-Serving Skew in Production
+
+**Step 1 — Log serving features.** Instrument your inference endpoint to log the raw feature vector for every prediction alongside the prediction and entity ID. Store these logs in a data warehouse.
+
+**Step 2 — Compare distributions.** For each feature, compare the distribution observed in the training set against the distribution of served features over a rolling window. Track mean, standard deviation, and a statistical test (e.g., PSI — Population Stability Index). A PSI above 0.2 indicates significant shift.
+
+**Step 3 — Trace to the source.** If \`avg_spend_30d\` is drifting, check whether the serving pipeline recently changed, whether the upstream data source has schema drift, or whether a time-window mismatch was introduced.
+
+**Step 4 — Shadow mode validation.** Before deploying a new feature pipeline, run both old and new pipelines simultaneously, log both feature vectors, and compare them on live traffic before switching the model to the new features.`,
+
+  tryGuidance: `Explore each stage of the interview graph. In the click-target stage, read the training and serving pipeline code carefully — spot where the time window diverges between the two implementations. In the scenario stages, reason about offline vs online store responsibilities, point-in-time join semantics, and how to diagnose production skew before selecting your answer.`,
+
+  interviewGraph: {
+    initialStageId: "intro_skew",
+    artifactDimensions: [
+      { label: "Skew Diagnosis", recoveryStageId: "skew_recovery" },
+      { label: "Feature Store Architecture", recoveryStageId: "fs_recovery" },
     ],
-    learnMarkdown: `## Feature Stores & Feature Engineering at Scale
+    stages: {
+      intro_skew: {
+        id: "intro_skew",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Defining Training-Serving Skew",
+        prompt: "A model achieves AUC 0.91 on the hold-out test set but only 0.68 in production after one week. No concept drift is detected in the label distribution. What is the most likely root cause?",
+        choices: [
+          { id: "a", label: "The model overfit to the training set", description: "Overfitting shows up as a large train/val gap, not a train/production gap with a stable label distribution." },
+          { id: "b", label: "Training-serving skew — features are computed differently at train vs serve time", description: "The offline pipeline and the serving pipeline implement the same feature name with different logic, so the model receives out-of-distribution inputs." },
+          { id: "c", label: "The test set was too small to be representative", description: "A small test set would show high variance in offline AUC, not a systematic offline-to-production gap." },
+          { id: "d", label: "The model was not retrained recently enough", description: "Stale models degrade gradually due to concept drift, not suddenly on deployment with a stable label distribution." },
+        ],
+        branches: { a: "skew_recovery", b: "skew_click", c: "skew_recovery", d: "skew_recovery" },
+        rationale: "Training-serving skew is the canonical explanation when offline metrics are strong but production performance collapses immediately after deployment and the label distribution is stable. The model is functioning correctly — it's receiving different inputs than it was trained on.",
+      },
 
-Training-serving skew is the silent killer of production ML systems. It's the #1 cause of models that perform well in offline evaluation but fail in production. Feature stores exist specifically to solve this problem.
+      skew_recovery: {
+        id: "skew_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · What Is Training-Serving Skew?",
+        prompt: "Training-serving skew occurs when the same feature produces different values at training time vs. serving time. Which scenario best illustrates this?",
+        choices: [
+          { id: "a", label: "The training set has 10 M rows and the serving set has 1 M rows", description: "Dataset size differences affect statistical power, not feature distribution skew." },
+          { id: "b", label: "avg_purchase_7d is computed with a 7-day window in training but fetched from a 3-day Redis cache in serving", description: "The feature name is identical but the underlying computation differs — exactly what training-serving skew means." },
+          { id: "c", label: "The model was trained on 2023 data but deployed in 2024", description: "This is temporal concept drift, not training-serving skew." },
+        ],
+        branches: { a: "skew_click", b: "skew_click", c: "skew_click" },
+        rationale: "Training-serving skew is specifically about the computation of a feature being inconsistent between offline and online pipelines. The canonical example is a time window mismatch: 7-day average in training, 3-day cache in serving.",
+      },
 
-### Training-Serving Skew
+      skew_click: {
+        id: "skew_click",
+        type: "click_target",
+        badge: "Stage 2",
+        title: "Stage 2 · Spot the Skew Bug",
+        prompt: "Below are two pipeline functions — one used during training, one used during serving. Click on the line that contains the training-serving skew bug.",
+        code_snippet: `# training_pipeline.py
+def compute_user_features_training(user_df, events_df):
+    user_df['avg_spend_30d'] = (
+        events_df.groupby('user_id')['amount']
+        .rolling(30).mean()                    # -- ds-target:training_compute
+        .reset_index(level=0, drop=True)
+    )
+    return user_df
 
-Skew occurs when the feature computation logic differs between training time and serving time. Common causes:
-
-1. **Different code paths**: training computes \`age_days = (today - signup_date).days\` in Python; serving computes it in Java — off-by-one or timezone bugs
-2. **Aggregation window misalignment**: training uses a 30-day window from historical data; serving accidentally uses a 7-day window
-3. **Missing data handling**: training drops nulls; serving returns 0 for null features
-4. **Schema drift**: a source system adds a new column; training code uses it; serving code doesn't yet
-
-**Impact**: model degrades silently. Offline metrics show 0.85 AUC; production AUC is 0.71. Debugging requires feature-level comparison between training and serving distributions.
-
-### What a Feature Store Solves
-
-A feature store provides a **single computation definition** that serves both training and serving:
-
-\`\`\`
-Feature Definition (Python/SQL) — written ONCE
-         |
-    ┌────┴────┐
-    ↓         ↓
-Offline Store   Online Store
-(S3/BigQuery)   (Redis/DynamoDB)
-    ↓               ↓
-Training        Inference
-(batch join)    (real-time lookup)
-\`\`\`
-
-Same code, same output. No skew.
-
-### Offline Store
-
-- **Purpose**: training data generation
-- **Storage**: S3, BigQuery, Hive — cheap, scalable, batch-optimized
-- **Access pattern**: full table scans, joins, time-range filters
-- **Latency**: seconds to minutes — acceptable for batch training jobs
-- **Content**: historical feature values with timestamps
-
-### Online Store
-
-- **Purpose**: real-time inference
-- **Storage**: Redis, DynamoDB, Cassandra — low-latency key-value lookup
-- **Access pattern**: get features for entity_id (user_id, item_id) — single row
-- **Latency**: sub-10ms — required for real-time inference SLAs
-- **Content**: current (or near-current) feature values only
-
-### Point-in-Time Correctness
-
-When generating training data from a feature store, you must use the feature value that was current **at the time of the training event**, not the current value.
-
-Example: predicting whether a user will click on a recommendation made at 2pm on Jan 15.
-- Correct: use the user's 30-day session count as of Jan 15, 2pm
-- Wrong: use the user's current 30-day session count (future data)
-
-Feature stores with point-in-time query support automatically handle this via:
-\`\`\`
-feature_store.get_historical_features(
-    entity_df=training_events,  # contains entity_id + event_timestamp
-    features=["user_30d_session_count", "user_avg_session_duration"]
-)
-\`\`\`
-
-### Feature Reuse
-
-Without a feature store, every team recomputes the same features independently. A feature store enables:
-- Team A publishes \`user_30d_purchase_amount\` → Team B's churn model reuses it
-- Prevents duplicated compute costs
-- Ensures consistent feature definitions across models
-
-### Popular Feature Stores
-
-| Platform | Type | Key Characteristic |
-|---|---|---|
-| Feast | Open source | Lightweight, Kubernetes-native, offline+online |
-| Tecton | Managed SaaS | Production-grade, streaming features, expensive |
-| Hopsworks | Open source/managed | Data-science focused, model registry included |
-| Vertex AI Feature Store | GCP managed | Native BigQuery integration |
-| SageMaker Feature Store | AWS managed | Native SageMaker integration |`,
-    video: null,
-    videoFallbackMarkdown: `## Deep Dive: Streaming Features
-
-### Real-Time Feature Computation
-
-Some features must reflect events that just happened:
-- User's last action (3 seconds ago)
-- Transaction amount relative to user's 24-hour rolling average
-
-These cannot be precomputed on a batch schedule. **Streaming feature pipelines** compute them in real time:
-
-\`\`\`
-Kafka Event → Flink Feature Computation → Redis (online store)
-                                        → S3 (offline store, for training consistency)
-\`\`\`
-
-The same Flink job writes to both stores, guaranteeing consistency between online serving and offline training.
-
-### Backfilling Features
-
-When a new feature is defined, historical values must be backfilled into the offline store so models can be trained on it. Feast and Tecton support point-in-time backfill jobs that replay historical events through the feature computation logic.`,
-    tryGuidance: "Use the feature store diagram to trace how features flow from offline training to online serving.",
-    interviewGraph: {
-      initialStageId: "sd_m2_s1",
-      artifactDimensions: [
-        { label: "Training-Serving Skew", recoveryStageId: "sd_m2_r1" },
-        { label: "Point-in-Time Correctness", recoveryStageId: "sd_m2_r2" },
-      ],
-      stages: {
-        sd_m2_s1: {
-          id: "sd_m2_s1",
-          type: "scenario_choice",
-          badge: "Stage 1",
-          title: "Stage 1 · Diagnosing Skew",
-          prompt: "Your team trains a churn prediction model and achieves AUC 0.87 on the holdout set. After deploying, the model performs at AUC 0.69 in production. Business impact is significant. What's your first hypothesis?",
-          choices: [
-            { id: "a", label: "Training-serving skew — feature computation differs between training and production", description: "Compare feature distributions between training pipeline output and serving pipeline output for the same users on the same day." },
-            { id: "b", label: "The model overfit to the training set", description: "The 0.87 holdout AUC should have caught overfitting. Check train vs holdout gap." },
-            { id: "c", label: "The production data distribution has shifted since training", description: "Compare the distribution of input features in production vs the training period." },
-          ],
-          branches: { a: "sd_m2_s2", b: "sd_m2_r1", c: "sd_m2_r1" },
-          rationale: "When offline-to-online performance gap is large and sudden (right after deployment), training-serving skew is the primary hypothesis. Data drift is also plausible but would typically cause gradual degradation, not an immediate gap on day 1.",
+# serving_pipeline.py
+def compute_user_features_serving(user_id, redis_client):
+    spend_data = redis_client.lrange(f"spend:{user_id}", 0, 6)  # -- ds-target:serving_compute
+    return {'avg_spend_30d': sum(spend_data) / len(spend_data)}`,
+        validationCopy: {
+          training_compute: "Close — the training code uses a 30-day window, which is the intended definition. The serving code is where the mismatch is introduced: it fetches only 7 entries (indices 0-6) from Redis, giving a ~7-day window instead of 30 days.",
+          serving_compute: "Correct! The serving pipeline fetches lrange(..., 0, 6) — only 7 entries — which approximates a 7-day window, not the 30-day rolling average the model was trained on. This is the skew bug.",
         },
-        sd_m2_r1: {
-          id: "sd_m2_r1",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Skew Diagnosis",
-          prompt: "To diagnose training-serving skew, you compare the feature distributions from the training pipeline against the serving pipeline for the same 1000 users on the same day. You find user_30d_session_count is 40% higher in serving than in training. What likely happened?",
-          choices: [
-            { id: "a", label: "Different window calculations — training used a different time range than serving", description: "Training code computed a 30-day window differently (e.g., UTC vs local time, off-by-one on window boundary) compared to the serving code." },
-            { id: "b", label: "The model needs more training data to learn the correct distribution", description: "More data will reduce the gap between training and serving feature distributions." },
-          ],
-          branches: { a: "sd_m2_s2", b: "sd_m2_s2" },
-          rationale: "A 40% systematic difference in a feature value between training and serving is a classic skew symptom. The fix is a feature store: define the computation once, use it in both training and serving pipelines.",
-        },
-        sd_m2_s2: {
-          id: "sd_m2_s2",
-          type: "scenario_choice",
-          badge: "Stage 2",
-          title: "Stage 2 · Online vs Offline Store",
-          prompt: "Your recommendation model needs two types of features: (1) user's account age and historical purchase count (changes daily), (2) user's last click (changes every few seconds). Which storage solution handles each correctly?",
-          choices: [
-            { id: "a", label: "Daily features → offline store (batch); last click → online store (Redis, streaming update)", description: "Daily features are computed in batch and served from the online store (Redis) refreshed daily. Last click requires a streaming pipeline updating Redis in near-real-time." },
-            { id: "b", label: "Both in Redis — Redis handles all feature types", description: "Put everything in Redis for consistent sub-10ms serving latency." },
-            { id: "c", label: "Both in S3 — online store adds unnecessary complexity", description: "Read all features from S3 at inference time." },
-          ],
-          branches: { a: "sd_m2_t", b: "sd_m2_r2", c: "sd_m2_r2" },
-          rationale: "The split is correct: batch features are refreshed periodically and served from Redis. Streaming features require a Kafka → Flink → Redis pipeline to stay current. S3 has seconds of read latency — unacceptable for real-time serving.",
-        },
-        sd_m2_r2: {
-          id: "sd_m2_r2",
-          type: "scenario_choice",
-          badge: "Recovery 2",
-          title: "Recovery 2 · Latency Requirements",
-          prompt: "The online store (Redis/DynamoDB) serves features at sub-10ms. The offline store (S3/BigQuery) serves at seconds-to-minutes. Why can't we use S3 directly for real-time inference?",
-          choices: [
-            { id: "a", label: "S3 read latency (50-200ms+ per request) violates typical inference SLAs", description: "S3 GET requests take 50-200ms. A model needing 20 features would require 20 sequential reads — 1-4 seconds total. Far too slow for <100ms inference SLAs." },
-            { id: "b", label: "S3 doesn't support key-value lookups", description: "S3 supports object reads by key, but it's not optimized for sub-millisecond point lookups." },
-          ],
-          branches: { a: "sd_m2_t", b: "sd_m2_t" },
-          rationale: "Both are valid points. S3 latency is the primary blocker: 50-200ms per object read is incompatible with real-time inference SLAs. Redis achieves sub-millisecond reads via in-memory storage, which is why it's the standard online store backend.",
-        },
-        sd_m2_t: {
-          id: "sd_m2_t",
-          type: "scenario_choice",
-          badge: "Complete",
-          title: "Complete · Feature Store Value",
-          prompt: "In one sentence, what is the single most important problem a feature store solves?",
-          choices: [
-            { id: "a", label: "Training-serving skew — by providing a single feature computation definition used in both training and inference", description: "One definition, two stores (offline for training, online for serving), guaranteed consistency." },
-          ],
-          branches: { a: "sd_m2_t" },
-          terminal: true,
-          rationale: "Feature reuse, discoverability, and monitoring are valuable secondary benefits. But the primary value proposition is eliminating the risk of computing features differently at training vs serving time — the root cause of the most common silent model failures.",
-        },
+        branches: { training_compute: "fix_skew", serving_compute: "offline_store_role" },
+      },
+
+      fix_skew: {
+        id: "fix_skew",
+        type: "scenario_choice",
+        badge: "Stage 3 (Recovery)",
+        title: "Stage 3 · Fixing the Window Mismatch",
+        prompt: "You have been asked to fix the training-serving skew in the pipeline above. What is the correct approach?",
+        choices: [
+          { id: "a", label: "Both training and serving must use the same time window and aggregation logic — enforce this via a shared feature definition", description: "The only correct fix is a single source of truth for the transform logic." },
+          { id: "b", label: "Serving can use a shorter window because real-time latency requirements are different", description: "Latency constraints must be met through engineering (pre-computation, caching), not by changing the feature semantics the model was trained on." },
+          { id: "c", label: "The difference is acceptable since both values are approximate averages", description: "A 7-day vs 30-day average can differ dramatically during promotion periods or seasonal spikes, causing significant distribution shift." },
+        ],
+        branches: { a: "offline_store_role", b: "offline_store_role", c: "offline_store_role" },
+        rationale: "The only safe fix is to enforce that both pipelines compute the exact same feature. A feature store does this by writing a single transform that materializes to both the offline store (for training) and the online store (for serving). Latency constraints are addressed by pre-computing and caching the 30-day average, not by changing the definition.",
+      },
+
+      offline_store_role: {
+        id: "offline_store_role",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Offline Store Responsibility",
+        prompt: "In a feature store, what is the primary purpose of the offline store?",
+        choices: [
+          { id: "a", label: "Serve low-latency feature lookups during model inference", description: "Low-latency serving is the role of the online store (Redis, DynamoDB), not the offline store." },
+          { id: "b", label: "Store historical feature snapshots for training dataset generation and backfills", description: "The offline store (BigQuery, S3/Parquet) retains the full history of feature values, enabling point-in-time correct training data generation." },
+          { id: "c", label: "Store the model weights and serving graph", description: "Model artifacts belong in a model registry, not the feature store." },
+          { id: "d", label: "Stream real-time events from Kafka into the feature pipeline", description: "Kafka is an event streaming platform; the offline store is the destination, not the ingestion layer." },
+        ],
+        branches: { a: "fs_recovery", b: "pit_joins", c: "fs_recovery", d: "fs_recovery" },
+        rationale: "The offline store is a historical data warehouse for features. Training pipelines read from it to generate datasets. The online store is the low-latency counterpart that holds only the latest feature values for real-time inference.",
+      },
+
+      fs_recovery: {
+        id: "fs_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Online vs Offline Store",
+        prompt: "A data scientist needs to generate training data for 2 million users labeled across 18 months. An ML engineer needs to retrieve features for a single user within 10 ms during inference. Which store should each use?",
+        choices: [
+          { id: "a", label: "Both should use the online store (Redis)", description: "Redis stores only the latest value and does not support time-travel or bulk historical reads efficiently." },
+          { id: "b", label: "Data scientist uses the offline store (BigQuery); ML engineer uses the online store (Redis)", description: "Exactly right. Bulk historical reads with time-travel go to the offline store; low-latency single-entity lookups go to the online store." },
+          { id: "c", label: "Both should use the offline store (BigQuery)", description: "BigQuery is optimized for bulk analytical queries, not single-row lookups at 10 ms p99 latency." },
+        ],
+        branches: { a: "pit_joins", b: "pit_joins", c: "pit_joins" },
+        rationale: "The offline store handles high-throughput batch reads with historical snapshots. The online store handles single-entity lookups at inference latency. They are complementary — both populated by the same transform logic.",
+      },
+
+      pit_joins: {
+        id: "pit_joins",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Point-in-Time Joins",
+        prompt: "Point-in-time correct feature retrieval during training dataset generation is designed to prevent which specific problem?",
+        choices: [
+          { id: "a", label: "Model overfitting due to too many features", description: "Overfitting is addressed through regularization or feature selection, not point-in-time joins." },
+          { id: "b", label: "Future data leakage — using feature values from after the label timestamp", description: "Point-in-time joins ensure that for each training example, only feature values available at or before the label event time are used." },
+          { id: "c", label: "Slow training pipeline throughput", description: "Point-in-time joins are a correctness mechanism; they may even add query complexity and latency." },
+          { id: "d", label: "Inconsistent feature names across teams", description: "Feature naming is a registry concern, not a temporal join concern." },
+        ],
+        branches: { a: "skew_recovery", b: "production_drop", c: "skew_recovery", d: "fs_recovery" },
+        rationale: "Future data leakage is one of the most common and damaging bugs in ML systems. If a training row for a user labeled as churned on 2024-01-15 accidentally picks up their purchase behavior from 2024-01-20, the model learns an impossible signal and performs far worse in production where future data is unavailable.",
+      },
+
+      production_drop: {
+        id: "production_drop",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · Diagnosing Production Degradation",
+        prompt: "A recommender model has AUC 0.92 offline but only 0.71 after one week in production. Label distribution is stable. What should you investigate first?",
+        choices: [
+          { id: "a", label: "Retrain the model with more recent data", description: "Retraining before diagnosing the cause may reproduce the same skew if the pipelines are not fixed." },
+          { id: "b", label: "Compare feature distributions between the logged training data and the live serving feature vectors", description: "Comparing distributions directly tests the training-serving skew hypothesis. If the features look different, you have found the root cause." },
+          { id: "c", label: "Check whether the model hyperparameters were set correctly", description: "Hyperparameters affect training performance, not a training-to-production gap with stable labels." },
+          { id: "d", label: "Increase the model regularization strength", description: "Regularization addresses overfitting on training data, not a serving distribution mismatch." },
+        ],
+        branches: { a: "skew_recovery", b: "duplicate_feature", c: "skew_recovery", d: "skew_recovery" },
+        rationale: "The fastest way to confirm or rule out training-serving skew is to log the feature vectors at serving time and compare their distributions to the training dataset. Tools like EvidentlyAI or custom PSI monitoring make this straightforward. Only after confirming skew should you fix and retrain.",
+      },
+
+      duplicate_feature: {
+        id: "duplicate_feature",
+        type: "scenario_choice",
+        badge: "Stage 7",
+        title: "Stage 7 · Duplicated Feature Logic",
+        prompt: "Two microservices — the recommendations service and the pricing service — each implement their own version of user_lifetime_value. They produce slightly different values due to different null-handling rules. What is the primary risk?",
+        choices: [
+          { id: "a", label: "Minor inconsistency — both values are approximately correct and the difference is negligible", description: "Differences in null-handling can cause large divergences at the tail of the distribution, where the most important customers often live." },
+          { id: "b", label: "Training-serving skew if the model was trained on one service's definition but served by another", description: "If the model learned from one computation of LTV and receives another at inference, its predictions are based on a feature it was never trained on." },
+          { id: "c", label: "Only a storage cost concern — two copies of the same data", description: "The primary risk is correctness and skew, not storage." },
+          { id: "d", label: "A compliance issue because user data is duplicated across services", description: "Feature duplication is not inherently a compliance violation; the primary risk here is model correctness." },
+        ],
+        branches: { a: "fs_recovery", b: "identify_feast", c: "fs_recovery", d: "fs_recovery" },
+        rationale: "Duplicate feature implementations are a classic training-serving skew risk. The feature registry in a feature store solves this by making one canonical definition the single source of truth — all consumers read from the same materialized output rather than re-implementing the transform.",
+      },
+
+      identify_feast: {
+        id: "identify_feast",
+        type: "scenario_choice",
+        badge: "Stage 8",
+        title: "Stage 8 · Identifying a Feature Store",
+        prompt: "Which of the following is a feature store designed to eliminate training-serving skew?",
+        choices: [
+          { id: "a", label: "Feast", description: "Feast is an open-source feature store that materializes features to both offline (BigQuery, Parquet) and online (Redis, DynamoDB) stores from a single feature definition." },
+          { id: "b", label: "Apache Airflow", description: "Airflow is a workflow orchestration platform. It can run feature pipelines but is not itself a feature store." },
+          { id: "c", label: "MLflow", description: "MLflow is a model registry and experiment tracking platform, not a feature store." },
+          { id: "d", label: "Great Expectations", description: "Great Expectations is a data quality validation framework, not a feature store." },
+        ],
+        branches: { a: "terminal_stage", b: "fs_recovery", c: "fs_recovery", d: "fs_recovery" },
+        rationale: "Feast, Tecton, Hopsworks, and Vertex AI Feature Store are all feature stores. Airflow orchestrates pipelines, MLflow tracks experiments and models, and Great Expectations validates data quality — none of them manage offline/online feature materialization to prevent training-serving skew.",
+      },
+
+      terminal_stage: {
+        id: "terminal_stage",
+        type: "scenario_choice",
+        badge: "Stage 9",
+        title: "Stage 9 · Putting It All Together",
+        prompt: "You are designing an ML platform for a fintech company. The model requires a feature fraud_velocity_1h — the number of transactions in the last hour. Which architecture correctly prevents training-serving skew?",
+        choices: [
+          { id: "a", label: "Define the feature once in Feast; stream events to the online store (Redis) for serving and materialize hourly snapshots to the offline store (BigQuery) for training", description: "Single definition, two materializations, same logic — the textbook correct approach." },
+          { id: "b", label: "Compute the feature in a notebook for training and have the fraud API team implement it separately in Java", description: "Two separate implementations of the same feature guarantee eventual skew as the codebase evolves independently." },
+          { id: "c", label: "Use only the online store for both training and serving to keep the architecture simple", description: "The online store holds only the latest value per entity — it cannot serve the historical snapshots needed for point-in-time correct training data." },
+          { id: "d", label: "Pre-compute features weekly and cache them; the model only needs approximate recency", description: "A 1-hour velocity feature loses all signal if only updated weekly. Approximation that destroys feature semantics is not a valid trade-off." },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage", d: "terminal_stage" },
+        rationale: "The correct pattern is: define the feature transform once in a feature store, stream real-time events into the online store for low-latency inference, and write time-stamped snapshots to the offline store for point-in-time correct training. This is the architectural pattern that eliminates training-serving skew by construction.",
+        terminal: true,
       },
     },
-    knowledgeCheck: [
-      {
-        question: "A team trains a fraud model using Python code that computes features, then deploys a Java service that recomputes the same features for inference. Six months later, the model underperforms. What is the likely root cause?",
-        options: ["The model overfit during training", "Training-serving skew: Python and Java implementations diverged over time", "The fraud patterns changed (concept drift)"],
-        correctIndex: 1,
-        explanation: "Maintaining the same feature logic in two languages (Python for training, Java for serving) almost inevitably leads to divergence — different handling of nulls, timezone differences, floating point rounding. A feature store eliminates this by having one definition.",
-      },
-      {
-        question: "When generating training data from a feature store, what does 'point-in-time correctness' prevent?",
-        options: ["Model overfitting by limiting feature count", "Data leakage by ensuring training examples only use features available at the time of the event", "Feature store cache invalidation bugs"],
-        correctIndex: 1,
-        explanation: "Point-in-time correctness means: for a training event at time T, only use feature values computed from data available before T. Using feature values computed after T (e.g., a feature updated the next day) constitutes data leakage and inflates offline metrics.",
-      },
-      {
-        question: "What is the key architectural difference between the online store and offline store in a feature store system?",
-        options: ["Online store is encrypted; offline store is not", "Online store (Redis/DynamoDB) provides sub-10ms lookups for real-time inference; offline store (S3/BigQuery) provides historical values for batch training", "Online store is the primary store; offline is a backup"],
-        correctIndex: 1,
-        explanation: "They serve different consumers: the offline store is optimized for training (batch scans, historical queries, point-in-time joins); the online store is optimized for serving (sub-10ms single-entity lookups). Both are populated from the same feature computation definitions.",
-      },
-    ],
   },
+
+  knowledgeCheck: [
+    {
+      question: "A model's offline AUC is 0.89 but production AUC is 0.65 with no change in label distribution. The most likely explanation is:",
+      options: [
+        "The model overfit because the training set was too small",
+        "Training-serving skew — features are computed differently between the training pipeline and the serving pipeline",
+        "Concept drift in the input features",
+        "The model's learning rate was set too high",
+      ],
+      correctIndex: 1,
+      explanation: "Training-serving skew is the canonical cause of a large offline-to-production gap when label distribution is stable. The model is correct for the data it saw in training; the problem is that serving delivers different feature distributions.",
+    },
+    {
+      question: "In a feature store, which component enables point-in-time correct training dataset generation?",
+      options: [
+        "The online store (e.g., Redis), which holds low-latency snapshots for each entity",
+        "The offline store (e.g., BigQuery or S3/Parquet), which retains historical feature snapshots keyed by entity and timestamp",
+        "The model registry, which tracks feature versions alongside model versions",
+        "The streaming ingestion layer (e.g., Kafka), which ensures real-time freshness",
+      ],
+      correctIndex: 1,
+      explanation: "The offline store retains historical snapshots of every feature value. Point-in-time joins query this store to find, for each training label, the feature value that was available at or just before the label's timestamp — preventing future data leakage.",
+    },
+    {
+      question: "What does a point-in-time correct join guarantee when constructing a training dataset?",
+      options: [
+        "Each training example uses features computed from the most recent data available today",
+        "Each training example uses only the feature values that were available at or before the label's event timestamp, preventing future leakage",
+        "Features are joined across entities to capture cross-user signals",
+        "The training dataset is balanced across positive and negative label classes",
+      ],
+      correctIndex: 1,
+      explanation: "A point-in-time correct join looks up the feature snapshot whose timestamp is the largest value that is less than or equal to the label event timestamp. This ensures no information from after the labeling moment leaks into the training example, making offline evaluation a faithful simulation of production.",
+    },
+  ],
+},
 
   "sd-m3": {
-    durationLabel: "15 min",
-    outcomes: [
-      "Choose between batch inference and online serving based on latency, staleness, and cost requirements",
-      "Explain shadow mode, canary, and champion-challenger deployment strategies",
-      "Design a model deployment workflow using a model registry with staging and rollback capability",
+  durationLabel: "15 min",
+  outcomes: [
+    "Distinguish batch, online, and near-real-time inference and when to use each",
+    "Explain shadow mode, canary, and blue/green deployment strategies",
+    "Identify the right serving pattern given latency SLA, feature freshness, and cost constraints",
+    "Answer 'how would you safely deploy this model?' confidently in an interview",
+  ],
+  learnMarkdown: `## Batch Inference
+
+Batch inference runs the model periodically — nightly, hourly, or on some defined schedule — against a large set of inputs. Predictions are written to a database or cache and served to users from there.
+
+**When to use it:**
+- Use cases where slight staleness is acceptable (product recommendations, churn scores, content rankings)
+- High-volume scoring (millions of users) where calling the model per request would be prohibitively expensive
+- Features that don't change in real time (historical purchase data, demographic attributes)
+
+**Tradeoffs:** Predictions can be stale by hours or days. The model never sees the user's current context. But it's cheap, scalable, and operationally simple — the model doesn't sit in the hot path of user requests.
+
+---
+
+## Online (Real-Time) Inference
+
+Online inference calls the model at request time, synchronously, and returns a fresh prediction. The model runs inside or alongside your API layer.
+
+**When to use it:**
+- Fraud detection: must evaluate the current transaction, not yesterday's risk score
+- Search ranking: must rank results for the user's exact query right now
+- Personalization where real-time context matters (current session, cart contents)
+
+**Hard requirement:** latency must stay under ~100ms for user-facing features. This forces simpler models, optimized runtimes (ONNX, TensorRT), and careful infrastructure sizing.
+
+**Cost:** real-time endpoints are expensive — GPU instances idle-spin waiting for requests. Auto-scaling helps but adds cold-start latency.
+
+---
+
+## Near-Real-Time (Micro-Batch)
+
+A compromise between the two extremes. Predictions are refreshed every few minutes using streaming pipelines (Kafka, Flink) or short-interval batch jobs. Feature stores (Feast, Tecton) play a key role here, keeping features materialized and fresh without per-request model calls.
+
+---
+
+## Decision Factors
+
+| Factor | Batch | Near-Real-Time | Online |
+|---|---|---|---|
+| Latency SLA | Hours–Days acceptable | Minutes acceptable | < 100–200ms required |
+| Feature freshness | Historical OK | Semi-fresh OK | Current context required |
+| Traffic volume | Millions cheaply | Moderate | Low-moderate (costly at scale) |
+| Cost | Lowest | Medium | Highest |
+
+**Interview tip:** Before recommending a serving pattern, always ask: *"What is the latency SLA, and does the prediction need to reflect the user's current context?"* This one question immediately signals ML system design maturity.
+
+---
+
+## Shadow Mode
+
+Shadow mode (also called dark launching) runs a new model in parallel with the production model. Both models receive the same live traffic, but **only the production model's predictions are served**. The new model's predictions are logged for offline evaluation.
+
+**Why it matters:** You can measure real-distribution performance — accuracy, latency, error rates — without any risk to user experience. It's the safest way to validate a model before promotion.
+
+---
+
+## Canary Deployment
+
+A canary routes a small percentage of traffic (1–5%) to the new model while the remaining traffic goes to the current production model. Both serve real predictions. You monitor metrics (conversion rate, error rate, latency) and gradually increase the canary percentage if things look good.
+
+**Advantages:** Gradual risk exposure. If the new model underperforms, you roll back by diverting traffic back — no code deploy needed.
+
+---
+
+## Blue/Green Deployment
+
+Blue/green maintains two complete, identical environments. Blue is production; green is the new version. When you're confident the new model is ready, you switch **all traffic at once** from blue to green. Rollback is instant — just point traffic back to blue.
+
+**Tradeoff:** No gradual ramp-up. You either commit fully or you don't. Best for cases where you've already validated the model thoroughly (e.g., via shadow mode) and need an instant cutover.
+
+---
+
+## ML Serving Infrastructure
+
+Common tools:
+- **TensorFlow Serving / TorchServe** — framework-native model servers with REST and gRPC endpoints
+- **Seldon Core / BentoML** — framework-agnostic, Kubernetes-native, support A/B testing and canary natively
+- **SageMaker Endpoints** — managed AWS solution with built-in traffic splitting for canary/blue-green
+- **Triton Inference Server** — NVIDIA high-throughput server supporting multi-framework, multi-GPU
+
+---
+
+## Interview-Ready Summary
+
+- **Batch inference** is cheap, scalable, and stale — ideal for periodic use cases like weekly emails or nightly churn scores
+- **Online inference** is fresh and expensive — required when the prediction must reflect the user's current context within milliseconds
+- **Shadow mode** is the safest deployment gate: new model gets real traffic, zero risk to users
+- **Canary** gives gradual exposure with real feedback; **blue/green** gives instant cutover with instant rollback
+- Always clarify latency SLA and feature freshness requirements before recommending a serving pattern
+- Infrastructure choice (BentoML, SageMaker, Seldon) matters less in interviews than demonstrating you understand the deployment lifecycle
+`,
+
+  video: null,
+
+  videoFallbackMarkdown: `## Deep Dive: Shadow Mode, Canary, and Safe Deployment Answers
+
+### Shadow Mode Mechanics
+
+Shadow mode is deceptively simple but operationally powerful. The serving layer forks every incoming request: one copy goes to the production model, one to the shadow model. The production prediction is returned to the user. The shadow prediction is written to a log — typically a data warehouse table or a message queue — for async evaluation.
+
+The key operational detail: **shadow mode requires feature parity**. The shadow model must receive the same features as the production model at the same point in time. If your feature store serves production features with less than 10ms latency, your shadow path must hit the same store. Otherwise you're comparing apples to oranges in your offline analysis.
+
+What shadow mode validates: accuracy on real-world distribution, latency percentiles (p50, p95, p99) under production load, and silent failure modes (NaN outputs, unexpected nulls, class distribution drift). It does NOT validate business metrics — for that you need a live canary.
+
+### Canary Strategy in Practice
+
+A well-run canary follows a schedule: 1% then 5% then 20% then 50% then 100%, with a 24–48 hour hold at each step and automated guardrails that halt promotion if error rate or business metric degrades beyond a threshold.
+
+The hardest part is choosing the right evaluation metric. Loss on a holdout set tells you nothing about what matters to the business. Define a **guardrail metric** (e.g., prediction error rate, p95 latency) and a **success metric** (e.g., click-through rate, fraud catch rate) before you start the canary.
+
+### Answering "How Would You Safely Deploy This Model?" in Interviews
+
+A strong answer follows this structure:
+
+1. **Offline validation** — holdout set, sliced by important subgroups (recency, geography, user segment)
+2. **Shadow mode** — run alongside production for 1–2 weeks on live traffic, compare prediction distributions and latency
+3. **Canary at 1–5%** — route a small traffic slice to the new model, monitor guardrail metrics for 24–48 hours
+4. **Gradual rollout** — increase traffic in steps; automated rollback if guardrails breach
+5. **Full cutover** — blue/green switch once confidence is established; keep old model warm for 48 hours for instant rollback
+
+This answer demonstrates you understand production ML is not just about model accuracy — it's about risk management, operational continuity, and business trust.
+`,
+
+  tryGuidance: `Work through the interactive interview simulation. You will debug a serving configuration with a mismatched pattern, then answer scenario questions about shadow mode, canary deployment, and the right serving strategy for different latency and freshness requirements. Pay attention to the rationale explanations — they contain the exact reasoning interviewers want to hear.`,
+
+  interviewGraph: {
+    initialStageId: "serving_bug",
+    artifactDimensions: [
+      { label: "Serving Pattern Selection", recoveryStageId: "serving_recovery" },
+      { label: "Deployment Safety", recoveryStageId: "deploy_recovery" },
     ],
-    learnMarkdown: `## Model Serving: Batch vs Real-Time
-
-Deploying a trained model is not the end of the ML lifecycle—it's the beginning of the hardest part. Choosing the right serving pattern and deployment strategy determines whether your model actually creates value.
-
-### Batch Inference
-
-Precompute predictions on a schedule, store in a database, serve via lookup.
-
-**Architecture:**
-\`\`\`
-Nightly Spark job → Score all users → Write to Redis/DynamoDB
-         ↓
-User requests → Lookup prediction (< 1ms)
-\`\`\`
-
-**Advantages:**
-- Extremely fast serving (pure database lookup, no compute at request time)
-- Cheap at scale (one batch job vs millions of individual inference calls)
-- Simple infrastructure (no real-time model serving endpoint)
-
-**Disadvantages:**
-- Predictions always stale (as old as the last batch run)
-- Cannot incorporate real-time context (user's current session, live inventory)
-- Wasted compute for users who never request predictions
-
-**Best for**: recommendations precomputed overnight, daily churn scores, offline risk assessments.
-
-### Online Serving (Real-Time Inference)
-
-Predict on-demand when a request arrives.
-
-**Architecture:**
-\`\`\`
-User request → Feature lookup (Redis, < 5ms)
-            → Model inference (ONNX/TensorRT, < 20ms)
-            → Return prediction
-\`\`\`
-
-**Optimization techniques:**
-- **ONNX Runtime**: framework-agnostic model format. Export PyTorch/sklearn model to ONNX, run with OnnxRuntime for 2–5× speedup
-- **TensorRT**: NVIDIA's inference optimizer for GPU serving — quantization, layer fusion
-- **Model warm-up**: send dummy requests on startup to pre-load model into memory before serving real traffic
-- **Connection pooling**: reuse connections to Redis/DynamoDB for feature lookups
-
-**Best for**: fraud detection, dynamic pricing, real-time content ranking.
-
-### Deployment Strategies
-
-**Shadow Mode (Safest):**
-New model receives a copy of production traffic but its predictions are NOT served to users. Predictions are logged and compared offline against production model.
-- Zero user impact
-- Reveals discrepancies in feature availability, latency, and prediction distributions
-- Required for any high-risk model change
-
-**Canary Release:**
-Route 5% of traffic to the new model; serve its predictions to real users.
-- Catches issues with small user exposure
-- Monitor latency, error rate, and business metric (CTR, conversion) on the 5% slice
-- Roll back in minutes if metrics degrade
-
-**Champion-Challenger A/B Test:**
-Two model versions serving live traffic simultaneously. Statistical test determines winner after sufficient traffic.
-- Requires experimental design (minimum sample size, p-value threshold)
-- Measure business impact, not just model metrics
-
-**Blue-Green Deployment:**
-Two identical production environments. Switch 100% of traffic from Blue (current) to Green (new) instantly. Rollback = switch back to Blue.
-
-### Model Registry
-
-The model registry tracks every trained model through its lifecycle:
-
-\`\`\`
-Training → [STAGING] → human review → [PRODUCTION] → retire → [ARCHIVED]
-\`\`\`
-
-Capabilities:
-- Version every model artifact with metadata: training run ID, dataset version, metrics
-- Approval gate: a human must approve promotion from Staging to Production
-- Rollback: promote previous version back to Production with one command
-- Lineage: which training data + code produced this model?
-
-MLflow Model Registry is the open-source standard. SageMaker Model Registry and Vertex AI Model Registry are managed alternatives.`,
-    video: null,
-    videoFallbackMarkdown: `## Deep Dive: Model Latency Optimization
-
-### The Latency Budget
-
-For a <100ms end-to-end SLA, budget each component:
-\`\`\`
-Network + load balancer: 10ms
-Feature lookup (Redis): 5ms
-Model inference: 20ms
-Response serialization: 5ms
-Total: 40ms (60ms headroom)
-\`\`\`
-
-If inference alone takes 80ms, you need to optimize the model.
-
-### Quantization
-
-Reduce model weights from float32 to int8. Typical effect: 3–4× speedup, <1% accuracy loss for most models. Apply with:
-\`\`\`python
-# PyTorch dynamic quantization
-quantized_model = torch.quantization.quantize_dynamic(
-    model, {torch.nn.Linear}, dtype=torch.qint8
-)
-\`\`\`
-
-### Model Distillation
-
-Train a smaller "student" model to mimic a larger "teacher" model's outputs. The student achieves 90%+ of teacher accuracy at 10–20% of the latency. Standard technique for deploying large NLP models to production.`,
-    tryGuidance: "Use the diagram to compare when each serving pattern is appropriate.",
-    interviewGraph: {
-      initialStageId: "sd_m3_s1",
-      artifactDimensions: [
-        { label: "Serving Pattern Selection", recoveryStageId: "sd_m3_r1" },
-        { label: "Deployment Strategy", recoveryStageId: "sd_m3_r2" },
-      ],
-      stages: {
-        sd_m3_s1: {
-          id: "sd_m3_s1",
-          type: "scenario_choice",
-          badge: "Stage 1",
-          title: "Stage 1 · Serving Pattern",
-          prompt: "A Netflix-like streaming service wants to show personalized movie recommendations on the homepage. The recommendations should reflect a user's viewing from the last 24 hours but don't need to update during the current session. 10M users will visit the homepage daily. Which serving pattern is best?",
-          choices: [
-            { id: "a", label: "Batch inference: score all users nightly, store in Redis, serve via lookup", description: "Run recommendations for all 10M users once per night after their daily viewing is captured. Homepage lookup hits Redis in <1ms." },
-            { id: "b", label: "Real-time inference: compute recommendations on every homepage load", description: "Invoke the recommendation model for each of the 10M daily requests as the page loads." },
-            { id: "c", label: "Hybrid: real-time model, but cache results in browser for 1 hour", description: "Compute recommendations in real time on first visit, cache in browser." },
-          ],
-          branches: { a: "sd_m3_s2", b: "sd_m3_r1", c: "sd_m3_r1" },
-          rationale: "24-hour staleness is acceptable, so batch inference is ideal. Real-time inference on 10M requests/day requires significant GPU infrastructure. Batch scoring overnight is cheaper, faster at serving time, and meets the stated requirement.",
+    stages: {
+      serving_bug: {
+        id: "serving_bug",
+        type: "click_target",
+        badge: "Stage 1",
+        title: "Stage 1 · Debug the Serving Config",
+        prompt: "A data scientist configured this serving spec for a weekly email recommendation system. One line contains a critical mismatch. Click the line with the most significant architectural bug.",
+        code_snippet: `serving_config = {
+    "use_case": "weekly_email_product_recommendations",
+    "serving_pattern": "real_time_api",    # -- ds-target:wrong_pattern
+    "latency_sla_ms": 50,                  # -- ds-target:tight_sla
+    "model": "two_tower_ranking_model",
+    "feature_freshness": "30_days",        # -- ds-target:stale_features
+}`,
+        validationCopy: {
+          wrong_pattern: "Correct. Weekly email recommendations are generated once per run, not at user request time. Real-time inference adds cost and operational complexity with zero benefit here — batch inference nightly is the right pattern.",
+          tight_sla: "The 50ms SLA is suspicious, but it's a symptom of the root cause. Weekly email recommendations don't have a latency SLA at all — they're pre-generated. The real bug is the serving pattern.",
+          stale_features: "30-day-old features are fine for weekly email recommendations. This is consistent with the use case. The architectural bug is the serving pattern choice.",
         },
-        sd_m3_r1: {
-          id: "sd_m3_r1",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Staleness Tradeoff",
-          prompt: "Batch inference is simpler and cheaper, but predictions are always stale. What types of use cases REQUIRE real-time inference and cannot tolerate batch's staleness?",
-          choices: [
-            { id: "a", label: "Fraud detection at transaction time and dynamic pricing based on live inventory", description: "These require current context (the transaction happening now, today's inventory level) that batch cannot capture." },
-            { id: "b", label: "Monthly churn prediction and daily sales forecasting", description: "These can be computed in batch and stored—no real-time context needed." },
-          ],
-          branches: { a: "sd_m3_s2", b: "sd_m3_s2" },
-          rationale: "Real-time inference is required when the prediction depends on context that cannot be precomputed (current transaction details, live event happening now). For predictions that only depend on slowly-changing features, batch is almost always preferable.",
+        branches: {
+          wrong_pattern: "shadow_purpose",
+          tight_sla: "serving_recovery",
+          stale_features: "serving_recovery",
         },
-        sd_m3_s2: {
-          id: "sd_m3_s2",
-          type: "scenario_choice",
-          badge: "Stage 2",
-          title: "Stage 2 · Deployment Strategy",
-          prompt: "Your team has retrained a fraud detection model that shows a 15% improvement in AUC on the offline holdout set. The model is being promoted to production and will affect real user transactions. What deployment strategy do you recommend?",
-          choices: [
-            { id: "a", label: "Shadow mode first, then canary to 5%, then full rollout", description: "Shadow mode verifies no infrastructure issues and compares prediction distributions. Canary catches production issues with minimal user exposure before full rollout." },
-            { id: "b", label: "Full rollout immediately — offline improvement is significant", description: "A 15% AUC improvement justifies immediate full deployment to capture business value." },
-            { id: "c", label: "Champion-challenger A/B test at 50/50 split", description: "A/B test the new and old model on equal traffic to confirm the offline improvement translates online." },
-          ],
-          branches: { a: "sd_m3_t", b: "sd_m3_r2", c: "sd_m3_r2" },
-          rationale: "For high-stakes systems (fraud detection affecting real transactions), shadow → canary → full is the responsible path. Offline metrics frequently don't translate to online improvements; shadow mode catches infrastructure issues before any user impact.",
-        },
-        sd_m3_r2: {
-          id: "sd_m3_r2",
-          type: "scenario_choice",
-          badge: "Recovery 2",
-          title: "Recovery 2 · Shadow vs Canary",
-          prompt: "What is the key difference between shadow mode and canary deployment?",
-          choices: [
-            { id: "a", label: "Shadow: predictions logged but not served (zero user impact). Canary: predictions served to a small % of users (real user impact).", description: "Shadow is pure observation. Canary is a limited real-world experiment." },
-            { id: "b", label: "Shadow uses 1% of traffic; canary uses 5% of traffic", description: "The traffic percentage is just a configuration choice; the key distinction is whether predictions are actually served." },
-          ],
-          branches: { a: "sd_m3_t", b: "sd_m3_t" },
-          rationale: "The served vs not-served distinction is the critical difference. Shadow mode is completely safe—users never see the new model's output. Canary introduces real user impact, enabling measurement of business metrics but creating potential for harm if the model is wrong.",
-        },
-        sd_m3_t: {
-          id: "sd_m3_t",
-          type: "scenario_choice",
-          badge: "Complete",
-          title: "Complete · Deployment Lifecycle",
-          prompt: "A deployed model's precision drops from 0.82 to 0.65 over 3 weeks. What actions do you take, in order?",
-          choices: [
-            { id: "a", label: "1) Trigger rollback to previous champion. 2) Investigate drift. 3) Retrain with recent data.", description: "Protect users first (rollback), then diagnose and fix." },
-          ],
-          branches: { a: "sd_m3_t" },
-          terminal: true,
-          rationale: "The model registry enables instant rollback. This is why maintaining the previous champion version in an 'archived but ready' state is essential. Diagnose after you've stopped the bleeding—don't debug with degraded models serving production traffic.",
-        },
+      },
+
+      serving_recovery: {
+        id: "serving_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Serving Pattern for Weekly Emails",
+        prompt: "The serving config uses real-time inference for weekly email product recommendations. What is the correct pattern and why?",
+        choices: [
+          { id: "a", label: "Batch inference — predict nightly and store results", description: "Run the model once per day against all eligible users, write predictions to a database, read from there when building the email." },
+          { id: "b", label: "Real-time inference is always preferable because predictions are fresher", description: "Fresher predictions always lead to better recommendations regardless of the use case." },
+          { id: "c", label: "The 50ms SLA is achievable with a two-tower model so real-time is fine", description: "Two-tower models are fast enough that real-time serving is reasonable here." },
+        ],
+        branches: { a: "shadow_purpose", b: "shadow_purpose", c: "shadow_purpose" },
+        rationale: "Batch inference is correct. Weekly emails are generated on a schedule — there is no user waiting for a synchronous response. Real-time inference would require a live model endpoint running 24/7 for a job that runs once a week. The 50ms SLA is irrelevant because email generation happens offline. 'Fresher is always better' is a common misconception: freshness only matters if staleness would meaningfully harm the prediction quality in that specific use case.",
+      },
+
+      shadow_purpose: {
+        id: "shadow_purpose",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Shadow Mode Purpose",
+        prompt: "Your team wants to deploy a new ranking model but is nervous about regressions. A colleague suggests shadow mode. What is the PRIMARY purpose of running a model in shadow mode?",
+        choices: [
+          { id: "a", label: "To A/B test the model and measure business metric lift", description: "Shadow mode is essentially an A/B test where both variants are compared." },
+          { id: "b", label: "To validate model behavior on real production traffic with zero risk to users", description: "Shadow mode runs the new model on live requests, logs predictions, but only serves the existing model's output to users." },
+          { id: "c", label: "To replace the production model with the new model immediately", description: "Shadow mode is a fast deployment path that skips canary." },
+          { id: "d", label: "To reduce inference costs by running the new model on a subset of traffic", description: "Shadow mode is a cost optimization technique." },
+        ],
+        branches: { a: "fraud_serving", b: "fraud_serving", c: "fraud_serving", d: "fraud_serving" },
+        rationale: "Shadow mode's defining characteristic is zero user risk. The new model receives real traffic and its predictions are logged — but only the production model's output is served. This lets you measure real-distribution latency, accuracy, and failure modes before any user is affected. It is NOT an A/B test (no business metric measurement, no real serving) and NOT a cost reduction tool.",
+      },
+
+      fraud_serving: {
+        id: "fraud_serving",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Fraud Detection Serving Pattern",
+        prompt: "You're designing a fraud detection system. Transactions must be evaluated in under 200ms before the payment is approved. Which serving pattern is appropriate?",
+        choices: [
+          { id: "a", label: "Batch inference — score all transactions nightly", description: "Run the fraud model once per night on all transactions from that day." },
+          { id: "b", label: "Online (real-time) inference — call model synchronously per transaction", description: "Each payment request calls the fraud model and waits for a prediction before proceeding." },
+          { id: "c", label: "Near-real-time micro-batch — refresh scores every 5 minutes", description: "Predictions are refreshed on a short interval and cached; the payment system reads the cache." },
+          { id: "d", label: "Pre-computed batch scores stored in a feature store", description: "Batch-compute risk scores for all users and look them up at transaction time." },
+        ],
+        branches: { a: "canary_vs_bluegreen", b: "canary_vs_bluegreen", c: "canary_vs_bluegreen", d: "canary_vs_bluegreen" },
+        rationale: "Online inference is required. The 200ms constraint and the need to evaluate the current transaction (amount, merchant, location, card) before approving payment makes batch or micro-batch serving impossible. The decision happens in the request hot path — the model must be called synchronously. Batch scoring nightly would miss fraud entirely for transactions that occur before the next batch run.",
+      },
+
+      canary_vs_bluegreen: {
+        id: "canary_vs_bluegreen",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Canary vs Blue/Green",
+        prompt: "Which deployment strategy allows you to gradually shift traffic from the old model to the new model, increasing exposure only if metrics stay healthy?",
+        choices: [
+          { id: "a", label: "Blue/green deployment", description: "Switch all traffic from the old environment to the new one in a single atomic operation." },
+          { id: "b", label: "Canary deployment", description: "Route a small percentage of traffic to the new model, monitor metrics, and progressively increase the percentage." },
+          { id: "c", label: "Shadow mode", description: "Run the new model in parallel but don't serve its predictions." },
+        ],
+        branches: { a: "deploy_recovery", b: "staleness_check", c: "deploy_recovery" },
+        rationale: "Canary deployment is the gradual traffic-shifting strategy. You start at 1–5%, hold for a monitoring window, and ramp up only if guardrail metrics are healthy. Blue/green is an atomic all-or-nothing switch — instant rollback is its advantage, not gradual exposure. Shadow mode never serves the new model's predictions at all.",
+      },
+
+      deploy_recovery: {
+        id: "deploy_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Canary vs Blue/Green",
+        prompt: "You need to deploy a new recommendation model with the ability to catch regressions early by exposing only a small fraction of users first. Which strategy fits?",
+        choices: [
+          { id: "a", label: "Blue/green — switch all traffic atomically, roll back instantly if needed", description: "Flip all traffic to the new model at once; roll back by flipping back." },
+          { id: "b", label: "Canary — start at 1–5% traffic, increase gradually based on metrics", description: "Slowly ramp traffic to the new model while watching guardrail metrics." },
+          { id: "c", label: "Shadow mode — run new model on all traffic but don't serve predictions", description: "Validate in production without any user impact." },
+        ],
+        branches: { a: "staleness_check", b: "staleness_check", c: "staleness_check" },
+        rationale: "Canary is the correct answer when gradual exposure and early regression detection are the goals. Blue/green is all-or-nothing — good for instant rollback after thorough prior validation, not for gradual ramp-up. Shadow mode gives zero user exposure (no real serving at all), which is safer but also means no real business metric feedback.",
+      },
+
+      staleness_check: {
+        id: "staleness_check",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · When is Batch Staleness Acceptable?",
+        prompt: "You're evaluating whether batch inference (refreshed daily) is acceptable for a new feature. Which factor MOST determines whether daily-stale predictions are tolerable?",
+        choices: [
+          { id: "a", label: "Whether the model's predictions meaningfully change within a day for most users", description: "If user context and features are relatively stable day-to-day, daily predictions are good enough." },
+          { id: "b", label: "Whether the model was trained on data from the last 6 months", description: "Training data recency determines if batch serving is acceptable." },
+          { id: "c", label: "Whether the engineering team has bandwidth to build a real-time pipeline", description: "Staleness tolerance is determined by engineering resource availability." },
+          { id: "d", label: "Whether the model accuracy on the test set is above 90%", description: "High accuracy means staleness is less of a concern." },
+        ],
+        branches: { a: "shadow_catches", b: "shadow_catches", c: "shadow_catches", d: "shadow_catches" },
+        rationale: "Staleness is acceptable when the underlying user context doesn't change significantly within the refresh interval. For weekly email recommendations, a user's preferences rarely flip overnight — daily batch is fine. For fraud detection, a user's current transaction context changes every second — staleness is fatal. Training data recency and model accuracy are orthogonal concerns.",
+      },
+
+      shadow_catches: {
+        id: "shadow_catches",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · What Shadow Mode Catches",
+        prompt: "Your team runs a new model in shadow mode for two weeks before promoting it. Which of the following issues would shadow mode MOST reliably surface BEFORE deployment?",
+        choices: [
+          { id: "a", label: "The new model has higher p99 latency than the production model under peak load", description: "Shadow mode runs the new model on real production traffic, so latency characteristics are observable." },
+          { id: "b", label: "The new model's recommendations lead to lower user click-through rates", description: "Click-through rate requires that the new model's predictions actually be served to users." },
+          { id: "c", label: "The new model will increase infrastructure costs by 40%", description: "Infrastructure cost projections require capacity planning, not shadow mode." },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage" },
+        rationale: "Shadow mode reliably surfaces latency and prediction quality issues because the new model runs on real traffic at real scale. However, it cannot measure business metrics like click-through rate — those require the new model's predictions to actually be served to users. Business impact measurement requires a canary or A/B test, not shadow mode. Infrastructure cost estimation is a separate capacity-planning exercise.",
+      },
+
+      terminal_stage: {
+        id: "terminal_stage",
+        type: "scenario_choice",
+        badge: "Stage 7",
+        title: "Stage 7 · Putting It Together",
+        prompt: "An interviewer asks: 'You've built a new fraud detection model that outperforms the current one on your test set. Walk me through how you'd safely deploy it to production.' Which answer best reflects production ML deployment best practices?",
+        choices: [
+          { id: "a", label: "Deploy directly to production — the test set results prove it's better", description: "Strong offline metrics are sufficient justification for direct deployment." },
+          { id: "b", label: "Shadow mode first, then canary at 1–5%, then full rollout with guardrail metrics", description: "Validate on real traffic risk-free, then ramp up gradually while monitoring business guardrails." },
+          { id: "c", label: "Blue/green switch immediately — instant rollback capability means risk is managed", description: "Blue/green's rollback capability makes it safe enough to skip validation steps." },
+          { id: "d", label: "Run an offline A/B test on historical data, then deploy if results hold", description: "Historical A/B testing is sufficient to validate production readiness." },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage", d: "terminal_stage" },
+        terminal: true,
+        rationale: "The gold-standard answer is: shadow mode (validate on real traffic with zero risk) then canary at 1–5% (catch regressions early with real business metrics) then gradual rollout with guardrails then full cutover. Offline test set performance does not predict production behavior — distribution shift, latency under load, and edge cases are invisible until you hit real traffic. Blue/green is fast but skips gradual validation. Historical A/B testing cannot capture live traffic dynamics.",
       },
     },
-    knowledgeCheck: [
-      {
-        question: "A model precomputes daily credit risk scores for 50M customers and stores them in a database for loan officers to query. What serving pattern is this?",
-        options: ["Real-time inference", "Batch inference", "Shadow mode deployment"],
-        correctIndex: 1,
-        explanation: "Batch inference: predictions are precomputed on a schedule (daily) and stored in a database. Loan officers query the database for a lookup, not the model directly. This is appropriate because daily staleness is acceptable for credit risk scoring.",
-      },
-      {
-        question: "What is the primary purpose of shadow mode deployment?",
-        options: ["To A/B test two models against each other to determine statistical significance", "To route production traffic to a new model for logging without serving its predictions to users", "To reduce inference latency by running models in parallel"],
-        correctIndex: 1,
-        explanation: "Shadow mode receives real production traffic, runs the new model, and logs its predictions—but users always receive the current production model's predictions. It's a zero-risk way to verify infrastructure, check prediction distributions, and catch bugs before any user impact.",
-      },
-      {
-        question: "Why is ONNX used for production model serving?",
-        options: ["ONNX provides automatic model retraining when performance degrades", "ONNX is a framework-agnostic model format that enables optimized inference engines (OnnxRuntime) independent of the training framework (PyTorch, scikit-learn)", "ONNX compresses model files to reduce storage costs"],
-        correctIndex: 1,
-        explanation: "ONNX separates training frameworks from inference runtimes. You train in PyTorch, export to ONNX, run with OnnxRuntime which applies graph optimizations. This achieves 2–5× speedup over native framework inference and enables deployment on any platform.",
-      },
-    ],
   },
+
+  knowledgeCheck: [
+    {
+      question: "A product team wants to add 'users who bought this also bought' recommendations to an e-commerce homepage. The team expects 10 million daily active users. Which serving pattern is most appropriate?",
+      options: [
+        "Real-time inference — call the model for each page load to ensure freshest recommendations",
+        "Batch inference — pre-compute recommendations nightly, serve from a fast lookup table",
+        "Near-real-time micro-batch — refresh recommendations every 5 minutes per user",
+        "Blue/green deployment — run two model versions and serve whichever is newer",
+      ],
+      correctIndex: 1,
+      explanation: "Batch inference is correct. 'Also bought' recommendations based on purchase history are not time-critical — they're stable over hours or days. Pre-computing nightly for 10M users and serving from a key-value store (Redis, DynamoDB) is far cheaper and more scalable than calling a model on every page load. Real-time inference at 10M DAU would require significant GPU infrastructure with no meaningful quality gain.",
+    },
+    {
+      question: "What is the defining characteristic that distinguishes shadow mode from a canary deployment?",
+      options: [
+        "Shadow mode is faster to set up than canary",
+        "Shadow mode routes more traffic to the new model than canary",
+        "Shadow mode never serves the new model's predictions to users",
+        "Shadow mode only works for batch inference, not real-time",
+      ],
+      correctIndex: 2,
+      explanation: "Shadow mode's defining property is that the new model's predictions are logged but NEVER served to users. The production model handles all user-facing responses. Canary, by contrast, actually serves the new model's predictions to a small percentage of real users. This makes shadow mode completely safe for user experience but unable to measure business impact metrics.",
+    },
+    {
+      question: "When would you choose blue/green deployment over canary for a model rollout?",
+      options: [
+        "When you want to gradually ramp traffic and catch regressions early",
+        "When you need zero downtime and have already validated the model thoroughly via shadow mode or canary",
+        "When the model has never been tested on production traffic",
+        "When infrastructure costs need to be minimized",
+      ],
+      correctIndex: 1,
+      explanation: "Blue/green is the right choice when you need an instant, atomic cutover with instant rollback capability, and when you've already done thorough validation (shadow mode, canary, or both). It's NOT for gradual ramp-up — canary serves that purpose. Blue/green makes most sense after prior validation has built confidence, and when the business can tolerate no-ramp (e.g., a scheduled rollout with clear go/no-go criteria).",
+    },
+  ],
+},
 
   "sd-m4": {
     durationLabel: "25 min",
@@ -36875,162 +37374,387 @@ slides = [
 "mo-c1": {
   durationLabel: "20 min",
   outcomes: [
-    "Describe how ML CI/CD differs from software CI/CD by adding data validation and model evaluation gates",
-    "Design a 7-stage ML pipeline from lint to post-deploy monitoring",
-    "Define rollback triggers based on production metric degradation",
-    "Explain what Great Expectations does and where it fits in the pipeline",
+    "Explain how ML CI/CD differs from standard software CI/CD",
+    "Design a pipeline with proper evaluation gates before model promotion",
+    "Choose appropriate retraining triggers for a production ML system",
+    "Apply the ML testing pyramid: unit, integration, and model tests",
   ],
-  learnMarkdown: `## CI/CD for Machine Learning
+  learnMarkdown: `## Why ML CI/CD Differs from Software CI/CD
 
-Standard software CI/CD runs tests and deploys code. ML CI/CD must also validate data, train a model, evaluate it against a champion, and monitor it post-deploy. Each stage is a gate — failure stops the pipeline.
+Traditional software CI/CD tests code logic: if the code passes tests and builds successfully, you deploy it. ML systems break this assumption because **three separate artifacts** must all be correct — your code, your training data, and your model weights.
 
----
+A model can degrade without a single line of code changing. Upstream data pipelines can introduce silent schema changes or distribution shifts that produce a model that trains without error but performs worse in production. This means ML CI/CD must version and validate not just code commits, but data snapshots and model evaluation results before any deployment.
 
-## How ML CI/CD Differs
+The second fundamental difference is that ML deployments are **non-deterministic**. Two identical training runs on the same data can produce slightly different models due to random initialization. Your pipeline must treat evaluation results — not build success — as the deployment gate.
 
-| Stage | Software CI/CD | ML CI/CD |
-|-------|---------------|----------|
-| Test | Unit + integration tests | Unit tests + **data validation** |
-| Build | Compile/package | **Model training** (non-deterministic) |
-| Evaluate | N/A | **Model evaluation gate** vs champion |
-| Deploy | Blue-green / canary | **Shadow mode → canary → full** |
-| Monitor | Error rate, latency | + **data drift, prediction drift** |
+## Components of an ML CI/CD Pipeline
 
----
+A complete ML CI/CD pipeline contains six sequential stages:
 
-## The 7-Stage ML Pipeline
+1. **Code tests** — standard unit and integration tests for preprocessing logic and pipeline code
+2. **Data validation** — schema and distribution checks on the incoming training batch
+3. **Model training** — reproducible training run, logged to experiment tracker
+4. **Evaluation gate** — new model must beat baseline by a defined threshold on a held-out eval set
+5. **Model registry push** — only if the gate passes; model lands in Staging, not Production
+6. **Deployment** — promotion from Staging to Production after any required manual or automated approval
 
-1. **Lint + unit tests**: code quality, import checks, fixture tests on small data
-2. **Data validation** (Great Expectations): schema check (correct columns, types), distribution drift (mean/std within expected range), null rate threshold, row count lower bound
-3. **Model training**: triggered by code change OR data drift signal. Training is non-deterministic — pin random seeds, log all hyperparameters.
-4. **Evaluation gate**: AUC > minimum threshold AND AUC > champion AUC by margin (e.g., 0.01). Both conditions required to proceed.
-5. **Staging / shadow mode**: new model receives production traffic, logs predictions, but serves the champion's predictions. Safe evaluation under real load.
-6. **Canary release**: 5–10% of traffic serves the challenger. Monitor for 24–72 hours against guardrail metrics.
-7. **Full rollout + post-deploy monitoring**: drift detection, prediction distribution monitoring, periodic business metric comparison to holdout.
+Skipping or reordering these stages is the most common source of silent production regressions in ML systems.
 
----
+## Data Validation: Schema Checks and Distribution Drift
 
-## Data Validation with Great Expectations
+Before training begins, your pipeline should run two types of data checks.
 
-Great Expectations defines "expectations" — assertions about your data:
-- \`expect_column_to_exist("user_id")\`
-- \`expect_column_values_to_not_be_null("purchase_amount")\`
-- \`expect_column_mean_to_be_between("session_length", 45, 180)\`
+**Schema validation** confirms that columns are present, types match, and no required fields are null. The most widely used library for this is **Great Expectations**, which lets you define an "expectation suite" — a declarative spec of what valid data looks like — and run it as a pipeline step. A schema violation fails the pipeline before a single training epoch runs.
 
-These run as a gate before training. If training data fails validation, the pipeline stops — training on bad data produces a bad model silently.
+**Distribution drift detection** checks whether the statistical properties of the new training batch resemble the distribution seen during previous training. Tools like **Evidently** or custom KL-divergence checks flag when a feature's mean or variance has shifted beyond a threshold. Catching this before training prevents you from silently training a model on anomalous data.
 
----
+## The Model Evaluation Gate
 
-## Rollback Triggers
+The evaluation gate is the most critical stage in ML CI/CD. After training completes, the pipeline automatically compares the new model's performance against the **champion model** (currently in production) on a fixed, held-out evaluation set that neither model was trained on.
 
-Define rollback conditions before deployment:
-- Primary metric degrades > 5% from baseline
-- Error rate increases > 0.5 percentage points
-- p99 latency exceeds SLA
+The gate passes only when the challenger beats the champion by a specified margin — for example, AUC ≥ champion + 0.01, or RMSE ≤ champion × 0.98. The margin should account for variance in the evaluation metric to avoid promoting a model that improved only by noise.
 
-Automated rollback: revert model registry version to champion, redirect traffic, alert on-call engineer.
+If the gate fails, the pipeline stops. The model is never pushed to the registry at production stage, and the current champion remains deployed.
+
+## Model Registry: Versioning and Stage Transitions
+
+A **model registry** is a versioned store of trained model artifacts with lifecycle stages. The two most common tools are **MLflow Model Registry** and **Weights & Biases Model Registry**.
+
+When a model passes the evaluation gate, the pipeline pushes it to **Staging** — not Production. Staging allows integration tests, shadow traffic evaluation, or human review before the final promotion. Promotion from Staging to Production can be automated (if integration tests pass) or require a manual approval step for high-stakes systems. A registry also lets you instantly roll back by re-promoting a previous version.
+
+## Automated Retraining Triggers
+
+Rather than retraining on a fixed schedule alone, mature ML systems use three types of triggers:
+
+- **Data drift**: feature distributions in live traffic diverge from the training distribution beyond a threshold
+- **Performance degradation**: online evaluation metrics (click-through rate, prediction error on labeled feedback) drop below a threshold
+- **Scheduled retraining**: weekly or monthly runs to incorporate new labeled data, regardless of drift signals
+
+Combining all three prevents both stale models and unnecessary retraining costs.
+
+## The ML Testing Pyramid
+
+| Layer | What it tests | Example |
+|-------|--------------|---------|
+| **Unit tests** | Individual transform functions, feature engineering logic | \`test_normalize_age()\` returns values in [0,1] |
+| **Integration tests** | Full pipeline end-to-end on a small data fixture | Pipeline runs without error, output schema matches spec |
+| **Model tests** | Eval metrics on held-out set, slice performance on subgroups | AUC ≥ 0.82; accuracy on minority class ≥ 0.75 |
+
+Model tests are unique to ML. They assert not that code runs correctly, but that the trained artifact meets quality contracts. Slice performance tests catch models that perform well overall but fail on important subgroups.
+
+## Orchestration: GitHub Actions, Kubeflow, Vertex Pipelines
+
+For teams already using GitHub, **GitHub Actions** workflows can chain data validation → training → evaluation into a CI pipeline triggered on data pushes or cron schedules. For large-scale or GPU-intensive training, **Kubeflow Pipelines** (Kubernetes-native) and **Vertex AI Pipelines** (GCP managed) provide component-level caching, distributed execution, and artifact lineage tracking natively.
+
+## Interview-Ready Summary
+
+- ML CI/CD must validate three artifacts: code, data, and model weights — code tests alone are insufficient
+- The evaluation gate compares challenger vs. champion on a fixed held-out set and blocks deployment if the challenger does not beat the baseline by the required margin
+- Data validation has two layers: schema checks (Great Expectations) catch structural errors; distribution drift checks catch statistical anomalies before training
+- Model registries (MLflow, W&B) use stage transitions (Staging → Production) to prevent untested models from reaching live traffic
+- Retraining should be triggered by data drift, performance degradation, or schedule — not only by code commits
+- The ML testing pyramid adds a model-tests layer on top of unit and integration tests, asserting metric contracts and slice fairness
 `,
   video: null,
-  videoFallbackMarkdown: `## Deep Dive: Continuous Training vs Continuous Delivery
+  videoFallbackMarkdown: `## Evaluation Gates in Depth
 
-**CT (Continuous Training)** triggers model retraining automatically on schedule or data drift signal. The trained model is validated and deployed without human approval — used when: model decay is fast, labels arrive quickly, business risk of stale model outweighs deployment risk.
+The evaluation gate is where most teams cut corners — and where most silent regressions enter production. The key design decisions are: what metric to gate on, what threshold to require, and what evaluation set to use.
 
-**CD (Continuous Delivery)** produces a deployable artifact on every code push but requires human approval to deploy. Appropriate when: model changes require review, regulatory compliance mandates human sign-off, business stakes are high.
+**Choosing the right metric** means aligning the gate metric with business impact, not just model accuracy. A fraud detection model should gate on recall and precision at the operating threshold, not raw AUC. An RMSE gate on a demand-forecasting model should use a weighted RMSE that penalizes errors on high-value SKUs more heavily.
 
-Most production ML systems use CD with automated evaluation gates, not fully automated CT. True CT (train-and-ship without human review) is only appropriate for well-understood models with fast label feedback and low-risk predictions.
+**Setting the threshold** requires understanding your metric's variance. If AUC varies by ±0.005 between identical training runs, a gate of "new model must exceed champion by 0.001" will produce random promotions. A practical rule: set the threshold at 2–3× the observed variance in your metric across repeated training runs on the same data.
+
+**Holding out the evaluation set** sounds obvious but is frequently violated. The eval set must be locked — sampled before any experimentation begins and never used for hyperparameter tuning. Leaking the eval set into training or selection produces optimistic gate results and models that underperform in production.
+
+## Model Registry Stage Transitions
+
+The standard lifecycle in MLflow or W&B has three stages: **None → Staging → Production**, with an optional **Archived** state for retired versions.
+
+The pipeline should automate the **None → Staging** transition when the evaluation gate passes. The **Staging → Production** transition is where you decide how much human oversight to require. For low-risk models, an automated integration test suite can trigger this promotion. For models with regulatory or safety implications, a required human approval (implemented as a GitHub Actions environment protection rule or a W&B manual review gate) is the appropriate control.
+
+**Rollback** is a promotion in reverse: re-promoting the previous Production version. Because the registry stores all versions with their artifact URIs and evaluation results, rollback is a metadata operation — no retraining required. Your deployment infrastructure should be able to serve the previous version within minutes of a rollback decision.
+
+## Continuous Training vs Continuous Delivery
+
+"Continuous training" (CT) is sometimes confused with "continuous delivery" (CD). CD means every passing build is automatically deployed. CT means the model is retrained on new data on a regular cadence, but each retrained model still goes through the full evaluation gate before being deployed. CT without a gate is dangerous — it automates the production of potentially degraded models at scale.
+
+A mature ML system combines both: CT generates new model candidates continuously, and CD handles the evaluation gate, registry promotion, and deployment — ensuring that only improved models reach production.
 `,
-  tryGuidance: "No interactive viz — work through the ML pipeline design scenarios in the interview simulation.",
+  tryGuidance: `Work through the CI/CD pipeline bug hunt and scenario stages. In the click-target stage, read the YAML carefully and identify which step is missing the evaluation gate. For scenario stages, apply the principles from the lesson: evaluation gates gate on champion comparison, retraining is triggered by drift or degradation, and model tests assert metric contracts — not just code correctness.`,
   interviewGraph: {
-    initialStageId: "mo_c1_stage1",
+    initialStageId: "click_bug",
     artifactDimensions: [
-      { label: "Pipeline Design", recoveryStageId: "mo_c1_rec1" },
-      { label: "Evaluation Gates", recoveryStageId: "mo_c1_terminal", passLabel: "ML CI/CD" },
+      { label: "Pipeline Design", recoveryStageId: "pipeline_recovery" },
+      { label: "Quality Gates", recoveryStageId: "gate_recovery" },
     ],
     stages: {
-      mo_c1_stage1: {
-        id: "mo_c1_stage1",
-        type: "scenario_choice",
+      click_bug: {
+        id: "click_bug",
+        type: "click_target",
         badge: "Stage 1",
-        title: "Stage 1 · Missing gates",
-        prompt: "A team's ML pipeline is: commit → train model → deploy. What critical gates are missing?",
-        choices: [
-          { id: "a", label: "Performance benchmarks and load testing", description: "Important for serving, but not the primary ML-specific gaps." },
-          { id: "b", label: "Data validation before training, model evaluation gate vs champion before deploy, and shadow/canary release before full rollout", description: "These three gates prevent bad data, worse models, and production failures from reaching users." },
-          { id: "c", label: "More unit tests and code coverage requirements", description: "Code tests alone don't catch data or model quality issues." },
-        ],
-        branches: { a: "mo_c1_rec1", b: "mo_c1_stage2", c: "mo_c1_rec1" },
-        rationale: "B is correct. The three missing gates: (1) data validation — bad training data silently produces bad models; (2) evaluation gate — deploying a worse model than the champion is worse than not deploying; (3) canary/shadow — production load reveals issues that staging misses.",
+        title: "Stage 1 · Spot the missing evaluation gate",
+        prompt: "This ML pipeline YAML deploys a retrained model straight to production. One stage is the root cause of a critical quality gap. Click the line that identifies the problem.",
+        code_snippet: `# ml_pipeline.yaml
+stages:
+  - name: data_validation
+    run: python validate_data.py
+
+  - name: model_training          # -- ds-target:train_stage
+    run: python train_model.py
+
+  - name: push_to_registry        # -- ds-target:skip_eval
+    run: python push_model.py --stage production
+    depends_on: model_training
+
+  - name: deploy_to_production    # -- ds-target:deploy_stage
+    run: kubectl apply -f deployment.yaml
+    depends_on: push_to_registry`,
+        validationCopy: {
+          train_stage: "Training runs fine — but the real problem is what happens right after it. Keep looking.",
+          skip_eval: "Correct. `push_to_registry` pushes directly to the production stage without any evaluation step comparing the new model to the current champion. A degraded model can silently reach production on every retraining run.",
+          deploy_stage: "Deployment is the consequence, not the cause. The damage is done before this step runs. Look one step earlier.",
+        },
+        branches: {
+          train_stage: "pipeline_recovery",
+          skip_eval: "retrain_trigger",
+          deploy_stage: "pipeline_recovery",
+        },
       },
-      mo_c1_rec1: {
-        id: "mo_c1_rec1",
+
+      pipeline_recovery: {
+        id: "pipeline_recovery",
         type: "scenario_choice",
         badge: "Recovery",
-        title: "Recovery · ML-specific gates",
-        prompt: "What makes ML CI/CD different from standard software CI/CD?",
+        title: "Recovery · What must come between training and registry push?",
+        prompt: "The pipeline pushes the newly trained model straight to the production stage in the registry. What stage is missing between `model_training` and `push_to_registry`?",
         choices: [
-          { id: "a", label: "ML pipelines must validate data quality, train a non-deterministic model, and evaluate it against a champion — none of these exist in standard software pipelines", description: "Data validation + model evaluation are ML-specific requirements." },
+          {
+            id: "a",
+            label: "An evaluation stage that compares the new model to the current champion on a held-out eval set",
+            description: "Before any registry push, the challenger must beat the baseline by the required margin.",
+          },
+          {
+            id: "b",
+            label: "The model registry handles evaluation automatically when you push with --stage production",
+            description: "Registries store and version artifacts — they do not run evaluations on your behalf.",
+          },
+          {
+            id: "c",
+            label: "Data validation before training is a sufficient quality gate for deployment",
+            description: "Data validation catches input problems, but cannot predict whether the resulting model beats the current champion.",
+          },
         ],
-        branches: { a: "mo_c1_stage2" },
-        rationale: "Data validation catches training data corruption. Model evaluation ensures the new model actually improves on the champion before deployment.",
+        branches: { a: "retrain_trigger", b: "pipeline_recovery", c: "pipeline_recovery" },
+        rationale: "An explicit evaluation stage must load both the challenger and the champion, run both on the same held-out eval set, compare the target metric, and fail the pipeline if the challenger does not meet the required threshold. Neither the registry nor the data validation step does this — it must be a purpose-built stage in the pipeline.",
       },
-      mo_c1_stage2: {
-        id: "mo_c1_stage2",
+
+      retrain_trigger: {
+        id: "retrain_trigger",
         type: "scenario_choice",
         badge: "Stage 2",
-        title: "Stage 2 · Evaluation gate design",
-        prompt: "Your evaluation gate requires AUC > 0.85. The new model achieves AUC 0.86, but the current champion is AUC 0.89. Should it deploy?",
+        title: "Stage 2 · Retraining triggers",
+        prompt: "A production recommendation model was last trained three months ago. Business intelligence shows that user behavior shifted significantly after a product redesign two weeks ago. Which retraining trigger is most directly relevant here?",
         choices: [
-          { id: "a", label: "Yes — 0.86 exceeds the 0.85 threshold", description: "Deploying a worse model than the champion is a regression." },
-          { id: "b", label: "No — the gate should require AUC > threshold AND AUC > champion; deploying a model worse than the champion is a regression", description: "Absolute threshold + relative comparison to champion are both required." },
+          {
+            id: "a",
+            label: "Scheduled retraining — retrain on a fixed weekly cadence regardless of signals",
+            description: "Scheduled retraining would eventually catch this, but may be too slow if the behavior shift is significant.",
+          },
+          {
+            id: "b",
+            label: "Data drift trigger — feature distributions in live traffic diverge from the training distribution",
+            description: "A product redesign changes user interaction patterns, which manifests as feature distribution shift in the input data.",
+          },
+          {
+            id: "c",
+            label: "Code commit trigger — retrain whenever the model code is updated in version control",
+            description: "The code has not changed — only the data distribution has.",
+          },
+          {
+            id: "d",
+            label: "Manual trigger only — retrain when a data scientist decides to",
+            description: "Manual triggers introduce latency and human bottlenecks; automated drift detection is faster and more reliable.",
+          },
         ],
-        branches: { a: "mo_c1_rec1", b: "mo_c1_terminal" },
-        rationale: "B is correct. The evaluation gate has two conditions: (1) exceeds absolute quality floor, (2) improves on the champion. Meeting only the floor is insufficient — you'd be deploying a 3-point AUC regression. Both gates must pass.",
+        branches: { a: "gate_recovery", b: "model_tests", c: "gate_recovery", d: "gate_recovery" },
+        rationale: "A product redesign shifts user behavior, which changes the statistical distribution of input features — classic data drift. A drift monitoring system that continuously compares live traffic distributions to the training baseline will detect this and trigger retraining automatically. Scheduled retraining is a useful backstop but is not the most directly responsive trigger for a known distribution shift.",
       },
-      mo_c1_terminal: {
-        id: "mo_c1_terminal",
+
+      gate_recovery: {
+        id: "gate_recovery",
         type: "scenario_choice",
-        badge: "Complete",
-        title: "Complete · Pipeline mastered",
-        prompt: "What triggers rollback in a deployed ML model?",
+        badge: "Recovery",
+        title: "Recovery · Identifying the right retraining trigger",
+        prompt: "Your ML system should retrain automatically when model quality degrades in production. Which signal is the most direct indicator of performance degradation — as opposed to a leading indicator?",
         choices: [
-          { id: "a", label: "Pre-defined production metric degradation thresholds: primary metric down >X%, error rate up >Y%, latency exceeds SLA — automated rollback to champion version", description: "Rollback triggers must be defined before deployment, not after problems appear." },
+          {
+            id: "a",
+            label: "Feature distribution drift detected by comparing live traffic to the training baseline",
+            description: "Drift is a leading indicator — it predicts future degradation but doesn't confirm it has already happened.",
+          },
+          {
+            id: "b",
+            label: "Declining online evaluation metrics on labeled feedback from production traffic",
+            description: "Online metrics on labeled feedback directly measure whether predictions are correct in production.",
+          },
+          {
+            id: "c",
+            label: "Increased training data volume since last retraining run",
+            description: "More data alone doesn't indicate performance degradation — it's a schedule-based signal, not a quality signal.",
+          },
         ],
-        branches: { a: "mo_c1_terminal" },
+        branches: { a: "model_tests", b: "model_tests", c: "gate_recovery" },
+        rationale: "Online evaluation metrics on labeled production feedback are a direct (lagging) indicator: they tell you the model is performing poorly right now. Feature drift is a leading indicator — it predicts degradation before labels arrive. Both are valuable, but they play different roles: drift triggers proactive retraining, while performance metrics confirm that retraining is urgently needed.",
+      },
+
+      model_tests: {
+        id: "model_tests",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · ML testing pyramid",
+        prompt: "A senior engineer asks you to add 'model tests' to the CI pipeline for a customer churn classifier. Which of the following best describes what model tests should assert?",
+        choices: [
+          {
+            id: "a",
+            label: "That the Python training script runs without raising exceptions",
+            description: "This is an integration test at best — it checks code execution, not model quality.",
+          },
+          {
+            id: "b",
+            label: "That the trained model's AUC on the held-out eval set meets a minimum threshold, and that recall on the minority class meets a slice-level contract",
+            description: "Model tests assert metric contracts on both overall performance and critical subgroup slices.",
+          },
+          {
+            id: "c",
+            label: "That feature engineering functions return the correct data types and value ranges",
+            description: "This is a unit test — it tests code logic, not trained model behavior.",
+          },
+          {
+            id: "d",
+            label: "That the model artifact file is non-empty and can be loaded by the serving framework",
+            description: "This is an artifact integrity check — necessary but not sufficient as a model test.",
+          },
+        ],
+        branches: { a: "great_expectations", b: "great_expectations", c: "great_expectations", d: "great_expectations" },
+        rationale: "Model tests sit at the top of the ML testing pyramid. They load the trained artifact and assert quality contracts: overall metric thresholds (AUC, F1, RMSE) AND slice-level thresholds on important subgroups. Slice tests catch models that appear acceptable overall but fail on minority classes, protected attributes, or high-value segments. Unit tests (transform functions) and integration tests (pipeline runs) are separate layers below model tests.",
+      },
+
+      great_expectations: {
+        id: "great_expectations",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Data validation with Great Expectations",
+        prompt: "Your data validation step uses Great Expectations to run an expectation suite before training. Which type of problem is Great Expectations best suited to catch at this stage?",
+        choices: [
+          {
+            id: "a",
+            label: "A new column was added to the upstream data source, changing the schema from what the training code expects",
+            description: "Great Expectations expectation suites define expected column sets, types, and nullability — schema changes are caught immediately.",
+          },
+          {
+            id: "b",
+            label: "The model will underfit on the new training batch because learning rate is too high",
+            description: "Great Expectations validates data properties — it has no visibility into model hyperparameters or training dynamics.",
+          },
+          {
+            id: "c",
+            label: "The deployment cluster has insufficient GPU memory to serve the new model",
+            description: "Infrastructure capacity is an operations concern, not a data validation concern.",
+          },
+        ],
+        branches: { a: "registry_transitions", b: "registry_transitions", c: "registry_transitions" },
+        rationale: "Great Expectations validates the data artifact entering the pipeline: column presence, data types, value ranges, null rates, and referential integrity. A schema change — added columns, renamed fields, changed types — is exactly what expectation suites are designed to catch. Distribution drift detection (using statistical tests on feature distributions) is a complementary check, often implemented alongside but separately from schema validation.",
+      },
+
+      registry_transitions: {
+        id: "registry_transitions",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Model registry stage transitions",
+        prompt: "A newly trained model has passed the evaluation gate and been pushed to the Staging stage in MLflow Model Registry. What should happen before it can be promoted to Production?",
+        choices: [
+          {
+            id: "a",
+            label: "It should be automatically promoted to Production immediately, since it already passed the evaluation gate",
+            description: "The evaluation gate confirms the model is better than the champion — but Staging allows additional checks before live traffic exposure.",
+          },
+          {
+            id: "b",
+            label: "Integration tests or shadow traffic evaluation should run in Staging; for high-stakes models, a human approval step should be required before Production promotion",
+            description: "Staging provides a controlled environment for integration testing and optional manual review before production traffic.",
+          },
+          {
+            id: "c",
+            label: "The model must be retrained from scratch in the Production environment to ensure reproducibility",
+            description: "Retraining in production is wasteful and introduces non-determinism; the Staging artifact is promoted, not retrained.",
+          },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage" },
+        rationale: "Staging exists precisely because passing an offline evaluation gate does not guarantee correct behavior under real serving conditions. Integration tests in Staging check that the model loads correctly into the serving framework, latency meets SLOs, and outputs match the expected schema. For regulated or high-stakes models, a human approval gate on the Staging → Production transition adds an explicit accountability step. The artifact promoted to Production is the same one that passed the gate — no retraining.",
+      },
+
+      terminal_stage: {
+        id: "terminal_stage",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · Continuous training vs continuous delivery",
+        prompt: "A teammate proposes enabling 'continuous training' so the model retrains automatically every night and deploys the result to production without human review. What is the most important risk to flag?",
+        choices: [
+          {
+            id: "a",
+            label: "Nightly retraining is too frequent — models should only retrain monthly to avoid instability",
+            description: "Frequency is a design choice, not an inherent risk. The problem is not cadence but the missing gate.",
+          },
+          {
+            id: "b",
+            label: "Without an evaluation gate, continuous training automates the deployment of potentially degraded models at scale",
+            description: "CT without a gate means every bad training run — due to data issues, upstream changes, or random variance — reaches production automatically.",
+          },
+          {
+            id: "c",
+            label: "Automated retraining violates data privacy regulations in most jurisdictions",
+            description: "Automation frequency is not a privacy concern by default; privacy depends on what data is used, not how often training runs.",
+          },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage" },
+        rationale: "Continuous training (CT) and continuous delivery (CD) must both be present. CT generates new model candidates on a cadence; CD ensures each candidate passes the evaluation gate before reaching production. CT without CD means degraded models are deployed automatically — the opposite of the intended outcome. The evaluation gate is what makes automated retraining safe.",
         terminal: true,
-        rationale: "Rollback triggers are pre-defined, not reactive judgments. Automated rollback reduces mean time to recovery from a bad model deploy.",
       },
     },
   },
   knowledgeCheck: [
     {
-      question: "What does Great Expectations do in an ML CI/CD pipeline?",
+      question: "A newly trained model achieves AUC 0.847, while the current production model achieves AUC 0.851 on the same held-out eval set. According to ML CI/CD best practices, what should happen?",
       options: [
-        "It automatically generates model training code from data schemas",
-        "It validates data quality by running assertions (expectations) on training data before model training begins, blocking the pipeline if data quality fails",
-        "It monitors model predictions in production for distribution shift",
+        "Deploy the new model anyway — AUC differences below 0.01 are negligible",
+        "The evaluation gate should block deployment; the challenger has not beaten the champion",
+        "Run the evaluation gate again with a different eval set to get a more favorable comparison",
+        "Promote the new model to Staging but automatically promote to Production after 24 hours",
       ],
       correctIndex: 1,
-      explanation: "Great Expectations runs assertions about your data — column existence, null rates, value ranges, statistical distributions — before training. If training data fails these checks, the pipeline stops. This prevents the silent failure mode where a model trains successfully on corrupted data and deploys with degraded quality.",
+      explanation: "The evaluation gate requires the challenger to beat the champion by a defined threshold. If the new model scores lower (0.847 vs 0.851), the gate fails and the pipeline stops. The current production model remains deployed. Re-running with a different eval set would invalidate the held-out guarantee.",
     },
     {
-      question: "What is shadow mode deployment in ML and why use it before canary?",
+      question: "Which layer of the ML testing pyramid would catch a bug where a preprocessing function incorrectly clips feature values at the wrong threshold?",
       options: [
-        "Shadow mode serves the new model's predictions to a small percentage of users",
-        "Shadow mode routes production traffic to the new model for logging purposes only — the champion's predictions are still served — allowing safe evaluation under real load without user risk",
-        "Shadow mode is a development environment that mirrors production data",
+        "Model tests — by checking that eval metrics meet the required threshold",
+        "Integration tests — by running the full pipeline end-to-end on a fixture dataset",
+        "Unit tests — by asserting that the transform function returns values in the correct range",
+        "Data validation — by running Great Expectations on the raw input data",
       ],
-      correctIndex: 1,
-      explanation: "In shadow mode, the new model receives real production requests and logs its predictions, but users still see the champion's predictions. This lets you measure new model quality under real production traffic distribution — which often differs from your evaluation dataset — with zero user risk. Only after shadow mode validation do you proceed to canary.",
+      correctIndex: 2,
+      explanation: "A preprocessing function that clips values at the wrong threshold is a code logic bug in a transform function. Unit tests that assert input/output contracts on individual functions (e.g., `test_clip_feature()` checks output is in [0, 1]) will catch this before the pipeline even runs. Integration and model tests might surface the effect indirectly, but unit tests are the fastest and most targeted check.",
     },
     {
-      question: "Why should random seeds be pinned and all hyperparameters logged in ML training?",
+      question: "What distinguishes a data drift trigger from a performance degradation trigger for automated model retraining?",
       options: [
-        "To make training faster by avoiding random initialization overhead",
-        "Because ML training is non-deterministic — pinning seeds and logging params ensures the training run can be reproduced, which is required for debugging and regulatory compliance",
-        "To prevent the model from overfitting during training",
+        "Data drift triggers retrain on a fixed schedule; performance degradation triggers retrain on code commits",
+        "Data drift is a leading indicator based on input distribution changes; performance degradation is a lagging indicator based on measured prediction quality",
+        "Data drift applies only to batch models; performance degradation applies only to real-time models",
+        "There is no meaningful difference — both signals indicate the same underlying cause",
       ],
       correctIndex: 1,
-      explanation: "Non-determinism in ML training (random initialization, data shuffling, dropout) means the same code on the same data can produce different models. Pinning random seeds + logging all hyperparameters + logging the data version ensures the training run is reproducible — critical for debugging model regressions and satisfying audit requirements.",
+      explanation: "Data drift detects shifts in input feature distributions before labels are available — it is a leading indicator that predicts future degradation. Performance degradation metrics (measured on labeled production feedback) directly confirm the model is making worse predictions right now — a lagging indicator. Mature systems use both: drift for proactive retraining, performance metrics for urgent remediation.",
     },
   ],
 },
@@ -37213,344 +37937,706 @@ Model cards are increasingly required for compliance (EU AI Act) and are good en
 },
 
 "mo-c3": {
-  durationLabel: "18 min",
+  durationLabel: "16 min",
   outcomes: [
-    "Distinguish data drift (P(X) changes) from concept drift (P(y|X) changes) with real examples",
-    "Calculate and interpret the Population Stability Index (PSI)",
-    "Apply the KS test for detecting distributional shift in feature values",
-    "Design a monitoring strategy when ground truth labels arrive with a 30-day delay",
+    "Explain what MLflow tracks and why experiment tracking matters for reproducibility",
+    "Use the MLflow Tracking API to log params, metrics, and artifacts",
+    "Describe the Model Registry lifecycle: Staging → Production → Archived",
+    "Compare MLflow with Weights & Biases and articulate when to use each",
+    "Answer 'how do you ensure reproducibility?' confidently in a system design interview",
   ],
-  learnMarkdown: `## Monitoring & Drift Detection
+  learnMarkdown: `## The Reproducibility Problem
 
-A model that was accurate at training time can silently degrade in production. Without monitoring, you won't notice until business outcomes deteriorate. Monitoring is the last line of defense.
+Picture this: you train a model on a Tuesday, it hits 91% accuracy, and you excitedly move on. Three weeks later your manager asks you to reproduce it — or worse, a colleague asks why the production model behaves differently from last month. You stare at a folder of \`model_v2_final_FINAL.pkl\` files and a notebook with no record of which hyperparameters you used.
 
----
+This is the **reproducibility crisis** of ML. Unlike traditional software, where the same code always produces the same output, ML experiments are shaped by dozens of choices: learning rate, random seeds, data preprocessing steps, library versions, and git state. Without systematic tracking, you are flying blind.
 
-## Two Types of Drift
-
-### Data Drift (Covariate Shift)
-The input feature distribution P(X) changes, but the relationship P(y|X) may be stable.
-
-Example: a credit risk model trained on 2021 data. In 2024, more applicants are gig workers — the income distribution and employment type distribution have shifted. The model may still be accurate for the patterns it learned, but it's now evaluating a different population.
-
-### Concept Drift
-The relationship P(y|X) itself changes — the model's learned mapping is no longer valid.
-
-Example: a fraud detection model trained before cryptocurrency payments. Fraud patterns evolved to use crypto. Even for transactions with the same features as before, the fraud probability changed — the concept (what fraud looks like) drifted.
-
-**Why the distinction matters**: data drift may not impair model accuracy (if P(y|X) is stable). Concept drift always impairs accuracy. Data drift is detectable without labels; concept drift requires labels to confirm.
+**MLflow** is the open-source answer. It turns your ad-hoc experiment scripts into a searchable, comparable, auditable record of every run you have ever executed.
 
 ---
 
-## Population Stability Index (PSI)
+## MLflow Components
 
-PSI measures the shift between a reference distribution (training) and a current distribution (production):
+MLflow is four loosely coupled subsystems:
 
+**Tracking** — The core. Every time you call \`mlflow.start_run()\`, MLflow creates a *run* record inside an *experiment*. A run stores parameters, scalar metrics (optionally per-step for learning curves), arbitrary artifacts (model files, plots, CSVs), and environment metadata. The UI lets you sort and filter across hundreds of runs.
+
+**Models** — A packaging convention. MLflow wraps your model in a standard format with a \`MLmodel\` manifest that declares *flavors* (sklearn, pytorch, pyfunc, etc.). This lets a downstream service load the model without knowing which framework trained it.
+
+**Model Registry** — Version control for models. After logging a model, you register it under a named entry (e.g., \`fraud-detector\`). Each registered version flows through lifecycle stages: **None → Staging → Production → Archived**. Teams can gate production promotion with approval workflows.
+
+**Projects** — Packaging for reproducibility at the code level. A \`MLproject\` file declares entry points and Conda/Docker environments so anyone can run your experiment with \`mlflow run .\`.
+
+---
+
+## What to Log
+
+Logging everything may seem like overkill — until you need it.
+
+- **Hyperparameters**: every tunable value (\`n_estimators\`, \`learning_rate\`, \`batch_size\`). Log these with \`mlflow.log_param()\` before training starts.
+- **Metrics per epoch/step**: call \`mlflow.log_metric("val_loss", loss, step=epoch)\` to capture the learning curve, not just the final number.
+- **Artifacts**: model weights, feature importance plots, confusion matrices, SHAP plots. Log them with \`mlflow.log_artifact()\` or \`mlflow.log_figure()\`.
+- **Environment**: requirements.txt, conda.yaml, Python version. MLflow auto-captures these when you use \`mlflow.autolog()\`.
+- **Git commit**: MLflow records the active git hash automatically. This pins the exact code version to every run.
+
+A good rule of thumb: if a parameter affects the model's behavior or the metric's validity, log it.
+
+---
+
+## MLflow Tracking API
+
+\`\`\`python
+import mlflow
+import mlflow.sklearn
+from sklearn.ensemble import RandomForestClassifier
+
+mlflow.set_experiment("churn-prediction")
+
+with mlflow.start_run(run_name="rf-baseline"):
+    # Log every hyperparameter
+    mlflow.log_param("n_estimators", 100)
+    mlflow.log_param("max_depth", 5)
+    mlflow.log_param("random_state", 42)
+
+    model = RandomForestClassifier(n_estimators=100, max_depth=5, random_state=42)
+    model.fit(X_train, y_train)
+
+    # Log scalar metrics
+    mlflow.log_metric("accuracy", model.score(X_test, y_test))
+    mlflow.log_metric("f1", f1_score(y_test, model.predict(X_test)))
+
+    # Log the model as a tracked artifact with schema
+    mlflow.sklearn.log_model(model, artifact_path="model")
+
+    # Log a confusion matrix image
+    mlflow.log_artifact("confusion_matrix.png")
 \`\`\`
-PSI = Σ (Actual% - Expected%) × ln(Actual% / Expected%)
-\`\`\`
 
-Computed by binning the feature into deciles:
-
-| PSI | Interpretation |
-|-----|----------------|
-| < 0.1 | Stable — no action needed |
-| 0.1 – 0.2 | Slight shift — investigate |
-| > 0.2 | Major shift — likely model degradation |
-
-PSI > 0.2 on a key feature is a trigger for retraining.
+The \`with mlflow.start_run()\` context manager ensures the run is closed even if an exception occurs. Using \`mlflow.sklearn.log_model()\` instead of \`joblib.dump()\` stores the model inside the run's artifact store with its flavor manifest — making it loadable by the registry.
 
 ---
 
-## KS Test for Drift Detection
+## Model Registry Workflow
 
-The **Kolmogorov-Smirnov test** compares two distributions without assuming normality:
+1. **Log**: train a run and call \`mlflow.sklearn.log_model()\`.
+2. **Register**: in the UI or via \`mlflow.register_model(run_uri, "model-name")\` — creates version 1.
+3. **Transition to Staging**: evaluate on a holdout set, run integration tests.
+4. **Transition to Production**: once validated, move the version to Production. The serving layer loads whichever version holds the Production stage.
+5. **Archive**: when a newer version supersedes it, archive the old one — it stays queryable but is no longer served.
 
-- H₀: the two distributions are the same
-- p < 0.05: statistically significant distributional shift
-
-More sensitive than PSI for detecting subtle shifts, but produces a binary decision (drift / no drift) rather than a magnitude.
+This workflow decouples the training team from the serving team and gives you an auditable history of every model version that ever reached production.
 
 ---
 
-## Monitoring with Delayed Labels
+## Alternatives
 
-When ground truth labels take 30+ days to arrive (e.g., loan defaults, churn), you can't measure accuracy in real time. Use **proxy metrics**:
+**Weights & Biases (W&B)** — richer visualizations, better support for deep learning (gradient histograms, system metrics, media logging). More popular in research and computer vision teams. Hosted SaaS with a generous free tier.
 
-- **Prediction distribution shift**: if the distribution of predicted probabilities shifts, something changed
-- **Feature distribution monitoring**: PSI on input features (no labels needed)
-- **Downstream business metrics**: if the model drives decisions, downstream outcomes (click rate, conversion) can indicate model degradation
-- **Slice monitoring**: if a specific customer segment shows unusual prediction patterns, investigate
+**Neptune** — strong collaboration features, good for larger teams.
 
-When labels do arrive, run a retrospective accuracy check and compare to the training baseline.
+**Comet ML** — similar to W&B, good UI, offers a self-hosted option.
+
+For interviews: know that W&B is dominant in the DL/research space, while MLflow is dominant in enterprise/batch ML workflows where Databricks or a self-hosted setup is preferred.
+
+---
+
+## Why This Matters in Interviews
+
+The question "how do you ensure reproducibility in your ML pipeline?" is a litmus test for ML engineering maturity. The strong answer describes: (1) version-controlling data and code, (2) logging all params and metrics per run, (3) storing artifacts in a tracked registry, (4) gating stage transitions with validation criteria. Candidates who answer "I just save the pickle file" signal they have not operated ML in production.
+
+---
+
+## Interview-Ready Summary
+
+- MLflow Tracking records params, metrics, artifacts, and git state for every training run inside named experiments.
+- A *run* is a single execution of training code; an *experiment* groups related runs for comparison.
+- Always log hyperparameters with \`mlflow.log_param()\`, not just final metrics — params are what make a run reproducible.
+- Use \`mlflow.sklearn.log_model()\` (not \`joblib.dump()\`) to store models with their flavor manifest for registry compatibility.
+- The Model Registry separates training from serving via lifecycle stages: Staging → Production → Archived.
+- W&B is preferred for deep learning / research; MLflow for enterprise batch ML and Databricks environments.
 `,
+
   video: null,
-  videoFallbackMarkdown: `## Deep Dive: Gradual vs Sudden Drift
 
-**Sudden drift** (concept change): a discrete event changes the data distribution overnight — a new payment method, a new product launch, a regulation change. Symptoms: immediate sharp performance drop. Detection: rolling-window PSI with short window (7 days).
+  videoFallbackMarkdown: `## Deep Dive: Registry Stage Transitions and Tool Trade-offs
 
-**Gradual drift**: slow evolution of user behavior or data collection process. Symptoms: slow performance decay over months. Detection: requires long-window trend analysis (monthly PSI comparison to original baseline, not just last month's).
+### Navigating Model Registry Stages
 
-**Seasonal drift**: recurring patterns that look like drift but are expected. Example: holiday shopping behavior changes feature distributions every December. Mitigation: compare to the same period last year, not the previous month.
+The Model Registry is not just a file store — it is an organizational contract between the team that trains models and the team that serves them. Understanding how stage transitions work at the operational level signals genuine production ML experience.
+
+**None → Staging**: triggered by the data scientist after a run looks promising. The model is registered (creating a versioned entry) and moved to Staging. At this point the inference service does *not* serve it. The team runs offline evaluation on a held-out test set, checks latency benchmarks, and often runs shadow-mode predictions alongside the current Production model.
+
+**Staging → Production**: a deliberate promotion that should require sign-off — either a human approval or an automated gate (e.g., accuracy must exceed a threshold, latency p99 must be under 200 ms). MLflow lets you add a description and transition comment to each stage change, creating an audit trail. In Databricks, this can be wired to a CI/CD approval step.
+
+**Production → Archived**: when a new version is promoted to Production, the old version is archived rather than deleted. This preserves the artifact for rollback or post-incident analysis. A common mistake is to skip archiving and leave multiple versions in Production simultaneously — this creates ambiguity about which version the serving layer will load.
+
+### MLflow vs Weights & Biases: When to Choose
+
+The choice between MLflow and W&B is often a cultural and infrastructure question rather than a purely technical one.
+
+**Choose MLflow when**: your organization uses Databricks or Apache Spark; you need a fully self-hosted, air-gapped deployment; you work primarily with tabular data and batch inference; your team values interoperability with the broader Python ML ecosystem without vendor lock-in.
+
+**Choose W&B when**: you are training deep learning models and want gradient histograms, system GPU metrics, and rich media logging out of the box; your team is research-oriented and values fast iteration with slick collaboration features; you need to share experiment dashboards with stakeholders outside the engineering team.
+
+**The maturity signal**: candidates who can articulate *why* they chose one over the other — not just that they used it — demonstrate genuine engineering judgment. In a system design interview, saying "we chose MLflow because we were already on Databricks and needed an air-gapped deployment for compliance reasons" is far stronger than "we used MLflow because it was popular."
+
+### Demonstrating ML Engineering Maturity
+
+In system design interviews, the experiment tracking and model registry question is really about whether you understand the *lifecycle* of a model, not just training. A complete answer covers: how experiments are logged and compared (tracking), how the best model is promoted through validated stages (registry), how the serving layer queries the registry (model loading by stage), and how rollbacks are handled (archive + re-promote). Tying each layer to a concrete tool and explaining the organizational contract it enforces distinguishes senior ML engineers from practitioners who have only trained models in notebooks.
 `,
-  tryGuidance: "No interactive viz — work through the drift detection scenarios in the interview simulation.",
+
+  tryGuidance: "Step through the interactive stages. For the code review, click the line that contains the most critical missing tracking practice. For scenario questions, choose the answer you would give in a real interview — the rationale reveals what interviewers are probing for.",
+
   interviewGraph: {
-    initialStageId: "mo_c3_stage1",
+    initialStageId: "intro_tracking",
     artifactDimensions: [
-      { label: "Drift Types", recoveryStageId: "mo_c3_rec1" },
-      { label: "Delayed Labels", recoveryStageId: "mo_c3_terminal", passLabel: "Drift Monitoring" },
+      { label: "Experiment Tracking", recoveryStageId: "tracking_recovery" },
+      { label: "Model Registry", recoveryStageId: "registry_recovery" },
     ],
     stages: {
-      mo_c3_stage1: {
-        id: "mo_c3_stage1",
+      intro_tracking: {
+        id: "intro_tracking",
         type: "scenario_choice",
         badge: "Stage 1",
-        title: "Stage 1 · Drift type identification",
-        prompt: "A spam classifier's accuracy drops after a major social network launches. The email features (word frequencies, sender patterns) all look the same. What type of drift is this?",
+        title: "Stage 1 · Why track experiments?",
+        prompt: "Your team ran 40 experiments last month. Now you need to reproduce the model that performed best. Which MLflow feature is most directly useful?",
         choices: [
-          { id: "a", label: "Data drift — the email feature distributions changed", description: "The question states features look the same — data drift isn't the cause." },
-          { id: "b", label: "Concept drift — the relationship between features and spam label changed because spammers adopted new tactics not represented in training data", description: "Same features, different meaning — P(y|X) changed." },
-          { id: "c", label: "No drift — accuracy drops are expected and don't indicate drift", description: "Systematic accuracy drop is a key drift indicator." },
+          { id: "a", label: "Model Registry", description: "Browse registered model versions and their stage history" },
+          { id: "b", label: "MLflow Tracking", description: "Search runs by metric, inspect logged params and artifacts for each run" },
+          { id: "c", label: "MLflow Projects", description: "Re-run the project entry point with the same environment" },
+          { id: "d", label: "MLflow Models", description: "Load the model artifact using its flavor interface" },
         ],
-        branches: { a: "mo_c3_rec1", b: "mo_c3_stage2", c: "mo_c3_rec1" },
-        rationale: "B is correct. Concept drift: spammers evolved tactics after observing what gets caught. The feature distributions (email structure, word frequencies) may look similar, but the same features now correspond to different spam/ham labels. The model's learned decision boundary is no longer valid.",
+        branches: { a: "tracking_recovery", b: "code_review", c: "tracking_recovery", d: "tracking_recovery" },
+        rationale: "MLflow Tracking is where params, metrics, and artifacts are stored per run. To reproduce the best model you need to find its run, read the logged params, and reload the artifact — that is all Tracking. The Registry stores *promoted* versions, not every experimental run.",
       },
-      mo_c3_rec1: {
-        id: "mo_c3_rec1",
+
+      tracking_recovery: {
+        id: "tracking_recovery",
         type: "scenario_choice",
         badge: "Recovery",
-        title: "Recovery · Data vs concept drift",
-        prompt: "What distinguishes data drift from concept drift?",
+        title: "Recovery · Tracking vs Registry",
+        prompt: "An MLflow *experiment* is to a *run* as a Git repository is to:",
         choices: [
-          { id: "a", label: "Data drift: P(X) changes but P(y|X) may be stable. Concept drift: P(y|X) itself changes — the relationship between features and target evolved.", description: "Data drift may not hurt the model; concept drift always does." },
+          { id: "a", label: "A commit", description: "Each run is a single recorded snapshot, like a commit" },
+          { id: "b", label: "A branch", description: "Runs diverge from each other like branches" },
+          { id: "c", label: "A tag", description: "Runs mark notable points like tags" },
         ],
-        branches: { a: "mo_c3_stage2" },
-        rationale: "Data drift = the input population changed. Concept drift = the prediction task itself changed. The latter always requires retraining.",
+        branches: { a: "code_review", b: "code_review", c: "code_review" },
+        rationale: "A run is the atomic unit in MLflow Tracking — one execution of training code producing one set of params, metrics, and artifacts. An experiment groups many runs, just as a repo groups many commits.",
       },
-      mo_c3_stage2: {
-        id: "mo_c3_stage2",
-        type: "scenario_choice",
+
+      code_review: {
+        id: "code_review",
+        type: "click_target",
         badge: "Stage 2",
-        title: "Stage 2 · Monitoring without labels",
-        prompt: "Your loan default model has a 60-day label delay. How do you monitor model health in real time?",
-        choices: [
-          { id: "a", label: "Wait 60 days for labels before running any quality checks", description: "60 days of silent degradation is unacceptable." },
-          { id: "b", label: "Monitor prediction score distribution (PSI on model outputs), input feature PSI, and downstream business proxy metrics; run accuracy check retrospectively when labels arrive", description: "Label-free monitoring detects problems early; retrospective accuracy confirms severity." },
-        ],
-        branches: { a: "mo_c3_rec1", b: "mo_c3_terminal" },
-        rationale: "B is correct. Label-free monitoring: input PSI detects data drift, prediction distribution shift detects model behavior change. These are leading indicators. When labels finally arrive at day 60, run a retrospective accuracy audit and compare to training baseline.",
+        title: "Stage 2 · Spot the tracking bug",
+        prompt: "This MLflow training script has two problems. Click the line that represents the *most critical* missing tracking practice — the one that makes this run irreproducible.",
+        code_snippet: `import mlflow
+
+with mlflow.start_run():
+    model = RandomForestClassifier(n_estimators=100, max_depth=5)
+    model.fit(X_train, y_train)
+
+    accuracy = model.score(X_test, y_test)
+    mlflow.log_metric("accuracy", accuracy)    # -- ds-target:single_metric
+
+    # Save model locally
+    joblib.dump(model, "model.pkl")            # -- ds-target:local_save
+
+    # No hyperparameters logged                # -- ds-target:missing_params`,
+        validationCopy: {
+          single_metric: "Logging only final accuracy is a partial problem — you also need per-step metrics for training curves. But the *most critical* gap is the missing hyperparameters. Without them you cannot reconstruct this exact model. Try the comment line.",
+          local_save: "Saving the model locally instead of using mlflow.sklearn.log_model() means the model is not stored inside the run's artifact store and cannot be registered. This is a real bug — but the even more fundamental issue is that the hyperparameters are not logged at all. Try the comment line.",
+          missing_params: "Correct. Without logging n_estimators=100 and max_depth=5 via mlflow.log_param(), you cannot reproduce this exact model even if you re-run the same script with different defaults. Hyperparameters are the most critical thing to log.",
+        },
+        branches: {
+          single_metric: "param_recovery",
+          local_save: "param_recovery",
+          missing_params: "registry_intro",
+        },
       },
-      mo_c3_terminal: {
-        id: "mo_c3_terminal",
+
+      param_recovery: {
+        id: "param_recovery",
         type: "scenario_choice",
-        badge: "Complete",
-        title: "Complete · PSI threshold",
-        prompt: "Your monitoring system reports PSI = 0.24 on the 'income' feature. What do you do?",
+        badge: "Recovery",
+        title: "Recovery · What must be logged",
+        prompt: "Which of the following makes a training run *reproducible* when logged in MLflow?",
         choices: [
-          { id: "a", label: "PSI = 0.24 is above 0.2 — major shift detected. Investigate the income distribution change, assess model performance on recent data, and trigger retraining evaluation.", description: "PSI > 0.2 is the action threshold — major population shift likely affecting model accuracy." },
+          { id: "a", label: "Log hyperparameters with mlflow.log_param()", description: "Records every tunable setting so the exact model config can be reconstructed" },
+          { id: "b", label: "Log only the final accuracy metric", description: "Final accuracy summarizes performance but does not describe how the model was built" },
+          { id: "c", label: "Save model.pkl locally with joblib", description: "Local files are not stored in the run artifact store and disappear if the file system changes" },
         ],
-        branches: { a: "mo_c3_terminal" },
+        branches: { a: "registry_intro", b: "registry_intro", c: "registry_intro" },
+        rationale: "Hyperparameters define the model configuration. Logging them with mlflow.log_param() is the single most important step for reproducibility — without them, even having the trained artifact does not tell you how to retrain if needed.",
+      },
+
+      registry_intro: {
+        id: "registry_intro",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Staging → Production promotion",
+        prompt: "What should be true before you transition a model version from Staging to Production in the MLflow Registry?",
+        choices: [
+          { id: "a", label: "The model achieved the highest training accuracy in its experiment", description: "Training accuracy measures fit, not generalization or production readiness" },
+          { id: "b", label: "The model passed offline evaluation on a held-out test set and latency benchmarks", description: "Validates both predictive quality and serving performance before live traffic" },
+          { id: "c", label: "The previous Production version has been deleted", description: "Old versions should be archived, not deleted — you need them for rollback" },
+          { id: "d", label: "The model was registered at least 24 hours ago", description: "Time elapsed is not a meaningful validation criterion" },
+        ],
+        branches: { a: "registry_recovery", b: "reproduce_stage", c: "registry_recovery", d: "registry_recovery" },
+        rationale: "Staging exists as a validation gate. Best practice is to run the Staging model on a held-out evaluation set (separate from any data used during training or hyperparameter search) and confirm latency/throughput meets SLOs before promoting to Production.",
+      },
+
+      registry_recovery: {
+        id: "registry_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Model Registry stages",
+        prompt: "When a new model version is promoted to Production, what should happen to the previous Production version?",
+        choices: [
+          { id: "a", label: "Delete it to save storage", description: "Deletion removes the rollback option and violates audit trail requirements" },
+          { id: "b", label: "Leave it in Production alongside the new version", description: "Multiple Production versions creates ambiguity about which version is served" },
+          { id: "c", label: "Transition it to Archived", description: "Archiving retains the artifact and audit trail while marking it inactive" },
+        ],
+        branches: { a: "reproduce_stage", b: "reproduce_stage", c: "reproduce_stage" },
+        rationale: "Archive is the correct state for superseded models. It keeps the artifact accessible for rollback or forensic analysis without confusing the serving layer about which version is active.",
+      },
+
+      reproduce_stage: {
+        id: "reproduce_stage",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Reproducing a run from last month",
+        prompt: "A colleague needs to reproduce your best model from six weeks ago exactly. What combination of MLflow artifacts makes this possible?",
+        choices: [
+          { id: "a", label: "The logged params, the logged artifact, and the git commit hash", description: "Together these pin the hyperparameters, the trained weights, and the exact code version" },
+          { id: "b", label: "The final validation metric and the model artifact", description: "Metrics describe performance but do not tell you what hyperparameters produced it" },
+          { id: "c", label: "The conda.yaml environment file only", description: "Environment captures dependencies but not hyperparameters or model weights" },
+          { id: "d", label: "The experiment name and the run timestamp", description: "These identify the run but are not sufficient to reproduce it without the actual logged data" },
+        ],
+        branches: { a: "mlflow_vs_wandb", b: "tracking_recovery", c: "tracking_recovery", d: "tracking_recovery" },
+        rationale: "Full reproducibility requires three things: the hyperparameters (params), the trained model weights (artifact), and the code that trained it (git commit). MLflow logs all three inside a single run record.",
+      },
+
+      mlflow_vs_wandb: {
+        id: "mlflow_vs_wandb",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · MLflow vs Weights & Biases",
+        prompt: "Your team is building a computer vision model with a transformer backbone. Training runs for 3 days on 8 GPUs. Which tracking tool is likely the better fit and why?",
+        choices: [
+          { id: "a", label: "MLflow, because it is open source and self-hostable", description: "True, but self-hosting is an operational cost, not a feature advantage for this use case" },
+          { id: "b", label: "Weights & Biases, because it has richer DL-specific logging: gradient histograms, GPU metrics, and media logging", description: "W&B was designed for exactly this scenario — long-running DL training with rich per-step diagnostics" },
+          { id: "c", label: "Neither — just log to TensorBoard and read the files manually", description: "TensorBoard has no model registry, no run comparison UI, and no artifact storage" },
+          { id: "d", label: "MLflow, because Databricks integrates with it natively", description: "Databricks integration is a strong reason to use MLflow, but this team is not described as using Databricks" },
+        ],
+        branches: { a: "run_definition", b: "run_definition", c: "run_definition", d: "run_definition" },
+        rationale: "W&B was built with deep learning in mind. Its gradient histogram logging, system-level GPU and memory metrics, and first-class support for logging images and video make it substantially more useful for multi-day transformer training than MLflow's more tabular-oriented feature set.",
+      },
+
+      run_definition: {
+        id: "run_definition",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · What is a 'run'?",
+        prompt: "An interviewer asks: 'In MLflow, what exactly is a run and what does it contain?' Select the most complete and accurate answer.",
+        choices: [
+          { id: "a", label: "A run is a single execution of training code that records params, metrics, artifacts, tags, and environment metadata under a unique run ID", description: "Complete — covers all the key contents and the unique identifier" },
+          { id: "b", label: "A run is a trained model file stored in the artifact store", description: "Artifacts are one component of a run, but a run contains much more than the model file" },
+          { id: "c", label: "A run is equivalent to an experiment — they are interchangeable terms", description: "An experiment groups many runs; they are distinct hierarchical concepts" },
+        ],
+        branches: { a: "terminal_stage", b: "tracking_recovery", c: "tracking_recovery" },
+        rationale: "A run is the atomic unit of MLflow Tracking. It is identified by a UUID, belongs to one experiment, and contains: logged parameters (key-value), metrics (with optional step index), artifacts (files), tags (freeform metadata), and automatically captured environment info (git hash, Python version, start/end time).",
+      },
+
+      terminal_stage: {
+        id: "terminal_stage",
+        type: "scenario_choice",
+        badge: "Stage 7",
+        title: "Stage 7 · Answering in a system design interview",
+        prompt: "An interviewer asks: 'How do you ensure reproducibility in your ML pipeline?' What structure makes for the strongest answer?",
+        choices: [
+          { id: "a", label: "Mention only that you use MLflow to track experiments", description: "Naming the tool is necessary but insufficient — you need to describe what you log and why" },
+          { id: "b", label: "Describe: version-controlled data + all params logged per run + artifacts in registry + git commit captured + stage-gated promotion", description: "This covers the full lifecycle and shows you understand reproducibility as a system property, not a single tool" },
+          { id: "c", label: "Explain that you save model files with version numbers in S3", description: "Ad-hoc file naming is not a reproducibility system — it lacks param logging, run comparison, and governance" },
+          { id: "d", label: "Say you use random seeds to make training deterministic", description: "Deterministic training is one small part of reproducibility — it does not address tracking or governance" },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage", d: "terminal_stage" },
+        rationale: "The strongest reproducibility answer frames it as a pipeline property: data versioning ensures the same input, param logging ensures the same configuration, artifact storage with git hash ensures the same code and weights, and registry stage gates ensure the same governance. MLflow is the mechanism, but the principle is what impresses.",
         terminal: true,
-        rationale: "PSI > 0.2 = major shift. The 'income' feature distribution has changed substantially from training. This likely means the model's learned income-related patterns are no longer representative, and retraining on recent data should be evaluated.",
       },
     },
   },
+
   knowledgeCheck: [
     {
-      question: "PSI = 0.07 on a feature. What action should you take?",
+      question: "Which of the following should you log in MLflow to make a training run fully reproducible?",
       options: [
-        "Immediately retrain the model — any PSI above 0 indicates drift",
-        "No action required — PSI < 0.1 indicates a stable distribution, no significant shift detected",
-        "Trigger a full model audit — PSI below 0.1 still indicates moderate shift",
+        "Only the final validation metric",
+        "Hyperparameters, per-step metrics, model artifact, and git commit",
+        "The model pickle file and the experiment name",
+        "The conda environment file only",
       ],
       correctIndex: 1,
-      explanation: "PSI < 0.1 is the 'stable' range — the feature distribution is consistent with training. PSI 0.1–0.2 is slight shift (investigate). PSI > 0.2 is major shift (likely action required). At 0.07, no action is needed — continue routine monitoring.",
+      explanation: "Full reproducibility requires logging every hyperparameter (so you can reconstruct the config), metrics (to compare runs), the model artifact via mlflow.sklearn.log_model() (so the trained weights are in the artifact store), and the git commit (so the exact code is pinned). MLflow captures the git hash automatically.",
     },
     {
-      question: "What is the key difference between monitoring a model with daily label feedback vs. a model with 60-day label delay?",
+      question: "In the MLflow Model Registry, what is the correct sequence of lifecycle stages for a newly trained model?",
       options: [
-        "Models with daily labels can use accuracy as a real-time signal; models with delayed labels must rely on proxy metrics (input PSI, prediction distribution, downstream business metrics) until labels arrive",
-        "Models with delayed labels should not be monitored until labels arrive",
-        "There is no meaningful difference — all models should use the same monitoring approach",
-      ],
-      correctIndex: 0,
-      explanation: "Daily labels enable real-time accuracy tracking — the best quality signal. With 60-day delay, you can't measure accuracy in real time. Proxy monitoring (input feature distributions, prediction score distribution, downstream outcomes) provides early warning signals. When labels arrive, run retrospective accuracy and compare to baseline to confirm whether the proxy signals correctly indicated degradation.",
-    },
-    {
-      question: "You have concept drift but no data drift. What does this mean practically?",
-      options: [
-        "Nothing — concept drift without data drift is impossible",
-        "The input features look the same, but the relationship between features and target changed — the model is making predictions based on patterns that are no longer valid, and retraining is required",
-        "The model is stable — only data drift requires retraining",
+        "Production → Staging → Archived",
+        "None → Staging → Production → Archived",
+        "Staging → None → Production",
+        "Draft → Review → Published",
       ],
       correctIndex: 1,
-      explanation: "Concept drift without data drift: the inputs look normal, so input PSI won't flag it. But the labels would show accuracy degradation if you had them. Example: a churn model where user retention now depends on customer support quality (new factor) rather than historical engagement patterns (same features, different drivers). Input monitoring won't catch this — only label-based accuracy monitoring will.",
+      explanation: "Models start in None (registered but undeployed), move to Staging for evaluation, are promoted to Production when they pass validation, and are finally Archived when superseded. Skipping Staging and going directly to Production bypasses the validation gate.",
+    },
+    {
+      question: "Why should you use mlflow.sklearn.log_model() instead of joblib.dump() to save a scikit-learn model?",
+      options: [
+        "mlflow.sklearn.log_model() is faster than joblib.dump()",
+        "joblib.dump() produces larger files",
+        "mlflow.sklearn.log_model() stores the model inside the run's artifact store with a flavor manifest, enabling Model Registry integration and framework-agnostic loading",
+        "joblib.dump() does not support scikit-learn models",
+      ],
+      correctIndex: 2,
+      explanation: "mlflow.sklearn.log_model() does three things joblib.dump() does not: it stores the artifact inside the tracked run (so it appears in the MLflow UI), it writes an MLmodel manifest declaring the sklearn flavor (enabling mlflow.pyfunc.load_model() to load it without knowing the framework), and it makes the model registerable via mlflow.register_model().",
     },
   ],
 },
 
 "mo-c4": {
-  durationLabel: "15 min",
+  durationLabel: "20 min",
   outcomes: [
-    "Compare three retraining trigger strategies: scheduled, performance-based, drift-triggered",
-    "Design a retraining pipeline for a fraud model with delayed labels",
-    "Explain retraining loops and how exploration prevents feedback loop corruption",
-    "Define the full retraining workflow: data refresh → train → evaluate → shadow → deploy",
+    "Explain why feature stores exist and what problems they solve",
+    "Describe the architecture components: offline store, online store, feature registry",
+    "Implement point-in-time correct historical feature retrieval",
+    "Choose between batch, streaming, and on-demand feature engineering patterns",
+    "Articulate training-serving skew and how feature stores prevent it",
   ],
-  learnMarkdown: `## Automated Retraining Pipelines
+  learnMarkdown: `## The Problem Feature Stores Solve
 
-A model deployed 6 months ago is trained on 6-month-old data. The world has changed. Retraining keeps models current — but automated retraining introduces new failure modes.
+As ML systems scale, two painful problems emerge: **feature duplication** and **training-serving skew**.
 
----
+Without a feature store, Team A builds a \`user_avg_spend_30d\` feature in Python for their churn model, and Team B independently builds the same feature in SQL for a recommendation model. The definitions drift — one uses calendar days, the other uses rolling 30 days — and suddenly two models disagreeing on user behavior is a debugging nightmare.
 
-## Three Trigger Strategies
+Training-serving skew is subtler but more dangerous. A model trains on features computed one way in a batch notebook, then serves on features computed differently in a real-time API. Even a small difference in how nulls are handled or timestamps are rounded can silently degrade model performance in production while offline metrics look fine.
 
-### 1. Scheduled Retraining
-Retrain on a fixed schedule (weekly, monthly) regardless of drift.
+**Point-in-time correctness** is the third pillar. When building a training dataset, you must join features at the *exact timestamp* each label was generated — not the features as they exist today. If a user churned on March 15, you need their \`avg_spend_30d\` as of March 15, not their current value. Using current feature values leaks future information into training, producing inflated evaluation metrics that collapse at deployment.
 
-- **Pros**: simple, predictable, no monitoring infrastructure required
-- **Cons**: may retrain unnecessarily (wasting compute), or retrain too late (if drift happens between schedules)
+## Architecture Components
 
-### 2. Performance-Based Trigger
-Retrain when model accuracy drops below a threshold.
+A feature store has four main components:
 
-- **Pros**: responds to actual model degradation
-- **Cons**: requires fast label feedback (useless if labels take 60 days)
+**Feature Pipelines** ingest raw data and produce feature values. Batch pipelines run on a schedule (hourly, daily) using tools like Spark or dbt. Streaming pipelines consume event streams (Kafka, Kinesis) and update features in near-real-time.
 
-### 3. Drift-Triggered Retraining
-Retrain when PSI > 0.2 or KS test detects significant input distribution shift.
+**Offline Store** persists the full historical record of feature values, partitioned by entity and timestamp. Common backends: Hive tables on S3, BigQuery, Snowflake, or Delta Lake. Used for training dataset generation and batch scoring.
 
-- **Pros**: proactive — no labels needed; catches data drift early
-- **Cons**: data drift doesn't always impair model accuracy; may trigger unnecessary retraining
+**Online Store** holds only the *latest* feature value per entity, optimized for low-latency lookup (< 10ms). Common backends: Redis, DynamoDB, or Cassandra. Used exclusively for real-time inference.
 
-**In practice**: combine strategies — scheduled as baseline, drift-triggered as early warning, performance-based for confirmation when labels arrive.
+**Feature Registry / Metadata Layer** is the catalog: feature definitions, data types, owners, freshness SLAs, and lineage. It enforces that the same transform logic is applied offline and online, eliminating skew at the source.
 
----
+## Feature Engineering Patterns
 
-## Retraining Pipeline Steps
+**Batch features** are recomputed on a schedule. Examples: \`avg_purchase_last_30d\`, \`days_since_last_login\`. Materialized into both offline (full history) and online (latest value) stores. Simple and cheap; acceptable when slight staleness is tolerable.
 
-1. **Data refresh**: collect the most recent N days of data. Decide: expanding window (all historical data) or sliding window (last N days only). Sliding window is better for concept drift; expanding window gives more data for rare events.
-2. **Train with same config**: use the same hyperparameters and feature set unless there's a reason to change. Changing multiple things at once makes debugging harder.
-3. **Evaluate on a held-out temporal test set**: always evaluate on data that comes after the training window (time-respecting split).
-4. **Shadow mode**: run the retrained model alongside the champion. Compare on recent production traffic.
-5. **Champion-challenger**: if retrained model beats champion, promote. If not, investigate — the retraining trigger may have been spurious.
+**Streaming features** are updated as events arrive. Examples: \`purchases_last_5_minutes\`, \`page_views_last_hour\`. Computed in a stream processor (Flink, Spark Streaming) and written directly to the online store. Essential for fraud detection or live recommendations.
 
----
+**On-demand features** are computed at serving time from raw inputs and other features. Examples: \`distance_from_user_to_store\` (needs the current request context). Defined as Python functions in the feature registry; never stored.
 
-## Retraining Loop Corruption
+## Serving Patterns
 
-When a model influences user behavior, the resulting data reflects the model's outputs, not ground truth. Example:
+**Batch fetch for offline training**: call \`get_historical_features(entity_df)\` with an entity dataframe containing entity IDs and \`event_timestamp\` columns. The feature store performs a point-in-time join — for each row, it finds the most recent feature value *as of* that timestamp. The result is a training-ready dataframe with no future leakage.
 
-- Recommendation model A recommends mostly pop music
-- Users interact with pop (because that's what they see)
-- Training data shows pop as high-engagement content
-- Retrained model recommends even more pop
-- Filter bubble deepens over time
+**Online lookup for real-time inference**: call \`get_online_features(entity_rows)\` at prediction time. The store returns the pre-materialized latest value from Redis/DynamoDB in single-digit milliseconds.
 
-**Fix**: inject exploration — serve random or diverse recommendations to a small fraction of users (5–10%). Their interactions provide exploration data uncontaminated by the current model's biases.
+## Point-in-Time Correctness in Depth
+
+The \`event_timestamp\` column in your entity dataframe is not optional — it is the mechanism by which the feature store prevents leakage. Feast and similar systems perform an *as-of join*: for each (entity, timestamp) pair, return the feature value that was valid at that moment.
+
+Dropping or ignoring this column means the store falls back to the current latest value for all training rows — introducing future leakage for every row whose label predates the current feature computation.
+
+## Feast: Open-Source Feature Store
+
+Feast is the most widely adopted open-source feature store. It supports pluggable offline backends (BigQuery, Snowflake, file-based Parquet) and online backends (Redis, DynamoDB, SQLite for local dev). **Push materialization** sends feature values directly to the online store as they are computed. **Pull materialization** (the default) runs a scheduled job that reads from the offline store and writes the latest values to the online store.
+
+## Operational Concerns
+
+**Feature freshness SLAs**: each feature has a defined maximum acceptable staleness. Breaching an SLA should trigger alerts and potentially block model serving.
+
+**Materialization failures**: if the batch job fails, the online store serves stale features. Circuit-breaker patterns or serving fallback defaults are common mitigations.
+
+**Cost trade-offs**: Redis delivers sub-millisecond reads but costs ~10x DynamoDB per GB. Features with high read volume and low cardinality (e.g., global statistics) are better served from DynamoDB or even in-memory caches. Features with low cardinality but high write frequency are Redis candidates.
+
+## Interview-Ready Summary
+
+- Feature stores solve feature reuse, training-serving skew, and point-in-time correctness simultaneously
+- Offline store = historical record for training; online store = latest values for real-time inference
+- Point-in-time joins use \`event_timestamp\` to prevent future leakage in training data
+- Batch, streaming, and on-demand features address different latency and staleness requirements
+- Shared transform definitions in the registry are the architectural guarantee against skew
+- Feast supports push and pull materialization across pluggable offline/online backends
 `,
   video: null,
-  videoFallbackMarkdown: `## Deep Dive: Online Learning vs Periodic Retraining
+  videoFallbackMarkdown: `## Feast Architecture Deep Dive
 
-**Periodic retraining** (batch): retrain on accumulated data every N days. Simple, stable, well-tested. Most production ML uses this.
+Feast organizes feature definitions in a **feature repository** — a directory of Python files checked into source control. Each \`FeatureView\` declares a data source, a set of feature columns, an entity (the join key), and a TTL (how long values remain valid in the online store).
 
-**Online learning**: update model weights incrementally as each new observation arrives. Can adapt within minutes. Risks: (1) more vulnerable to adversarial manipulation (single bad examples have outsized effect), (2) harder to debug and audit, (3) training stability issues with streaming optimizers.
+### The Materialization Flow
 
-For most business applications, periodic retraining with drift monitoring is preferable to online learning. Online learning is appropriate for rapidly changing signal (real-time bidding, fraud with millisecond patterns) where batch retraining frequency is insufficient.
+When you run \`feast materialize\`, Feast reads from the offline store (BigQuery, Parquet files, Snowflake) and writes the most recent feature values per entity into the online store (Redis, DynamoDB). This is **pull materialization** — the online store is populated by pulling from offline history.
+
+**Push materialization** is the alternative: your streaming pipeline writes directly to the online store (and optionally to the offline store simultaneously) as events occur. This is preferred when features must reflect events within seconds.
+
+### Point-in-Time Joins Under the Hood
+
+\`get_historical_features\` executes a SQL-style temporal join. Internally, Feast constructs a query like:
+
+\`\`\`sql
+SELECT e.user_id, e.label, e.event_timestamp,
+       f.avg_spend_30d, f.login_count
+FROM entity_df e
+LEFT JOIN feature_table f
+  ON e.user_id = f.user_id
+  AND f.feature_timestamp <= e.event_timestamp  -- as-of condition
+  AND f.feature_timestamp > e.event_timestamp - INTERVAL 30 DAY  -- TTL window
+QUALIFY ROW_NUMBER() OVER (
+  PARTITION BY e.user_id, e.event_timestamp
+  ORDER BY f.feature_timestamp DESC
+) = 1
+\`\`\`
+
+This ensures each training row sees only the feature state that existed before the label was generated — no future information bleeds through.
+
+### Feature Freshness Monitoring
+
+Production feature stores instrument every materialization job with three metrics:
+
+1. **Freshness lag**: \`now() - max(feature_timestamp)\` in the online store, per feature view
+2. **Materialization latency**: wall-clock time for the materialization job to complete
+3. **Entity coverage**: percentage of active entities with a non-stale feature value
+
+A common SLO pattern: alert if freshness lag exceeds 2× the materialization interval. If a daily feature hasn't been updated in 30 hours, page the on-call engineer before models serve on data that is a day and a half stale.
+
+### Avoiding Common Pitfalls
+
+**Schema drift**: feature column types changing in the source data silently break materialization. Add schema validation as a pre-materialization step.
+
+**Cold-start entities**: new users have no feature history. Design explicit default values or fallback feature views for cold-start entities rather than serving nulls.
+
+**Large entity spaces**: materializing features for 500M users into Redis requires careful batching and memory planning. Pre-filter to active entities only (users active in the last N days) to control cost.
 `,
-  tryGuidance: "No interactive viz — work through the retraining design scenarios in the interview simulation.",
+  tryGuidance: `Work through the interview graph to practice diagnosing real feature store production issues. In the click-target stage, read the Python code carefully and identify which line introduces a point-in-time correctness bug. In the scenario stages, reason about the architectural trade-offs — there is always a "correct enough" answer and a nuanced explanation of why the alternatives fall short.`,
   interviewGraph: {
-    initialStageId: "mo_c4_stage1",
+    initialStageId: "fs_intro",
     artifactDimensions: [
-      { label: "Trigger Design", recoveryStageId: "mo_c4_rec1" },
-      { label: "Feedback Loops", recoveryStageId: "mo_c4_terminal", passLabel: "Retraining Pipeline" },
+      { label: "Feature Store Design", recoveryStageId: "fs_design_recovery" },
+      { label: "Point-in-Time Correctness", recoveryStageId: "pit_recovery" },
     ],
     stages: {
-      mo_c4_stage1: {
-        id: "mo_c4_stage1",
+      fs_intro: {
+        id: "fs_intro",
         type: "scenario_choice",
         badge: "Stage 1",
-        title: "Stage 1 · Delayed labels",
-        prompt: "Design a retraining trigger for a fraud model where ground truth labels (confirmed fraud/legitimate) arrive 45 days after transactions.",
+        title: "Stage 1 · Why feature stores exist",
+        prompt: `An interviewer asks: "Your team has 10 data scientists each building ML models. What's the biggest ML infrastructure risk as the team grows, and how does a feature store address it?"`,
         choices: [
-          { id: "a", label: "Performance-based trigger: retrain when accuracy drops below 0.90", description: "Labels arrive 45 days late — by the time you measure accuracy, the degradation is 45+ days old." },
-          { id: "b", label: "Drift-triggered: monitor input feature PSI and prediction distribution daily; trigger retraining when PSI > 0.2. Validate with accuracy check when 45-day labels arrive.", description: "PSI provides early warning without labels; accuracy check confirms severity." },
-          { id: "c", label: "Scheduled: retrain every 30 days regardless of drift", description: "Schedule doesn't respond to actual drift timing, but is a useful fallback." },
+          { id: "a", label: "Model versioning conflicts", description: "Different teams deploying models at the same time cause version conflicts in the model registry." },
+          { id: "b", label: "Training-serving skew and feature duplication", description: "Teams independently recompute the same features with slightly different logic, causing skew between training and serving environments." },
+          { id: "c", label: "Compute cost overruns", description: "Too many Spark jobs running simultaneously exhaust the cluster budget." },
+          { id: "d", label: "Data warehouse query contention", description: "Scientists running heavy queries block production ETL pipelines." },
         ],
-        branches: { a: "mo_c4_rec1", b: "mo_c4_stage2", c: "mo_c4_stage2" },
-        rationale: "B is best for delayed labels. Performance-based trigger is blind for 45 days. Drift-triggered retraining (PSI on inputs, prediction distribution shift) provides early warning without needing labels. The accuracy check at day 45 confirms whether the drift actually impaired model quality.",
+        branches: { a: "fs_design_recovery", b: "fs_online_vs_offline", c: "fs_design_recovery", d: "fs_design_recovery" },
+        rationale: "Training-serving skew is the canonical motivation for feature stores. When teams independently compute the same feature (e.g., avg_spend_30d) with subtly different logic — different null handling, slightly different time windows — models degrade silently in production. Feature stores enforce a single registered definition used in both training pipelines and online serving, eliminating the skew at the architectural level.",
       },
-      mo_c4_rec1: {
-        id: "mo_c4_rec1",
+      fs_design_recovery: {
+        id: "fs_design_recovery",
         type: "scenario_choice",
         badge: "Recovery",
-        title: "Recovery · Label delay problem",
-        prompt: "When labels are delayed 45 days, which trigger strategy is feasible?",
+        title: "Recovery · Feature store primary value",
+        prompt: `Let's recalibrate. A feature store's primary value is that it provides a single source of truth for feature definitions used in both training and serving. Which of the following best describes the problem this directly prevents?`,
         choices: [
-          { id: "a", label: "Drift-triggered: monitor input distributions and prediction patterns (no labels needed) as a proactive signal", description: "PSI and prediction distribution are observable immediately without labels." },
+          { id: "a", label: "Training-serving skew", description: "The same feature computed differently offline vs online causes models to underperform in production." },
+          { id: "b", label: "Data pipeline latency", description: "Raw data takes too long to reach the model." },
+          { id: "c", label: "Model explainability gaps", description: "Engineers can't explain which features drove a prediction." },
         ],
-        branches: { a: "mo_c4_stage2" },
-        rationale: "When labels are delayed, performance-based triggers are blind during the delay window. Drift monitoring on inputs and model outputs provides leading warning signals.",
+        branches: { a: "fs_online_vs_offline", b: "fs_online_vs_offline", c: "fs_online_vs_offline" },
+        rationale: "Training-serving skew — where features computed in training differ from those computed at serving — is exactly what feature stores prevent by centralizing transform logic in the registry.",
       },
-      mo_c4_stage2: {
-        id: "mo_c4_stage2",
+      fs_online_vs_offline: {
+        id: "fs_online_vs_offline",
         type: "scenario_choice",
         badge: "Stage 2",
-        title: "Stage 2 · Expanding vs sliding window",
-        prompt: "Your fraud model is retrained. Should you use all historical data (expanding window) or only the last 90 days (sliding window)?",
+        title: "Stage 2 · Online vs offline store responsibilities",
+        prompt: `An interviewer asks: "A feature store has both an offline store and an online store. What is each optimized for, and why can't you just use one store for both use cases?"`,
         choices: [
-          { id: "a", label: "Always expanding — more data is always better for ML models", description: "More data is better if the historical data is still representative." },
-          { id: "b", label: "Sliding window if fraud patterns change rapidly (concept drift); expanding window if historical patterns are still valid and rare fraud examples need more history", description: "The right choice depends on drift velocity and minority class frequency." },
+          { id: "a", label: "Offline for training history, online for low-latency inference", description: "The offline store preserves full historical feature values for point-in-time training joins; the online store holds only latest values for sub-10ms serving." },
+          { id: "b", label: "Offline for cold features, online for hot features", description: "Any feature accessed more than once per day is promoted to the online store; rarely accessed features stay offline." },
+          { id: "c", label: "They are interchangeable — the difference is only cost", description: "You could use one store for both, but teams typically split them to reduce cost." },
+          { id: "d", label: "Online for batch training, offline for real-time serving", description: "The online store supports high-throughput batch reads during training; the offline store handles real-time lookups." },
         ],
-        branches: { a: "mo_c4_rec1", b: "mo_c4_terminal" },
-        rationale: "B is correct. Fraud patterns change — attackers adapt. Historical data from 2 years ago may describe patterns that no longer exist. Sliding window focuses on recent, relevant patterns. But fraud is rare — if you only train on 90 days, you may not have enough examples of rare fraud types. The right window length is empirical: compare model quality for different windows on a temporal validation set.",
+        branches: { a: "pit_click_target", b: "pit_recovery", c: "pit_recovery", d: "pit_recovery" },
+        rationale: "The offline store (Hive, S3, BigQuery) is optimized for large-scale historical scans needed to build training datasets. The online store (Redis, DynamoDB) is optimized for single-entity low-latency lookups at inference time. They have fundamentally different access patterns — you cannot efficiently serve both from a single store without severe cost or latency penalties.",
       },
-      mo_c4_terminal: {
-        id: "mo_c4_terminal",
+      pit_recovery: {
+        id: "pit_recovery",
         type: "scenario_choice",
-        badge: "Complete",
-        title: "Complete · Exploration",
-        prompt: "Your recommendation model has been live for 2 years. You notice the training data has almost no pop music examples anymore — only classical. What likely happened?",
+        badge: "Recovery",
+        title: "Recovery · Online vs offline store roles",
+        prompt: `To clarify: the offline store holds the complete time-series history of feature values and is used to generate training datasets. The online store holds only the most recent value per entity for fast inference. Given this, which scenario correctly uses the offline store?`,
         choices: [
-          { id: "a", label: "User preferences genuinely shifted to classical music over 2 years", description: "Possible, but a more systematic explanation exists." },
-          { id: "b", label: "Retraining loop: the model stopped recommending pop → users didn't see pop → no pop interaction data → model learned pop is unpopular → recommended pop even less. Inject exploration to break the loop.", description: "Feedback loop collapse — the model's outputs shaped the training data." },
+          { id: "a", label: "Fetching a user's features to score them in real time during checkout", description: "The online store handles real-time single-entity lookups." },
+          { id: "b", label: "Generating a training dataset for all users labeled in Q1", description: "The offline store provides the historical values at each label's timestamp." },
+          { id: "c", label: "Caching feature values to reduce API latency", description: "Caching is an online store concern." },
         ],
-        branches: { a: "mo_c4_terminal", b: "mo_c4_terminal" },
+        branches: { a: "pit_click_target", b: "pit_click_target", c: "pit_click_target" },
+        rationale: "Generating a training dataset requires historical feature values at specific past timestamps — exactly what the offline store is designed to provide via point-in-time joins.",
+      },
+      pit_click_target: {
+        id: "pit_click_target",
+        type: "click_target",
+        badge: "Stage 3",
+        title: "Stage 3 · Spot the point-in-time bug",
+        prompt: `This code retrieves historical features for model training. One line introduces a critical point-in-time correctness bug that will cause future feature leakage in training data. Click the bug.`,
+        code_snippet: `# Feature retrieval for training
+def get_training_features(entity_df):
+    # entity_df has columns: user_id, label, event_timestamp
+
+    feature_store = FeatureStore(repo_path=".")
+
+    training_df = feature_store.get_historical_features(
+        entity_df=entity_df,
+        features=["user_features:avg_spend_30d", "user_features:login_count"],
+        # No timestamp column specified              # -- ds-target:no_timestamp
+    ).to_df()
+
+    return training_df.drop(columns=["event_timestamp"])  # -- ds-target:drop_timestamp
+
+# Serving
+def get_online_features(user_id):
+    return feature_store.get_online_features(
+        features=["user_features:avg_spend_30d"],
+        entity_rows=[{"user_id": user_id}]
+    ).to_dict()`,
+        validationCopy: {
+          no_timestamp: "Close — but the bigger runtime bug is on the return line. The event_timestamp IS present in entity_df and Feast will use it for the as-of join during get_historical_features(). The real damage happens when it's dropped before being used.",
+          drop_timestamp: "Correct. Dropping event_timestamp here removes the temporal anchor before the as-of join takes effect on downstream operations. More critically, in many pipelines the returned dataframe is passed to further processing that relies on event_timestamp to validate point-in-time correctness. Discarding it means future code or audits cannot verify the join was performed correctly, and re-using this dataframe in a secondary join would use current feature values instead of historical ones.",
+        },
+        branches: {
+          no_timestamp: "pit_recovery_choice",
+          drop_timestamp: "batch_failure_stage",
+        },
+      },
+      pit_recovery_choice: {
+        id: "pit_recovery_choice",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Why event_timestamp must be retained",
+        prompt: `The primary bug is dropping event_timestamp from the returned training dataframe. Why is retaining event_timestamp so important during historical feature retrieval?`,
+        choices: [
+          { id: "a", label: "event_timestamp must be retained to ensure point-in-time correctness — it anchors each training row to the correct historical feature snapshot", description: "Removing it loses the temporal anchor, preventing verification and downstream as-of joins." },
+          { id: "b", label: "Dropping event_timestamp is fine since the labels are already joined before this function is called", description: "The labels being present doesn't remove the need for temporal anchoring in feature lookups." },
+          { id: "c", label: "Historical feature retrieval doesn't use timestamps — only online serving does", description: "This is incorrect; point-in-time joins are exclusively an offline/historical concern." },
+        ],
+        branches: { a: "batch_failure_stage", b: "batch_failure_stage", c: "batch_failure_stage" },
+        rationale: "event_timestamp is the mechanism that makes the as-of join possible. Feast uses it to find, for each (entity, timestamp) pair, the most recent feature value that existed *before* that moment. Dropping it after retrieval means downstream code cannot re-use the dataframe for additional point-in-time operations, and audits cannot confirm correctness.",
+      },
+      batch_failure_stage: {
+        id: "batch_failure_stage",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Batch job failure impact",
+        prompt: `Your daily feature materialization job fails at 3 AM. By 9 AM, product teams notice their recommendation models seem stale. Which serving path is affected first, and what is the correct immediate mitigation?`,
+        choices: [
+          { id: "a", label: "Offline store is affected first — retrain models immediately using the stale offline store", description: "The offline store accumulates history; a single missed run doesn't corrupt it. Retraining on stale data is expensive and unnecessary." },
+          { id: "b", label: "Online store is affected first — it now serves yesterday's feature values, and the mitigation is to alert on freshness lag and trigger a manual backfill", description: "The online store holds only the latest materialized values. A failed run means it never received today's values, serving stale data to live inference." },
+          { id: "c", label: "Both stores fail simultaneously — the entire feature store must be rebuilt from scratch", description: "The offline store's historical partitions are immutable and unaffected by a failed incremental run." },
+          { id: "d", label: "Neither store is affected — Feast caches results and serves from cache until the next successful run", description: "Feast does not transparently cache; stale data in the online store is served as-is." },
+        ],
+        branches: { a: "feature_reuse_stage", b: "feature_reuse_stage", c: "feature_reuse_stage", d: "feature_reuse_stage" },
+        rationale: "The online store is affected first and most severely. It holds only the latest materialized snapshot per entity. When the materialization job fails, the online store is never updated, so all real-time inference requests receive yesterday's (or older) feature values. The offline store is largely unaffected — its historical partitions are immutable. The correct mitigation is freshness monitoring (alert when freshness lag > 2× materialization interval) and a triggered manual backfill run.",
+      },
+      feature_reuse_stage: {
+        id: "feature_reuse_stage",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Feature definition divergence",
+        prompt: `Two data science teams both compute "user_avg_spend_30d" independently. Team A uses a 30-day rolling window; Team B uses the last calendar month. Their models give conflicting user risk scores. What is the risk, and what is the architectural solution?`,
+        choices: [
+          { id: "a", label: "The risk is model disagreement; solution is to pick one team's definition and deprecate the other", description: "Ad-hoc deprecation doesn't prevent future divergence or ensure serving consistency." },
+          { id: "b", label: "The risk is training-serving skew and semantic inconsistency; solution is to register a single canonical feature definition in the feature registry so all teams share the same transform logic", description: "A shared registry ensures one authoritative definition used consistently across all teams and both training and serving." },
+          { id: "c", label: "The risk is compute duplication; solution is to schedule both jobs at different times to avoid cluster contention", description: "Staggering jobs doesn't resolve the semantic divergence or skew." },
+          { id: "d", label: "There is no risk — two models can legitimately define the same concept differently", description: "When models feed downstream decisions together, semantic disagreement causes unpredictable system behavior." },
+        ],
+        branches: { a: "freshness_sla_stage", b: "freshness_sla_stage", c: "freshness_sla_stage", d: "freshness_sla_stage" },
+        rationale: "The core risk is semantic inconsistency and training-serving skew. If Team A's model is used in production serving while its features were defined with a rolling 30-day window but the materialization job uses Team B's calendar-month logic, the model silently degrades. Registering a single canonical FeatureView in the feature registry guarantees the same Python/SQL transform is used in both offline historical retrieval and online materialization, eliminating skew by construction.",
+      },
+      freshness_sla_stage: {
+        id: "freshness_sla_stage",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · Freshness SLA and materialization strategy",
+        prompt: `A fraud detection model requires that its "transactions_in_last_hour" feature is never more than 5 minutes stale. Your current approach is a batch materialization job running every 30 minutes. An incident reveals that during peak load the job takes 45 minutes to complete, breaching the SLA. What is the correct architectural fix?`,
+        choices: [
+          { id: "a", label: "Increase batch job frequency to every 5 minutes", description: "Running a heavy batch job every 5 minutes adds enormous compute cost and still can't guarantee sub-5-minute freshness during load spikes." },
+          { id: "b", label: "Switch to streaming materialization — push feature values from a Kafka consumer directly to the online store as transactions arrive", description: "Streaming materialization decouples feature freshness from batch job duration. Features update in near-real-time as source events occur." },
+          { id: "c", label: "Increase the SLA threshold to 60 minutes to match the job duration", description: "Relaxing the SLA to fit the infrastructure is backwards — the SLA is driven by the fraud model's requirements, not the pipeline's current performance." },
+          { id: "d", label: "Cache the feature values in the application layer and refresh the cache every 5 minutes", description: "Application-layer caching introduces another staleness layer and doesn't solve the root pipeline latency problem." },
+        ],
+        branches: { a: "fs_terminal", b: "fs_terminal", c: "fs_terminal", d: "fs_terminal" },
+        rationale: "When a freshness SLA cannot be met by batch materialization, the correct fix is streaming materialization. A Kafka consumer processes each transaction event and pushes the updated feature value (e.g., increments the count, updates the rolling sum) directly to the online store (Redis/DynamoDB) within seconds of the event occurring. This decouples freshness from batch job duration entirely and is the standard architecture for latency-sensitive features like fraud signals.",
+      },
+      fs_terminal: {
+        id: "fs_terminal",
+        type: "scenario_choice",
+        badge: "Stage 7",
+        title: "Stage 7 · Interview synthesis",
+        prompt: `Final question: An interviewer asks, "How would you design a feature store to serve both a real-time fraud model (needs sub-5ms feature lookup) and a weekly churn model (needs 6 months of feature history)?" What is the correct architecture?`,
+        choices: [
+          { id: "a", label: "Use Redis for both — it's fast enough for real-time and has enough capacity for 6 months of history", description: "Storing 6 months of history for millions of users in Redis would cost prohibitively. Redis is optimized for latest-value lookups, not historical scans." },
+          { id: "b", label: "Use a unified online+offline architecture: Redis online store for the fraud model's sub-5ms lookups, and BigQuery/S3 offline store for the churn model's historical point-in-time joins; share feature definitions via the registry", description: "This is the canonical dual-store pattern. Each store is optimized for its access pattern, and the shared registry ensures both models use identical feature logic." },
+          { id: "c", label: "Use a single data warehouse for both — modern warehouses are fast enough for real-time lookups", description: "Even optimized warehouses cannot reliably deliver sub-5ms query latency for single-row lookups at production scale." },
+          { id: "d", label: "Use separate independent feature stores for each model to avoid coupling", description: "Separate stores re-introduce the feature duplication and divergence problem that feature stores are designed to solve." },
+        ],
+        branches: { a: "fs_terminal", b: "fs_terminal", c: "fs_terminal", d: "fs_terminal" },
+        rationale: "The canonical answer is a dual-store architecture: an online store (Redis, DynamoDB) for sub-millisecond latest-value lookups serving real-time models, and an offline store (BigQuery, S3) for full historical scans enabling point-in-time joins for batch training. Both stores are fed from the same feature pipelines and governed by the same registry definitions, ensuring consistency across both the fraud model and the churn model.",
         terminal: true,
-        rationale: "B is the retraining loop problem. The model's recommendations changed user behavior, which changed training data, which further reinforced the model's biases. Fix: serve diverse/random recommendations to 5-10% of users to generate exploration data uncontaminated by current model biases.",
       },
     },
   },
   knowledgeCheck: [
     {
-      question: "What is the main disadvantage of scheduled retraining as the only trigger strategy?",
+      question: "When building a training dataset using a feature store's get_historical_features(), what is the purpose of the event_timestamp column in the entity dataframe?",
       options: [
-        "Scheduled retraining is too complex to implement reliably",
-        "It retrains on a fixed calendar regardless of actual drift — may retrain unnecessarily (wasting compute) or too late (if drift happens between schedules)",
-        "Scheduled retraining doesn't support automated deployment",
+        "It is used to sort the resulting dataframe chronologically",
+        "It anchors each training row to the correct historical feature snapshot, preventing future feature values from leaking into training",
+        "It filters out entities whose features were not updated before that timestamp",
+        "It is required by the online store to cache the result",
       ],
       correctIndex: 1,
-      explanation: "Schedule-based retraining is simple but ignorant of actual data quality. If drift happens on day 3 of a 30-day cycle, the model runs degraded for 27 days. If no drift occurs, the retrain is wasted compute. A combined strategy (schedule + drift trigger) is more robust.",
+      explanation: "event_timestamp enables the point-in-time (as-of) join: for each (entity, timestamp) pair, the feature store returns the most recent feature value that existed *before* that moment. Without it, training rows would receive current feature values, introducing future leakage and inflating evaluation metrics.",
     },
     {
-      question: "What is a retraining feedback loop and how does exploration mitigate it?",
+      question: "A real-time recommendation API requires feature lookups in under 10ms. Which component of a feature store handles this?",
       options: [
-        "A loop where retraining takes too long and creates a scheduling backlog",
-        "A loop where model outputs influence user behavior, which creates training data reflecting the model's biases rather than true preferences — mitigated by serving random/diverse results to a small fraction of users to generate unbiased exploration data",
-        "A loop where the model retriggers retraining immediately after each deployment",
+        "The offline store (BigQuery or S3)",
+        "The feature registry",
+        "The online store (Redis or DynamoDB)",
+        "The feature pipeline scheduler",
       ],
-      correctIndex: 1,
-      explanation: "Feedback loops corrupt training data over time: if a recommendation model only recommends popular items, users only interact with popular items, and the next training set shows only popular items as valuable. Exploration (serving random or diverse content to 5-10% of traffic) generates interaction data independent of current model biases, breaking the loop.",
+      correctIndex: 2,
+      explanation: "The online store holds the most recent feature value per entity and is optimized for single-entity low-latency lookups (sub-10ms). The offline store is optimized for large historical scans used in training, not real-time serving.",
     },
     {
-      question: "When should you use a sliding window (last N days) instead of an expanding window (all historical data) for retraining?",
+      question: "What is the primary benefit of registering a feature definition in a shared feature registry rather than letting each team compute features independently?",
       options: [
-        "Always — sliding windows produce better models because recent data is more relevant",
-        "When the task exhibits concept drift (patterns change over time) — old data may reflect patterns that no longer apply; when rare events need maximum history, expanding window provides more examples",
-        "When training data storage exceeds 1TB",
+        "It reduces the number of Spark jobs that need to run each day",
+        "It ensures the same transform logic is used in both training and serving, preventing training-serving skew and semantic divergence between teams",
+        "It allows features to be stored in the online store without a materialization job",
+        "It enforces that all features must be computed as batch features, never streaming",
       ],
       correctIndex: 1,
-      explanation: "Sliding windows are appropriate when the concept being learned changes over time (fraud tactics, user preferences, economic conditions). Historical data from two years ago may actively hurt performance if it describes patterns that no longer exist. But for rare events where recent data alone doesn't provide enough positive examples, expanding windows provide more training signal at the cost of potentially stale patterns.",
+      explanation: "A shared registry enforces a single authoritative feature definition used across all teams and both the offline training pipeline and online serving pipeline. This prevents training-serving skew (different logic offline vs online) and semantic divergence (two teams computing the same feature with different window definitions).",
     },
   ],
 },
