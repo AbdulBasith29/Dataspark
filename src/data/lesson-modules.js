@@ -31983,7 +31983,6 @@ for message in consumer:
   ],
 },
 
-  const mod = {
 "sd-p4": {
   durationLabel: "20 min",
   outcomes: [
@@ -32325,7 +32324,7 @@ Rule of thumb: **denormalize dimensions until joins disappear**. The storage cos
     },
   ],
 },
-};,
+
 
   "sd-m1": {
     durationLabel: "25 min",
@@ -41271,8 +41270,8 @@ Modern end-to-end models (REBEL, TANL) do NER + RE simultaneously.`,
     ],
   },
 
-};
 
+};
 
 
 
