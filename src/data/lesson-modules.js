@@ -29800,599 +29800,1222 @@ Draw the 2×2 matrix from memory. Run a thought experiment on a 1%-positive data
 },
 
 "ml-e2": {
-  durationLabel: "20 min",
-  outcomes: [
-    "Explain the ROC curve as TPR vs FPR at every classification threshold",
-    "Interpret AUC as a threshold-independent classifier quality measure",
-    "Choose the right operating threshold for a given precision/recall tradeoff",
-    "Compare classifiers using ROC-AUC vs PR-AUC and know when each is appropriate",
-    "Recognize why AUC can mislead on severely imbalanced datasets",
-  ],
-  learnMarkdown: `## ROC Curve & AUC
-
-A classifier doesn't output a single prediction — it outputs a **score** (a probability or logit). The decision threshold converts that score into a binary label. The ROC curve shows how classifier performance changes as you sweep the threshold from 0 to 1.
-
----
-
-## The ROC Curve
-
-Each point on the ROC curve corresponds to one threshold:
-
-- **True Positive Rate (TPR / Recall)** = TP / (TP + FN) — of all actual positives, what fraction did we catch?
-- **False Positive Rate (FPR)** = FP / (FP + TN) — of all actual negatives, what fraction did we wrongly flag?
-
-A random classifier lies on the diagonal (TPR = FPR at every threshold). A perfect classifier reaches the top-left corner (TPR=1, FPR=0). Better classifiers bow toward the top-left.
-
----
-
-## AUC: Area Under the Curve
-
-**AUC** (Area Under the ROC Curve) collapses the full curve into a single number between 0 and 1.
-
-Probabilistic interpretation: **AUC = probability that a randomly chosen positive is scored higher than a randomly chosen negative.** AUC 0.9 means 90% of random (positive, negative) pairs are correctly ranked.
-
-| AUC | Interpretation |
-|-----|----------------|
-| 1.0 | Perfect ranking |
-| 0.9–0.99 | Excellent |
-| 0.7–0.9 | Good |
-| 0.5 | Random (useless) |
-| < 0.5 | Worse than random |
-
-AUC is **threshold-independent** — it measures ranking quality, not calibration quality.
-
----
-
-## Choosing a Threshold
-
-After training, choose the operating threshold based on the cost tradeoff:
-
-- **High recall (low threshold)**: catch more positives, accept more false alarms — appropriate when missing a positive is costly (cancer screening, fraud detection)
-- **High precision (high threshold)**: fewer false alarms, more misses — appropriate when acting on a false alarm is costly (spam filtering → false positives hide real emails)
-
-Tools: Youden's J (maximize TPR − FPR), F1 threshold search, or explicit cost-benefit analysis.
-
----
-
-## ROC-AUC vs PR-AUC
-
-**ROC-AUC** looks good even on imbalanced datasets because it normalizes by FP + TN (which is large when negatives dominate). A classifier that barely improves on the majority class can still have high ROC-AUC.
-
-**PR-AUC** (Precision-Recall AUC) is more informative for imbalanced problems. The baseline PR-AUC equals the positive class prevalence, so any improvement is visible. Use PR-AUC when:
-- Positive class prevalence < 5%
-- False positives are cheap but you care deeply about recall
-- You're reporting to stakeholders who care about precision
-
----
-
-## Common Mistake: Comparing Classifiers by a Single Threshold
-
-AUC compares the full operating range. Two classifiers can have the same AUC but cross each other's ROC curves — one is better at high recall, the other at high precision. Always look at the region of the curve relevant to your operational threshold.
-`,
-  video: null,
-  videoFallbackMarkdown: `## Deep Dive: Multi-Class AUC & Calibration
-
-### Multi-Class Extension
-For K classes, extend ROC to **one-vs-rest**: compute AUC(class k vs all others) for each class, then average. **Macro AUC** weights classes equally; **weighted AUC** weights by support. A micro-average pools all one-vs-rest predictions.
-
-### Calibration vs Discrimination
-AUC measures **discrimination** (ranking). A perfectly discriminating model (AUC=1) can still be poorly calibrated — the scores 0.99 and 0.51 may not correspond to actual probabilities of 99% and 51%.
-
-**Calibration**: the predicted probability p should match the observed positive rate when you group predictions near p. A calibration plot (reliability diagram) shows predicted vs observed. A well-calibrated model follows the diagonal.
-
-Calibration matters when you use the score itself (not just the ranking) — e.g., to set a threshold at "p > 0.3 means flag", the 0.3 should represent 30% real-world positive rate.
-`,
-  tryGuidance: "Use the ROC Curve interactive to sweep the threshold and watch TPR/FPR change. Compare two classifiers by overlaying their curves and observe which has higher AUC. Try identifying the optimal operating point for a recall-focused vs precision-focused use case.",
-  interviewGraph: {
-    initialStageId: "ml_e2_stage1",
-    artifactDimensions: [
-      { label: "ROC Interpretation", recoveryStageId: "ml_e2_rec1" },
-      { label: "AUC Meaning", recoveryStageId: "ml_e2_rec2" },
-      { label: "PR vs ROC", recoveryStageId: "ml_e2_stage3", passLabel: "Curve Selection" },
+    durationLabel: "18–20 min",
+    outcomes: [
+      "Define the **ROC curve** as the locus of (FPR, TPR) over all thresholds, and read **AUC** as the probability a random positive outranks a random negative.",
+      "Explain *why* **ROC is threshold-free and prevalence-invariant**, and what that buys you — and when it misleads you under heavy imbalance.",
+      "Choose an **operating threshold** using Youden's J or cost-based reasoning rather than defaulting to 0.5.",
+      "Decide between **ROC-AUC and PR-AUC** based on class balance and which error the business actually experiences.",
+      "Extend ROC to **multi-class** settings using the one-vs-rest strategy.",
     ],
-    stages: {
-      ml_e2_stage1: {
-        id: "ml_e2_stage1",
-        type: "scenario_choice",
-        badge: "Stage 1",
-        title: "Stage 1 · Threshold sweep",
-        prompt: "Your fraud classifier has AUC 0.94. The fraud team says they can review 100 alerts/day. You need to select the operating threshold. Which approach is correct?",
-        choices: [
-          { id: "a", label: "Set threshold = 0.5 (the default probability midpoint)", description: "The standard default divides scores symmetrically." },
-          { id: "b", label: "Find the threshold that produces exactly 100 positives at the predicted volume", description: "Calibrate to operational capacity: sort scores descending, flag the top-N." },
-          { id: "c", label: "Use the threshold that maximizes AUC", description: "AUC is already maximized — it's a property of the full curve, not a single threshold." },
-          { id: "d", label: "Use the threshold that maximizes F1 score", description: "F1-optimal is one defensible choice but doesn't account for the volume constraint." },
-        ],
-        branches: { a: "ml_e2_rec1", b: "ml_e2_stage2", c: "ml_e2_rec1", d: "ml_e2_stage2" },
-        rationale: "B is correct. AUC is threshold-independent — it measures ranking quality. Choosing a threshold is a separate, operational decision. Given a volume constraint (100 reviews/day), rank by score and flag the top-100. AUC doesn't have a threshold to maximize — that's a category error. F1-optimal is reasonable but ignores the capacity constraint.",
-      },
-      ml_e2_rec1: {
-        id: "ml_e2_rec1",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · AUC vs threshold",
-        prompt: "AUC measures the full ROC curve. When does it make sense to select a threshold?",
-        choices: [
-          { id: "a", label: "After training, when deploying — based on operational cost tradeoffs and capacity", description: "Threshold selection is a deployment decision, not a training metric." },
-        ],
-        branches: { a: "ml_e2_stage2" },
-        rationale: "AUC measures classifier quality across all thresholds. Threshold selection happens at deployment time, informed by business costs and operational constraints.",
-      },
-      ml_e2_stage2: {
-        id: "ml_e2_stage2",
-        type: "scenario_choice",
-        badge: "Stage 2",
-        title: "Stage 2 · Imbalanced dataset",
-        prompt: "You're building a rare disease detector (1% prevalence). Classifier A has ROC-AUC 0.96. Classifier B has PR-AUC 0.41. A colleague says 'A is clearly better — look at that AUC.' What do you say?",
-        choices: [
-          { id: "a", label: "Agree — ROC-AUC 0.96 means the classifier is excellent regardless of prevalence", description: "ROC-AUC at 0.96 shows excellent ranking quality universally." },
-          { id: "b", label: "On a 1% prevalence problem, ROC-AUC can look great even for a mediocre precision — PR-AUC is more informative here", description: "With 99% negatives, a classifier only needs to rank positives above most negatives to get high ROC-AUC, but precision may still be very low." },
-          { id: "c", label: "Reject both — only use accuracy for medical classifiers", description: "Accuracy is the worst metric for imbalanced medical problems." },
-        ],
-        branches: { a: "ml_e2_rec2", b: "ml_e2_stage3", c: "ml_e2_rec2" },
-        rationale: "B is correct. On rare-event problems, ROC-AUC inflates because the FPR denominator (FP + TN) is dominated by the large negative class. A classifier can have ROC-AUC 0.9+ while still having very low precision (many false positives for every true positive). PR-AUC is more informative here because the baseline is the prevalence rate (1%), making improvements visible.",
-      },
-      ml_e2_rec2: {
-        id: "ml_e2_rec2",
-        type: "scenario_choice",
-        badge: "Recovery 2",
-        title: "Recovery 2 · PR-AUC context",
-        prompt: "When should you prefer PR-AUC over ROC-AUC?",
-        choices: [
-          { id: "a", label: "When the positive class is rare (<5–10%) and precision on positives is what matters operationally", description: "PR-AUC surfaces how well the model identifies rare positives." },
-        ],
-        branches: { a: "ml_e2_stage3" },
-        rationale: "PR-AUC is preferred for rare-event classification because it directly captures precision/recall tradeoffs without inflating from the large negative class.",
-      },
-      ml_e2_stage3: {
-        id: "ml_e2_stage3",
-        type: "scenario_choice",
-        badge: "Stage 3",
-        title: "Stage 3 · AUC probabilistic interpretation",
-        prompt: "What does AUC 0.85 mean in plain English?",
-        choices: [
-          { id: "a", label: "The model is correct 85% of the time", description: "That's accuracy, not AUC." },
-          { id: "b", label: "If you pick one random positive and one random negative, the model ranks the positive higher 85% of the time", description: "This is the formal probabilistic interpretation of AUC." },
-          { id: "c", label: "The model achieves precision of 85% and recall of 85% simultaneously", description: "That's the F1 relationship, not AUC." },
-        ],
-        branches: { a: "ml_e2_stage3", b: "ml_e2_stage3", c: "ml_e2_stage3" },
-        terminal: true,
-        rationale: "B is the correct interpretation. AUC = P(score(positive) > score(negative)) over all random (positive, negative) pairs. It's a ranking metric, not an accuracy metric. This interpretation explains why AUC is threshold-independent — it measures discriminative power across the entire score distribution.",
+    learnMarkdown: `## A classifier outputs a score, not a label
+
+A classifier outputs a score, not a label. The ROC curve is a photograph of every possible threshold at once.
+
+Every time you call \`model.predict_proba(X)\`, you get a real-valued confidence in [0, 1]. To produce a binary label you pick a **threshold** — but which one? The insight behind the ROC curve is that you don't have to commit yet. Instead, you sweep the threshold from +∞ to −∞ and record the confusion-matrix that results at each step. The ROC curve is simply the **locus of those confusion matrices**, reduced to two numbers per point:
+
+- **x-axis: FPR** = FP / (FP + TN) — the fraction of true negatives you falsely flag.
+- **y-axis: TPR** (sensitivity / recall) = TP / (TP + FN) — the fraction of true positives you catch.
+
+At an infinitely high threshold you predict nothing positive: FPR = 0, TPR = 0 → point (0, 0). At an infinitely low threshold everything is predicted positive: FPR = 1, TPR = 1 → point (1, 1). Lowering the threshold traces a monotone path between those corners. Curves bowing toward the **top-left** are better; the ideal model jumps straight to (0, 1) — catch everything, flag nothing innocent. The **diagonal** is random guessing: a model whose curve hugs the diagonal ranks positives and negatives indistinguishably.
+
+## AUC: one number with a clean probabilistic meaning
+
+**AUC** (area under the ROC curve) collapses the whole curve to a scalar in [0, 1]:
+
+- 0.5 = random ranking; 1.0 = perfect ranking; < 0.5 = worse than random (flip your scores).
+- The interpretation that wins interviews: **AUC = P(score(positive) > score(negative))** when randomly drawing one positive and one negative. It is exactly the Wilcoxon-Mann-Whitney rank-sum statistic, normalized. This is not a mnemonic — it is the derivation. AUC measures *discrimination*, not accuracy.
+
+\`\`\`python
+from sklearn.metrics import roc_auc_score
+
+# Probabilistic interpretation — verified empirically:
+from itertools import product
+pairs_correct = sum(
+    1 for p, n in product(scores[y == 1], scores[y == 0])
+    if p > n
+)
+empirical_auc = pairs_correct / (len(scores[y == 1]) * len(scores[y == 0]))
+# empirical_auc ≈ roc_auc_score(y, scores)
+\`\`\`
+
+Because AUC integrates over all thresholds, it answers "is the ranking any good?" without committing to one — useful early in a project when operating constraints aren't yet fixed.
+
+## Choosing the operating threshold
+
+AUC picks the *model*. A separate step picks the *threshold* for deployment. Do not default to 0.5; it is an arbitrary number inherited from logistic regression's output scale, not from your business.
+
+**Youden's J statistic** maximizes (TPR − FPR), i.e., the vertical distance from the diagonal. It balances sensitivity and specificity symmetrically and is a principled default when the two errors are equally costly:
+
+\`\`\`python
+from sklearn.metrics import roc_curve
+import numpy as np
+
+fpr, tpr, thresholds = roc_curve(y_true, y_scores)
+j_scores = tpr - fpr                    # Youden's J at each threshold
+best_idx = np.argmax(j_scores)
+optimal_threshold = thresholds[best_idx]
+\`\`\`
+
+**Cost-based selection** is more principled when errors have different consequences. If a false negative (missed fraud) costs C_fn and a false positive (blocked legitimate transaction) costs C_fp, the expected cost at each threshold is:
+
+\`\`\`python
+cost = C_fp * fpr * prevalence_neg + C_fn * (1 - tpr) * prevalence_pos
+optimal_threshold = thresholds[np.argmin(cost)]
+\`\`\`
+
+Capacity constraints — "we can review at most 200 alerts per day" — translate directly to an FPR budget, letting you read the corresponding TPR off the curve.
+
+## ROC vs Precision–Recall: pick by what the consumer feels
+
+TPR and FPR are each computed **within a single class** (TPR over positives, FPR over negatives), so the ROC curve is **invariant to class prevalence** — a useful property when comparing models measured on differently sampled test sets.
+
+But that invariance is also the danger. With millions of negatives, even thousands of false positives barely move FPR. A model can look superb on ROC (AUC 0.97) while delivering terrible precision at any usable threshold.
+
+| Question | ROC curve | PR curve |
+|---|---|---|
+| Axes | FPR vs TPR | Recall vs Precision |
+| Sensitive to negative-class size? | No — FPR absorbs TN | Yes — precision includes TN via complement |
+| Behavior under heavy imbalance | Optimistically flat | Honest — precision tanks visibly |
+| Random-classifier baseline | Diagonal (AUC = 0.5) | Horizontal at positive **prevalence** |
+| Best when | Classes balanced, both errors matter | Positives rare, you act on flagged set |
+| Summary scalar | AUC | Average Precision (AP) |
+
+Rule: **if the positive class is rare and you act on the positive predictions** (fraud, rare disease, retrieval), report PR-AUC / average precision. Always state the base rate — a PR-AUC of 0.40 is excellent at 1% prevalence and mediocre at 40%.
+
+Use \`sklearn.metrics.average_precision_score\` rather than trapezoidal PR-AUC; the PR curve's sawtooth shape makes naive interpolation optimistic.
+
+## Multi-class extension: one-vs-rest
+
+For K classes, compute one ROC curve per class treating that class as "positive" and all others as "negative" — the **one-vs-rest (OvR)** strategy. Average the per-class AUCs:
+
+\`\`\`python
+from sklearn.metrics import roc_auc_score
+
+# macro: unweighted average across classes
+macro_auc = roc_auc_score(y_true, y_proba, multi_class="ovr", average="macro")
+
+# weighted: weight each class by its prevalence
+weighted_auc = roc_auc_score(y_true, y_proba, multi_class="ovr", average="weighted")
+\`\`\`
+
+Macro-average treats all classes equally (use when all classes matter equally). Weighted-average discounts rare classes (use when you care about aggregate performance over the observed distribution). The one-vs-one (OvO) variant is also available and is more robust to extreme imbalance among the K classes.
+
+## Interview-Ready Summary
+
+The ROC curve is a threshold-free portrait of a model's ranking quality: it plots (FPR, TPR) at every possible threshold, and its area equals the probability that a randomly drawn positive outscores a randomly drawn negative. That probabilistic meaning is exact, not a heuristic. AUC is the right tool to compare models before you fix an operating point, but it does not tell you which threshold to deploy — choose that via Youden's J or explicit cost minimization, not by defaulting to 0.5. Under heavy class imbalance, AUC flatters because FPR's huge denominator absorbs false positives; switch to PR-AUC or average precision, and always report the base rate alongside it. Finally, a high AUC says nothing about calibration — ranking correctly and emitting trustworthy probabilities are independent properties, and production systems that price risk or blend models need both.`,
+
+    video: null,
+
+    videoFallbackMarkdown: `## Calibration vs Discrimination: the distinction AUC cannot see
+
+AUC measures **discrimination** — whether the model ranks positives above negatives. It says nothing about **calibration** — whether the model's numeric probabilities mean what they claim.
+
+A model with AUC 0.97 might output "0.9" for events that actually occur 55% of the time. Every positive is still ranked above every negative, so AUC is unaffected. But the probability value is wrong by 35 percentage points. That error is invisible to ROC analysis.
+
+**Reliability diagrams** (calibration plots) expose it. Bin predictions into ten buckets (0–0.1, 0.1–0.2, …, 0.9–1.0) and plot mean predicted probability vs actual positive fraction per bucket. A perfectly calibrated model lies on the diagonal. A model that is overconfident bows above it; underconfident curves below. The visual gap is what AUC cannot show.
+
+Two standard fixes:
+- **Platt scaling** fits a logistic regression on top of the raw scores using a held-out calibration set. Cheap, parametric, works well when miscalibration is roughly sigmoid-shaped.
+- **Isotonic regression** fits a non-parametric step function. More flexible but needs more calibration data and can overfit on small sets.
+
+Both are available in scikit-learn as \`CalibratedClassifierCV\` with \`method="sigmoid"\` or \`method="isotonic"\`.
+
+The key insight: **a perfectly discriminating model can still give terrible probabilities.** A model that ranks every single positive above every negative (AUC = 1.0) might still output 0.51 for all positives and 0.49 for all negatives — technically perfect ranking, catastrophically wrong probabilities.
+
+The production implication is concrete. If you threshold on raw model scores — which almost every deployment does — miscalibration shifts the effective operating point. You intend to capture all events above predicted probability 0.7, but if 0.7 actually means 0.4 in the real world, you are operating at a very different recall than planned. Measure calibration separately from discrimination, fix it if it matters for your use case, and document both metrics in your model card.`,
+
+    tryGuidance: `Open the ROC Curve visualization and drag the threshold slider. Watch the green operating point trace the curve from (0,0) to (1,1) and confirm the AUC number stays fixed — it summarizes the whole curve, not your current threshold. Then switch to the PR view and observe how the baseline shifts to match the positive prevalence. Finally, use the Youden's J overlay to find the threshold that maximizes TPR − FPR, and compare it to the arbitrary 0.5 default.`,
+
+    interviewGraph: {
+      initialStageId: "e2_stage1_framing",
+      artifactDimensions: [
+        {
+          label: "AUC Interpretation",
+          recoveryStageId: "e2_rec_auc",
+        },
+        {
+          label: "Operating Point Selection",
+          recoveryStageId: "e2_rec_threshold",
+        },
+        {
+          label: "ROC vs PR Curve",
+          recoveryStageId: "e2_rec_pr",
+          passLabel: "ROC & AUC Mastery",
+        },
+      ],
+      stages: {
+
+        // ─── Stage 1: scenario_choice (before click_target) ───────────────────
+        e2_stage1_framing: {
+          id: "e2_stage1_framing",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · What the ROC curve actually captures",
+          prompt: "A junior colleague says: 'We already computed accuracy, precision, and recall at threshold 0.5 — what extra information does the ROC curve add?' What is the most accurate answer?",
+          code_snippet: `from sklearn.metrics import (
+    accuracy_score, precision_score,
+    recall_score, roc_auc_score, roc_curve
+)
+
+# Metrics at the default threshold of 0.5
+y_pred = (y_scores >= 0.5).astype(int)
+print("Accuracy: ", accuracy_score(y_true, y_pred))
+print("Precision:", precision_score(y_true, y_pred))
+print("Recall:   ", recall_score(y_true, y_pred))
+
+# Threshold-free summary
+auc = roc_auc_score(y_true, y_scores)
+print("AUC:      ", auc)`,
+          choices: [
+            {
+              id: "a",
+              label: "The ROC curve summarises model performance across every possible threshold at once, so you can compare models and choose a threshold for any operating constraint — not just 0.5.",
+              description: "Exactly right. A single confusion matrix at 0.5 shows one operating point; the ROC curve shows all of them simultaneously. That lets you pick the threshold that satisfies a business constraint (e.g., 'catch 90% of frauds') rather than inheriting an arbitrary default.",
+            },
+            {
+              id: "b",
+              label: "The ROC curve shows the model's calibration, proving that predicted probabilities are accurate.",
+              description: "ROC does not measure calibration. AUC only cares about the rank order of scores, not their numeric values. A model can have AUC 0.99 and be badly miscalibrated.",
+            },
+            {
+              id: "c",
+              label: "The ROC curve gives a higher accuracy estimate than a confusion matrix at 0.5, since it integrates over all thresholds.",
+              description: "AUC is not a higher accuracy estimate. It is a completely different quantity — the probability that a randomly drawn positive outscores a randomly drawn negative. It is not comparable to accuracy.",
+            },
+          ],
+          branches: {
+            a: "e2_click1",
+            b: "e2_rec_auc",
+            c: "e2_rec_auc",
+          },
+          rationale: "Accuracy, precision, and recall at a fixed threshold give a snapshot. The ROC curve is the full album — every threshold's (FPR, TPR) pair plotted at once. Its AUC summarises ranking quality with a single number that has a clean probabilistic meaning: P(score(positive) > score(negative)).",
+        },
+
+        // ─── Stage 2: click_target ─────────────────────────────────────────────
+        e2_click1: {
+          id: "e2_click1",
+          type: "click_target",
+          badge: "Stage 2",
+          title: "Stage 2 · Spot the bad operating threshold",
+          prompt: "Your team lead shares the code below. It computes ROC metrics correctly but then makes a common deployment mistake. Click the line that is wrong.",
+          code_snippet: `from sklearn.metrics import roc_curve, auc
+from sklearn.linear_model import LogisticRegression
+
+model = LogisticRegression()
+model.fit(X_train, y_train)
+y_scores = model.predict_proba(X_test)[:, 1]
+
+fpr, tpr, thresholds = roc_curve(y_true, y_scores)
+roc_auc = auc(fpr, tpr)
+
+# Team lead's suggested operating point:
+operating_threshold = 0.5          -- ds-target:e2_default_threshold
+precision = y_scores[y_scores > operating_threshold].mean()
+flagged = (y_scores > operating_threshold).sum()
+print(f"Flags per day: {flagged}, Precision: {precision:.2f}")`,
+          validationCopy: {
+            e2_default_threshold: "Correct. Threshold 0.5 is the logistic regression output's natural midpoint, not a value derived from your business cost structure or from Youden's J. The ROC curve already contains the information you need: find the threshold that maximises TPR − FPR (Youden's J), or minimise the expected cost weighted by your FP/FN costs. Defaulting to 0.5 means your operating point is chosen by the model's output scale, not by what the business actually needs.",
+          },
+          branches: {
+            e2_default_threshold: "e2_stage3_threshold",
+          },
+        },
+
+        // ─── Stage 3: scenario_choice — threshold selection ───────────────────
+        e2_stage3_threshold: {
+          id: "e2_stage3_threshold",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · Choosing the operating threshold correctly",
+          prompt: "You've built a fraud detection model. A false negative (missed fraud) costs $500; a false positive (blocking a good transaction) costs $20. The positive prevalence is 1%. Which strategy gives the most defensible operating threshold?",
+          code_snippet: `fpr, tpr, thresholds = roc_curve(y_true, y_scores)
+
+# Strategy A — Youden's J
+j_scores = tpr - fpr
+threshold_j = thresholds[np.argmax(j_scores)]
+
+# Strategy B — Cost minimisation
+prevalence = 0.01
+cost = (20 * fpr * (1 - prevalence)) + (500 * (1 - tpr) * prevalence)
+threshold_cost = thresholds[np.argmin(cost)]
+
+# Strategy C — Default
+threshold_default = 0.5`,
+          choices: [
+            {
+              id: "a",
+              label: "Strategy B — cost minimisation, because the asymmetric costs ($500 vs $20) mean symmetric threshold selection wastes money.",
+              description: "Correct. Youden's J maximises TPR − FPR, which implicitly treats the two error types as equally costly. Here a missed fraud costs 25× more than a false alarm, so you should shift the threshold to catch more fraud even at the cost of more false alarms. Cost minimisation encodes that business reality directly.",
+            },
+            {
+              id: "b",
+              label: "Strategy A — Youden's J, because it is the mathematically principled maximum of the ROC curve.",
+              description: "Youden's J is principled when errors are equally costly, but that assumption fails here. A $500 missed fraud and a $20 false alarm are not equivalent, so a symmetric metric produces the wrong answer.",
+            },
+            {
+              id: "c",
+              label: "Strategy C — default 0.5, because logistic regression is calibrated and 0.5 is the natural decision boundary.",
+              description: "Even if the model were perfectly calibrated, 0.5 would only be optimal if $500 missed fraud = $500 false alarm, which is not the case. Calibration and optimal threshold selection are separate questions.",
+            },
+            {
+              id: "d",
+              label: "None — the threshold should be set by A/B testing in production, not from the ROC curve.",
+              description: "A/B testing is used to measure production impact after a threshold is chosen, not to select the threshold in the first place. The ROC curve on your validation set gives you all the information needed to derive a principled threshold before any production traffic is involved.",
+            },
+          ],
+          branches: {
+            a: "e2_stage4_imbalance",
+            b: "e2_rec_threshold",
+            c: "e2_rec_threshold",
+            d: "e2_rec_threshold",
+          },
+          rationale: "Youden's J optimises (TPR − FPR) symmetrically. Cost minimisation is strictly more general: it weights each error type by its real consequence. When FN cost >> FP cost, the optimal threshold shifts lower (catch more positives, tolerate more false alarms). The formula: expected_cost = C_fp × FPR × P(neg) + C_fn × (1 − TPR) × P(pos). Minimise over the threshold array from roc_curve.",
+        },
+
+        // ─── Stage 4: scenario_choice — ROC vs PR ────────────────────────────
+        e2_stage4_imbalance: {
+          id: "e2_stage4_imbalance",
+          type: "scenario_choice",
+          badge: "Stage 4",
+          title: "Stage 4 · ROC-AUC vs PR-AUC under class imbalance",
+          prompt: "Your dataset has 99.5% negative class (rare fraud). ROC-AUC = 0.96; average precision (PR-AUC) = 0.18. A stakeholder argues the model is excellent because AUC is near 1. How do you respond?",
+          code_snippet: `from sklearn.metrics import roc_auc_score, average_precision_score
+
+roc_auc = roc_auc_score(y_test, y_proba)           # 0.96
+avg_prec = average_precision_score(y_test, y_proba)# 0.18
+
+# Positive prevalence: 0.5%
+# At threshold=0.5:
+#   Precision = 0.07  (93 of every 100 flagged are legitimate)
+#   Recall    = 0.81`,
+          choices: [
+            {
+              id: "a",
+              label: "ROC-AUC looks high because FPR has the huge negative count in its denominator — even thousands of false positives barely move FPR. PR-AUC of 0.18 is the honest signal: 7% precision means 93 of every 100 reviewed alerts are wasted effort.",
+              description: "This is the correct diagnosis. With 99.5% negatives, TN dominates FPR's denominator so the ROC barely moves even with poor precision. Precision = TP/(TP+FP) ignores TN entirely, making PR-AUC the metric that reflects what fraud analysts actually experience.",
+            },
+            {
+              id: "b",
+              label: "Both metrics are equivalent — ROC-AUC 0.96 and PR-AUC 0.18 are just different scales of the same underlying performance.",
+              description: "They are not equivalent scales. ROC-AUC and PR-AUC measure different things. Davis & Goadrich (2006) showed that ROC dominance implies PR dominance, but the numeric values and visual shapes diverge substantially under imbalance — that divergence is informative, not a scaling artefact.",
+            },
+            {
+              id: "c",
+              label: "Oversample the minority class to make both metrics agree, then report whichever is higher.",
+              description: "Resampling the data changes the prevalence and therefore changes the metrics — you would be reporting an inflated number from a synthetic distribution, not the real one. And cherry-picking the higher metric is not analysis; it is misleading.",
+            },
+            {
+              id: "d",
+              label: "A PR-AUC of 0.18 is acceptable because the positive prevalence is only 0.5%, making any non-trivial precision difficult.",
+              description: "Prevalence does set context — a random classifier's PR-AUC would be ≈ 0.005 here, so 0.18 is substantially above random. But that does not make 7% precision operationally acceptable. The analysis should present both the numeric PR-AUC and the precision at the planned operating threshold so the stakeholder understands actual workload.",
+            },
+          ],
+          branches: {
+            a: "e2_terminal",
+            b: "e2_rec_pr",
+            c: "e2_rec_pr",
+            d: "e2_rec_pr",
+          },
+          rationale: "ROC's prevalence-invariance is a double-edged property: it transfers well across datasets but hides imbalance problems. FPR = FP/(FP+TN); with millions of TN, even large FP stays small. Precision = TP/(TP+FP) — no TN in sight, so it reflects what reviewers experience. Under heavy imbalance, always report both AUC and average precision, and present the precision at the deployed threshold.",
+        },
+
+        // ─── Recovery 1: AUC probabilistic meaning ────────────────────────────
+        e2_rec_auc: {
+          id: "e2_rec_auc",
+          type: "scenario_choice",
+          badge: "Recovery A",
+          title: "Recovery · What AUC actually measures",
+          prompt: "Which statement most precisely captures what ROC-AUC = 0.88 means?",
+          code_snippet: `# ROC curve construction:
+# Sort all test examples by predicted score descending.
+# Walk down the sorted list:
+#   - Every positive encountered: step UP by 1/n_positives (TPR increases)
+#   - Every negative encountered: step RIGHT by 1/n_negatives (FPR increases)
+# AUC = area under the resulting staircase
+#
+# Result: AUC = fraction of (positive, negative) pairs correctly ordered
+# i.e., P(score[positive] > score[negative])`,
+          choices: [
+            {
+              id: "a",
+              label: "If you draw one random positive and one random negative, there is an 88% chance the positive has a higher predicted score — regardless of which threshold you use.",
+              description: "Correct — this is the Wilcoxon-Mann-Whitney interpretation. AUC is not accuracy, not calibration, and not threshold-dependent. It is purely about whether the model ranks positives above negatives.",
+            },
+            {
+              id: "b",
+              label: "The model predicts the correct class 88% of the time at threshold 0.5.",
+              description: "That is accuracy at a specific threshold, not AUC. AUC is threshold-free — it is the same regardless of where you put the cutoff.",
+            },
+            {
+              id: "c",
+              label: "88% of the area in the confusion matrix falls in the correct cells.",
+              description: "AUC is not derived from a single confusion matrix. A confusion matrix requires a fixed threshold; AUC integrates over all thresholds.",
+            },
+            {
+              id: "d",
+              label: "The model's predicted probabilities are accurate to within 12% on average.",
+              description: "That describes calibration (closeness of predicted probabilities to empirical frequencies), not AUC. A model can have AUC 0.99 with probabilities that are wrong by 40 percentage points.",
+            },
+          ],
+          branches: {
+            a: "e2_click1",
+            b: "e2_click1",
+            c: "e2_click1",
+            d: "e2_click1",
+          },
+          rationale: "AUC = P(score(positive) > score(negative)) — the Mann-Whitney U statistic normalized by the total number of pairs. It is derived geometrically from the ROC staircase and is completely threshold-independent. AUC below 0.5 means the model is inverted — flip the scores.",
+        },
+
+        // ─── Recovery 2: threshold selection ──────────────────────────────────
+        e2_rec_threshold: {
+          id: "e2_rec_threshold",
+          type: "scenario_choice",
+          badge: "Recovery B",
+          title: "Recovery · Threshold selection strategies",
+          prompt: "You want to set a threshold so that the model catches at least 90% of true positives (TPR ≥ 0.90) with the lowest possible FPR. How do you use the output of roc_curve() to find that threshold?",
+          code_snippet: `fpr, tpr, thresholds = roc_curve(y_true, y_scores)
+# fpr, tpr, thresholds are all aligned:
+# fpr[i], tpr[i] is the operating point at thresholds[i]
+# Arrays are sorted by descending threshold (ascending FPR).
+
+# How do you find the threshold for TPR >= 0.90?`,
+          choices: [
+            {
+              id: "a",
+              label: "Find the first index where tpr >= 0.90 (scanning from high to low threshold), then read thresholds[that index]. This gives the highest threshold that still achieves the recall target.",
+              description: "Correct. roc_curve returns arrays sorted by descending threshold (ascending FPR). The first index where tpr >= 0.90 corresponds to the loosest (highest) threshold that achieves the recall target — minimising FPR at that constraint.",
+            },
+            {
+              id: "b",
+              label: "Set threshold = 1 − 0.90 = 0.10, since threshold and TPR are complementary.",
+              description: "There is no arithmetic relationship between a threshold value and the TPR it produces. The mapping depends entirely on the model's score distribution, which is data-dependent.",
+            },
+            {
+              id: "c",
+              label: "Sort the tpr array and use binary search to find 0.90, then read the corresponding fpr — the threshold is not needed.",
+              description: "You do need the threshold to deploy the model. Reading the FPR gives you the false alarm rate, but you also need the threshold value to make predictions.",
+            },
+            {
+              id: "d",
+              label: "Set threshold = 0.90 directly, since predicted probabilities are in [0, 1] and TPR is also in [0, 1].",
+              description: "Probability scores and TPR live on the same numeric scale by coincidence, but they have no arithmetic relationship. Threshold 0.90 may produce a TPR anywhere from 0.10 to 1.0 depending on the model.",
+            },
+          ],
+          branches: {
+            a: "e2_stage4_imbalance",
+            b: "e2_stage4_imbalance",
+            c: "e2_stage4_imbalance",
+            d: "e2_stage4_imbalance",
+          },
+          rationale: "roc_curve() returns three aligned arrays: fpr, tpr, thresholds. Scan tpr for the first value >= your recall target; the corresponding thresholds entry is the value to use in production. For Youden's J: threshold = thresholds[np.argmax(tpr - fpr)]. For a cost objective: minimise C_fp * fpr * P(neg) + C_fn * (1 - tpr) * P(pos) over the thresholds array.",
+        },
+
+        // ─── Recovery 3: PR curve ─────────────────────────────────────────────
+        e2_rec_pr: {
+          id: "e2_rec_pr",
+          type: "scenario_choice",
+          badge: "Recovery C",
+          title: "Recovery · Why PR-AUC is honest under imbalance",
+          prompt: "Which explanation best captures why ROC-AUC can look impressive on a 0.1%-positive dataset even when the model is operationally useless?",
+          code_snippet: `# 1,000,000 test examples: 1,000 positive, 999,000 negative
+# Model flags 10,000 examples as positive, catching 900 of the 1,000 positives
+
+# ROC metrics:
+# TPR = 900 / 1,000    = 0.90   (great!)
+# FPR = 9,100 / 999,000 = 0.0091 (looks tiny!)
+# ROC-AUC will be high
+
+# PR metrics:
+# Precision = 900 / 10,000 = 0.09  (9% — 91% of alerts are wrong)
+# Recall    = 900 / 1,000  = 0.90
+# Average Precision (PR-AUC): much lower`,
+          choices: [
+            {
+              id: "a",
+              label: "FPR divides false positives by the enormous negative count (999,000), so even 9,100 false positives produce a tiny FPR of 0.009. The ROC curve stays pinned near the top-left, looking great, while precision = TP/(TP+FP) = 9% reveals the real operational pain.",
+              description: "Exactly right. The denominator of FPR is TN + FP, which is dominated by the millions of true negatives in imbalanced data. Precision's denominator is only TP + FP — the set of things you actually flagged — which makes it immediately reflect your alert quality.",
+            },
+            {
+              id: "b",
+              label: "ROC-AUC is computed incorrectly on imbalanced data due to numerical precision issues in sklearn.",
+              description: "sklearn computes ROC-AUC correctly. The issue is conceptual, not numerical: the metric's definition rewards models that correctly rank the majority class, which is easy when the majority class is 99.9% of the data.",
+            },
+            {
+              id: "c",
+              label: "The model is overfitting to the majority class, which is a training problem rather than a metric problem.",
+              description: "Even a model that generalises perfectly could show this pattern. With 0.1% positives, a model that always predicts 'negative' has 99.9% accuracy and reasonable-looking FPR, while precision on the positive class is undefined or 0. The metric choice matters independently of overfitting.",
+            },
+            {
+              id: "d",
+              label: "ROC-AUC and PR-AUC are always misleading on imbalanced data — accuracy is the correct metric.",
+              description: "Accuracy is the worst choice under imbalance: 99.9% accuracy by predicting all negatives looks perfect. PR-AUC is specifically designed to be honest under imbalance; ROC-AUC is the one that can be misleading.",
+            },
+          ],
+          branches: {
+            a: "e2_terminal",
+            b: "e2_terminal",
+            c: "e2_terminal",
+            d: "e2_terminal",
+          },
+          rationale: "TPR = TP/P and FPR = FP/N — both denominators are fixed class sizes, so the ROC curve is prevalence-invariant. Precision = TP/(TP+FP) — the denominator is your predicted positive set size, which is small under high thresholds. Under imbalance, a model that flags a huge chunk of negatives still looks good on ROC because FPR/N is small. PR-AUC exposes this because precision tanks visibly.",
+        },
+
+        // ─── Terminal stage ───────────────────────────────────────────────────
+        e2_terminal: {
+          id: "e2_terminal",
+          type: "scenario_choice",
+          badge: "Final",
+          title: "Mastery complete · ROC & AUC",
+          terminal: true,
+          prompt: "A senior interviewer asks: 'Your fraud model has AUC 0.95 and your team chose threshold 0.5 for production. Walk me through everything that's wrong with that picture.' Give the strongest answer.",
+          code_snippet: `# Production system summary card:
+# Model: Gradient Boosted Trees
+# Test ROC-AUC: 0.95
+# Positive prevalence: 0.8% (rare fraud)
+# Operating threshold: 0.5  (default)
+# Precision at 0.5: 0.11
+# Recall at 0.5: 0.73
+# Average Precision (PR-AUC): 0.22
+# Calibration check: not performed`,
+          choices: [
+            {
+              id: "a",
+              label: "Three problems: (1) threshold 0.5 is arbitrary — it should come from Youden's J or cost minimisation given the FN/FP cost ratio; (2) ROC-AUC 0.95 flatters this 0.8%-prevalence model — average precision 0.22 is the honest signal and precision 0.11 at the chosen threshold means 89% of reviewed alerts are wasted; (3) without a calibration check, we don't know if the predicted probabilities are meaningful for any downstream use.",
+              description: "This is the complete answer. Threshold selection, metric choice for imbalanced data, and calibration are three distinct concerns — all of which this summary card fails. Raising any one of them in an interview demonstrates seniority; raising all three with the right vocabulary is the target.",
+            },
+            {
+              id: "b",
+              label: "AUC 0.95 is high so the model is fine; the only issue is that threshold 0.5 should be tuned.",
+              description: "This misses two of the three problems: (1) AUC 0.95 on 0.8% prevalence data is misleading — FPR's huge denominator makes the metric optimistic; and (2) calibration is unverified. Threshold tuning is the smallest of the three concerns.",
+            },
+            {
+              id: "c",
+              label: "The model needs to be retrained on balanced data so the threshold of 0.5 becomes valid.",
+              description: "Resampling the data to make 0.5 'valid' replaces a conceptual misunderstanding with a data engineering workaround. The right fix is to choose the threshold intentionally based on costs, and to use PR-AUC rather than ROC-AUC for evaluation. Rebalancing for the sake of the metric is the wrong direction.",
+            },
+          ],
+          branches: {
+            a: "e2_terminal",
+            b: "e2_terminal",
+            c: "e2_terminal",
+          },
+          rationale: "The three-part critique is the senior answer: (1) threshold 0.5 is a default, not a decision — use Youden's J or cost minimisation; (2) ROC-AUC overstates quality under heavy imbalance — report average precision and state the base rate; (3) AUC ≠ calibration — high ranking quality does not mean probabilities are trustworthy for expected-value decisions. All three appear in production ML systems regularly.",
+        },
       },
     },
+
+    knowledgeCheck: [
+      {
+        question: "What is the precise probabilistic meaning of ROC-AUC = 0.88?",
+        options: [
+          "If you randomly draw one positive and one negative example, there is an 88% chance the model gives the positive a higher score.",
+          "The model correctly classifies 88% of test examples at threshold 0.5.",
+          "The model's predicted probabilities are within 12% of the true empirical frequencies.",
+        ],
+        correctIndex: 0,
+        explanation: "AUC is exactly the Wilcoxon-Mann-Whitney statistic: P(score(positive) > score(negative)) over all positive-negative pairs. This is the definition, not an approximation. It is threshold-independent — the same AUC holds regardless of where you put the decision boundary. Options B describes accuracy at 0.5 and C describes calibration, both of which AUC says nothing about.",
+      },
+      {
+        question: "Your fraud model has ROC-AUC 0.96 and average precision (PR-AUC) 0.14 on a dataset where 0.5% of examples are fraud. A stakeholder says 'AUC is near 1, the model is production-ready.' What is the most important thing to tell them?",
+        options: [
+          "ROC-AUC looks high because FPR's denominator is dominated by the huge number of negatives, so even many false positives barely move FPR. Average precision 0.14 is the honest signal: at any reasonable threshold, most flagged transactions are not fraud, meaning the analyst team reviews far more false alarms than real cases.",
+          "Both metrics are valid and the stakeholder should choose whichever aligns with business goals.",
+          "AUC 0.96 proves the model has excellent calibration, so predicted probabilities can be used directly for risk pricing.",
+        ],
+        correctIndex: 0,
+        explanation: "FPR = FP / (FP + TN). With 99.5% negatives, TN is enormous, so even large FP keeps FPR small — the ROC curve stays near the top-left and AUC looks high. Precision = TP / (TP + FP) has no TN in its denominator, so it directly reflects what analysts experience: what fraction of their reviewed alerts are real fraud. Average precision 0.14 on a 0.5%-prevalence dataset means the model is far from production-ready at the metric that matters. AUC also says nothing about calibration.",
+      },
+      {
+        question: "A deployed fraud model uses threshold 0.5. The team wants to maximise fraud caught (TPR) subject to the constraint that at most 1 in 20 reviewed alerts is a false alarm (precision ≥ 0.95). How should the threshold be chosen?",
+        options: [
+          "Keep 0.5 — it is the model's natural decision boundary and provides the best balance of precision and recall.",
+          "Sweep the precision-recall curve and find the lowest threshold at which precision is still ≥ 0.95; that threshold maximises recall under the precision constraint.",
+          "Use Youden's J (argmax of TPR − FPR) because it is always the optimal operating point.",
+        ],
+        correctIndex: 1,
+        explanation: "The business constraint is precision ≥ 0.95, which means at most 1 false alarm per 20 reviews. The precision-recall curve (or equivalently the thresholds from precision_recall_curve()) maps every threshold to its (recall, precision) pair. Find the lowest threshold where precision is still ≥ 0.95 — that gives the maximum recall achievable under the constraint. Youden's J optimises TPR − FPR symmetrically with no precision constraint, which would give a very different (lower) threshold. Default 0.5 is arbitrary and almost certainly wrong for a 0.5%-prevalence dataset.",
+      },
+    ],
   },
-  knowledgeCheck: [
-    {
-      question: "What does the X-axis of the ROC curve represent?",
-      options: [
-        "False Positive Rate: FP / (FP + TN) — fraction of negatives wrongly classified as positive",
-        "False Negative Rate: FN / (FN + TP) — fraction of positives wrongly classified as negative",
-        "Precision: TP / (TP + FP) — fraction of positive predictions that are correct",
-      ],
-      correctIndex: 0,
-      explanation: "The X-axis is False Positive Rate = FP / (FP + TN). It increases as you lower the threshold (more items classified as positive, including negatives). The Y-axis is True Positive Rate = TP / (TP + FN). A random classifier follows the diagonal (TPR = FPR).",
-    },
-    {
-      question: "AUC = 0.72 on dataset A and AUC = 0.72 on dataset B. Can you conclude the classifiers are equally good?",
-      options: [
-        "Yes — AUC is the same, so the classifiers have identical discrimination power",
-        "No — the same AUC can result from ROC curves with different shapes; one may be better at low FPR and the other at high FPR",
-        "No — AUC is not a reliable metric and should always be replaced with F1",
-      ],
-      correctIndex: 1,
-      explanation: "Two ROC curves with the same area can cross each other. Classifier A may dominate at low FPR (better for high-precision regime) while Classifier B dominates at high FPR. Always visualize the curve in the operating region you care about, not just compare summary AUC values.",
-    },
-    {
-      question: "Why is PR-AUC preferred over ROC-AUC for a churn prediction model where churners are 2% of users?",
-      options: [
-        "PR-AUC is always more accurate than ROC-AUC regardless of class balance",
-        "ROC-AUC's FPR denominator is dominated by the large non-churner class, making a mediocre model look impressive; PR-AUC directly measures how well the model identifies the rare churners",
-        "PR-AUC is faster to compute on large datasets",
-      ],
-      correctIndex: 1,
-      explanation: "With 98% non-churners, FPR = FP / (FP + TN) is small even for many false positives because TN is huge. A classifier generating many false positives can still have low FPR and high ROC-AUC. PR-AUC uses precision = TP / (TP + FP), which directly penalizes false positives relative to true positives — making it sensitive to model quality on the rare class.",
-    },
-  ],
-},
 
 "ml-e3": {
-  durationLabel: "18 min",
-  outcomes: [
-    "Explain k-fold cross-validation and why it gives a better generalization estimate than a single train/test split",
-    "Apply stratified k-fold to preserve class proportions across folds",
-    "Implement time-series cross-validation that prevents data leakage from the future",
-    "Distinguish between cross-validation for model selection and for estimating test error",
-    "Recognize nested cross-validation and when it's needed",
-  ],
-  learnMarkdown: `## Cross-Validation
-
-A single train/test split is a noisy estimate of model performance — the result depends heavily on which examples happen to end up in the test set. **Cross-validation** reduces this variance by averaging performance across multiple splits.
-
----
-
-## K-Fold Cross-Validation
-
-Divide the dataset into k equal folds. For each fold i:
-1. Train on all folds except i
-2. Evaluate on fold i
-3. Record the metric
-
-Average the k scores. This uses every example for both training and evaluation across folds.
-
-**Typical k values:**
-- k=5: fast, reasonable variance — default choice
-- k=10: lower variance, more computation — preferred for smaller datasets
-- k=N (leave-one-out): maximum data use, maximum compute, low bias, high variance
-
----
-
-## Stratified K-Fold
-
-Standard k-fold may produce folds with very different class ratios by chance. **Stratified k-fold** ensures each fold preserves the original class proportion.
-
-Use stratified k-fold for:
-- Classification problems (especially imbalanced)
-- Whenever you need class ratios to be representative in each fold
-
----
-
-## Cross-Validation for Time Series
-
-**Never use standard k-fold on time-series data.** It leaks future information into training. Example: fold 3 uses data from week 8 to predict week 2 — this is impossible in deployment.
-
-**Time-series CV (walk-forward validation)**:
-- Split 1: train weeks 1-4, test week 5
-- Split 2: train weeks 1-5, test week 6
-- Split 3: train weeks 1-6, test week 7
-
-Each test set is always in the future relative to its training set. The training window can grow (expanding window) or slide (sliding window).
-
----
-
-## CV for Model Selection vs Error Estimation
-
-**Scenario A — Model selection only:** use CV on the full training set to compare hyperparameters. After selecting the best hyperparameter, retrain on all training data. The CV score is an estimate of the best configuration but is **optimistic** if used as the final reported test error (you peeked at it to make decisions).
-
-**Scenario B — Unbiased error estimation:** use **nested cross-validation**:
-- Outer loop: k-fold for error estimation (each fold is held entirely out)
-- Inner loop: k-fold within each training split for model/hyperparameter selection
-
-Nested CV is computationally expensive (k² fold evaluations) but gives an unbiased estimate of the generalization error, accounting for the variance introduced by hyperparameter selection.
-
----
-
-## Common Mistakes
-
-- **Preprocessing before CV**: scaling on the full dataset before splitting means test fold statistics leak into training. Always fit the scaler (or any preprocessing) on the training fold only, then apply to the test fold.
-- **Group leakage**: if samples from the same user/patient/entity appear in both train and test folds, CV overestimates performance. Use **GroupKFold** to keep all samples from one group in the same fold.
-`,
-  video: null,
-  videoFallbackMarkdown: `## Deep Dive: Variance in CV Estimates
-
-### How Many Folds?
-More folds = lower bias (more training data per fold) but higher variance between fold scores. With small datasets, 10-fold or LOOCV is standard. With large datasets (>100K), even 3-fold is fine since each fold still has ample data.
-
-### Repeated K-Fold
-Run k-fold with different random seeds and average across repetitions. Reduces variance further at the cost of more computation. 5×2 CV (2-fold repeated 5 times) is popular in statistical comparison tests.
-
-### Statistical Comparison of Models
-A single CV score is a point estimate. Use a **paired t-test** (or McNemar's test for classification) on the per-fold differences between two models to determine if the difference is statistically significant, not just due to fold variance.
-`,
-  tryGuidance: "Use the Cross-Validation interactive to see how fold assignment works, visualize train/test splits for time-series CV, and compare single split vs k-fold variance estimates on the same dataset.",
-  interviewGraph: {
-    initialStageId: "ml_e3_stage1",
-    artifactDimensions: [
-      { label: "K-Fold Mechanics", recoveryStageId: "ml_e3_rec1" },
-      { label: "Time-Series CV", recoveryStageId: "ml_e3_rec2" },
-      { label: "Preprocessing Leakage", recoveryStageId: "ml_e3_stage3", passLabel: "Leak-Free CV" },
+    durationLabel: "20 min",
+    outcomes: [
+      "Explain why a single train/test split is a point estimate and cross-validation is a statistical estimate",
+      "Choose k intelligently based on dataset size and the variance–bias tradeoff in evaluation",
+      "Apply stratified k-fold for classification and GroupKFold to prevent entity leakage",
+      "Implement time-series walk-forward validation with TimeSeriesSplit",
+      "Use sklearn Pipeline to ensure preprocessing is refit per fold, eliminating preprocessing leakage",
+      "Distinguish nested CV (unbiased error estimation) from flat CV (model selection)",
     ],
-    stages: {
-      ml_e3_stage1: {
-        id: "ml_e3_stage1",
-        type: "scenario_choice",
-        badge: "Stage 1",
-        title: "Stage 1 · Why k-fold?",
-        prompt: "You train a model on 80% of data, test on 20%, and get AUC 0.84. Your manager asks how confident you are in that number. What is the main weakness of this approach?",
-        choices: [
-          { id: "a", label: "The 80/20 split is too large — you need at least 90% for training", description: "Split ratio isn't the core issue." },
-          { id: "b", label: "A single split gives a noisy estimate — the score depends heavily on which examples land in the test set by chance", description: "Different random seeds can yield AUC 0.79–0.89 on the same model and dataset." },
-          { id: "c", label: "The model wasn't trained long enough — more epochs would give a stable estimate", description: "Training duration doesn't affect the reliability of the evaluation estimate." },
-        ],
-        branches: { a: "ml_e3_rec1", b: "ml_e3_stage2", c: "ml_e3_rec1" },
-        rationale: "B is correct. With a single split, you're rolling the dice on which examples end up in the test set. On small-to-medium datasets, this variance can be ±5–10 AUC points. K-fold averages over k different test sets, giving a much more stable estimate of true generalization performance.",
-      },
-      ml_e3_rec1: {
-        id: "ml_e3_rec1",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · CV purpose",
-        prompt: "What problem does k-fold cross-validation solve vs a single train/test split?",
-        choices: [
-          { id: "a", label: "It reduces the variance of the generalization estimate by averaging over multiple test splits", description: "Each fold gives a different view of model performance; averaging reduces noise." },
-        ],
-        branches: { a: "ml_e3_stage2" },
-        rationale: "K-fold CV averages performance over k different held-out sets, dramatically reducing the variance of the evaluation estimate compared to a single split.",
-      },
-      ml_e3_stage2: {
-        id: "ml_e3_stage2",
-        type: "scenario_choice",
-        badge: "Stage 2",
-        title: "Stage 2 · Time-series splits",
-        prompt: "You're building a weekly sales forecast model. A junior DS runs 5-fold cross-validation and reports AUC 0.92. What's wrong?",
-        choices: [
-          { id: "a", label: "5-fold is too few folds for time-series data — should use at least 10-fold", description: "The number of folds isn't the issue." },
-          { id: "b", label: "Standard k-fold randomly shuffles data, so some folds use future weeks to predict past weeks — this is data leakage", description: "In fold 3, training data may include week 52 while the test set is week 3. This is impossible in deployment." },
-          { id: "c", label: "For time series, you should use leave-one-out, not k-fold", description: "LOOCV has the same temporal leakage problem." },
-        ],
-        branches: { a: "ml_e3_rec2", b: "ml_e3_stage3", c: "ml_e3_rec2" },
-        rationale: "B is correct. Standard k-fold shuffles examples randomly without respecting time order. This causes future data to appear in the training fold, inflating the CV score. The model appears to 'know' future information it couldn't have in production. Time-series CV (walk-forward validation) always trains on the past and tests on the future.",
-      },
-      ml_e3_rec2: {
-        id: "ml_e3_rec2",
-        type: "scenario_choice",
-        badge: "Recovery 2",
-        title: "Recovery 2 · Walk-forward CV",
-        prompt: "How does walk-forward validation fix the time-series CV problem?",
-        choices: [
-          { id: "a", label: "Each test set is always temporally after its training set — no future information can leak into training", description: "Split 1: train weeks 1-4, test week 5. Split 2: train weeks 1-5, test week 6." },
-        ],
-        branches: { a: "ml_e3_stage3" },
-        rationale: "Walk-forward validation preserves temporal order: training always precedes testing in time. This mimics real deployment where the model only has access to historical data.",
-      },
-      ml_e3_stage3: {
-        id: "ml_e3_stage3",
-        type: "scenario_choice",
-        badge: "Stage 3",
-        title: "Stage 3 · Preprocessing leakage",
-        prompt: "You normalize features using StandardScaler before running 5-fold CV. Is this correct?",
-        choices: [
-          { id: "a", label: "Yes — scaling before CV is fine since we're not looking at labels", description: "Scaling uses feature statistics, not labels — but those statistics still come from test-fold data." },
-          { id: "b", label: "No — the scaler's mean/std is computed on the full dataset including test fold data, leaking test statistics into training", description: "Correct procedure: fit scaler inside each fold on training data only, transform test fold using those statistics." },
-          { id: "c", label: "It depends on whether the features are continuous or categorical", description: "Leakage risk applies regardless of feature type." },
-        ],
-        branches: { a: "ml_e3_stage3", b: "ml_e3_stage3", c: "ml_e3_stage3" },
-        terminal: true,
-        rationale: "B is correct. Fitting StandardScaler on the full dataset before CV means the scaler's mean and standard deviation are computed using test-fold examples. This is subtle data leakage — the model's preprocessing 'knows' the scale of the test data. The fix: use sklearn Pipeline to chain scaler and model, then pass the Pipeline to cross_val_score. The Pipeline refits the scaler on each fold's training data automatically.",
+    learnMarkdown: `## A Single Split Is a Coin Flip
+
+A single train/test split is a **point estimate** of model performance. Flip a different random seed and your reported AUC can swing ±5–8 points on medium-sized datasets — not because your model changed, but because a different set of examples happened to land in the test set. Cross-validation replaces that coin flip with a **statistical estimate**: multiple held-out evaluations averaged to yield both a mean and a standard deviation. That bound tells you whether two models are genuinely different or just got lucky on different splits.
+
+---
+
+## K-Fold Mechanics: What k=5 vs k=10 Actually Means
+
+In **k-fold CV**, the dataset is partitioned into k non-overlapping folds. For each iteration i, fold i is the test set and the remaining k-1 folds are the training set — every example is tested exactly once.
+
+\`\`\`python
+from sklearn.model_selection import KFold, cross_val_score
+from sklearn.linear_model import LogisticRegression
+
+kf = KFold(n_splits=5, shuffle=True, random_state=42)
+scores = cross_val_score(LogisticRegression(), X, y, cv=kf, scoring="roc_auc")
+print(f"AUC: {scores.mean():.3f} ± {scores.std():.3f}")
+\`\`\`
+
+**k=5**: 80% training per fold, fast, good default. **k=10**: 90% training — lower evaluation bias, 2× compute, preferred for smaller datasets (<5 000 rows). **LOOCV**: trained on all-but-one example — near-zero bias but extreme compute cost and surprisingly high variance. Rarely worth it beyond n < 500.
+
+---
+
+## Stratified K-Fold and GroupKFold
+
+**StratifiedKFold** guarantees each fold's class distribution matches the global distribution. On a 4% fraud dataset, standard k-fold can randomly produce a fold with 1% fraud and another with 7%, making fold scores incomparable. Stratified k-fold costs nothing extra — use it by default for classification.
+
+**GroupKFold** prevents entity leakage. If your dataset has multiple rows per user, patient, or device, standard k-fold can put the same user in both train and test. The model memorizes user-specific patterns and appears to generalise — but it doesn't.
+
+\`\`\`python
+from sklearn.model_selection import GroupKFold
+
+gkf = GroupKFold(n_splits=5)
+scores = cross_val_score(model, X, y, cv=gkf.split(X, y, groups=df["user_id"]))
+\`\`\`
+
+---
+
+## Time-Series Walk-Forward Validation
+
+Standard k-fold randomly shuffles data. On time-ordered data this is catastrophic: fold 3 might train on week 52 to predict week 2 — the model sees the future. **TimeSeriesSplit** always places training before test in time:
+
+- Split 1: train weeks 1–4 → test week 5
+- Split 2: train weeks 1–5 → test week 6
+
+\`\`\`python
+from sklearn.model_selection import TimeSeriesSplit
+
+tscv = TimeSeriesSplit(n_splits=5)
+scores = cross_val_score(model, X_time_ordered, y, cv=tscv, scoring="roc_auc")
+\`\`\`
+
+---
+
+## Nested CV: Unbiased Error Estimation
+
+When you tune hyperparameters using CV and then report that CV score, you've used the test folds to make decisions — the reported number is optimistic. **Nested CV** separates the concerns:
+
+\`\`\`python
+from sklearn.model_selection import KFold, GridSearchCV, cross_val_score
+
+inner_cv = KFold(n_splits=5, shuffle=True, random_state=1)
+outer_cv  = KFold(n_splits=5, shuffle=True, random_state=2)
+
+clf = GridSearchCV(LogisticRegression(), {"C": [0.01, 0.1, 1, 10]}, cv=inner_cv)
+nested_scores = cross_val_score(clf, X, y, cv=outer_cv, scoring="roc_auc")
+print(f"Nested CV AUC: {nested_scores.mean():.3f} ± {nested_scores.std():.3f}")
+\`\`\`
+
+The outer loop's test folds are never touched by hyperparameter selection. Use nested CV when you need a publication-quality error estimate. For day-to-day model selection, flat CV is fine — just never report the tuning CV score as your final test error.
+
+---
+
+## The Pipeline Pattern: Preprocessing Inside CV
+
+Fitting a StandardScaler before CV means the scaler's mean and std are computed using test-fold examples — subtle but real preprocessing leakage. sklearn **Pipeline** eliminates this by refitting preprocessing on each fold's training data automatically:
+
+\`\`\`python
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import cross_val_score, StratifiedKFold
+
+pipe = Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression())])
+cv   = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+scores = cross_val_score(pipe, X, y, cv=cv, scoring="roc_auc")
+\`\`\`
+
+Everything in the Pipeline — imputers, encoders, scalers, feature selectors — is refit per fold. This is not optional hygiene; it is correctness.
+
+---
+
+## Interview-Ready Summary
+
+**Q: Why not just use a holdout set?**
+
+> "A single holdout gives you a point estimate whose variance you can't quantify — the same model can score 0.79 or 0.89 AUC depending on the random seed. Cross-validation gives you \`0.84 ± 0.02\`: a mean and an uncertainty bound. That bound is what lets you say whether Model A genuinely outperforms Model B or the difference is just noise. In production you retrain on all data — CV is purely for trustworthy evaluation."
+`,
+    video: null,
+    videoFallbackMarkdown: `## Deep Dive: Variance, Repeated CV, and Model Comparison
+
+### The Variance–Bias Tradeoff in Choosing k
+
+More folds means each training set is larger — **lower evaluation bias**. But larger training sets mean folds share more data and become more correlated, which **increases variance** across fold scores. LOOCV reaches the extreme: near-zero bias, but each test set is a single example, so fold scores are extremely noisy. k=5 or k=10 hits the sweet spot. The practical rule: k=5 for most datasets, k=10 when n < 5 000, LOOCV only when n < 500 and compute is free.
+
+### Repeated K-Fold and 5×2 CV
+
+A single k-fold run still has variance from the particular random partition. **Repeated k-fold** runs the full procedure r times with different seeds and averages all k×r scores. The most important variant is **5×2 CV** (5 repetitions of 2-fold), introduced by Dietterich (1998). It costs only 10 model fits while sharply reducing estimate variance. Use it when you need tight confidence intervals — publishing a result, deciding between two very close models, or justifying a production swap.
+
+### McNemar's Test and Paired t-Test for Model Comparison
+
+If Model A scores 0.847 and Model B scores 0.851 on the same 5 CV folds, is the difference real? Two tests:
+
+**Paired t-test**: compute per-fold differences d_i = score_A_i − score_B_i, then run a one-sample t-test on {d_1,…,d_k} against μ=0. Pairing cancels fold-to-fold difficulty noise, making the test far more sensitive than comparing two independent evaluations.
+
+**McNemar's test**: for binary classification, count n_10 (A correct, B wrong) and n_01 (A wrong, B correct). Test statistic: (|n_10 − n_01| − 1)² / (n_10 + n_01), distributed χ² with 1 df. This is more appropriate than a t-test on accuracy because it uses per-example outcomes rather than fold averages. Evaluating both models on the **same folds** is what makes either test valid — independent evaluation cannot separate model quality from split luck.
+
+### Computational Cost of Nested CV
+
+Nested CV with k_outer=5, k_inner=5, and 20 hyperparameter combinations requires 500 model fits. For a 30-second fit that is 4+ hours. Practical mitigations: use random search in the inner loop (20 samples instead of a 200-point grid), reduce k_inner to 3, or tune a fast proxy model and report its nested error. Nested CV is worth the cost when the reported number drives a production decision — not during iterative prototyping.
+`,
+    tryGuidance: "Use the Cross-Validation interactive to visualise fold partitioning, compare single-split variance vs k-fold stability on the same dataset, see time-series splits that respect temporal order, and trace what happens when a scaler is fit inside vs outside the CV loop.",
+    interviewGraph: {
+      initialStageId: "e3_intro",
+      artifactDimensions: [
+        { label: "K-Fold Intuition", recoveryStageId: "e3_rec_kfold" },
+        { label: "Time-Series CV", recoveryStageId: "e3_rec_timeseries" },
+        { label: "Pipeline / Leakage", recoveryStageId: "e3_rec_pipeline", passLabel: "Leak-Free CV" },
+      ],
+      stages: {
+        e3_intro: {
+          id: "e3_intro",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · Why cross-validate?",
+          prompt: "You train a logistic regression on 80% of a 2 000-row dataset and evaluate on the held-out 20%, getting AUC 0.84. Your manager asks: 'How confident are you in that number?' What is the strongest critique of your evaluation methodology?",
+          choices: [
+            { id: "a", label: "The 80/20 ratio is wrong — 90/10 or 70/30 would give a more reliable estimate", description: "The split ratio matters less than the number of times you evaluate." },
+            { id: "b", label: "A single split is a point estimate with unquantified variance — a different random seed could yield AUC anywhere from 0.79 to 0.89 on the same model", description: "400 test rows is a small sample; performance estimates are noisy." },
+            { id: "c", label: "Logistic regression is underpowered for 2 000 rows — a more complex model would give a more reliable AUC", description: "Model capacity doesn't affect whether the evaluation estimate is reliable." },
+            { id: "d", label: "AUC is the wrong metric — you should use accuracy for a cleaner estimate", description: "The choice of metric doesn't affect the reliability of a single-split evaluation." },
+          ],
+          branches: { a: "e3_rec_kfold", b: "e3_timeseries", c: "e3_rec_kfold", d: "e3_rec_kfold" },
+          rationale: "B is correct. With only 400 test examples, the variance of the AUC estimate is substantial. Running the same experiment with a different random seed regularly produces swings of ±5 AUC points. K-fold CV averages over k different 400-row test sets, giving you both a mean and a standard deviation — a statistical estimate rather than a coin flip.",
+        },
+        e3_rec_kfold: {
+          id: "e3_rec_kfold",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · K-fold purpose",
+          prompt: "What does k-fold cross-validation give you that a single train/test split cannot?",
+          choices: [
+            { id: "a", label: "A mean performance score plus a standard deviation across folds — quantifying evaluation uncertainty, not just a single noisy number", description: "The ± bound tells you how much to trust the mean." },
+            { id: "b", label: "A guaranteed unbiased estimate of generalization error regardless of how hyperparameters are chosen", description: "CV is still biased when hyperparameter tuning uses the same folds — that's what nested CV solves." },
+            { id: "c", label: "A way to use 100% of data for both training and evaluation simultaneously", description: "Each example is used for testing exactly once, but only k-1 times for training — not truly 100% in both roles simultaneously." },
+            { id: "d", label: "Faster training than a single split because the folds share computation", description: "K-fold requires k full model fits — it is k× slower, not faster." },
+          ],
+          branches: { a: "e3_timeseries", b: "e3_timeseries", c: "e3_timeseries", d: "e3_timeseries" },
+          rationale: "A is the core answer. K-fold turns evaluation into a statistical estimate with a mean and standard deviation. That standard deviation is operationally critical: it tells you whether a difference between two models is real or noise.",
+        },
+        e3_timeseries: {
+          id: "e3_timeseries",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Time-series split",
+          prompt: "A data scientist uses cross_val_score with cv=5 on a time-series of daily stock prices, reporting AUC 0.91. What is wrong with this evaluation and how should it be fixed?",
+          choices: [
+            { id: "a", label: "cv=5 is too few folds for time-series — using cv=10 or cv=20 would eliminate the problem", description: "The number of folds is not the issue; the order of splits is." },
+            { id: "b", label: "Standard k-fold randomly shuffles the data, so training folds include future dates relative to test folds — the model sees future prices during training, inflating AUC; fix by using TimeSeriesSplit which always trains on the past", description: "This is temporal data leakage. In real deployment, future prices do not exist at prediction time." },
+            { id: "c", label: "Stock prices are non-stationary, so cross-validation cannot be applied at all — only a fixed holdout at the end of the time series is valid", description: "Walk-forward validation is a valid and widely used evaluation method for time series models." },
+            { id: "d", label: "cross_val_score uses accuracy by default — switching to roc_auc would fix the evaluation", description: "The scoring metric doesn't affect whether future data leaks into training folds." },
+          ],
+          branches: { a: "e3_rec_timeseries", b: "e3_click_leak", c: "e3_rec_timeseries", d: "e3_rec_timeseries" },
+          rationale: "B is correct. KFold(shuffle=True) destroys temporal order. In fold 3, the training set might include days from December to predict days from March. The model 'knows' the future — a form of leakage that's invisible unless you inspect the split indices. TimeSeriesSplit ensures every test window is strictly after its training window, mirroring real deployment conditions.",
+        },
+        e3_rec_timeseries: {
+          id: "e3_rec_timeseries",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Walk-forward CV",
+          prompt: "How does TimeSeriesSplit prevent temporal leakage that standard k-fold introduces?",
+          choices: [
+            { id: "a", label: "It uses expanding training windows so each test set is always in the future relative to its training set — training on the past, testing on the future", description: "Mirroring what happens in production: the model only ever has access to historical data." },
+            { id: "b", label: "It randomly shuffles within each fold instead of globally, limiting how far into the future training data can reach", description: "TimeSeriesSplit does not shuffle; it preserves strict temporal order." },
+            { id: "c", label: "It uses longer training windows to reduce variance, which incidentally reduces the chance of future leakage", description: "Window length alone does not prevent leakage — ordering does." },
+            { id: "d", label: "It applies stratification on the time axis, ensuring each fold has a proportional number of recent vs old observations", description: "Stratification is for class labels, not temporal ordering." },
+          ],
+          branches: { a: "e3_click_leak", b: "e3_click_leak", c: "e3_click_leak", d: "e3_click_leak" },
+          rationale: "A is correct. TimeSeriesSplit creates splits where training window = [start, t] and test window = [t+1, t+gap] for increasing values of t. No test example is ever in the past relative to any training example, which is the only evaluation setup that matches real-world deployment.",
+        },
+        e3_click_leak: {
+          id: "e3_click_leak",
+          type: "click_target",
+          badge: "Stage 3",
+          title: "Stage 3 · Find the preprocessing leak",
+          prompt: "A data scientist built a churn model with cross-validation. There is a subtle bug that causes the reported CV AUC to be optimistically biased. Click the line that introduces the leak.",
+          code_snippet: `import pandas as pd
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import cross_val_score
+
+df = pd.read_csv("customer_data.csv")
+X, y = df.drop("churn", axis=1), df["churn"]
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)           -- ds-target:e3_leak
+
+scores = cross_val_score(
+    LogisticRegression(), X_scaled, y, cv=5,
+    scoring="roc_auc"
+)
+print(f"CV AUC: {scores.mean():.3f} ± {scores.std():.3f}")`,
+          validationCopy: {
+            e3_leak: "Correct. scaler.fit_transform(X) computes mean and std using ALL rows — including the rows that will later be test folds. Every training fold's scaler 'knows' the scale of the test data. This is preprocessing leakage. Fix: wrap scaler and model in a Pipeline and pass the pipeline to cross_val_score — sklearn will refit the scaler on each fold's training data automatically.",
+          },
+          branches: { e3_leak: "e3_nested_cv" },
+          rationale: "Fitting any preprocessing step — scalers, imputers, encoders, feature selectors — on the full dataset before CV is leakage. The fix is always the same: use sklearn Pipeline so that preprocessing is refit inside each fold.",
+        },
+        e3_nested_cv: {
+          id: "e3_nested_cv",
+          type: "scenario_choice",
+          badge: "Stage 4",
+          title: "Stage 4 · When to use nested CV",
+          prompt: "You tune a random forest using 5-fold CV grid search over 50 hyperparameter combinations, then report the best CV score as your model's expected test performance. A senior DS says the reported score is optimistic. Why, and what should you do?",
+          choices: [
+            { id: "a", label: "The CV score is optimistic because you used the same folds to both select the best hyperparameter and report generalization performance — use nested CV to separate these concerns", description: "The outer folds were used to make the hyperparameter decision, so they are no longer truly held-out." },
+            { id: "b", label: "50 hyperparameter combinations is too many — reducing to 5 or 10 would make the CV score unbiased", description: "The number of combinations affects the degree of optimism but not the fundamental problem. Even 2 combinations introduces bias." },
+            { id: "c", label: "5-fold is insufficient for grid search — 10-fold would give an unbiased estimate even with hyperparameter tuning", description: "The number of folds does not affect whether the tuning folds double as evaluation folds." },
+            { id: "d", label: "The CV score is optimistic because random forests overfit CV — switching to logistic regression would give an unbiased CV score", description: "The optimism is in the evaluation methodology, not the model family." },
+          ],
+          branches: { a: "e3_terminal", b: "e3_rec_pipeline", c: "e3_rec_pipeline", d: "e3_rec_pipeline" },
+          rationale: "A is correct. When the same CV folds are used to select the best hyperparameter AND to report the final metric, the reported score is the 'best score after cherry-picking' — an upward-biased estimate. Nested CV keeps a separate outer loop of folds that are never involved in hyperparameter selection, giving a truly held-out estimate of the tuned model's generalization performance.",
+        },
+        e3_rec_pipeline: {
+          id: "e3_rec_pipeline",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Nested CV and Pipeline",
+          prompt: "Which two practices together eliminate both preprocessing leakage AND hyperparameter-selection bias in cross-validation?",
+          choices: [
+            { id: "a", label: "Using sklearn Pipeline (preprocessing inside CV) and nested CV (separate loops for tuning vs error estimation)", description: "Pipeline handles preprocessing leakage; nested CV handles selection bias." },
+            { id: "b", label: "Using StandardScaler before CV and increasing k from 5 to 10", description: "Scaling before CV is the source of the leakage; more folds don't fix it." },
+            { id: "c", label: "Applying PCA for dimensionality reduction before CV and using GridSearchCV with a holdout set", description: "PCA before CV is another preprocessing leakage. The combination doesn't address selection bias correctly." },
+            { id: "d", label: "Using cross_val_score with shuffle=False and reporting the first fold's score only", description: "A single fold is still a noisy point estimate, and no-shuffle doesn't help with preprocessing leakage." },
+          ],
+          branches: { a: "e3_terminal", b: "e3_terminal", c: "e3_terminal", d: "e3_terminal" },
+          rationale: "A is the correct pairing. Pipeline ensures every preprocessing step is refit on each fold's training data — no leakage. Nested CV ensures hyperparameter selection and error estimation use distinct sets of folds — no selection bias. Together they give you a clean, unbiased generalization estimate.",
+        },
+        e3_terminal: {
+          id: "e3_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · Interview synthesis",
+          prompt: "An interviewer asks: 'When would you NOT use cross-validation, and what would you use instead?' Select the most complete and accurate answer.",
+          choices: [
+            { id: "a", label: "Never — cross-validation is always superior to a holdout set in every situation", description: "CV is not always the right choice — consider when a holdout is appropriate." },
+            { id: "b", label: "For very large datasets (millions of rows) where even a single held-out 20% gives a stable, low-variance estimate, or for time-series where a fixed test period at the end better mirrors deployment — in those cases a well-designed holdout is faster and equally reliable", description: "The right tool depends on dataset size, data structure, and evaluation goals." },
+            { id: "c", label: "Whenever the dataset has more than 10 000 rows — at that size a holdout is always preferred", description: "10 000 rows is not a hard threshold. CV is still valuable for comparing models even on large datasets." },
+            { id: "d", label: "Cross-validation should be skipped any time you use a neural network, because backpropagation already validates the model internally via the validation loss curve", description: "The training validation loss is used to stop training, not to estimate generalization error on unseen data." },
+          ],
+          branches: { a: "e3_terminal", b: "e3_terminal", c: "e3_terminal", d: "e3_terminal" },
+          terminal: true,
+          rationale: "B is the nuanced, interviewer-pleasing answer. Cross-validation is valuable when your dataset is small-to-medium and you need a low-variance evaluation. On very large datasets, a single well-chosen holdout (or a fixed time-based test split for time series) gives a stable estimate at a fraction of the compute cost. Knowing when to reach for each tool demonstrates that you understand evaluation methodology rather than just applying CV by reflex.",
+        },
       },
     },
+    knowledgeCheck: [
+      {
+        question: "A data scientist uses cross_val_score with cv=5 on a time-series of daily stock prices and reports AUC 0.91. What is the core problem and the correct fix?",
+        options: [
+          "Standard k-fold randomly shuffles data, so some training folds include future dates relative to their test fold — this is temporal leakage. Fix: use TimeSeriesSplit, which ensures training always precedes testing in time.",
+          "cv=5 creates test folds that are too small to evaluate time-series models reliably. Fix: use cv=20 to get larger test folds.",
+          "cross_val_score uses accuracy by default for time-series problems. Fix: explicitly set scoring='roc_auc' to get a valid metric.",
+        ],
+        correctIndex: 0,
+        explanation: "Standard KFold(shuffle=True) destroys temporal ordering. In fold 3, training data may include December prices while the test fold contains March prices from the same year — the model is trained on the future. TimeSeriesSplit creates expanding training windows where each test window is strictly after its training window, mirroring real deployment conditions where only historical data is available at prediction time.",
+      },
+      {
+        question: "Why must preprocessing steps like StandardScaler always be placed inside a Pipeline when used with cross-validation?",
+        options: [
+          "Because sklearn's cross_val_score does not accept preprocessed input arrays — it requires raw feature matrices.",
+          "Fitting a scaler on the full dataset before CV computes mean and std using test-fold rows. These statistics then influence how training-fold features are scaled — a form of data leakage. Pipeline refits preprocessing on each fold's training data, then applies those fold-specific statistics to the test fold.",
+          "Pipeline is only required for GridSearchCV, not for cross_val_score — manually fitting and transforming outside CV is acceptable for basic evaluation.",
+        ],
+        correctIndex: 1,
+        explanation: "Preprocessing leakage is subtle but real: when you call scaler.fit_transform(X) before CV, the scaler's mean and std are computed on ALL rows including future test folds. Every training fold's scaled features are slightly contaminated with test-fold statistics. sklearn Pipeline eliminates this by treating the entire preprocessing + model chain as a single estimator that is refit from scratch on each fold's training data.",
+      },
+      {
+        question: "You tune a random forest with 5-fold GridSearchCV across 40 hyperparameter combinations and report the best CV score as your model's expected test AUC. Why is this score optimistic, and what is the correct approach?",
+        options: [
+          "The score is optimistic because random forests overfit CV by memorizing fold assignments. Use a linear model for CV evaluation then switch to random forest for deployment.",
+          "The score is optimistic because 40 combinations is too many — reducing to 5 combinations would make the CV score unbiased.",
+          "The score is optimistic because the same folds used to select the best hyperparameter are used to report performance — the reported score is the maximum over 40 candidates evaluated on those folds, not a fresh estimate. Fix: use nested CV with a separate outer loop for error estimation.",
+        ],
+        correctIndex: 2,
+        explanation: "When you grid search over 40 hyperparameter combinations and report the best CV score, you have implicitly used the CV folds to make a selection decision. The best-of-40 CV score is upward-biased relative to true generalization performance. Nested CV maintains a separate outer loop of folds that are never involved in hyperparameter selection — only the inner loop participates in tuning. The outer loop provides an unbiased estimate of the tuned model's generalization error.",
+      },
+    ],
   },
-  knowledgeCheck: [
-    {
-      question: "Why use stratified k-fold instead of standard k-fold for a classification problem with 5% positive class?",
-      options: [
-        "Stratified k-fold is faster because it uses fewer samples per fold",
-        "Standard k-fold may create folds with very few or zero positive examples by chance; stratified k-fold preserves the 5% positive rate in each fold",
-        "Stratified k-fold automatically handles class imbalance by oversampling positives in each fold",
-      ],
-      correctIndex: 1,
-      explanation: "With only 5% positives, random k-fold can accidentally put all positives in one fold, leaving others with zero positive examples. Stratified k-fold ensures each fold contains approximately the same proportion of positives as the full dataset, making each fold's evaluation representative.",
-    },
-    {
-      question: "What is the correct way to include feature scaling in a k-fold cross-validation loop?",
-      options: [
-        "Fit the scaler on the full dataset, then transform all data before the CV loop begins",
-        "Inside each fold: fit the scaler on the training fold, then transform both training and test folds using those statistics",
-        "Skip scaling for cross-validation and only scale when training the final model",
-      ],
-      correctIndex: 1,
-      explanation: "Fitting the scaler before the CV loop leaks test-fold statistics (mean and std) into training, making evaluation optimistic. The correct approach: fit preprocessing on each fold's training data only, then apply it to the test fold. Using sklearn Pipeline automates this correctly.",
-    },
-    {
-      question: "What is nested cross-validation and when is it necessary?",
-      options: [
-        "Running k-fold within another k-fold: the outer loop estimates generalization error, the inner loop selects hyperparameters — needed to get an unbiased error estimate when hyperparameter tuning is part of the model building process",
-        "Running k-fold twice on the same data to verify results are consistent",
-        "Cross-validating on a subset of data and nesting the full dataset evaluation inside",
-      ],
-      correctIndex: 0,
-      explanation: "When you tune hyperparameters using CV and then report that CV score as your test error, you've used the test folds to make decisions — so the reported score is optimistic. Nested CV uses a separate outer loop for error estimation, keeping those outer test folds truly held-out from all decisions including hyperparameter selection.",
-    },
-  ],
-},
 
 "ml-e4": {
-  durationLabel: "22 min",
-  outcomes: [
-    "Identify why accuracy is a misleading metric for imbalanced classification",
-    "Apply class weighting and threshold adjustment to handle imbalance without resampling",
-    "Explain SMOTE and contrast it with random oversampling and random undersampling",
-    "Choose the right evaluation metric for imbalanced problems (F1, PR-AUC, Matthews CC)",
-    "Recognize when to resample vs when to adjust decision threshold vs when to change the loss function",
-  ],
-  learnMarkdown: `## Imbalanced Classes
-
-Most real classification problems are imbalanced. Fraud (0.1% of transactions), rare disease detection (1% prevalence), equipment failure prediction (0.5% of machines). A naive model that predicts "all negative" achieves 99%+ accuracy while being completely useless.
-
----
-
-## The Accuracy Paradox
-
-On a dataset with 99% negatives:
-- **All-negative classifier**: accuracy = 99%, recall on positives = 0%, useless
-- **A real model**: accuracy might be 97%, recall = 70%, much more useful
-
-This is why **accuracy is the wrong metric for imbalanced problems**. Use instead:
-- **Recall (sensitivity)**: fraction of actual positives correctly caught
-- **Precision**: fraction of positive predictions that are correct
-- **F1**: harmonic mean of precision and recall
-- **PR-AUC**: area under the precision-recall curve
-- **Matthews Correlation Coefficient (MCC)**: balanced metric for binary classification, robust to class imbalance, ranges from -1 to 1
-
----
-
-## Strategy 1: Class Weights
-
-The simplest fix: tell the model to penalize errors on the minority class more heavily. In sklearn: \`class_weight='balanced'\` automatically sets weights proportional to inverse class frequency.
-
-Effect: the model is penalized more for missing a positive than for a false alarm. No data is created or deleted — the same data is used with weighted loss.
-
-**Use when**: the dataset isn't extremely small, and you want a fast baseline fix.
-
----
-
-## Strategy 2: Threshold Adjustment
-
-A model trained with default threshold 0.5 may classify very few examples as positive when positives are rare. After training, lower the threshold (e.g., 0.2) to catch more positives at the cost of more false alarms.
-
-This is operationally equivalent to class weighting in many cases but more flexible: you can tune the exact operating point post-training using the ROC or PR curve.
-
----
-
-## Strategy 3: Resampling
-
-### Random Undersampling
-Delete majority-class examples to balance the dataset. Fast, but wastes data — may remove informative majority examples.
-
-### Random Oversampling
-Duplicate minority examples. Creates exact copies — model memorizes rather than generalizes on rare class.
-
-### SMOTE (Synthetic Minority Oversampling Technique)
-Create **synthetic** minority examples by interpolating between real ones:
-1. For each minority sample, find k nearest minority neighbors
-2. Randomly select one neighbor
-3. Generate a new point on the line segment between them
-
-SMOTE creates diverse synthetic positives rather than duplicates, reducing overfitting on the minority class. Variants: ADASYN (adaptive weighting near decision boundary), BorderlineSMOTE (focus on hard examples near boundary).
-
-**Important**: apply resampling only to the **training set**. Never resample the validation or test set — you need to evaluate on the real distribution.
-
----
-
-## Decision Framework
-
-| Situation | Strategy |
-|-----------|---------|
-| Imbalance is moderate (10:1 to 30:1) | Class weights, then threshold tuning |
-| Severe imbalance (>100:1), adequate data | SMOTE + class weights |
-| Very small minority class (<50 examples) | Class weights only (SMOTE unreliable with too few neighbors) |
-| Model is already calibrated, just need better recall | Lower threshold |
-`,
-  video: null,
-  videoFallbackMarkdown: `## Deep Dive: SMOTE Pitfalls & Calibration
-
-### SMOTE Pitfalls
-SMOTE can create noisy synthetic samples in high-dimensional spaces. It interpolates between points that may span class boundaries in sparse regions. Variants like SVM-SMOTE or Borderline-SMOTE focus synthesis on the decision boundary where it matters most.
-
-### Calibration After Resampling
-If you oversample training data, the model's predicted probabilities will be calibrated for the resampled distribution, not the real distribution. A model trained on 50/50 synthetic balance will output probabilities near 0.5 for many examples that should be near 0.01 in reality.
-
-To get calibrated probabilities for the real distribution: use Platt scaling (sigmoid calibration) or isotonic regression after fitting on the original unsampled validation data. Alternatively, skip oversampling and use class weights (which don't distort probability calibration).
-
-### Ensemble Approaches
-BalancedRandomForest and EasyEnsemble (from imbalanced-learn) combine resampling with ensemble methods. Each tree in BalancedRandomForest undersamples the majority class to match the minority class for that tree, then aggregates predictions.
-`,
-  tryGuidance: "Use the Imbalanced Classes interactive to see how different strategies (class weights, SMOTE, threshold tuning) shift the decision boundary and change the confusion matrix. Try adjusting the imbalance ratio to see when each strategy breaks down.",
-  interviewGraph: {
-    initialStageId: "ml_e4_stage1",
-    artifactDimensions: [
-      { label: "Metric Choice", recoveryStageId: "ml_e4_rec1" },
-      { label: "Resampling", recoveryStageId: "ml_e4_rec2" },
-      { label: "Strategy Selection", recoveryStageId: "ml_e4_stage3", passLabel: "Imbalance Design" },
+    durationLabel: "22 min",
+    outcomes: [
+      "Identify why accuracy is a misleading metric for imbalanced classification",
+      "Apply class weighting and threshold adjustment to handle imbalance without resampling",
+      "Explain SMOTE and contrast it with random oversampling and random undersampling",
+      "Choose the right evaluation metric for imbalanced problems (F1, PR-AUC, Matthews CC)",
+      "Recognize when to resample vs when to adjust decision threshold vs when to change the loss function",
     ],
-    stages: {
-      ml_e4_stage1: {
-        id: "ml_e4_stage1",
-        type: "scenario_choice",
-        badge: "Stage 1",
-        title: "Stage 1 · Metric selection",
-        prompt: "Your fraud classifier achieves 99.2% accuracy. The data has 99% non-fraud. How should you evaluate this model?",
-        choices: [
-          { id: "a", label: "Report accuracy — 99.2% is very high", description: "A model that predicts all-non-fraud gets 99% accuracy too." },
-          { id: "b", label: "Report fraud recall and precision — catching fraud (recall) and not wasting investigators' time (precision) are what matter", description: "Recall = what fraction of real fraud was caught. Precision = what fraction of fraud flags were real." },
-          { id: "c", label: "Report the loss on the training set", description: "Training loss doesn't measure deployment quality." },
-          { id: "d", label: "Report F1 or PR-AUC on the fraud class", description: "These directly measure performance on the minority class we care about." },
-        ],
-        branches: { a: "ml_e4_rec1", b: "ml_e4_stage2", c: "ml_e4_rec1", d: "ml_e4_stage2" },
-        rationale: "B and D are both correct. Accuracy is useless here — the all-negative baseline achieves 99%. Fraud recall tells you what fraction of real fraud the model caught; precision tells you what fraction of flagged transactions are real fraud (affects investigator workload). F1 and PR-AUC are appropriate summary metrics for the minority class.",
-      },
-      ml_e4_rec1: {
-        id: "ml_e4_rec1",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · Better metrics",
-        prompt: "Which metric is appropriate for evaluating a model on a 99:1 imbalanced dataset?",
-        choices: [
-          { id: "a", label: "Recall and precision on the minority class, F1 or PR-AUC as summary metrics", description: "These focus evaluation on the rare class performance." },
-        ],
-        branches: { a: "ml_e4_stage2" },
-        rationale: "For imbalanced problems, accuracy is dominated by the majority class. Recall and precision on the minority class, plus F1 or PR-AUC, directly measure model utility on what matters.",
-      },
-      ml_e4_stage2: {
-        id: "ml_e4_stage2",
-        type: "scenario_choice",
-        badge: "Stage 2",
-        title: "Stage 2 · SMOTE timing",
-        prompt: "You decide to use SMOTE to handle class imbalance. Where in your pipeline should you apply it?",
-        choices: [
-          { id: "a", label: "Apply SMOTE to the full dataset before train/test split", description: "Synthetic copies of training examples would end up in the test set — data leakage." },
-          { id: "b", label: "Apply SMOTE to the training set only — never to the validation or test set", description: "Test/validation set must reflect the real-world distribution to give honest evaluation." },
-          { id: "c", label: "Apply SMOTE to both training and test sets for consistent distribution", description: "The test set must use the real distribution; SMOTE would distort evaluation." },
-        ],
-        branches: { a: "ml_e4_rec2", b: "ml_e4_stage3", c: "ml_e4_rec2" },
-        rationale: "B is correct. SMOTE creates synthetic training examples to help the model learn. But evaluation must reflect the real-world distribution (imbalanced). Applying SMOTE to the test set would make evaluation misleadingly optimistic — you'd be testing on artificial easy examples. Always apply resampling inside the training fold only.",
-      },
-      ml_e4_rec2: {
-        id: "ml_e4_rec2",
-        type: "scenario_choice",
-        badge: "Recovery 2",
-        title: "Recovery 2 · SMOTE scope",
-        prompt: "Why must resampling be applied only to training data, not test data?",
-        choices: [
-          { id: "a", label: "The test set must reflect the true class distribution to give an unbiased estimate of real-world performance", description: "SMOTE would make the test set artificially balanced, inflating minority-class metrics." },
-        ],
-        branches: { a: "ml_e4_stage3" },
-        rationale: "Evaluation must simulate deployment conditions. The test set represents real-world data, which is imbalanced. Resampling the test set changes the distribution being evaluated, giving a false picture of real performance.",
-      },
-      ml_e4_stage3: {
-        id: "ml_e4_stage3",
-        type: "scenario_choice",
-        badge: "Stage 3",
-        title: "Stage 3 · Strategy selection",
-        prompt: "You have 1,000,000 transactions with only 50 fraud cases (0.005%). Which strategy is most appropriate?",
-        choices: [
-          { id: "a", label: "SMOTE — it creates synthetic minority examples to balance the classes", description: "SMOTE requires enough real minority examples as seeds; 50 cases may produce noisy interpolations." },
-          { id: "b", label: "Class weighting — penalize fraud misses heavily in the loss function, keep original data", description: "Class weights work on any sample size and don't create noisy synthetic data." },
-          { id: "c", label: "Random undersampling — remove 999,950 non-fraud transactions to balance", description: "You'd discard almost all your data and lose signal from legitimate transaction patterns." },
-        ],
-        branches: { a: "ml_e4_stage3", b: "ml_e4_stage3", c: "ml_e4_stage3" },
-        terminal: true,
-        rationale: "B is most appropriate. With only 50 minority examples, SMOTE produces low-quality synthetic samples (each point's k nearest neighbors may be far away in a small cluster). Class weighting directly adjusts the loss function without modifying data, making it the safest choice when the minority class is very small. Random undersampling discards 99.995% of data — wasteful and harmful to majority-class pattern learning.",
+    learnMarkdown: `## The Accuracy Illusion
+
+99.5% accuracy on a fraud dataset is not impressive — it might just be the sound of a model that learned to say "not fraud" every time. If 99.5% of transactions are legitimate, a classifier that never predicts fraud achieves exactly that score. It has a confusion matrix with zero true positives and zero false positives — and zero value. This is the **accuracy paradox**, and it is the most common imbalanced-data mistake in industry.
+
+Use these metrics instead:
+- **Recall (sensitivity)**: fraction of actual positives correctly caught — answers "did we miss any fraud?"
+- **Precision**: fraction of flagged positives that are real — answers "are we wasting investigators' time?"
+- **F1**: harmonic mean of precision and recall — a balanced summary
+- **PR-AUC**: area under the precision-recall curve — robust summary across all thresholds
+- **Matthews Correlation Coefficient (MCC)**: ranges from −1 to +1; balanced for binary classification even with extreme imbalance
+
+---
+
+## Strategy 1: class_weight='balanced'
+
+The simplest, often the best, fix. Tell sklearn to penalize errors on the minority class more heavily — proportionally to the inverse class frequency. No data is created or deleted.
+
+\`\`\`python
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report
+
+model = LogisticRegression(class_weight='balanced', random_state=42)
+model.fit(X_train, y_train)
+print(classification_report(y_test, model.predict(X_test)))
+\`\`\`
+
+Works with LogisticRegression, RandomForestClassifier, SVC, XGBClassifier (use \`scale_pos_weight\`), and most sklearn estimators. Critically, it does **not** distort probability calibration — the predicted probabilities remain meaningful for the true class distribution.
+
+---
+
+## Strategy 2: Threshold Lowering Post-Training
+
+A model trained with default threshold 0.5 rarely flags examples as positive when positives are rare. After training, lower the threshold to capture more positives at the cost of more false alarms. This is tunable post-training using the PR or ROC curve.
+
+\`\`\`python
+import numpy as np
+from sklearn.metrics import precision_recall_curve
+
+probs = model.predict_proba(X_test)[:, 1]
+precision, recall, thresholds = precision_recall_curve(y_test, probs)
+
+# Find threshold that gives recall >= 0.80
+idx = np.argmax(recall >= 0.80)
+threshold = thresholds[idx]
+y_pred = (probs >= threshold).astype(int)
+print(classification_report(y_test, y_pred))
+\`\`\`
+
+---
+
+## Strategy 3: Random Undersampling
+
+Delete majority-class examples to balance the dataset. Fast and easy, but discards potentially informative data.
+
+\`\`\`python
+from imblearn.under_sampling import RandomUnderSampler
+
+rus = RandomUnderSampler(random_state=42)
+X_resampled, y_resampled = rus.fit_resample(X_train, y_train)
+\`\`\`
+
+---
+
+## Strategy 4: Random Oversampling
+
+Duplicate minority-class examples to match the majority. Creates exact copies — the model memorizes rather than generalizes on rare instances.
+
+\`\`\`python
+from imblearn.over_sampling import RandomOverSampler
+
+ros = RandomOverSampler(random_state=42)
+X_resampled, y_resampled = ros.fit_resample(X_train, y_train)
+\`\`\`
+
+---
+
+## Strategy 5: SMOTE with imblearn Pipeline
+
+**SMOTE** (Synthetic Minority Oversampling Technique) generates new minority samples by interpolating between real ones: for each minority point, pick a random k-nearest minority neighbor and place a synthetic sample on the line segment between them.
+
+\`\`\`python
+from imblearn.over_sampling import SMOTE
+from imblearn.pipeline import Pipeline
+from sklearn.linear_model import LogisticRegression
+
+smote_pipeline = Pipeline([
+    ('smote', SMOTE(random_state=42, k_neighbors=5)),
+    ('clf', LogisticRegression(random_state=42)),
+])
+
+smote_pipeline.fit(X_train, y_train)          # SMOTE applied only inside fit
+y_pred = smote_pipeline.predict(X_test)       # test set untouched
+\`\`\`
+
+Using \`imblearn.pipeline.Pipeline\` (not sklearn's) ensures SMOTE fires only during \`fit\` — never when calling \`predict\` or \`predict_proba\`. This is the safe, production-correct way to use SMOTE with cross-validation.
+
+---
+
+## Decision Table
+
+| Situation | Recommended Strategy |
+|---|---|
+| Moderate imbalance (10:1 – 30:1), enough data | \`class_weight='balanced'\`, then threshold tuning |
+| Severe imbalance (>100:1), minority class ≥ 200 samples | SMOTE inside imblearn Pipeline + class weights |
+| Tiny minority class (< 50 samples) | \`class_weight='balanced'\` only — SMOTE produces noisy interpolations |
+| Model already trained, need recall/precision tradeoff tuned | Threshold lowering on PR curve |
+| Very large dataset, minority class still large | Random undersampling to reduce training time, then class weights |
+
+---
+
+## Calibration Impact: SMOTE Distorts Probabilities
+
+When you train on a SMOTE-resampled 50/50 dataset but deploy on a real 1/99 class distribution, the model's predicted probabilities are calibrated for the artificial distribution, not reality. A sample that truly has a 2% probability of fraud might score 0.45 from a SMOTE-trained model.
+
+**Fix with Platt scaling (sigmoid calibration)**:
+
+\`\`\`python
+from sklearn.calibration import CalibratedClassifierCV
+
+base_model = LogisticRegression(random_state=42)
+# Train base on SMOTE-resampled data, then calibrate on held-out real data
+calibrated = CalibratedClassifierCV(base_model, method='sigmoid', cv='prefit')
+calibrated.fit(X_val_original, y_val_original)  # unsampled validation set
+\`\`\`
+
+Alternatively, skip oversampling entirely and use \`class_weight='balanced'\` — it adjusts the loss function without distorting the probability space.
+
+---
+
+## Interview-Ready Summary
+
+- Accuracy is meaningless on imbalanced data — a trivial majority-class classifier wins on accuracy.
+- Start with \`class_weight='balanced'\`: it is fast, safe, and does not distort probabilities.
+- Apply SMOTE **only to training data**, always wrapped in an imblearn Pipeline.
+- SMOTE is unreliable when the minority class has fewer than ~50 samples.
+- After SMOTE, recalibrate probabilities with Platt scaling if you need real probability estimates.
+- Lower the classification threshold post-training to hit a target recall without retraining.
+`,
+    video: null,
+    videoFallbackMarkdown: `## Deep Dive: SMOTE in High Dimensions, Variants, Ensembles, and Calibration
+
+### Why SMOTE Breaks in High-Dimensional Spaces
+
+SMOTE interpolates between minority samples: it picks a point's k-nearest minority neighbors and places a synthetic sample on the line segment between them. In low dimensions this is sensible — the line between two nearby fraud transactions probably passes through fraud-like space.
+
+In high dimensions (hundreds of features), distance metrics become unreliable — the "nearest neighbor" may be almost as far away as any random point in the space. The interpolated synthetic samples can land in majority-class territory, creating noisy mislabeled training data. The model then learns from fraudulent-labeled points that look like normal transactions, harming precision without helping recall.
+
+### SMOTE Variants
+
+**Standard SMOTE**: interpolates uniformly between a minority point and one of its k-nearest minority neighbors. Treats all minority samples equally regardless of how close they are to the decision boundary.
+
+**BorderlineSMOTE**: focuses synthesis exclusively on minority samples whose nearest neighbors are mostly majority-class examples — i.e., the borderline cases hardest to classify. This concentrates synthetic data where the model needs the most help, reducing noise in easy regions of feature space.
+
+**ADASYN (Adaptive Synthetic Sampling)**: weights each minority sample by how many of its nearest neighbors are majority-class. Samples in difficult regions get more synthetic neighbors. Unlike BorderlineSMOTE, ADASYN generates proportionally more examples in hard regions rather than restricting synthesis to the border entirely.
+
+Use BorderlineSMOTE or ADASYN instead of standard SMOTE when the minority class has moderate size (100+ samples) and high-dimensional features.
+
+### Ensemble Approaches from imbalanced-learn
+
+**BalancedRandomForest**: builds each tree in the forest by randomly undersampling the majority class to match the minority class — but a different random subsample per tree. Aggregating predictions across trees recovers statistical power lost by any single tree's undersampling. Effective and fast; no synthetic data needed.
+
+**EasyEnsemble**: trains multiple AdaBoost classifiers, each on a balanced subsample (undersampled majority + full minority). Predictions are averaged. Like BalancedRandomForest, it avoids synthetic data entirely, sidesteps calibration distortion, and is robust in high dimensions.
+
+Both are available in \`imblearn.ensemble\` and drop in as sklearn-compatible classifiers.
+
+### The Calibration Distortion Problem in Detail
+
+Suppose you have a real-world 1:99 minority-to-majority class split. You apply SMOTE to the training set, producing a 50:50 balanced dataset. Your logistic regression now learns decision boundaries appropriate for 50:50 — its intercept is calibrated for equal priors.
+
+At deployment time, you call \`model.predict_proba(X_new)\`. The model outputs 0.42 for a transaction. But in the real world, where only 1% of transactions are fraud, the true posterior probability for that input might be only 0.04. The model is systematically overconfident on the positive class because its training distribution was artificially shifted.
+
+**Consequences**: any downstream system that consumes probability scores (risk scoring, alerting thresholds, cost-sensitive decisions) will be wrong. Threshold-based decisions derived from these inflated probabilities will trigger far too many false positives.
+
+**Fix — Platt Scaling**: after training on the resampled data, hold out a validation set with the real class distribution and fit a two-parameter sigmoid on top of the model's raw scores. This recalibrates the output back to real-world posteriors. Isotonic regression is an alternative for larger calibration sets. The key is that the calibration set must never be resampled — it must reflect the true deployment distribution.
+`,
+    tryGuidance: "Use the Imbalanced Classes interactive to see how class weights, SMOTE, and threshold tuning shift the decision boundary and confusion matrix. Try the extreme imbalance ratio (0.5%) to see why SMOTE fails with tiny minority classes.",
+    interviewGraph: {
+      initialStageId: "e4_stage1",
+      artifactDimensions: [
+        { label: "Metric Choice", recoveryStageId: "e4_rec1" },
+        { label: "SMOTE Application", recoveryStageId: "e4_rec2" },
+        { label: "Strategy Selection", recoveryStageId: "e4_rec3", passLabel: "Imbalance Design" },
+      ],
+      stages: {
+        e4_stage1: {
+          id: "e4_stage1",
+          type: "scenario_choice",
+          badge: "Stage 1",
+          title: "Stage 1 · Metric trap",
+          prompt: "Your fraud classifier achieves 99.5% accuracy on a dataset where 0.5% of transactions are fraud. A stakeholder says the model is production-ready. How do you respond?",
+          choices: [
+            { id: "a", label: "Agree — 99.5% accuracy is well above industry benchmarks for fraud detection", description: "99.5% accuracy is the majority-class baseline, not a measure of fraud detection ability." },
+            { id: "b", label: "Challenge it: a model predicting 'not fraud' every time also achieves 99.5% accuracy — check recall and precision on the fraud class", description: "The all-negative baseline perfectly matches the majority-class rate." },
+            { id: "c", label: "Run the model on more data — a larger test set will reveal whether 99.5% is real", description: "Sample size is not the issue; the metric itself is misleading on imbalanced data." },
+            { id: "d", label: "Report F1 and PR-AUC on the fraud class instead of overall accuracy", description: "These metrics focus on minority-class performance and are not dominated by majority-class examples." },
+          ],
+          branches: { a: "e4_rec1", b: "e4_click", c: "e4_rec1", d: "e4_click" },
+          rationale: "B and D are correct. 99.5% accuracy matches the base rate of legitimate transactions — a trivial all-negative classifier achieves it. The meaningful metrics are recall (what fraction of actual fraud was caught), precision (what fraction of fraud alerts were real), F1, and PR-AUC on the positive class.",
+        },
+        e4_rec1: {
+          id: "e4_rec1",
+          type: "scenario_choice",
+          badge: "Recovery 1",
+          title: "Recovery 1 · Right metrics for imbalanced data",
+          prompt: "The interviewer asks: on a dataset where 99.5% of examples are class 0, which metrics actually reflect how well your model handles class 1?",
+          choices: [
+            { id: "a", label: "Overall accuracy — it summarizes how often the model is correct across all examples", description: "Accuracy is dominated by the majority class and tells you almost nothing about minority-class performance." },
+            { id: "b", label: "Recall and precision on the minority class, summarized with F1 or PR-AUC", description: "Recall measures whether you catch the rare positives; precision measures whether your alerts are trustworthy." },
+            { id: "c", label: "AUC-ROC only — it is threshold-independent and works for any imbalance ratio", description: "AUC-ROC can be misleadingly optimistic under high imbalance; PR-AUC is more informative in that regime." },
+            { id: "d", label: "Training loss — a low loss means the model has learned the correct decision boundary", description: "Training loss reflects the majority class distribution and is not a deployment quality metric." },
+          ],
+          branches: { a: "e4_rec1", b: "e4_click", c: "e4_click", d: "e4_rec1" },
+          rationale: "B is the core answer. Recall on the positive class tells you what fraction of real fraud you caught; precision tells you how many false alarms investigators must handle. F1 and PR-AUC are summary metrics that remain meaningful regardless of class imbalance. C (AUC-ROC) is partially correct but PR-AUC is strictly preferable under severe imbalance.",
+        },
+        e4_click: {
+          id: "e4_click",
+          type: "click_target",
+          badge: "Stage 2",
+          title: "Stage 2 · Spot the SMOTE misuse",
+          prompt: "A senior data scientist shares this pipeline. Click the exact line that introduces an evaluation error.",
+          code_snippet: `from imblearn.over_sampling import SMOTE
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+smote = SMOTE(random_state=42)
+X_resampled, y_resampled = smote.fit_resample(X_train, y_train)
+
+# Senior DS applies SMOTE to test set for "consistency"
+X_test_res, y_test_res = smote.fit_resample(X_test, y_test)       -- ds-target:e4_smote_test
+
+model = LogisticRegression()
+model.fit(X_resampled, y_resampled)
+print(classification_report(y_test_res, model.predict(X_test_res)))`,
+          validationCopy: {
+            e4_smote_test: "Correct. Applying SMOTE to the test set replaces the real class distribution with an artificial 50/50 balance — evaluation no longer reflects deployment conditions. The test set must always use the original imbalanced distribution.",
+          },
+          branches: {
+            e4_smote_test: "e4_stage3",
+            default: "e4_rec2",
+          },
+          rationale: "The test set must reflect the real-world distribution that the model will face in production. Applying SMOTE to it removes the imbalance, inflates minority-class recall artificially, and produces evaluation results that will never replicate in deployment. Always resample training data only — ideally inside an imblearn Pipeline so it fires only during fit.",
+        },
+        e4_rec2: {
+          id: "e4_rec2",
+          type: "scenario_choice",
+          badge: "Recovery 2",
+          title: "Recovery 2 · SMOTE scope",
+          prompt: "You missed the problematic line. The interviewer asks: where exactly should SMOTE be applied in a train/test pipeline, and why?",
+          choices: [
+            { id: "a", label: "To the full dataset before splitting, so training and test sets share the same synthetic distribution", description: "Synthetic minority samples derived from training points would leak into the test set, creating data leakage." },
+            { id: "b", label: "To the training set only, ideally inside an imblearn Pipeline so it fires only during fit — never on validation or test data", description: "The test set must reflect the real, imbalanced distribution to give an honest estimate of deployment performance." },
+            { id: "c", label: "To the test set only, so evaluation captures rare-class performance accurately", description: "This distorts evaluation — you would be measuring performance on artificial examples, not real ones." },
+            { id: "d", label: "To both train and test sets to ensure the model is evaluated on the same type of data it was trained on", description: "Train and test distributions should differ: training uses resampled data; evaluation uses real-world distribution." },
+          ],
+          branches: { a: "e4_rec2", b: "e4_stage3", c: "e4_rec2", d: "e4_rec2" },
+          rationale: "B is the only safe answer. SMOTE is a training-time data augmentation technique. The test/validation set must always represent the real class distribution because that is what the model faces at deployment. Using an imblearn Pipeline (not sklearn's Pipeline) ensures SMOTE is called only inside fit(), not during predict or cross-validation scoring.",
+        },
+        e4_stage3: {
+          id: "e4_stage3",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · Strategy ranking under extreme imbalance",
+          prompt: "You have 1 million transactions, 50 of which are fraudulent (0.005% minority rate). Your team debates three strategies: SMOTE, class_weight='balanced', and random undersampling. Rank these by appropriateness for this situation.",
+          choices: [
+            { id: "a", label: "SMOTE first (most synthetic diversity), then class weights, then undersampling", description: "SMOTE with only 50 seed samples produces low-quality interpolations — neighbors are far apart, synthetics are noisy." },
+            { id: "b", label: "class_weight='balanced' first (adjusts loss without touching data), then undersampling if speed matters, then SMOTE last", description: "Class weights work at any sample size and don't distort the data distribution or probability calibration." },
+            { id: "c", label: "Random undersampling first (balances quickly), then class weights, then SMOTE", description: "Undersampling discards 999,950 legitimate transactions — almost all majority-class signal is lost." },
+            { id: "d", label: "All three are equally appropriate at this sample size", description: "They differ substantially: SMOTE needs more minority samples; undersampling destroys majority data; class weights are always safe." },
+          ],
+          branches: { a: "e4_rec3", b: "e4_stage4", c: "e4_rec3", d: "e4_rec3" },
+          rationale: "B is correct. With only 50 minority samples, SMOTE's k-nearest-neighbor interpolation is unreliable — each point's neighbors may span the entire minority cluster, producing synthetic samples that are noisy and may land in majority-class space. class_weight='balanced' is always safe: it scales the loss function without touching the data. Random undersampling would discard 99.995% of legitimate transaction data, losing valuable majority-class patterns.",
+        },
+        e4_rec3: {
+          id: "e4_rec3",
+          type: "scenario_choice",
+          badge: "Recovery 3",
+          title: "Recovery 3 · Tiny minority class",
+          prompt: "With only 50 minority samples in a dataset of 1 million, why is SMOTE a poor choice compared to class weighting?",
+          choices: [
+            { id: "a", label: "SMOTE is too slow to run on 1 million rows", description: "SMOTE runs on the minority class only, so speed is not the issue — quality is." },
+            { id: "b", label: "50 minority samples is too few for reliable k-nearest-neighbor interpolation — synthetic samples land in noisy, low-confidence regions of feature space; class_weight='balanced' adjusts the loss without creating data", description: "SMOTE needs a reasonably dense minority cluster to interpolate meaningfully." },
+            { id: "c", label: "SMOTE cannot be combined with logistic regression, only with tree-based models", description: "SMOTE is model-agnostic — it operates on the training data before any model is fit." },
+            { id: "d", label: "class_weight='balanced' always outperforms SMOTE regardless of sample size", description: "SMOTE is valuable when the minority class has sufficient samples (100+); class weights win specifically when minority samples are very few." },
+          ],
+          branches: { a: "e4_rec3", b: "e4_stage4", c: "e4_rec3", d: "e4_stage4" },
+          rationale: "B is the key insight. SMOTE's quality depends on having a dense, coherent minority cluster so interpolated points remain in minority-class territory. With only 50 points spread across a high-dimensional feature space, neighbors can be distant and synthetic points end up in ambiguous regions. class_weight='balanced' sidesteps data creation entirely — it modifies how the loss function weights each class, working reliably at any minority sample count.",
+        },
+        e4_stage4: {
+          id: "e4_stage4",
+          type: "scenario_choice",
+          badge: "Stage 4",
+          title: "Stage 4 · Calibration after resampling",
+          prompt: "You trained a logistic regression on a SMOTE-resampled 50/50 balanced dataset. At deployment on the real 1/99 distribution, a transaction scores 0.44 probability of fraud. Should you trust this number?",
+          choices: [
+            { id: "a", label: "Yes — 0.44 is below 0.5 so the model predicts 'not fraud', which is correct behavior", description: "The threshold decision may work, but the probability value itself is distorted by resampling." },
+            { id: "b", label: "No — the model's probabilities are calibrated for 50/50 priors, not the real 1/99 distribution; the true posterior is likely far lower than 0.44", description: "Training on resampled data shifts the model's learned priors away from reality." },
+            { id: "c", label: "No — logistic regression probabilities are never reliable, regardless of resampling", description: "Logistic regression can be well-calibrated when trained on representative data." },
+            { id: "d", label: "Yes — SMOTE preserves the original feature relationships, so probability outputs remain valid", description: "SMOTE affects the class prior that the model implicitly learns, not just feature relationships." },
+          ],
+          branches: { a: "e4_terminal", b: "e4_terminal", c: "e4_terminal", d: "e4_terminal" },
+          terminal: true,
+          rationale: "B is the critical insight. Logistic regression's intercept is calibrated to match the training class ratio. After SMOTE produces a 50/50 dataset, the intercept reflects equal priors. At deployment on a 1/99 distribution, the model sees a sample that is truly rare and outputs inflated probability scores. The fix is Platt scaling (sigmoid calibration) fitted on a held-out unsampled validation set — or avoiding oversampling entirely by using class_weight='balanced', which never distorts the probability space.",
+        },
+        e4_terminal: {
+          id: "e4_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · Calibration fix",
+          prompt: "You have confirmed that SMOTE distorts probability calibration. Which approach correctly recalibrates the model's output to the real deployment distribution?",
+          choices: [
+            { id: "a", label: "Fit a CalibratedClassifierCV with method='sigmoid' on a held-out validation set that uses the real (unsampled) class distribution", description: "Platt scaling fits a sigmoid on top of the model's raw scores using a distribution-representative held-out set." },
+            { id: "b", label: "Retrain the model on the SMOTE data a second time to reinforce the calibration", description: "Retraining on the same resampled data does not fix the prior mismatch." },
+            { id: "c", label: "Multiply all predicted probabilities by 0.01 to account for the real 1% fraud rate", description: "A fixed multiplier is not a principled calibration — it ignores the nonlinear relationship between raw scores and true posteriors." },
+            { id: "d", label: "Use class_weight='balanced' instead of SMOTE — it adjusts the loss function without shifting the probability prior", description: "Avoiding oversampling entirely is the cleanest solution when calibrated probabilities are needed." },
+          ],
+          branches: { a: "e4_terminal", b: "e4_terminal", c: "e4_terminal", d: "e4_terminal" },
+          terminal: true,
+          rationale: "A and D are both valid. Platt scaling (sigmoid calibration) fitted on unsampled validation data is the canonical fix when you must use SMOTE. Using class_weight='balanced' instead avoids the problem entirely. B (more resampled training) and C (manual multiplier) are not principled solutions.",
+        },
       },
     },
+    knowledgeCheck: [
+      {
+        question: "A classifier achieves 99.5% accuracy on a fraud dataset where 0.5% of transactions are fraudulent. Why is this not impressive?",
+        options: [
+          "The model needs to be tested on more data before the accuracy figure is statistically reliable",
+          "A model that predicts 'not fraud' for every transaction achieves the same 99.5% accuracy — it has zero actual fraud detection ability",
+          "Accuracy should only be computed on the minority class, not across all examples",
+        ],
+        correctIndex: 1,
+        explanation: "The accuracy paradox: a trivial all-negative classifier matches the majority-class base rate. On a 99.5% non-fraud dataset, predicting 'not fraud' always gives 99.5% accuracy while catching exactly zero fraud cases. Accuracy on imbalanced data is dominated by the majority class and tells you nothing about how useful the model is. Use recall, precision, F1, or PR-AUC on the minority class instead.",
+      },
+      {
+        question: "You apply SMOTE to your full dataset before train/test splitting. What is the primary risk?",
+        options: [
+          "SMOTE will oversample the majority class instead of the minority class if applied before splitting",
+          "Synthetic minority samples derived from training points will appear in the test set, making evaluation optimistic and introducing data leakage",
+          "The model will overfit to the SMOTE-generated samples because they are too similar to real minority examples",
+        ],
+        correctIndex: 1,
+        explanation: "SMOTE generates synthetic samples by interpolating between real minority training points. If applied before splitting, some of those synthetic points — derived from training-set neighbors — end up in the test set. The test set is then no longer independent: it contains artificial examples that are near-copies of training points, making evaluation misleadingly optimistic. Always apply SMOTE only inside the training fold, ideally within an imblearn Pipeline so it fires only during fit().",
+      },
+      {
+        question: "After training a logistic regression on a SMOTE-resampled 50/50 balanced dataset, you deploy it on the real 1/99 class distribution. What happens to its probability outputs?",
+        options: [
+          "The probabilities remain accurate because SMOTE preserves the original feature relationships between classes",
+          "The probabilities are inflated for the positive class — the model's intercept was calibrated for 50/50 priors, not the real 1/99 distribution",
+          "The probabilities are deflated for the positive class because SMOTE adds noise to the minority samples",
+        ],
+        correctIndex: 1,
+        explanation: "Logistic regression's intercept encodes the training class ratio. Training on a 50/50 resampled dataset teaches the model that positive and negative cases are equally likely, shifting the intercept accordingly. At deployment on a 1/99 distribution, the model outputs inflated positive-class probabilities — a transaction that is truly rare gets scored far above its real posterior. Fix with Platt scaling (CalibratedClassifierCV with method='sigmoid') fitted on a held-out unsampled validation set, or avoid oversampling by using class_weight='balanced' instead.",
+      },
+    ],
   },
-  knowledgeCheck: [
-    {
-      question: "A classifier achieves 99.5% accuracy on a fraud dataset where 0.5% of transactions are fraudulent. Why is this not impressive?",
-      options: [
-        "The accuracy threshold for fraud models should be 99.9% — 99.5% is below industry standard",
-        "A model that predicts 'not fraud' for every transaction achieves the same 99.5% accuracy — it has zero actual fraud detection ability",
-        "The model needs to be tested on more data before the accuracy is reliable",
-      ],
-      correctIndex: 1,
-      explanation: "The accuracy paradox: a trivial all-negative classifier matches the majority class rate. On a 99.5% non-fraud dataset, predicting 'not fraud' always gives 99.5% accuracy while catching zero fraud cases. Accuracy on imbalanced data reflects the majority class distribution, not model usefulness. Use recall, precision, F1, or PR-AUC on the fraud class.",
-    },
-    {
-      question: "What does SMOTE do differently from random oversampling to address the minority class?",
-      options: [
-        "SMOTE randomly duplicates existing minority samples until classes are balanced",
-        "SMOTE creates synthetic minority samples by interpolating between existing minority examples and their nearest minority neighbors, generating diverse new points",
-        "SMOTE removes majority class samples that are far from the decision boundary",
-      ],
-      correctIndex: 1,
-      explanation: "Random oversampling duplicates existing minority samples, causing the model to overfit to the same points. SMOTE generates new synthetic points by interpolating between each minority sample and its k nearest minority neighbors, creating diverse examples that help the model generalize. This reduces overfitting on the minority class while increasing its representation.",
-    },
-    {
-      question: "When should you adjust the classification threshold rather than resampling the data?",
-      options: [
-        "When you want to increase model accuracy on the majority class",
-        "When the model is already trained and you want to tune the precision/recall tradeoff for a specific operational requirement without retraining",
-        "When SMOTE has already been applied and you need a second layer of adjustment",
-      ],
-      correctIndex: 1,
-      explanation: "Threshold adjustment is a post-training technique: after training a calibrated model, lower the threshold to increase recall (catch more positives) at the cost of more false positives. This is operationally flexible — you can target a specific recall or precision level without retraining. Resampling changes training data and requires retraining; threshold adjustment doesn't.",
-    },
-  ],
-},
 
 "sd-p1": {
     durationLabel: "20 min",
