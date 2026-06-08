@@ -35355,545 +35355,981 @@ for user_id in all_users:
 },
 
 "ps-c1": {
-  durationLabel: "20 min",
-  outcomes: [
-    "Apply the 5-step metric drop diagnostic framework in interview conditions",
-    "Distinguish data pipeline issues from real metric changes",
-    "Segment by platform, geography, cohort, and feature to isolate root cause",
-    "Structure a clear, confident verbal answer with confidence level and next steps",
-  ],
-  learnMarkdown: `## Diagnosing a Metric Drop: Framework
-
-When a metric drops unexpectedly, the worst response is guessing. The best response is systematic: rule out instrumentation issues first, then segment to isolate the driver, then hypothesize causes.
-
----
-
-## 5-Step Diagnostic Framework
-
-### Step 1: Is it Real?
-Before investigating causes, verify the data is valid:
-- Check data pipeline completeness (is logging still running? any ETL failures?)
-- Look for impossible values (negative counts, click rate > 100%)
-- Compare to a second data source (GA vs internal DB)
-- Check if the sample size is sufficient to trust the reading
-
-If the data is bad, stop here and fix instrumentation. 80% of "metric drops" in production are logging bugs.
-
-### Step 2: Is it External?
-- Seasonality (holiday, day of week pattern, annual cycle)
-- Competitor action or PR event affecting user behavior
-- Macroeconomic event (recession, major news)
-- Platform change outside your control (iOS update, Google algorithm change)
-
-### Step 3: Segment Breakdown
-If the drop is real and not fully explained externally, segment along every available axis:
-- **Platform**: iOS vs Android vs Web — is the drop concentrated in one?
-- **Geography**: US vs international, specific regions
-- **User cohort**: new users vs returning users (last 30 days vs older)
-- **Feature/surface**: homepage vs search vs notification-driven sessions
-- **Time of day/week**: weekday vs weekend, hour of day
-
-The goal: find the segment where the drop is concentrated. That tells you which team owns the fix.
-
-### Step 4: Causal Event Timeline
-What changed in the last 48 hours?
-- Deployments (check the deploy log)
-- A/B experiment launches or stops
-- Marketing campaign starts or ends
-- Content moderation policy change
-- Infrastructure migration
-
-### Step 5: Hypothesis Ranking
-List hypotheses. Rank by probability × impact × ease of validation. Investigate the most probable hypothesis first.
-
----
-
-## Presenting Findings
-
-Structure: "I believe X happened (confidence: HIGH/MEDIUM), because [evidence]. The next step is [specific validation]. The team to engage is [team]."
-
-Never say "I don't know" without a next step. Even if you can't identify the root cause, you can always say which hypothesis you're testing next and what data would confirm or reject it.
-`,
-  video: null,
-  videoFallbackMarkdown: `## Deep Dive: Segmentation in Practice
-
-**The segmentation trap**: with many segments, some will show drops by random variation alone (multiple comparison problem). Before declaring a segment as the problem area, ensure the drop in that segment is significant and the drop in other segments is not significant. The pattern "drop concentrated in X, stable in Y and Z" is more convincing than "X dropped most."
-
-**Cohort analysis**: plot the metric for each weekly user acquisition cohort. If new cohorts (last 2 weeks) show the drop but older cohorts are stable, the problem is in acquisition quality or onboarding. If all cohorts drop simultaneously, the problem is a product change that affects all users.
-`,
-  tryGuidance: "No interactive viz — practice the full diagnostic framework on the interview scenarios below.",
-  interviewGraph: {
-    initialStageId: "ps_c1_stage1",
-    artifactDimensions: [
-      { label: "Data Validity Check", recoveryStageId: "ps_c1_rec1" },
-      { label: "Segmentation", recoveryStageId: "ps_c1_rec2" },
-      { label: "Root Cause Structure", recoveryStageId: "ps_c1_terminal", passLabel: "Diagnostic Mastery" },
+    durationLabel: "20 min",
+    outcomes: [
+      "Apply the 5-step metric drop diagnostic framework under interview pressure",
+      "Distinguish data pipeline failures from real product changes before investigating causes",
+      "Perform MECE dimensional breakdowns to isolate which segment is driving a drop",
+      "Generate hypotheses from data evidence rather than intuition",
+      "Structure a confident, confidence-rated verbal answer with clear next steps",
     ],
-    stages: {
-      ps_c1_stage1: {
-        id: "ps_c1_stage1",
-        type: "scenario_choice",
-        badge: "Stage 1",
-        title: "Stage 1 · First check",
-        prompt: "DAU dropped 20% on Monday morning. What is your very first investigation step?",
-        choices: [
-          { id: "a", label: "Immediately check the deploy log for weekend releases", description: "Deployments are a possible cause but you haven't verified the data is real yet." },
-          { id: "b", label: "Verify the data is real: check logging pipeline health, look for ETL failures, compare to a second source, check for impossible values", description: "Most production metric drops are logging bugs, not real product issues." },
-          { id: "c", label: "Segment by platform to find where the drop is concentrated", description: "Segmentation is step 3 — do data validation first." },
-        ],
-        branches: { a: "ps_c1_rec1", b: "ps_c1_stage2", c: "ps_c1_rec1" },
-        rationale: "B is correct. The number one cause of sudden large metric drops in production is data pipeline failure — ETL jobs failing, logging breaking, or an instrumentation bug. Validating the data takes 5 minutes and saves hours of unnecessary investigation.",
-      },
-      ps_c1_rec1: {
-        id: "ps_c1_rec1",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · Data validity first",
-        prompt: "Why check data validity before investigating product causes?",
-        choices: [
-          { id: "a", label: "Most large sudden metric drops are logging or pipeline failures, not product changes — validating data first prevents wasted investigation", description: "5 minutes of data validation can save hours of root cause analysis." },
-        ],
-        branches: { a: "ps_c1_stage2" },
-        rationale: "In production, 70-80% of sudden large drops are instrumentation failures. Check the data first.",
-      },
-      ps_c1_stage2: {
-        id: "ps_c1_stage2",
-        type: "scenario_choice",
-        badge: "Stage 2",
-        title: "Stage 2 · Segment the drop",
-        prompt: "Data is valid. DAU is genuinely down 20%. You check platforms: iOS down 35%, Android flat, Web flat. What does this tell you?",
-        choices: [
-          { id: "a", label: "The whole product is broken — 20% drop is severe", description: "The concentration tells you which surface is affected." },
-          { id: "b", label: "The problem is iOS-specific — the drop is concentrated in iOS, Android and Web are unaffected — check iOS-specific changes (App Store update, iOS system change, iOS-specific code path)", description: "Platform concentration dramatically narrows the hypothesis space." },
-          { id: "c", label: "iOS users are more engaged so the drop appears larger there", description: "iOS users being more engaged doesn't explain a 35% platform-specific drop." },
-        ],
-        branches: { a: "ps_c1_rec2", b: "ps_c1_stage3", c: "ps_c1_rec2" },
-        rationale: "B is correct. iOS concentration means the problem is in the iOS code path, iOS system, or App Store. Android and Web being flat rules out server-side issues, database problems, and most feature changes. Check: was there an iOS app version release? A new iOS system update? A push notification failing only on iOS?",
-      },
-      ps_c1_rec2: {
-        id: "ps_c1_rec2",
-        type: "scenario_choice",
-        badge: "Recovery 2",
-        title: "Recovery 2 · Segmentation value",
-        prompt: "What does segment concentration in a metric drop tell you?",
-        choices: [
-          { id: "a", label: "It narrows the hypothesis space — the root cause must be in a system that affects only that segment, ruling out shared infrastructure problems", description: "Concentration = clue to the causal pathway." },
-        ],
-        branches: { a: "ps_c1_stage3" },
-        rationale: "Segment concentration dramatically reduces the number of hypotheses to investigate. A platform-specific drop rules out backend issues, marketing changes, and most feature releases.",
-      },
-      ps_c1_stage3: {
-        id: "ps_c1_stage3",
-        type: "scenario_choice",
-        badge: "Stage 3",
-        title: "Stage 3 · Framing the answer",
-        prompt: "You've found the drop is iOS-specific and correlates with an iOS app update pushed Sunday night. How do you present this finding?",
-        choices: [
-          { id: "a", label: "Say: 'I found a bug in the iOS update' without further evidence", description: "Don't over-conclude beyond your evidence." },
-          { id: "b", label: "Say: 'High confidence the iOS app update (v3.2.1) released Sunday is the root cause — DAU dropped 35% on iOS within 6 hours of release while Android/Web are flat. Next step: review v3.2.1 changelog with iOS engineering, consider rollback if critical path is broken.'", description: "State confidence level, evidence chain, and next steps." },
-        ],
-        branches: { a: "ps_c1_stage3", b: "ps_c1_stage3" },
-        terminal: true,
-        rationale: "B is the correct structure. A diagnostic finding should include: confidence level (high/medium/low), the evidence that supports it (timing correlation, segment concentration), what would confirm or refute it, and the immediate next step. This gives stakeholders the information they need to make a decision.",
+    learnMarkdown: `## Diagnosing a Metric Drop
+
+When a metric drops, most people ask the wrong question first. Their instinct is: *"What changed?"* That's premature. Before you can answer *what* changed, you need to answer *where* in the funnel, *for which users*, *on which surface*, and *since exactly when* the drop started. Only with those four constraints does "what changed?" have a precise, tractable answer. This is the discipline that separates senior analysts from junior ones.
+
+---
+
+## The 5-Step Diagnostic Framework
+
+### Step 1: Verify the Data Isn't Broken
+
+Before investigating causes, confirm the drop is real. In production, the majority of sudden large metric drops are instrumentation failures, not product changes.
+
+Concrete tactics:
+- **Pipeline health**: check ETL job status, look for ingestion lag or failed runs
+- **Impossibility checks**: negative counts, click-through rates above 100%, or null user IDs are data artifacts, not user behavior
+- **Second-source comparison**: compare server-side event counts to client-side SDK counts — divergence signals a logging bug
+- **Sample size sanity**: a 3% drop in a segment with 200 users is noise; compute a confidence interval before declaring a drop
+
+If the data is broken, stop here. Every hour investigating a phantom drop is an hour of wasted engineering.
+
+### Step 2: Nail the Timing
+
+Pin down exactly when the drop started. "This week versus last week" is too coarse — you want day-level precision at minimum.
+
+Concrete tactics:
+- Plot the metric at **daily granularity** for the last 14 days to find the exact inflection point
+- Check for **day-of-week effects**: a "Monday drop" that recovers Tuesday may be normal weekend seasonality
+- Compare to the **same weekday four weeks prior**, not the prior day, to control for weekly cycles
+- The timing tells you which window to search in the deploy log
+
+### Step 3: Segment the Drop
+
+Once you have the *when*, segment along every axis available. The goal is the **concentration point** — the slice where the drop is severe while other slices are flat. Concentration is your primary diagnostic signal.
+
+Segment axes in priority order:
+- **Platform** — iOS / Android / Web. A platform-specific drop rules out backend and server-side causes
+- **Geography** — US vs international. A US-only drop often points to a US-specific CDN issue, campaign, or rollout
+- **User cohort** — new users (last 30 days) vs returning users. New-cohort-only drops point to onboarding; all-cohort drops point to a product-wide change
+- **Feature surface** — homepage vs search vs checkout vs notification-driven sessions
+
+Apply the **MECE principle**: check iOS *and* Android *and* Web and confirm they sum to the total. A platform-specific drop in iOS with Android and Web flat rules out backend APIs, database issues, and most feature releases in a single step.
+
+### Step 4: Generate Hypotheses From What the Data Shows
+
+Only now — after timing and segmentation — do you ask "what changed?" Your segment result tells you *which universe* of changes to search.
+
+For each concentration found:
+- **Internal check**: deploy log, experiment launch log, pipeline change log for the exact window. Look for deployments, A/B experiment starts/stops, feature flags, marketing campaigns, infrastructure migrations
+- **External check**: seasonality (holiday, weekly cycle), competitor actions, platform changes (iOS update, App Store policy, Google algorithm change)
+
+Rank hypotheses by **probability × ease of validation**. A 60%-likely hypothesis you can confirm in 10 minutes beats a 90%-likely one requiring a full audit.
+
+### Step 5: Test Hypotheses
+
+For each hypothesis, specify three things:
+1. **The prediction** — if hypothesis H is true, what pattern should appear in the data?
+2. **The check** — what specific query or log lookup confirms or refutes it?
+3. **The outcome** — if confirmed, what is the mitigation? If refuted, what is next?
+
+This prevents "hypothesis drift" — endlessly re-explaining new evidence with the same preferred narrative.
+
+---
+
+## Presenting Your Findings
+
+Structure: *"My [HIGH / MEDIUM / LOW] confidence conclusion is X, because [evidence: timing, segment, event correlation]. The next step to confirm is [specific check]. If confirmed, the team to engage is [team] and the mitigation is [action]."*
+
+Never say "I don't know" without a next step. Even 40% confidence with a clear validation path is a useful answer.
+
+---
+
+## Interview-Ready Summary
+
+The 5-step metric drop framework:
+
+- **Step 1 — Verify the data**: check pipeline health, impossibility values, second-source comparison, sample size. Most large sudden drops are instrumentation failures.
+- **Step 2 — Nail the timing**: plot at daily granularity, compare to same weekday 4 weeks prior, find the exact inflection point. Timing constrains which events to investigate.
+- **Step 3 — Segment the drop**: MECE breakdown by platform, geography, cohort, device, surface. Find where the drop is concentrated; flat segments rule out shared causes.
+- **Step 4 — Hypothesize from evidence**: only after timing + segment do you ask "what changed?" Internal check: deploy log, experiment launches, pipeline changes. External check: seasonality, competitor events, platform changes. Rank by probability × ease of validation.
+- **Step 5 — Test hypotheses**: for each, state the prediction, the check, and the outcome. Eliminate one at a time.
+- **Present findings** with confidence level, evidence chain, next step, and team to engage.
+`,
+    video: null,
+    videoFallbackMarkdown: `## Interview Traps in Metric Drop Questions
+
+Interviewers who ask metric drop questions are evaluating two things simultaneously: your analytical process and your communication discipline. Most candidates fail on process, not knowledge. Here are the most common traps.
+
+**Trap 1: Jumping to hypotheses before data validation.**
+The single most common failure mode. A candidate hears "conversion dropped 15%" and immediately starts generating hypotheses about product bugs, marketing changes, or seasonality. They've skipped the most important step. The interviewer notes: *"Didn't check data quality first."* Always open with: "My first step would be to verify the data is real — check pipeline health, look for ETL failures, compare to a second source. Most sudden large drops I've seen in production were logging bugs, not product changes."
+
+**Trap 2: Stopping after the first explanation.**
+A candidate finds a platform-specific drop (iOS down, Android flat) and declares "it must be the iOS app update." That's a plausible hypothesis, not a conclusion. A strong candidate continues: "That's my leading hypothesis because of the timing and platform concentration. To confirm, I'd review the iOS v3.2.1 changelog with engineering and check whether the drop correlates with the app update's rollout percentage. I'd also rule out an iOS system update causing it, since that would affect all iOS apps, not just ours."
+
+**Trap 3: Ignoring seasonality as a first-order explanation.**
+Seasonality is underrated by candidates who over-index on product changes. Before any investigation, ask: "What day of the week did the drop occur? Is this a holiday period? Is this a time when we typically see this pattern?" A Monday drop that recovers by Tuesday is often just weekend seasonality — the cohort that usually drives the metric (e.g., B2B users) doesn't use the product on weekends.
+
+**The "did anything change?" internal check.**
+Before going deep into data, ask your PM or engineering lead: "Were there any deployments, experiment launches, data pipeline changes, or infrastructure migrations in the 24–48 hours before the drop?" This takes 30 seconds and often surfaces the answer immediately. Failing to do this internal check before building elaborate hypotheses is a sign of inexperience.
+
+**Always ask: "What is the comparison period?"**
+Before starting any analysis, confirm: "When you say 'dropped 15%,' what is the baseline? Day-over-day? Week-over-week? Month-over-month? Versus forecast?" The comparison period dramatically changes the analysis. A 15% drop week-over-week for a B2C product on a summer Friday may be expected. A 15% drop versus the prior 4-week average on a regular Tuesday is alarming. Never assume — always ask.
+`,
+    tryGuidance: "Work through the investigation stages below. The click-target stage asks you to spot a diagnostic gap in a SQL query. The scenario stages mirror real PM and DS interview questions about metric drops.",
+    interviewGraph: {
+      initialStageId: "ps_c1_query_review",
+      artifactDimensions: [
+        { label: "Data Validity Check", recoveryStageId: "ps_c1_rec_validity" },
+        { label: "Segmentation Discipline", recoveryStageId: "ps_c1_rec_segment" },
+        { label: "Hypothesis Rigor", recoveryStageId: "ps_c1_rec_hypothesis" },
+        { label: "Root Cause Structure", recoveryStageId: "ps_c1_terminal", passLabel: "Diagnostic Mastery" },
+      ],
+      stages: {
+        ps_c1_query_review: {
+          id: "ps_c1_query_review",
+          type: "click_target",
+          badge: "Stage 1",
+          title: "Stage 1 · Query Review",
+          prompt: "Your PM sends a Slack message: 'Conversion dropped 15% — can you dig in?' A colleague shares this investigation query. Identify the most critical analytical gap before you can use these results.",
+          code_snippet: `-- Metric Drop Investigation
+-- "Conversion dropped 15%" — PM Slack message
+
+SELECT
+    platform,
+    country,
+    COUNT(DISTINCT user_id)         AS visitors,
+    COUNT(DISTINCT order_id)        AS orders,
+    COUNT(DISTINCT order_id) * 1.0
+      / COUNT(DISTINCT user_id)     AS conversion_rate
+FROM events
+WHERE event_date >= '2024-01-01'    -- ds-target:ps_c1_no_time_segment
+  AND event_type IN ('page_view', 'purchase')
+GROUP BY platform, country
+ORDER BY conversion_rate ASC`,
+          validationCopy: {
+            ps_c1_no_time_segment: "The query aggregates all of January into a single snapshot. Without a time comparison (e.g., this week vs last week, or daily trend), you cannot see when the drop started, how large it is, or whether it is recovering. You need a time-windowed comparison — at minimum a WHERE clause that separates a 'current' period from a 'prior' period — before this query tells you anything about a drop.",
+          },
+          branches: {
+            ps_c1_no_time_segment: "ps_c1_stage2",
+          },
+        },
+
+        ps_c1_stage2: {
+          id: "ps_c1_stage2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Recovery Anomaly",
+          prompt: "Conversion dropped 15% on Monday. By Tuesday it had fully recovered to baseline. No code was deployed over the weekend. What is your first hypothesis?",
+          choices: [
+            { id: "a", label: "A/B experiment launched Monday that hurt conversion, then was rolled back Tuesday night", description: "Possible, but a full recovery within 24 hours without a rollback in the deploy log makes this less likely than a simpler explanation." },
+            { id: "b", label: "A data pipeline issue — the Monday data was incomplete or delayed, making conversion appear lower than reality. The 'recovery' is actually Tuesday's complete data arriving.", description: "A drop that perfectly recovers the next day, with no product changes, almost always points to an instrumentation or pipeline issue rather than a real user behavior change." },
+            { id: "c", label: "Monday is naturally lower conversion due to weekly seasonality, so the drop is expected", description: "Weekly seasonality is real, but a 15% drop would be unusually large for a day-of-week effect alone — and wouldn't be called a 'drop' unless it was anomalous versus prior Mondays." },
+            { id: "d", label: "A competitor launched a major promotion on Monday that drew users away, then it ended", description: "Competitor effects rarely resolve in exactly 24 hours and rarely cause a 15% swing with perfect next-day recovery." },
+          ],
+          branches: { a: "ps_c1_rec_validity", b: "ps_c1_stage3", c: "ps_c1_rec_validity", d: "ps_c1_rec_validity" },
+          rationale: "B is correct. A drop that perfectly recovers the next day with no product changes is the textbook signature of a data pipeline issue — delayed ingestion, a Monday ETL job that failed and backfilled by Tuesday, or a logging gap that filled in overnight. Real user behavior changes (bugs, competitor actions, experiments) do not reverse cleanly in 24 hours. Step 1 of the framework — verify the data — is precisely for catching this.",
+        },
+
+        ps_c1_rec_validity: {
+          id: "ps_c1_rec_validity",
+          type: "scenario_choice",
+          badge: "Recovery A",
+          title: "Recovery · Data Validity Check",
+          prompt: "Why should data validity be checked before investigating product causes — even when stakeholders are pressuring you for a root cause immediately?",
+          choices: [
+            { id: "a", label: "Because spending hours investigating product hypotheses on broken data wastes engineering time and erodes trust when the real cause turns out to be a logging bug", description: "A 5-minute pipeline check prevents hours of false investigation." },
+            { id: "b", label: "Because data validation is a formality that looks thorough, even though the real cause is almost always a product change", description: "This reverses the actual probability — instrumentation failures are more common than product-change-driven drops of the same magnitude." },
+            { id: "c", label: "Because stakeholders won't trust your analysis unless you mention it, regardless of whether it matters", description: "The reason to check data validity is epistemic, not performative." },
+          ],
+          branches: { a: "ps_c1_stage3", b: "ps_c1_stage3", c: "ps_c1_stage3" },
+          rationale: "A is correct. In production, the majority of sudden large metric drops are instrumentation failures. A 5-minute pipeline health check before launching a full investigation is the highest-ROI action in the entire framework.",
+        },
+
+        ps_c1_stage3: {
+          id: "ps_c1_stage3",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · Segmentation Signal",
+          prompt: "Data is confirmed valid. DAU is down 20% overall. You run a platform breakdown: iOS −35%, Android −2% (within noise), Web −1% (within noise). What is the correct inference and next action?",
+          choices: [
+            { id: "a", label: "The whole product is broken — 20% overall is a severe drop that requires a full-stack investigation across all platforms", description: "The overall number is a mix of the platform signals. The platform breakdown is the more informative view." },
+            { id: "b", label: "iOS is driving essentially the entire drop. Android and Web being flat rules out backend, database, and server-side causes. Narrow immediately to iOS-specific changes: App Store release, iOS system update, iOS-specific code path, push notification system", description: "Platform concentration eliminates entire categories of hypotheses — this is the value of segmentation." },
+            { id: "c", label: "iOS users are higher-engagement users so a smaller absolute problem shows up as a larger percentage drop on iOS", description: "Higher engagement doesn't explain a 35% platform-specific drop when the other platforms are flat — that would predict elevated iOS percentage but not a 35-point swing." },
+            { id: "d", label: "Segment further by geography before drawing any conclusions from the platform data", description: "Geography is a useful next dimension, but the platform concentration is already a strong signal worth acting on. Don't delay by requiring every possible segment before forming a hypothesis." },
+          ],
+          branches: { a: "ps_c1_rec_segment", b: "ps_c1_stage4", c: "ps_c1_rec_segment", d: "ps_c1_rec_segment" },
+          rationale: "B is correct. iOS −35% with Android and Web flat is a decisive signal. It rules out: backend APIs (all platforms would be affected), database issues (same), marketing spend changes (same), and most feature launches (typically web-first or cross-platform). The investigation scope collapses to: iOS app updates, iOS OS updates, iOS SDK changes, push notification infrastructure, and App Store changes. This is the power of MECE platform segmentation.",
+        },
+
+        ps_c1_rec_segment: {
+          id: "ps_c1_rec_segment",
+          type: "scenario_choice",
+          badge: "Recovery B",
+          title: "Recovery · Segmentation Discipline",
+          prompt: "A metric drops 18% overall. Platform breakdown shows Mobile −22%, Desktop −4%. What does this tell you about where to look?",
+          choices: [
+            { id: "a", label: "Mobile is driving the drop. Desktop being relatively flat narrows the cause to mobile-specific systems: mobile app releases, mobile push, mobile web rendering, or mobile-specific experiments", description: "Concentration = the causal pathway must pass through systems that affect mobile but not desktop." },
+            { id: "b", label: "Both platforms dropped so the cause must be cross-platform — investigate backend first", description: "A −22% vs −4% split is not 'both dropped equally.' The concentration is in mobile." },
+            { id: "c", label: "The 18% overall drop is more important than the platform breakdown — focus on overall recovery", description: "The overall number is what the PM cares about, but the platform breakdown is what tells you where the fix lives." },
+            { id: "d", label: "Segment by geography next before concluding anything about mobile", description: "Geography is a useful next step, but the mobile concentration is already a clear signal that should drive immediate hypothesis generation." },
+          ],
+          branches: { a: "ps_c1_stage4", b: "ps_c1_stage4", c: "ps_c1_stage4", d: "ps_c1_stage4" },
+          rationale: "A is the strongest answer. Concentration in mobile means the fix lives in the mobile stack. This is the core value of segmentation: it collapses the hypothesis space from 'everything' to 'systems that affect mobile but not desktop.'",
+        },
+
+        ps_c1_stage4: {
+          id: "ps_c1_stage4",
+          type: "scenario_choice",
+          badge: "Stage 4",
+          title: "Stage 4 · Hypothesis Generation",
+          prompt: "iOS DAU drop confirmed. You check the deploy log and find: iOS app v4.1.2 was released Saturday at 11pm. The drop begins Sunday at 2am — 3 hours after the release. What is the strongest hypothesis, and what would refute it?",
+          choices: [
+            { id: "a", label: "Hypothesis: v4.1.2 introduced a crash or blocking bug affecting DAU. Refutation: if the iOS crash rate (from Crashlytics or Firebase) did NOT spike at 2am, the release is likely not the cause — and you'd look at an iOS system update instead.", description: "Specific, falsifiable hypotheses with refutation conditions are what interviewers are looking for." },
+            { id: "b", label: "Hypothesis: v4.1.2 is the cause — the timing is too close to be coincidence. I'd recommend rolling back immediately.", description: "Correlation without a refutation condition is not a complete hypothesis. And recommending rollback before confirming the cause risks reverting unrelated beneficial changes." },
+            { id: "c", label: "Hypothesis: iOS 17.3 system update was pushed by Apple on Saturday and is the actual cause. The app release is a red herring.", description: "An iOS system update is a valid hypothesis, but the 3-hour timing correlation with the app release is a stronger prior — start with the internal change before assuming external." },
+            { id: "d", label: "Can't conclude anything from timing correlation alone — need to run a regression analysis before forming a hypothesis", description: "Regression analysis is appropriate for long-term trend investigation, not acute metric drops where the goal is rapid root cause isolation." },
+          ],
+          branches: { a: "ps_c1_stage5", b: "ps_c1_rec_hypothesis", c: "ps_c1_rec_hypothesis", d: "ps_c1_rec_hypothesis" },
+          rationale: "A is correct. A strong hypothesis has three components: the claim (v4.1.2 introduced a bug), the supporting evidence (3-hour timing correlation, iOS-specific concentration), and the refutation condition (if crash rate didn't spike, this is not the cause — look elsewhere). The refutation condition is what makes a hypothesis scientific rather than a narrative.",
+        },
+
+        ps_c1_rec_hypothesis: {
+          id: "ps_c1_rec_hypothesis",
+          type: "scenario_choice",
+          badge: "Recovery C",
+          title: "Recovery · Hypothesis Rigor",
+          prompt: "What makes a diagnostic hypothesis 'strong' in an interview or real investigation context?",
+          choices: [
+            { id: "a", label: "It is specific, supported by the segmentation and timing evidence, and includes a refutation condition — a check that, if negative, would rule it out and point to the next hypothesis", description: "A hypothesis without a refutation condition is a narrative, not a scientific claim." },
+            { id: "b", label: "It is the most dramatic explanation, which signals analytical creativity to the interviewer", description: "Dramatic explanations are usually lower-probability. Strong hypotheses are the most parsimonious explanation of the evidence." },
+            { id: "c", label: "It is the simplest possible explanation, regardless of whether it fits all the data", description: "Parsimony is valuable, but not at the cost of ignoring evidence. A strong hypothesis fits the observed segment concentration and timing." },
+            { id: "d", label: "It is validated before being stated, so you never say anything that might be wrong", description: "In a live interview and in real incidents, you state hypotheses before full validation — that is what drives the next investigative step." },
+          ],
+          branches: { a: "ps_c1_stage5", b: "ps_c1_stage5", c: "ps_c1_stage5", d: "ps_c1_stage5" },
+          rationale: "A is correct. Specificity, evidence grounding, and a refutation condition are the three marks of a strong diagnostic hypothesis. This structure lets you eliminate hypotheses systematically rather than chasing narratives.",
+        },
+
+        ps_c1_stage5: {
+          id: "ps_c1_stage5",
+          type: "scenario_choice",
+          badge: "Stage 5",
+          title: "Stage 5 · Presenting the Finding",
+          prompt: "You've completed the investigation: iOS DAU dropped 35% starting Sunday 2am, 3 hours after v4.1.2 release. Crash rate spiked 4x in the affected cohort. You are 85% confident this is the root cause. How do you present this to the PM?",
+          choices: [
+            { id: "a", label: "Say: 'I found a bug in the iOS update' and recommend a rollback.", description: "Too brief — no evidence chain, no confidence level, no next step beyond rollback. The PM cannot act confidently on this." },
+            { id: "b", label: "Say: 'High confidence the iOS app update v4.1.2, released Saturday 11pm, is the root cause. DAU dropped 35% on iOS starting 3 hours after release while Android and Web are flat. Crash rate spiked 4x in the same window — this is the confirmation. Recommended next step: iOS engineering reviews the v4.1.2 changelog immediately and prepares a hotfix or rollback. I'll monitor DAU hourly to track recovery.'", description: "Confidence level + evidence chain + confirmation data + recommended action + monitoring plan — this is the complete answer structure." },
+            { id: "c", label: "Present all hypotheses you considered, ranked by probability, and let the PM choose which to act on.", description: "Presenting ranked hypotheses without a recommendation abdicates the analytical role. The PM wants your conclusion, not your working notes." },
+            { id: "d", label: "Wait until you have 100% certainty before presenting findings, to avoid being wrong.", description: "Waiting for 100% certainty while DAU is down 35% is costly. 85% confidence with a clear evidence chain and next step is actionable — present it now." },
+          ],
+          branches: { a: "ps_c1_terminal", b: "ps_c1_terminal", c: "ps_c1_terminal", d: "ps_c1_terminal" },
+          terminal: true,
+          rationale: "B is the complete answer. A strong diagnostic presentation includes: confidence level (HIGH/MEDIUM/LOW), the evidence chain (timing correlation, segment concentration, confirming signal), the recommended action (hotfix/rollback), and a monitoring plan. This gives stakeholders everything they need to make a decision without requiring them to ask follow-up questions.",
+        },
+
+        ps_c1_terminal: {
+          id: "ps_c1_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Framework Complete",
+          prompt: "You've worked through all 5 steps of the metric drop diagnostic framework. Which step do most interview candidates skip — and what signal does that send to the interviewer?",
+          choices: [
+            { id: "a", label: "Step 1 (data validity). Skipping it signals you don't distinguish between instrumentation failures and real product changes — a fundamental gap in production analytics experience.", description: "Interviewers specifically watch for whether candidates validate data before hypothesizing." },
+            { id: "b", label: "Step 3 (segmentation). Skipping it signals you don't know how to use dimensional analysis to narrow hypothesis space.", description: "Segmentation is also commonly skipped, but data validation is the step skipped most often and with the most costly consequences." },
+            { id: "c", label: "Step 5 (structured presentation). Skipping it signals you can't communicate findings to non-technical stakeholders.", description: "Presentation structure matters, but the analytical gap from skipping data validation is more fundamental." },
+          ],
+          branches: { a: "ps_c1_terminal", b: "ps_c1_terminal", c: "ps_c1_terminal" },
+          terminal: true,
+          rationale: "A is correct. Step 1 — data validity — is the most frequently skipped step in interviews and the most costly to skip in production. Experienced analysts check the instrumentation first because they know how often 'metric drops' are actually logging failures. Demonstrating this instinct in an interview signals production experience.",
+        },
       },
     },
+    knowledgeCheck: [
+      {
+        question: "A metric drops 20% on a Tuesday and fully recovers by Wednesday morning. No code was deployed. What is the most likely explanation?",
+        options: [
+          "A competitor ran a flash promotion on Tuesday that ended overnight",
+          "A data pipeline or ETL issue caused Tuesday's data to be incomplete; the recovery is the delayed data arriving",
+          "Tuesday is a naturally low day due to day-of-week seasonality",
+        ],
+        correctIndex: 1,
+        explanation: "A drop that fully recovers in 24 hours with no product changes is the textbook signature of a data pipeline issue — delayed ingestion, an ETL job that failed and backfilled, or a logging gap. Real user behavior changes do not reverse cleanly overnight. Step 1 of the framework — verify the data — exists precisely to catch this before you spend hours investigating phantom product bugs.",
+      },
+      {
+        question: "Overall conversion dropped 18%. Platform breakdown: Mobile −24%, Desktop −3% (within noise). What is the correct next action?",
+        options: [
+          "Investigate backend APIs first since the overall drop affects all platforms",
+          "Narrow investigation to mobile-specific systems — app releases, push notifications, mobile web — since Desktop being flat rules out shared backend causes",
+          "Run a full regression analysis across all dimensions before forming any hypotheses",
+        ],
+        correctIndex: 1,
+        explanation: "Mobile −24% with Desktop −3% (noise) concentrates the cause in the mobile stack. Desktop being flat rules out backend APIs, databases, and cross-platform feature changes. The investigation scope collapses to systems that affect mobile but not desktop: app releases, mobile push, mobile web rendering, mobile-specific experiments. This is the core value of MECE platform segmentation — it eliminates entire hypothesis categories.",
+      },
+      {
+        question: "You are 75% confident that an iOS app release caused a DAU drop. The PM asks for your conclusion. What should you say?",
+        options: [
+          "Wait until you are 100% confident before presenting any conclusion",
+          "Present all your hypotheses without a recommendation and let the PM decide",
+          "State 'Medium-high confidence the v4.1.2 iOS release is the root cause,' give the evidence chain, and recommend a specific next step to confirm while preparing a rollback",
+        ],
+        correctIndex: 2,
+        explanation: "75% confidence with a clear evidence chain and a validation next step is fully actionable. Waiting for 100% certainty while DAU is down costs the business. Presenting hypotheses without a recommendation abdicates your analytical role. The correct structure: confidence level + evidence + next confirmation step + recommended preparation action. This is what senior analysts do.",
+      },
+    ],
   },
-  knowledgeCheck: [
-    {
-      question: "What is the most common cause of a sudden large metric drop in a production system?",
-      options: [
-        "A major product bug that affects all users simultaneously",
-        "A data pipeline failure, logging bug, or ETL error — validating data health should always be the first step",
-        "Competitor actions drawing users away",
-      ],
-      correctIndex: 1,
-      explanation: "In production, the majority of sudden large metric drops are instrumentation failures — ETL jobs break, logging events stop firing, database ingestion fails. Before investigating product causes, verify the data is real: check pipeline health, look for duplicate/missing events, compare to a second data source.",
-    },
-    {
-      question: "DAU dropped 15%. Web platform is down 30%, iOS is down 5%, Android is flat. Where do you focus investigation?",
-      options: [
-        "Focus on iOS since it affects more users globally",
-        "Focus on Web — the drop is concentrated there, implying the root cause is in the Web code path or Web-specific infrastructure",
-        "Investigate all three platforms equally",
-      ],
-      correctIndex: 1,
-      explanation: "Segment concentration is your primary diagnostic signal. A 30% Web drop with flat Android and slight iOS movement points to a Web-specific cause: a Web frontend deploy, a CDN issue, a web-only A/B experiment. Investigating all three equally wastes time — follow the signal to where the drop is concentrated.",
-    },
-    {
-      question: "After investigation, you're 70% confident a bad deploy caused the drop but can't fully confirm yet. How should you frame this?",
-      options: [
-        "Say nothing until you have 100% certainty",
-        "State: 'Medium confidence — the drop correlates with deploy X in timing and segment concentration. Next step: review the deploy diff with engineering. Recommend rollback preparation while we confirm.'",
-        "Report the drop without any hypothesis to avoid being wrong",
-      ],
-      correctIndex: 1,
-      explanation: "In a real incident investigation, 70% confidence with a clear next step is actionable. Waiting for 100% certainty while DAU is down 15% is costly. The correct frame: state your confidence level explicitly, present the supporting evidence, identify what would confirm or refute, and recommend a parallel preparation (rollback readiness) while confirmation proceeds.",
-    },
-  ],
-},
 
 "ps-c2": {
-  durationLabel: "15 min",
-  outcomes: [
-    "Apply the build vs buy decision matrix using core competency and cost dimensions",
-    "Calculate total cost of build including maintenance and opportunity cost",
-    "Assess vendor lock-in risks for critical infrastructure",
-    "Answer the five key questions that structure any build vs buy decision",
-  ],
-  learnMarkdown: `## Build vs Buy Decisions
-
-Every DS and ML engineer eventually faces this question: should we build this component internally or buy/use an existing solution?
-
----
-
-## The Decision Matrix
-
-Two key dimensions:
-1. **Core competency vs commodity**: is this something that differentiates your product, or is it table-stakes infrastructure everyone has?
-2. **Build cost vs buy cost**: what does it cost to build AND maintain vs. license and integrate?
-
-| | Core Competency | Commodity |
-|---|---|---|
-| **Low build cost** | Build — this is your moat | Evaluate carefully — buy may still be faster |
-| **High build cost** | Build — but budget carefully | Buy — don't build what you can buy |
-
----
-
-## True Cost of Building
-
-Most teams underestimate build cost:
-- **Initial development**: the estimate everyone gives
-- **Ongoing maintenance**: ~20–40% of initial dev cost per year
-- **Operational burden**: oncall, incidents, upgrades
-- **Opportunity cost**: the other features your team didn't build instead
-
-Example: building an experiment platform takes 6 months of engineering. Buying Optimizely costs $50K/year. If your eng team costs $300K/year fully loaded, 6 months = $150K + ~$60K/year maintenance. Payback period: 2–3 years, during which your team built 0 other features.
-
----
-
-## Vendor Lock-In Risks
-
-Vendor lock-in occurs when migrating away from a vendor becomes prohibitively expensive:
-- API proprietary formats (hard to switch)
-- Data stored in vendor-specific formats (export costs and incompatibilities)
-- Contract terms that increase over time
-- Vendor discontinuation or acquisition
-
-Mitigation:
-- Abstract the vendor behind an interface layer
-- Ensure you own your data and can export it
-- Use open standards where possible (ONNX for models, Parquet for data)
-- Negotiate migration provisions in contracts
-
----
-
-## The 5 Key Questions
-
-1. **Is this differentiating?** Would you lose competitive advantage if a competitor used the same vendor?
-2. **What's the frequency of use?** Build overhead is only justified for core, frequently-used infrastructure.
-3. **What's your team's expertise?** Buying gets you expert-built software; building requires building that expertise.
-4. **What's the timeline pressure?** Buy to launch fast; build to own long-term.
-5. **What's the total cost including maintenance?** Don't compare initial build cost to annual license — compare 3-year TCO.
-
----
-
-## Common DS Examples
-
-| Component | Typical recommendation |
-|-----------|----------------------|
-| Experiment platform | Buy (Optimizely, Statsig) for most teams; build only at Google/Netflix scale |
-| Feature store | Buy (Tecton, Feast-managed) unless you have 10+ ML teams |
-| ML monitoring | Buy (Arize, WhyLabs) for teams <5 ML engineers |
-| Data warehouse | Buy (Snowflake, BigQuery) — always |
-| Custom model | Build — this is your differentiator |
-`,
-  video: null,
-  videoFallbackMarkdown: `## Deep Dive: Open Source vs Commercial
-
-A third option exists between build and buy: open source. Feast (feature store), MLflow (experiment tracking), Airflow (orchestration), dbt (data transformation) are free to use but require operational investment.
-
-The open source cost equation: licensing is zero, but engineering operational burden is real. A team of 3 running their own Airflow cluster spends ~15% of time on Airflow operations (upgrades, incidents, scale). That 15% × 3 engineers × salary is your "build" cost.
-
-Managed open source (e.g., managed Airflow on Cloud Composer, managed MLflow on Databricks) is a middle path: open standards, reduced operational burden, but still a licensing cost.
-`,
-  tryGuidance: "No interactive viz — practice the build vs buy decision scenarios in the interview simulation.",
-  interviewGraph: {
-    initialStageId: "ps_c2_stage1",
-    artifactDimensions: [
-      { label: "Cost Analysis", recoveryStageId: "ps_c2_rec1" },
-      { label: "Strategic Fit", recoveryStageId: "ps_c2_terminal", passLabel: "Build/Buy Judgment" },
+    durationLabel: "20 min",
+    outcomes: [
+      "Apply the five-dimension decision framework to any build vs buy scenario",
+      "Calculate true total cost of ownership including opportunity cost and maintenance burden",
+      "Identify when building is the right call based on core competency and competitive differentiation",
+      "Recognize vendor lock-in risks and implement mitigation strategies using abstraction layers",
+      "Articulate the hybrid 'buy foundation, build differentiation' pattern used by leading data teams",
     ],
-    stages: {
-      ps_c2_stage1: {
-        id: "ps_c2_stage1",
-        type: "scenario_choice",
-        badge: "Stage 1",
-        title: "Stage 1 · Feature store decision",
-        prompt: "Your 3-person ML team needs a feature store. Should you build one or buy Tecton ($120K/year)?",
-        choices: [
-          { id: "a", label: "Build — you'll have full control and no vendor lock-in", description: "Building a feature store is a multi-month project for a 3-person team." },
-          { id: "b", label: "Buy — a 3-person team building a feature store from scratch would spend 6+ months on infrastructure instead of models; $120K/year is cheaper than the opportunity cost", description: "Feature stores are complex infrastructure. Tecton or managed Feast is the right call for small teams." },
-          { id: "c", label: "Neither — wait until you have more data before deciding", description: "Waiting has its own cost: training-serving skew continues until addressed." },
-        ],
-        branches: { a: "ps_c2_rec1", b: "ps_c2_stage2", c: "ps_c2_rec1" },
-        rationale: "B is correct. A feature store is infrastructure, not competitive differentiation. A 3-person team building one from scratch spends 6+ months that could have been spent on model improvements. $120K/year for Tecton or similar is justified when the alternative is diverting 2 engineers for 6 months ($150K+ in opportunity cost, then $60K/year maintenance).",
-      },
-      ps_c2_rec1: {
-        id: "ps_c2_rec1",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · True build cost",
-        prompt: "When calculating build vs buy, what costs do teams typically undercount?",
-        choices: [
-          { id: "a", label: "Ongoing maintenance (20-40% of initial dev/year), operational burden (oncall, incidents), and opportunity cost of features not built instead", description: "The initial estimate is usually just dev time — ongoing costs easily double the 3-year TCO." },
-        ],
-        branches: { a: "ps_c2_stage2" },
-        rationale: "Build decisions usually compare initial dev cost vs annual license. The full 3-year TCO comparison should include maintenance, operations, and what your team didn't build instead.",
-      },
-      ps_c2_stage2: {
-        id: "ps_c2_stage2",
-        type: "scenario_choice",
-        badge: "Stage 2",
-        title: "Stage 2 · Core competency test",
-        prompt: "Should a startup build its own data warehouse instead of using BigQuery to reduce costs?",
-        choices: [
-          { id: "a", label: "Yes — at scale the savings will be significant", description: "At startup scale, the team doesn't have the operational expertise for this." },
-          { id: "b", label: "No — a data warehouse engine is pure commodity infrastructure; building one would consume massive engineering resources with no competitive differentiation", description: "No startup has ever won by having a slightly better data warehouse than competitors." },
-        ],
-        branches: { a: "ps_c2_rec1", b: "ps_c2_terminal" },
-        rationale: "B is correct. A data warehouse is the clearest buy decision: pure commodity, extremely complex to build correctly, enormous operational burden, and zero differentiation. BigQuery, Snowflake, or Redshift are the standard answer. Every engineering hour spent on a custom data warehouse is an hour not spent on the actual product.",
-      },
-      ps_c2_terminal: {
-        id: "ps_c2_terminal",
-        type: "scenario_choice",
-        badge: "Complete",
-        title: "Complete · Build vs buy principle",
-        prompt: "What is the core question that determines whether to build or buy?",
-        choices: [
-          { id: "a", label: "Is this component core to your competitive differentiation? If yes and build cost is manageable, build. If it's commodity infrastructure, buy.", description: "Build your moat; buy everything else." },
-        ],
-        branches: { a: "ps_c2_terminal" },
-        terminal: true,
-        rationale: "The core principle: differentiation justifies build cost; commodities don't. Your models, proprietary data pipelines, and unique algorithms are moat-worthy. Your data warehouse, experiment platform, and monitoring tools are table stakes — buy them.",
+    learnMarkdown: `## Build vs Buy Decisions
+
+The most common mistake data teams make is treating build vs buy as a cost question. It isn't. **Build vs buy is a strategic question about where you want your team spending its engineering hours and where you want to own the risk.** Get that framing wrong and you'll either waste six months rebuilding commodity infrastructure or hand your competitive moat to a vendor.
+
+---
+
+## The Five-Dimension Decision Framework
+
+Robust build vs buy decisions require evaluating five dimensions — not just price:
+
+**1. Strategic Fit (Core Competency)**
+Does this capability directly differentiate your product from competitors? If every company in your industry could use the same vendor and get the same outcome, it is not a core competency — it is commodity infrastructure. A recommendation engine at Netflix is core competency. The data warehouse that stores the training data is not.
+
+**2. Total Cost of Ownership (TCO)**
+This is the most underestimated dimension. TCO is not the initial build estimate or the annual license. It is a three-year all-in number covering every dollar the decision will cost. We'll compute this precisely below.
+
+**3. Time-to-Value**
+Buying a mature product ships in weeks; building the equivalent ships in months or years. In fast-moving markets, the competitor who gets to market three months earlier may capture the whole segment. Time-to-value is a cost — it just shows up in revenue foregone rather than an expense line.
+
+**4. Lock-in Risk**
+Vendors can raise prices, get acquired, discontinue products, or accumulate proprietary data formats that make migration prohibitively expensive. The relevant question is: if this vendor doubles its price in year three, can you switch? If not, you don't have a vendor — you have a landlord.
+
+**5. Maintenance Burden**
+Building software is not a one-time cost. Every system you build requires ongoing maintenance: dependency upgrades, security patches, incident response, oncall rotations, and documentation. A system your team owns is a system your team is on the hook for at 2 a.m. when it fails.
+
+---
+
+## How to Calculate TCO
+
+The formula that makes build vs buy rigorous:
+
+\`\`\`
+Build TCO (3-year) =
+  Initial development cost
+  + Annual maintenance cost × 3        (typically 20–40% of initial dev/year)
+  + Annual operational burden × 3      (oncall, incidents, upgrades)
+  + Opportunity cost                   (value of features your team did NOT build)
+
+Buy TCO (3-year) =
+  Annual license × 3
+  + Integration engineering cost       (one-time, typically 2–8 weeks)
+  + Annual vendor management overhead  (renewals, support escalations)
+  + Migration insurance premium        (cost of lock-in risk, amortized)
+\`\`\`
+
+**Example — ML Feature Store decision:**
+A team of four ML engineers is evaluating whether to build a feature store or buy Tecton at \$120K/year.
+
+- Build estimate: 3 months × 2 engineers = 6 engineer-months at \$25K/month loaded cost = **\$150K initial**
+- Annual maintenance: 20% of \$150K = **\$30K/year**
+- Opportunity cost: 6 engineer-months not building the fraud model that was forecasted to save \$500K/year
+- Build TCO (3-year): \$150K + \$90K maintenance + \$1.5M opportunity cost = **\$1.74M**
+- Buy TCO (3-year): \$360K license + \$20K integration + \$10K overhead = **\$390K**
+
+The build vs buy decision looks very different once opportunity cost is on the table.
+
+---
+
+## When to Build
+
+Build when: the capability is **core competency** that competitors cannot replicate by writing a check; your **proprietary data** makes a custom solution dramatically better than any generic vendor model; **data privacy or residency requirements** prevent sending training data to external vendors (common in healthcare, finance, defense); or no mature vendor yet exists in the space.
+
+**Famous build example:** Airbnb built Bighead, an internal ML platform, rather than rely on AWS SageMaker. The decision was justified by hundreds of production models requiring deep integration with Airbnb's proprietary data systems, plus the fact that ML infrastructure excellence was itself a hiring advantage. Publishing about Bighead attracted engineers who wanted to work on cutting-edge infra — a benefit SageMaker cannot provide.
+
+---
+
+## When to Buy
+
+Buy when: the capability is **commodity functionality** — data warehouses (Snowflake, BigQuery), cloud storage, experiment platforms, monitoring tools — where no company wins by having a slightly better version than competitors; your team is **small and the system is complex**, meaning build cost overwhelms your engineering capacity; you need **speed** (buy and ship in weeks vs. build for months); or an **expertise gap** means you'd spend as much hiring the right engineers as paying a vendor who already has them.
+
+---
+
+## The Hybrid Pattern: Buy Foundation, Build Differentiation
+
+The best data teams layer both: **buy commodity infrastructure** (warehouse, orchestration, serving), then **build the differentiating layer on top** (proprietary models, feature engineering, business logic). Databricks provides the compute foundation; the model architecture and feature logic are built in-house. This gets vendor time-to-value and operational expertise while preserving the moat where it matters.
+
+---
+
+## Interview-Ready Summary
+
+Build vs buy is a **five-dimension strategic decision**, not a cost comparison. The dimensions are: strategic fit (core competency), total cost of ownership, time-to-value, lock-in risk, and maintenance burden. **Always calculate 3-year TCO** including ongoing maintenance (20–40% of initial dev/year) and opportunity cost. Build when the capability is your competitive moat or when data privacy requirements prevent outsourcing. Buy when the capability is commodity infrastructure or your team needs speed. The strongest teams layer both: buy the commodity foundation and build the differentiating layer on top.
+`,
+    video: null,
+    videoFallbackMarkdown: `## Deep Dive: Hidden Costs, Lock-In, and the Buy-AND-Build Pattern
+
+### The Hidden Costs of Building
+
+The estimate your team gives for a build project is almost always the initial engineering cost — and almost always wrong by a factor of two to three over three years.
+
+**Ongoing maintenance** is the most underestimated cost. Every dependency upgrades. Every security vulnerability requires a patch. Systems that handle more data need performance tuning. Teams that built the original version move on, and the institutional knowledge walks out with them. Rule of thumb: budget 20–40% of initial development cost per year for maintenance, indefinitely.
+
+**On-call burden** is invisible until it isn't. The team that builds the feature store is the team that gets paged when it falls over at 2 a.m. before a major product launch. Incident response, post-mortems, and reliability work compound quickly for a small team maintaining multiple internal systems.
+
+**Documentation debt** accumulates silently. Internal tools are chronically underdocumented. Every new engineer who joins the team spends days or weeks reverse-engineering systems with no documentation budget and no incentive to write any.
+
+**Hiring premium.** If you need to maintain a custom ML platform, you need engineers who want to work on ML platforms. Those engineers are expensive and have options. Vendors absorb this cost; you don't.
+
+### Vendor Lock-In: Risk and Mitigation
+
+Lock-in risk is real but often overstated. The mitigation strategies that work:
+
+**Abstraction layers.** Never let vendor-specific APIs surface throughout your codebase. Wrap the vendor behind an interface. When you swap vendors, you rewrite the wrapper — not a hundred call sites. This is the most important architectural decision for any bought system.
+
+**Open standards.** Store models in ONNX, not a vendor's proprietary format. Store data in Parquet, not a vendor-specific binary format. Insist on open standards during procurement. If a vendor cannot export your data in a standard format, that is the lock-in risk made concrete.
+
+**Data portability provisions.** Negotiate the right to export all your data in standard formats into every vendor contract. This is the clause that turns a landlord back into a vendor.
+
+**Annual alternatives review.** Lock-in compounds over time. A team that revisits alternatives annually keeps the vendor honest and keeps its own migration cost low.
+
+### The Buy-AND-Build Pattern
+
+The most mature data teams have stopped asking "build or buy?" and started asking "what layer should we buy, and what layer should we build?"
+
+The pattern: purchase the commodity foundation — compute, storage, orchestration, monitoring — from vendors who specialize in those capabilities. Then build your differentiating layer on top using vendor APIs and data, but with your own logic, models, and business rules.
+
+Example: a fraud detection team buys real-time feature serving infrastructure (Tecton), buys their data warehouse (Snowflake), and buys their model serving layer (SageMaker endpoints) — but builds the fraud detection model itself, the custom feature engineering logic, and the decision rules that encode their specific risk tolerance. The bought layers are invisible to customers. The built layers are the competitive moat.
+
+This pattern gets you time-to-value, specialized vendor expertise, and reduced operational burden — while preserving the freedom to differentiate where it actually matters.
+`,
+    tryGuidance: "No interactive viz for this lesson — work through the build vs buy decision scenarios in the interview simulation below to practice applying the five-dimension framework under realistic interview conditions.",
+    interviewGraph: {
+      initialStageId: "ps_c2_stage1",
+      artifactDimensions: [
+        { label: "TCO Analysis", recoveryStageId: "ps_c2_rec1" },
+        { label: "Strategic Judgment", recoveryStageId: "ps_c2_rec2", passLabel: "Build/Buy Mastery" },
+      ],
+      stages: {
+        ps_c2_stage1: {
+          id: "ps_c2_stage1",
+          type: "click_target",
+          badge: "Stage 1",
+          title: "Stage 1 · Incomplete TCO analysis",
+          prompt: "Your team has drafted a build vs buy analysis for an ML feature store. Review the code and identify the critical flaw in the decision-making process.",
+          code_snippet: `# Build vs Buy Analysis: ML Feature Store
+# Team recommendation: Build in-house
+
+analysis = {
+    "option": "build",
+    "rationale": [
+        "More control over data",
+        "Can customize for our needs",
+        "One-time engineering cost: 3 months × 2 engineers",
+    ],
+    "license_cost_avoided": "$50k/year",
+    "decision": "BUILD",              -- ds-target:ps_c2_missing_tco
+    # No maintenance cost estimate
+    # No opportunity cost calculation
+    # No vendor evaluation completed
+}`,
+          validationCopy: {
+            ps_c2_missing_tco: "Correct — this decision is missing a complete TCO calculation. The analysis counts only initial engineering cost (3 months × 2 engineers) but omits: (1) ongoing maintenance, estimated at 20–40% of initial dev cost per year — roughly $30–60K/year indefinitely; (2) opportunity cost of 6 engineer-months not spent on product features, which at $25K/month loaded cost is $150K in deferred value; and (3) no vendor alternatives have been evaluated, so the $50K/year avoided license may be the cheapest option available. A defensible build decision requires comparing 3-year TCO for both paths.",
+          },
+          branches: {
+            ps_c2_missing_tco: "ps_c2_stage2",
+          },
+        },
+
+        ps_c2_stage2: {
+          id: "ps_c2_stage2",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Opportunity cost calculation",
+          prompt: "After fixing the analysis, you calculate that building the feature store costs $150K upfront plus $35K/year maintenance. Buying Tecton costs $90K/year. Your fraud model, currently blocked on consistent features, is projected to save $400K/year once deployed. What does the correct 3-year TCO comparison show?",
+          choices: [
+            { id: "a", label: "Build is cheaper: $150K + $105K maintenance = $255K vs $270K for Tecton. Build wins on cost.", description: "This calculation ignores the opportunity cost of delaying the fraud model by 3 months while the feature store is built." },
+            { id: "b", label: "Buy is cheaper even though the license is higher: the 3-month build delay costs ~$100K in deferred fraud savings, and 6 engineer-months not working on other models adds another $150K in opportunity cost — making the real build TCO $255K + $250K = $505K vs $270K to buy.", description: "Opportunity cost is the most frequently omitted item in build cost calculations." },
+            { id: "c", label: "The costs are too close to call. Flip a coin or defer to whoever has more seniority.", description: "When costs are uncertain, the answer is to reduce uncertainty — not to defer or randomize." },
+            { id: "d", label: "Always buy infrastructure regardless of cost — the principle overrides the numbers.", description: "Principles should inform analysis, not replace it. Some infrastructure decisions are legitimately close calls." },
+          ],
+          branches: { a: "ps_c2_rec1", b: "ps_c2_stage3", c: "ps_c2_rec1", d: "ps_c2_rec1" },
+          rationale: "B is correct. Opportunity cost is the hidden multiplier in almost every build decision. Three months of two senior engineers not working on the fraud model means three months of $400K/year savings not materializing — roughly $100K. Add the ongoing opportunity cost of maintenance absorbing future engineering capacity and the buy case becomes decisive. The rule: never compare build cost to license cost. Always compare 3-year TCO including opportunity cost.",
+        },
+
+        ps_c2_rec1: {
+          id: "ps_c2_rec1",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · TCO components",
+          prompt: "A colleague argues that the build cost for an ML pipeline is just the initial sprint estimate: four weeks of two engineers at $20K each = $40K. What is missing from this calculation?",
+          choices: [
+            { id: "a", label: "Nothing — sprint estimates are accurate for engineering work.", description: "Sprint estimates capture planned work but not long-term system ownership costs." },
+            { id: "b", label: "Ongoing maintenance (20–40% of $40K per year = $8–16K/year), operational burden (oncall, incidents), opportunity cost of features not built, and a vendor alternatives comparison to assess whether $40K is actually cheap.", description: "All four items are systematically underrepresented in build estimates." },
+            { id: "c", label: "Only opportunity cost — the other items are small enough to ignore for a four-week build.", description: "Maintenance compounds over years. A system that takes four weeks to build can absorb hundreds of hours of maintenance over three years." },
+            { id: "d", label: "Only vendor alternatives — you should always get a quote before building.", description: "Vendor alternatives matter, but the hidden costs of building are the more important gap here." },
+          ],
+          branches: { a: "ps_c2_stage3", b: "ps_c2_stage3", c: "ps_c2_stage3", d: "ps_c2_stage3" },
+          rationale: "B is the complete answer. Maintenance, operational burden, and opportunity cost are the three items systematically missing from build estimates. A four-week build project with $8K/year maintenance and regular on-call involvement over three years is not a $40K decision — it is a $64K+ decision, before opportunity cost.",
+        },
+
+        ps_c2_stage3: {
+          id: "ps_c2_stage3",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · Core competency test",
+          prompt: "A startup is evaluating whether to build their own data warehouse to avoid Snowflake's $80K/year bill. The CTO argues: 'We're an engineering-first company — we can build this ourselves and save money at scale.' How do you respond?",
+          choices: [
+            { id: "a", label: "Agree — engineering-first companies should own their infrastructure stack and $80K/year is significant for a startup.", description: "The 'engineering-first' label does not change whether data warehousing is core competency." },
+            { id: "b", label: "Challenge the framing: data warehousing is commodity infrastructure with zero competitive differentiation. The 'savings at scale' argument ignores that Snowflake, BigQuery, and Redshift are built by hundreds of engineers over many years. Building an equivalent system would require years of effort that should be spent on the actual product.", description: "No startup has ever won a market by having a slightly better data warehouse than competitors." },
+            { id: "c", label: "Suggest using PostgreSQL instead — it's free and technically a warehouse alternative.", description: "PostgreSQL is an OLTP database, not an analytical warehouse. This is a technical non-answer." },
+            { id: "d", label: "Agree only if the team has three or more engineers who have previously built distributed storage systems.", description: "Even with the expertise, the opportunity cost argument stands — those engineers should be building the actual product." },
+          ],
+          branches: { a: "ps_c2_rec2", b: "ps_c2_stage4", c: "ps_c2_rec2", d: "ps_c2_rec2" },
+          rationale: "B is correct. A data warehouse is the clearest possible buy decision: it is pure commodity infrastructure, extraordinarily complex to build correctly (distributed query execution, columnar storage, query optimization), and produces zero competitive differentiation. The fact that the team 'can' build it is irrelevant — the question is whether they should spend those engineering hours here vs. on the product. Answer: never.",
+        },
+
+        ps_c2_rec2: {
+          id: "ps_c2_rec2",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Core competency vs commodity",
+          prompt: "Which of the following is the best example of a 'build' decision because it is genuinely core competency?",
+          choices: [
+            { id: "a", label: "A fintech company building its own fraud detection model trained on proprietary transaction patterns and tuned to its specific risk tolerance — where a generic vendor model cannot access the company's internal fraud labels.", description: "Proprietary data + business-specific logic + competitive stakes = build." },
+            { id: "b", label: "A mid-size e-commerce company building its own experiment platform to avoid Optimizely's $40K/year fee.", description: "Experiment platforms are commodity infrastructure. The $40K/year is almost certainly cheaper than the engineering cost of building and maintaining a reliable experimentation system." },
+            { id: "c", label: "A healthcare startup building its own cloud storage layer to avoid AWS S3 fees.", description: "Object storage is pure commodity. Building a reliable distributed storage system is a multi-year engineering effort with no product differentiation." },
+            { id: "d", label: "A logistics company building its own ETL pipeline framework instead of using dbt.", description: "ETL orchestration is commodity. dbt or similar tools are the standard answer for transformation pipelines." },
+          ],
+          branches: { a: "ps_c2_stage4", b: "ps_c2_stage4", c: "ps_c2_stage4", d: "ps_c2_stage4" },
+          rationale: "A is the correct example of a genuine build case. The fraud model is differentiating (it directly affects revenue and risk), data-moat-dependent (the vendor cannot access the company's internal fraud labels), and business-logic-intensive (risk tolerance is company-specific). The other three are commodity infrastructure where building provides no competitive advantage and imposes significant engineering cost.",
+        },
+
+        ps_c2_stage4: {
+          id: "ps_c2_stage4",
+          type: "scenario_choice",
+          badge: "Stage 4",
+          title: "Stage 4 · Vendor lock-in mitigation",
+          prompt: "Your team has decided to buy a managed ML model serving platform. The VP Engineering is worried about vendor lock-in — if the vendor raises prices 3x in year two, you're stuck. What architectural decision mitigates this risk most effectively?",
+          choices: [
+            { id: "a", label: "Avoid vendors entirely and build in-house from the start to eliminate lock-in risk.", description: "Eliminating vendors eliminates lock-in risk but recreates all the build costs. This is not mitigation — it is avoidance." },
+            { id: "b", label: "Negotiate a multi-year price lock in the contract.", description: "Price locks expire. This mitigates short-term price risk but does not address the structural lock-in from proprietary data formats and API dependencies." },
+            { id: "c", label: "Abstract the vendor behind an interface layer in your codebase, store models in ONNX or another open standard, ensure contractual data portability rights, and review alternatives annually to keep migration costs low.", description: "This is the complete mitigation: architectural (abstraction layer), technical (open standards), legal (portability), and operational (annual review)." },
+            { id: "d", label: "Use multiple vendors simultaneously to avoid dependence on any single one.", description: "Multi-vendor can reduce lock-in risk but adds significant integration complexity and operational overhead." },
+          ],
+          branches: { a: "ps_c2_rec3", b: "ps_c2_rec3", c: "ps_c2_stage5", d: "ps_c2_rec3" },
+          rationale: "C is the complete mitigation strategy. An abstraction layer means vendor-specific code is isolated to one place — swapping vendors requires rewriting the wrapper, not a hundred call sites. Open standards (ONNX for models, Parquet for data) ensure your assets remain portable. Contractual data portability rights mean you can always leave. Annual alternatives review keeps migration costs low by preventing institutional knowledge atrophy about alternatives.",
+        },
+
+        ps_c2_rec3: {
+          id: "ps_c2_rec3",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Lock-in mitigation layers",
+          prompt: "You are reviewing a vendor contract for a data pipeline tool. Which contract clause is most important to include for managing lock-in risk?",
+          choices: [
+            { id: "a", label: "A price cap limiting annual increases to no more than 5%.", description: "Price caps help with cost predictability but do not address the structural lock-in from proprietary data formats or migration complexity." },
+            { id: "b", label: "The right to export all data and pipeline configurations in standard, documented formats at any time, at no additional cost.", description: "Data portability is the foundational lock-in mitigation. Without it, even a technically superior alternative is inaccessible because migration cost exceeds the benefit." },
+            { id: "c", label: "A 30-day termination clause allowing you to exit the contract with 30 days notice.", description: "Short termination clauses help with contract flexibility but do not solve the data migration problem — if your data is locked in a proprietary format, 30-day notice does not make migration cheap." },
+          ],
+          branches: { a: "ps_c2_stage5", b: "ps_c2_stage5", c: "ps_c2_stage5" },
+          rationale: "B is correct. Data portability rights are the foundational lock-in protection. A vendor can hold you hostage if your data is in a proprietary format and you have no contractual right to export it in a usable form. Price caps and termination clauses are useful but secondary — they do not solve the structural problem of inaccessible data.",
+        },
+
+        ps_c2_stage5: {
+          id: "ps_c2_stage5",
+          type: "scenario_choice",
+          badge: "Stage 5",
+          title: "Stage 5 · Hybrid pattern",
+          prompt: "Airbnb built an internal ML platform called Bighead rather than relying entirely on AWS SageMaker. Which best describes why this was the right decision for Airbnb specifically — and what that implies about when others should follow?",
+          choices: [
+            { id: "a", label: "Airbnb built because all companies at scale should own their ML infrastructure — buying is only for small teams.", description: "Scale alone does not justify building commodity infrastructure. The decision was justified by specific factors at Airbnb, not by a universal scale rule." },
+            { id: "b", label: "Airbnb built because: (1) hundreds of models required deep integration with proprietary data systems that SageMaker could not access; (2) ML infrastructure excellence was a competitive hiring advantage; (3) they had engineering scale to absorb the build cost. Other teams should build only when they can make the same three arguments — scale, deep data integration need, and a hiring/differentiation benefit.", description: "The build decision was justified by specific factors that most companies lack — not by a principle that SageMaker is bad." },
+            { id: "c", label: "Airbnb built to avoid vendor lock-in on AWS, which was the right call for any company that might switch cloud providers.", description: "Bighead was not primarily an AWS lock-in avoidance decision. And for most companies, the risk of cloud provider switching does not justify rebuilding ML infrastructure." },
+            { id: "d", label: "Airbnb built because open source alternatives were not mature at the time — the decision would be different today.", description: "Partially true historically but misses the core reasoning: the build decision was about deep proprietary data integration and talent strategy, not just open source maturity." },
+          ],
+          branches: { a: "ps_c2_rec3", b: "ps_c2_terminal", c: "ps_c2_rec3", d: "ps_c2_rec3" },
+          rationale: "B is the nuanced and correct answer. Airbnb's Bighead decision was justified by three conditions that most companies do not share: (1) hundreds of production models requiring deep integration with proprietary Airbnb data systems that a generic cloud service could not access; (2) ML infrastructure as a recruiting tool — publishing about Bighead attracted ML engineers who wanted to work on cutting-edge infra; (3) the engineering scale to actually absorb the build and maintenance cost. The lesson is not 'big companies should build' — it is 'build when you can make the case on differentiation, data integration need, and capacity, simultaneously.'",
+        },
+
+        ps_c2_terminal: {
+          id: "ps_c2_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · Build vs buy synthesis",
+          prompt: "You are advising a 10-person data team at a Series B company. They need: (1) a data warehouse, (2) an experiment platform, (3) a fraud detection model, (4) a real-time feature serving layer. How do you apply build vs buy to each?",
+          choices: [
+            { id: "a", label: "Build everything for maximum control and no vendor dependency.", description: "Building a data warehouse, experiment platform, and feature serving layer would consume the entire team for 12+ months and produce no business value during that period." },
+            { id: "b", label: "Buy the data warehouse (Snowflake/BigQuery — pure commodity), buy the experiment platform (Statsig/Optimizely — commodity, fast need), build the fraud detection model (core competency, proprietary labels, business-specific risk tolerance), and buy the feature serving layer while building proprietary features on top (hybrid: buy foundation, build differentiation).", description: "This is the full framework applied correctly: commodity → buy; core competency → build; complex infrastructure → hybrid." },
+            { id: "c", label: "Buy all four — a 10-person team is too small to build anything.", description: "Team size is one factor but not the only one. Fraud detection is genuinely core competency for a fraud-sensitive company regardless of team size." },
+            { id: "d", label: "Defer all four decisions until the team reaches 25 people and the budget picture is clearer.", description: "Deferring infrastructure decisions has costs: training-serving skew, experiment blind spots, and undetected fraud all compound." },
+          ],
+          branches: { a: "ps_c2_terminal", b: "ps_c2_terminal", c: "ps_c2_terminal", d: "ps_c2_terminal" },
+          terminal: true,
+          rationale: "B applies the complete framework correctly. The data warehouse is the canonical buy: pure commodity, astronomically complex to build, zero differentiation. The experiment platform is a buy for a small team that needs speed. The fraud model is the canonical build: differentiating, data-moat-dependent, business-logic-intensive. The feature serving layer is the hybrid pattern: buy the low-latency serving infrastructure (Tecton or Redis-based), build the proprietary features that feed it. This is how mature data teams allocate scarce engineering hours — buy the table stakes, build the moat.",
+        },
       },
     },
+    knowledgeCheck: [
+      {
+        question: "What are the five dimensions of the build vs buy decision framework?",
+        options: [
+          "Cost, timeline, team size, technical debt, and regulatory compliance",
+          "Strategic fit (core competency), total cost of ownership, time-to-value, lock-in risk, and maintenance burden",
+          "Cloud provider choice, open source availability, API quality, vendor reputation, and SLA guarantees",
+        ],
+        correctIndex: 1,
+        explanation: "The five dimensions are: (1) Strategic fit — is this core competency or commodity? (2) TCO — 3-year all-in cost including maintenance and opportunity cost. (3) Time-to-value — buying ships faster; building takes months. (4) Lock-in risk — how hard is it to switch vendors if needed? (5) Maintenance burden — who owns this at 2 a.m. when it fails? Evaluating all five produces a defensible decision; evaluating only cost produces a decision that looks cheap on paper and expensive in practice.",
+      },
+      {
+        question: "Your team estimates building an internal ML monitoring tool will cost $60K in engineering time. The leading vendor charges $25K/year. A junior engineer says 'build is clearly cheaper.' What's missing from their analysis?",
+        options: [
+          "Nothing — $60K one-time vs $75K over 3 years means build wins on a 3-year horizon",
+          "The calculation ignores ongoing maintenance ($12–24K/year), operational burden (oncall and incidents), and opportunity cost — what the engineers who spent $60K did NOT build instead. The real 3-year TCO for build is likely $96–132K plus opportunity cost, making the buy option competitive or superior",
+          "The calculation needs vendor lock-in risk factored in, which always tips the decision toward building",
+        ],
+        correctIndex: 1,
+        explanation: "The classic error: comparing initial build cost to annual license cost. A complete TCO comparison adds: ongoing maintenance (20–40% of $60K = $12–24K/year × 3 years = $36–72K), operational burden, and opportunity cost of the features not built during the 60K sprint. True 3-year build TCO: $60K + $54K–$72K maintenance + opportunity cost. At that range, $75K for a vendor that ships in weeks and is maintained by specialists is often the better call.",
+      },
+      {
+        question: "What is the 'buy foundation, build differentiation' pattern and why do leading data teams use it?",
+        options: [
+          "Buy open-source tools for free tiers, then build proprietary wrappers to avoid licensing fees",
+          "Purchase commodity infrastructure layers (warehouse, orchestration, serving) from vendors who specialize in them, then build proprietary models, features, and business logic on top — getting vendor time-to-value and expertise while preserving competitive differentiation where it matters",
+          "Buy commercial tools for prototyping and replace them all with internal builds once the product scales beyond Series B",
+        ],
+        correctIndex: 1,
+        explanation: "The hybrid pattern works because competitive advantage almost never comes from commodity infrastructure — it comes from the logic, models, and data built on top of that infrastructure. Buying the warehouse, orchestration, and serving layers gets you battle-tested software built by specialists, faster time-to-value, and reduced operational burden. Building the model, feature engineering, and decision logic on top preserves the moat. The pattern lets a 10-person team punch far above its weight by avoiding the engineering cost of rebuilding infrastructure that vendors have already solved.",
+      },
+    ],
   },
-  knowledgeCheck: [
-    {
-      question: "What is vendor lock-in and what's the primary mitigation strategy?",
-      options: [
-        "Vendor lock-in occurs when migration to another vendor becomes prohibitively expensive due to proprietary formats, data, or contracts — mitigated by abstracting the vendor behind an interface layer and using open standards",
-        "Vendor lock-in occurs when a vendor increases prices — mitigated by multi-year contracts",
-        "Vendor lock-in is when a vendor has exclusive rights to your product data — mitigated by IP agreements",
-      ],
-      correctIndex: 0,
-      explanation: "Vendor lock-in means the switching cost exceeds the annual savings from switching — the vendor has you 'locked in' by making migration expensive. Mitigation: abstract the vendor behind an interface (so you can swap implementations), ensure data portability in open formats, and use open standards (ONNX, Parquet) where possible.",
-    },
-    {
-      question: "Your team is building a custom recommendation model for your e-commerce site. Should you build or buy the model?",
-      options: [
-        "Buy a commercial recommendation system — customization isn't worth the build cost",
-        "Build — the recommendation model directly drives product differentiation; your proprietary user behavior data and business logic make a custom model your competitive moat",
-        "Use an open source recommendation library with no customization",
-      ],
-      correctIndex: 1,
-      explanation: "Recommendation models are a core competency for e-commerce — they directly determine product discovery and revenue. Your proprietary user behavior data, business rules (margin, inventory), and product knowledge are inputs that make a custom model outperform generic solutions. This is the canonical 'build' case: differentiating, data-intensive, and requiring business logic that off-the-shelf tools can't accommodate.",
-    },
-    {
-      question: "What are the five key questions for any build vs buy decision?",
-      options: [
-        "Cost, timeline, team size, technical debt, and regulatory compliance",
-        "Is it differentiating? How frequently used? What's the team's expertise? What's the timeline? What's the 3-year total cost of ownership including maintenance?",
-        "Cloud provider, open source availability, API quality, vendor reputation, and support SLA",
-      ],
-      correctIndex: 1,
-      explanation: "The five questions: (1) Differentiation — would competitors benefit equally from the same vendor? (2) Frequency — is build overhead justified? (3) Expertise — do you have the skills? (4) Timeline — do you need speed? (5) TCO — 3-year total cost including maintenance, operations, and opportunity cost. These structure any defensible build/buy recommendation.",
-    },
-  ],
-},
 
 "ps-c3": {
-  durationLabel: "18 min",
-  outcomes: [
-    "Lead with business impact rather than methodology when communicating results",
-    "Translate confidence intervals into business-language dollar ranges",
-    "Explain model outputs (SHAP values) to non-technical stakeholders",
-    "Handle 'why did the AI do X' questions with prepared feature attribution answers",
-  ],
-  learnMarkdown: `## Communicating to Non-Technical Stakeholders
-
-A model that delivers great predictions but can't be explained to decision-makers has zero business value. Communication is a core DS skill.
-
----
-
-## Rule 1: Lead with Business Impact
-
-**Wrong**: "Our model achieved AUC 0.87 on the holdout set."
-
-**Right**: "Our model identifies 78% of churners 30 days before they cancel, giving the retention team a 30-day window to intervene. Based on our historical conversion rate, this is worth $1.8M in retained revenue annually."
-
-Technical metrics (AUC, F1, RMSE) are internal benchmarks — they mean nothing to a VP of Sales. Translate every technical result into a business outcome: revenue saved, costs reduced, decisions improved.
-
----
-
-## Translating Confidence Intervals
-
-A 95% confidence interval [3%, 7%] for a conversion rate lift is meaningless to most stakeholders. Translate:
-
-"We're 95% confident the true lift is between 3% and 7%. Given our current revenue of $20M, that's between $600K and $1.4M in additional annual revenue."
-
-This makes the uncertainty tangible and actionable: even the low end ($600K) justifies shipping.
-
----
-
-## Explaining Model Outputs (SHAP)
-
-When a non-technical stakeholder asks "why did the model predict this customer will churn?", SHAP values give you a translation:
-
-**Technical**: "The SHAP value for login_frequency is -0.23 in log-odds space."
-
-**Stakeholder version**: "The three biggest drivers for this prediction are: (1) this customer hasn't logged in for 17 days — that's pushing the churn risk up by 35 percentage points, (2) they submitted a support ticket 3 days ago unresolved, and (3) their current tier has lower feature access than competitors. Together these explain 80% of the predicted risk."
-
----
-
-## Handling "Why Did the AI Do X"
-
-Prepare a standard attribution answer for your model:
-
-1. State the top 3 features by SHAP magnitude
-2. Give the direction (pushed risk up / down)
-3. Give the magnitude in plain terms (not log-odds)
-4. Acknowledge model limitations: "This reflects patterns in historical data — we flag it as a signal to investigate, not a definitive answer."
-
----
-
-## Choosing Visualizations by Audience
-
-| Audience | Chart type |
-|----------|-----------|
-| Non-technical executive | Large KPI number + trend arrow |
-| Product manager | Bar chart with absolute values + confidence band |
-| Data scientist | Scatter plot, ROC curve, calibration plot |
-| Engineer | Table with raw numbers |
-
-Never use a pie chart with more than 4 slices, 3D charts, or dual Y-axis without a clear reason — these obscure rather than reveal.
-
----
-
-## The One-Sentence P-Value Explanation
-
-"A p-value of 0.04 means: if the feature had no real effect, there's only a 4% chance we'd see results this strong by random chance alone — so we're fairly confident the effect is real."
-`,
-  video: null,
-  videoFallbackMarkdown: `## Deep Dive: Stakeholder Personas
-
-Different stakeholders need different translations of the same result:
-
-**CEO/VP**: bottom line impact, risk, timeline. No methodology at all. "We can save $2M/year by implementing this — 90% confidence based on 4-week experiment."
-
-**Product Manager**: metrics, tradeoffs, ship recommendation. "Primary metric +8%, guardrails all OK, no SRM. Recommend ship. One risk: novelty effect — run a 30-day holdout to confirm long-term value."
-
-**Finance**: ROI, variance, assumptions. "Expected return $1.8M, 95% CI [$600K, $3.1M]. Assumes 40% retention intervention conversion rate — sensitivity analysis attached."
-
-**Legal/Compliance**: fairness, auditability, model behavior. "Model uses 12 features, none protected class. SHAP explainability report available per-prediction. Audit log maintained for 3 years."
-
-Match your communication to the audience's decision-making need.
-`,
-  tryGuidance: "No interactive viz — practice the stakeholder communication scenarios in the interview simulation.",
-  interviewGraph: {
-    initialStageId: "ps_c3_stage1",
-    artifactDimensions: [
-      { label: "Impact Translation", recoveryStageId: "ps_c3_rec1" },
-      { label: "Model Explanation", recoveryStageId: "ps_c3_terminal", passLabel: "Stakeholder Comms" },
+    durationLabel: "20 min",
+    outcomes: [
+      "Apply the pyramid principle: lead with the conclusion, then support with evidence",
+      "Translate every technical metric into a business outcome — revenue, cost, risk, or user impact",
+      "Run the 'so what?' test on every slide before an executive presentation",
+      "Handle 'can you prove causality?' and 'so it definitely works?' from skeptical stakeholders without being defensive",
+      "Distinguish a data briefing from a decision meeting and structure each accordingly",
     ],
-    stages: {
-      ps_c3_stage1: {
-        id: "ps_c3_stage1",
-        type: "scenario_choice",
-        badge: "Stage 1",
-        title: "Stage 1 · Executive communication",
-        prompt: "You present to the CEO: 'Our churn model has AUC 0.88 and F1 0.74.' What's the problem?",
-        choices: [
-          { id: "a", label: "AUC and F1 are strong metrics — CEOs should understand these", description: "Most non-technical executives don't know what AUC or F1 mean." },
-          { id: "b", label: "These are technical metrics with no business translation — a CEO wants to know: what does this mean for the company in dollars, decisions, or time saved?", description: "Lead with business impact: 'This model identifies 70% of churners 30 days early, worth $2M/year retained.'" },
-          { id: "c", label: "The metrics are too low — get to AUC 0.95 before presenting", description: "Communication style is the issue, not metric level." },
-        ],
-        branches: { a: "ps_c3_rec1", b: "ps_c3_stage2", c: "ps_c3_rec1" },
-        rationale: "B is correct. Technical metrics are internal quality measures. To a CEO, AUC 0.88 means nothing. The correct translation: 'We catch 70% of churners 30 days before they cancel. Our retention team closes 40% of interventions. At $500 average revenue per user, this is worth $2.1M in retained annual revenue.'",
-      },
-      ps_c3_rec1: {
-        id: "ps_c3_rec1",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · Business translation",
-        prompt: "How do you translate a technical metric (AUC 0.88) into a business outcome for an executive?",
-        choices: [
-          { id: "a", label: "Quantify the operational impact: what fraction of the target problem does the model address, and what is the dollar value of those cases?", description: "AUC 0.88 → 'catches 74% of churners' → '74% × monthly churn volume × retention rate × LTV = $X/year'." },
-        ],
-        branches: { a: "ps_c3_stage2" },
-        rationale: "Every technical metric has a business translation. AUC → fraction of problem caught. Precision → false alarm rate → cost of acting on wrong signal. F1 → balance of both. Always compute the dollar impact chain.",
-      },
-      ps_c3_stage2: {
-        id: "ps_c3_stage2",
-        type: "scenario_choice",
-        badge: "Stage 2",
-        title: "Stage 2 · SHAP explanation",
-        prompt: "A sales manager asks: 'Why did your model say this customer has 80% churn risk?' You have SHAP values. How do you respond?",
-        choices: [
-          { id: "a", label: "List all 20 SHAP values with their log-odds contributions", description: "20 features in log-odds is incomprehensible to a sales manager." },
-          { id: "b", label: "State the top 3 drivers in plain language: 'The biggest factors are: no login in 17 days (+35% risk), open support ticket for 5 days (+20% risk), and downgraded plan last month (+15% risk). These three account for most of the prediction.'", description: "3 factors, direction, magnitude in plain units, not log-odds." },
-        ],
-        branches: { a: "ps_c3_rec1", b: "ps_c3_terminal" },
-        rationale: "B is correct. Non-technical stakeholders need: (1) the top 3 factors — not all of them, (2) the direction (pushing risk up or down), and (3) the magnitude in familiar units (percentage points, not log-odds). This gives actionable information without overwhelming complexity.",
-      },
-      ps_c3_terminal: {
-        id: "ps_c3_terminal",
-        type: "scenario_choice",
-        badge: "Complete",
-        title: "Complete · Communication principle",
-        prompt: "What is the single most important principle when presenting data science results to non-technical stakeholders?",
-        choices: [
-          { id: "a", label: "Lead with business impact in their language: revenue, cost, risk, time — not technical metrics in data science language", description: "The result must answer: what should the decision-maker do, and what is it worth?" },
-        ],
-        branches: { a: "ps_c3_terminal" },
-        terminal: true,
-        rationale: "Technical metrics are the means, not the end. Every result should be translated into: what decision does this enable, and what is the expected value of making that decision vs. not? That's the language of business.",
+    learnMarkdown: `## Communicating to Non-Technical Stakeholders
+
+The most common mistake data scientists make when presenting to executives is answering the question they were asked instead of the question that matters — and burying that answer in a slide full of model diagnostics the VP will never read. Your p-values, confusion matrices, and SHAP plots are evidence to justify a recommendation. They are not the recommendation. The executive wants to know: what should we do, and what happens if we do or don't?
+
+---
+
+## The Pyramid Principle: Conclusion First
+
+State your recommendation first, then your supporting logic, then your evidence. Most data scientists do this backwards — they walk through the analysis chronologically, building to a conclusion on the last slide.
+
+**Backwards (chronological):**
+> We collected 6 months of data → trained three models → the Transformer won → here's the confusion matrix → you should probably ship this.
+
+**Pyramid order:**
+> We recommend shipping the personalization model to 100% of users. It generates an estimated $2.4M in incremental annual revenue — here's why we're confident.
+
+If the meeting ends after slide 1, the decision-maker still knows what you recommend and what it's worth.
+
+---
+
+## The Data Story Arc (SCQA)
+
+The SCQA framework (Situation, Complication, Question, Answer) gives every presentation a narrative shape:
+
+- **Situation**: "We have 180K MAU, and monthly churn has run at 4.2% for two quarters."
+- **Complication**: "At that rate we're losing $3.1M in ARR annually — and our retention effort is manual and unscalable."
+- **Question**: "Can we identify at-risk users early enough to intervene?"
+- **Answer**: "Yes — our model catches 73% of churners 30 days before cancellation, worth an estimated $1.8M in recoverable ARR."
+
+Without this arc, results feel like a homework assignment being turned in, not a business decision being enabled.
+
+---
+
+## Translating Metrics to Business Impact
+
+Every technical metric maps to a business outcome. Build the translation chain before the meeting.
+
+| Technical metric | Business translation |
+|-----------------|---------------------|
+| Recall 73% | "We catch 73% of churners — X customers, $Y/month" |
+| p-value 0.031 | "Less than 3% chance this is random noise — strong evidence the effect is real" |
+| 95% CI [3%, 7%] lift | "We're 95% confident the true lift is between $600K and $1.4M annually" |
+| RMSE down 12% | "Forecast error dropped 12% — that's $X less safety stock per warehouse" |
+
+The CI example is critical: never leave a range as percentages. Convert it to dollars. Even the low end ($600K) is a concrete number the CFO can compare against implementation cost.
+
+---
+
+## What to Show vs. What to Cut
+
+**Cut from executive decks:** p-values (unless translated), confusion matrices, ROC curves, loss curves, SHAP plots, model architecture diagrams. These belong in an appendix or a separate technical review.
+
+**Include:** the recommendation (slide 1, not slide 6), the business metric that changed and by how much, the dollar or user-count impact, confidence in plain language ("strong evidence" / "early signal"), and the cost of *not* acting — the counterfactual matters.
+
+---
+
+## Handling Skeptical Stakeholders
+
+**"Can you prove causality?"** — Don't get defensive. Acknowledge the limit, then explain the design: "We ran a randomized experiment, so selection bias is controlled. Randomization neutralizes pre-existing differences between groups. We can't rule out every confound forever, but this design gives us strong evidence the improvement is real, not an artifact."
+
+**"So it's definitely working?"** — Don't overclaim. Validate, correct gently, quantify: "We have strong statistical evidence — less than 3% chance this is random noise. In practical terms, we expect around 840 more conversions per week. I'd say 'very likely working' rather than 'definitely,' but the evidence is strong enough to ship."
+
+The pattern is the same in both cases: acknowledge the limit honestly, explain why your design addresses the specific concern, land on a recommendation. A VP respects intellectual honesty. What they don't respect is either overclaiming or hiding behind uncertainty to avoid committing to an answer.
+
+---
+
+## Pre-Read Documents vs. Live Presentations
+
+These are different artifacts for different purposes:
+
+- **Pre-read**: a 1–3 page narrative memo — dense, readable, contains evidence and assumptions. Executives read it before the meeting to arrive prepared.
+- **Live deck**: 5–8 sparse slides, recommendation on slide 1, drives a decision.
+
+If you send the 40-slide analysis deck as a pre-read, no one reads it. If you present the 3-page document on screen, you've lost the room. Match the format to the meeting type.
+
+---
+
+## Interview-Ready Summary
+
+**Pyramid principle**: conclusion first, evidence second — never build to a reveal.
+
+**SCQA arc**: Situation → Complication → Question → Answer. Lead with the "why this matters."
+
+**Metric translation**: every technical metric has a dollar, user-count, or risk translation. Build it before the meeting.
+
+**What to cut**: p-values, confusion matrices, SHAP plots, loss curves — appendix only.
+
+**Causality pushback**: "Randomized experiment — selection bias is controlled. Strong evidence, not definitive proof, but enough to act."
+
+**"Definitely working?"**: "Very likely — less than 3% chance it's noise. Strong enough to ship."
+
+**Pre-read vs. deck**: narrative document vs. sparse visual — different formats for different purposes.
+`,
+    video: null,
+    videoFallbackMarkdown: `## Deep Dive: The "So What?" Test and Stakeholder Dynamics
+
+### The "So What?" Test
+
+Before every slide goes into an executive deck, ask: so what? What decision does this enable? If the answer is "it shows our model accuracy" — cut it. If the answer is "it justifies shipping to 100%" — keep it. Every slide that can't pass the so-what test is a slide that wastes decision-maker time.
+
+Run it on every bullet, too. "Model trained on 6 months of data" — so what? If the answer is "so the model has seen multiple seasonal cycles and is robust to Q4 spikes" — write that instead.
+
+---
+
+### The SCQA Framework in Practice
+
+SCQA (Situation, Complication, Question, Answer) is a meeting-opening framework, not just a deck structure. Use it to open verbal presentations:
+
+"Currently, our recommendation engine serves the same items to all users regardless of browsing history [Situation]. Last quarter, click-through rate dropped 18% as our catalog grew — users can't find relevant items [Complication]. Can personalization close that gap? [Question] Yes — a collaborative filter trained on 90 days of behavior improves CTR by 22% in a 4-week holdout [Answer]. I'm recommending we ship to all users."
+
+The whole opening takes 30 seconds. The decision-maker knows what you're about to show them and why it matters.
+
+---
+
+### When a Stakeholder Misunderstands Statistical Significance
+
+A product VP sees "p=0.03" and says: "So it's definitely working — let's scale it immediately." The right response is not a statistics lecture. It's:
+
+"We have strong evidence — there's less than a 3% chance this lift is just random noise. I'd characterize it as 'very likely real' rather than 'definitely.' We should scale it — I just want to be precise so we're making the decision with accurate expectations."
+
+You've corrected the overclaim gently, validated the recommendation, and built credibility by being careful with language. A stakeholder who hears you say "definitely" and later sees a result regress will lose trust in you permanently. A stakeholder who hears you say "strong evidence, likely real" and sees the result hold will trust your judgment.
+
+---
+
+### Data Briefing vs. Decision Meeting
+
+These are different meeting types that require different preparation.
+
+A **data briefing** shares findings. The decision comes later. Your goal: make the findings clear and memorable. Format: narrative, some evidence, visual summary. Room tone: inquisitive, exploratory.
+
+A **decision meeting** ends with a decision being made. Your goal: make the correct option obvious and the risk of the wrong option visible. Format: recommendation on slide 1, evidence as appendix, clear ask. Room tone: aligned, resolving.
+
+If you go into a decision meeting with a briefing deck, you'll confuse the room. Know which meeting you're in before you build your slides.
+`,
+    tryGuidance: "No interactive viz for this lesson — work through the interview simulation below to practice translating technical results into executive-ready communication.",
+    interviewGraph: {
+      initialStageId: "ps_c3_slide_audit",
+      artifactDimensions: [
+        { label: "Pyramid Principle", recoveryStageId: "ps_c3_rec_pyramid" },
+        { label: "Metric Translation", recoveryStageId: "ps_c3_rec_translation" },
+        { label: "Stakeholder Handling", recoveryStageId: "ps_c3_terminal", passLabel: "Executive Communicator" },
+      ],
+      stages: {
+        ps_c3_slide_audit: {
+          id: "ps_c3_slide_audit",
+          type: "click_target",
+          badge: "Stage 1",
+          title: "Stage 1 · Audit an executive deck",
+          prompt: "Your colleague just finished the Q4 personalization model results deck for the VP of Product. Review the slide outline below and click the slide (or element) that most undermines the presentation's effectiveness for an executive audience.",
+          code_snippet: `# Executive Presentation Outline
+# "Q4 Personalization Model Results" — for VP Product
+
+slides = [
+    "Slide 1: Model Architecture Overview (LSTM vs Transformer)",
+    "Slide 2: Training Loss Curves (train vs validation)",
+    "Slide 3: Confusion Matrix — 5-class classifier",
+    "Slide 4: p-value = 0.031, statistically significant",  -- ds-target:ps_c3_wrong_audience
+    "Slide 5: Feature Importance (SHAP values top 20)",
+    "Slide 6: Recommendation: Ship to 100%",
+]`,
+          validationCopy: {
+            ps_c3_wrong_audience: "Correct — and the problem is bigger than just slide 4. Raw p-values, confusion matrices, SHAP plots, and loss curves are appropriate for a technical review, not a VP presentation. But the structural failure is worse: the recommendation is on slide 6. An executive who leaves early — or whose attention drifts by slide 3 — never gets to the point. In a pyramid-structured deck, the recommendation is slide 1, and all technical evidence moves to an appendix.",
+          },
+          branches: { ps_c3_wrong_audience: "ps_c3_pyramid_order" },
+        },
+
+        ps_c3_pyramid_order: {
+          id: "ps_c3_pyramid_order",
+          type: "scenario_choice",
+          badge: "Stage 2",
+          title: "Stage 2 · Pyramid principle",
+          prompt: "You're rebuilding the VP Product deck using the pyramid principle. What goes on slide 1?",
+          choices: [
+            { id: "a", label: "The methodology: we trained an LSTM and a Transformer, evaluated on a 4-week holdout, and the Transformer won on F1.", description: "This is still building to a conclusion. The executive doesn't care which architecture won — they care what it means for the business." },
+            { id: "b", label: "The recommendation with business impact: 'Ship the personalization model to 100% of users. Expected incremental revenue: $2.4M annually. Evidence summary on next slide.'", description: "Conclusion first, evidence second. If the meeting ends after slide 1, the decision-maker still knows what you recommend and why." },
+            { id: "c", label: "The business context: quarterly churn rate, current revenue, and the problem statement.", description: "Context is important but it belongs after the conclusion in pyramid order — the situation sets up the complication, not the answer." },
+            { id: "d", label: "An agenda slide listing what each slide will cover.", description: "Agenda slides consume a slide and add no value for a 6-slide deck. Use the time to show your recommendation." },
+          ],
+          branches: { a: "ps_c3_rec_pyramid", b: "ps_c3_translate_metric", c: "ps_c3_rec_pyramid", d: "ps_c3_rec_pyramid" },
+          rationale: "B is correct. The pyramid principle says: state the conclusion first, then justify it. For a VP, slide 1 should be: what we recommend and what it's worth. Slides 2–5 are evidence. Slide 6 is appendix or next steps. If they push back on the recommendation, you have the evidence ready. If they agree immediately, you've saved 20 minutes.",
+        },
+
+        ps_c3_rec_pyramid: {
+          id: "ps_c3_rec_pyramid",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Pyramid principle",
+          prompt: "In pyramid-order communication, where does the recommendation go relative to the supporting evidence and data analysis?",
+          choices: [
+            { id: "a", label: "First — state the recommendation, then provide supporting evidence for those who want to verify it.", description: "The executive may agree immediately and skip the evidence. Or they may scrutinize every assumption. Either way, they know where you're headed from slide 1." },
+            { id: "b", label: "Last — build up the evidence so the recommendation feels earned and credible.", description: "This is the intuitive approach, but it's backwards for executive audiences. By the time you get to the recommendation, attention has wandered." },
+            { id: "c", label: "Middle — context first, then recommendation, then evidence.", description: "Closer, but context belongs after the recommendation in tight decks. Lead with the answer, then provide context if needed." },
+          ],
+          branches: { a: "ps_c3_translate_metric", b: "ps_c3_translate_metric", c: "ps_c3_translate_metric" },
+          rationale: "The recommendation goes first. This is counterintuitive because it feels like you haven't 'earned' the conclusion yet. But executive audiences are time-constrained and already trust your technical work — they need the answer, not the journey. Evidence is there for questions, not as a prerequisite for hearing the recommendation.",
+        },
+
+        ps_c3_translate_metric: {
+          id: "ps_c3_translate_metric",
+          type: "scenario_choice",
+          badge: "Stage 3",
+          title: "Stage 3 · Metric translation",
+          prompt: "Your A/B test shows a 95% confidence interval of [3.1%, 6.9%] revenue lift. Current annual revenue is $20M. How do you present this to the VP of Revenue?",
+          choices: [
+            { id: "a", label: "\"The 95% confidence interval is 3.1% to 6.9% — statistically significant at p=0.04.\"", description: "Abstract percentages and p-values don't help a VP make a budget decision." },
+            { id: "b", label: "\"We're 95% confident the true revenue lift is between $620K and $1.38M annually. Even the low end exceeds our implementation cost of $180K, so the financial case is strong.\"", description: "Dollars, bounded range, direct comparison to the decision threshold. This is what makes the choice obvious." },
+            { id: "c", label: "\"The midpoint estimate is a 5% lift — approximately $1M in annual revenue.\"", description: "The midpoint without the range hides the uncertainty. A VP making a $500K investment decision needs to know the downside, not just the expected value." },
+            { id: "d", label: "\"Results are statistically significant. Recommend approving budget for full rollout.\"", description: "You've skipped the translation entirely. The VP can't evaluate this without knowing what 'statistically significant' means in dollars." },
+          ],
+          branches: { a: "ps_c3_rec_translation", b: "ps_c3_causality_q", c: "ps_c3_rec_translation", d: "ps_c3_rec_translation" },
+          rationale: "B is correct. The translation chain: 3.1%–6.9% × $20M = $620K–$1.38M. Then the so-what: even the low end clears the cost threshold. This is the complete translation — range in dollars, framed against the decision. The VP can now make a rational choice without asking a follow-up question.",
+        },
+
+        ps_c3_rec_translation: {
+          id: "ps_c3_rec_translation",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Metric translation",
+          prompt: "A stakeholder sees your confidence interval [3%, 7%] and asks 'what does that mean in real terms?' Walk through the translation.",
+          choices: [
+            { id: "a", label: "Explain that confidence intervals mean the parameter falls within the range 95% of the time if we repeated the experiment many times.", description: "Technically accurate, but not what the stakeholder is asking. They want to know what to do with this information." },
+            { id: "b", label: "Convert to dollars using current revenue, state the range explicitly, and compare it to the cost or risk threshold relevant to the decision.", description: "3%–7% × current revenue = $X–$Y. Compare to implementation cost. If even the low end clears the threshold, say so. If the low end is borderline, acknowledge the risk." },
+            { id: "c", label: "Report only the midpoint (5%) to keep it simple.", description: "Hiding the range from a decision-maker is worse than showing it. They need to understand the downside, not just the expected value." },
+          ],
+          branches: { a: "ps_c3_causality_q", b: "ps_c3_causality_q", c: "ps_c3_causality_q" },
+          rationale: "Convert to dollars and show the range. The point of a confidence interval is to communicate uncertainty about the true effect size. Translating to dollars makes that uncertainty concrete and actionable: is the lower bound still worth the investment? That's the question the CI is actually answering.",
+        },
+
+        ps_c3_causality_q: {
+          id: "ps_c3_causality_q",
+          type: "scenario_choice",
+          badge: "Stage 4",
+          title: "Stage 4 · Handling the causality question",
+          prompt: "After presenting your A/B test results showing +8% conversion, the CFO says: 'But can you actually prove this causes the improvement? Maybe users who opted in were already more likely to convert.' How do you respond?",
+          choices: [
+            { id: "a", label: "\"You're right — we can't prove causality definitively. We recommend waiting for more data before making any decisions.\"", description: "This overcorrects into paralysis. The CFO asked a good question but you have a good answer — don't abandon the recommendation." },
+            { id: "b", label: "\"Yes, the A/B test definitively proves causation because we controlled all the variables.\"", description: "Overclaims. No single experiment definitively proves causation, and a CFO who knows statistics will lose trust in you immediately." },
+            { id: "c", label: "\"That's a sharp question. We ran a randomized experiment — users were randomly assigned to treatment and control, which is exactly how we control for pre-existing differences like engagement level. Randomization neutralizes selection bias. So while we can't rule out every confound forever, the design gives us strong evidence that the improvement is caused by the change, not by who received it.\"", description: "Acknowledge the limit, explain the design's protection against this specific concern, land on confidence." },
+            { id: "d", label: "\"Causality is a philosophical question — we prefer to focus on predictive validity rather than causal claims.\"", description: "Evasive. The CFO asked a reasonable question about the experimental design, not a philosophy seminar." },
+          ],
+          branches: { a: "ps_c3_rec_stakeholder", b: "ps_c3_rec_stakeholder", c: "ps_c3_sig_question", d: "ps_c3_rec_stakeholder" },
+          rationale: "C is correct. The response structure: (1) validate the question — it's a good one, (2) explain the design feature that addresses the concern — randomization controls for pre-existing differences, (3) be honest about limits without abandoning your recommendation. A CFO who asks about causality is testing whether you understand your own methodology. Show that you do.",
+        },
+
+        ps_c3_rec_stakeholder: {
+          id: "ps_c3_rec_stakeholder",
+          type: "scenario_choice",
+          badge: "Recovery",
+          title: "Recovery · Handling pushback",
+          prompt: "When a skeptical executive challenges the validity of your analysis, what is the right response structure?",
+          choices: [
+            { id: "a", label: "Acknowledge the concern, explain what your methodology specifically does to address it, state your confidence level honestly, and maintain your recommendation.", description: "Validate → address → calibrate → recommend. This builds trust even with skeptics." },
+            { id: "b", label: "Defend your methodology by citing the statistical tests you ran and the validation steps in your analysis pipeline.", description: "Technical defense often reads as defensive posturing. The executive wants to know if you understand the limits of your own work, not whether you can name your validation steps." },
+            { id: "c", label: "Defer to follow-up: 'Good question — let me dig into that and come back to you.'", description: "Sometimes appropriate, but often a missed opportunity. If you know the answer, give it. Saying 'let me get back to you' on a core methodology question suggests you're uncertain about your own work." },
+          ],
+          branches: { a: "ps_c3_sig_question", b: "ps_c3_sig_question", c: "ps_c3_sig_question" },
+          rationale: "Validate, address the specific concern, calibrate confidence honestly, maintain the recommendation. The worst thing you can do is get defensive. The second worst is to abandon your recommendation because someone pushed back. A well-designed analysis can withstand scrutiny — walk through it calmly.",
+        },
+
+        ps_c3_sig_question: {
+          id: "ps_c3_sig_question",
+          type: "scenario_choice",
+          badge: "Stage 5",
+          title: "Stage 5 · Statistical significance question",
+          prompt: "A VP sees 'p = 0.03' on your slide and says: 'So our new feature is definitely working — let's roll it out to everyone today.' How do you respond?",
+          choices: [
+            { id: "a", label: "\"Yes, that's right — p=0.03 means the feature is definitely working. Let's proceed.\"", description: "This overclaims. 'Definitely' implies certainty that statistical significance doesn't provide. If results regress later, you've burned your credibility." },
+            { id: "b", label: "Explain that p=0.03 doesn't mean 'definitely' — it means there's a 3% chance of a false positive under the null hypothesis, which is a frequentist probability statement about the data given the null, not the probability that the null is true.", description: "Technically correct but not useful for a VP. You've given a lecture when you should have given a recommendation." },
+            { id: "c", label: "\"We have strong statistical evidence — there's less than a 3% chance this improvement happened by random chance. In practical terms, we expect around 840 more conversions per week. I'd say 'very likely working' rather than 'definitely' — but the evidence is strong enough that I recommend rolling out now.\"", description: "Validate the direction, correct the overclaim gently, quantify the practical impact, land on the recommendation." },
+            { id: "d", label: "\"Let's wait for more data before committing — statistical significance at p=0.03 is only borderline.\"", description: "p=0.03 clears the conventional threshold. Recommending more waiting when the evidence justifies action is unhelpful." },
+          ],
+          branches: { a: "ps_c3_terminal", b: "ps_c3_terminal", c: "ps_c3_terminal", d: "ps_c3_terminal" },
+          rationale: "C is correct. The pattern: (1) validate the direction — 'strong evidence,' (2) correct the overclaim without being pedantic — 'very likely working rather than definitely,' (3) quantify the practical impact in real units — '840 more conversions per week,' (4) land on the actionable recommendation — 'evidence is strong enough to roll out.' A VP who hears this knows you're both rigorous and decisive.",
+        },
+
+        ps_c3_terminal: {
+          id: "ps_c3_terminal",
+          type: "scenario_choice",
+          badge: "Complete",
+          title: "Complete · Pre-read vs. decision meeting",
+          prompt: "You're presenting to the executive team in 48 hours. They've asked for a pre-read. Your full analysis deck is 38 slides. What do you send?",
+          choices: [
+            { id: "a", label: "Send the full 38-slide deck — they asked for the pre-read, so they should see everything.", description: "A 38-slide deck as pre-read means no one reads it. Pre-reads are narrative documents, not presentation decks." },
+            { id: "b", label: "Send a 2–3 page narrative memo: context, key finding, recommendation, top 3 supporting points, assumptions, and risk. Save the 38-slide deck for backup questions in the meeting.", description: "The pre-read is dense and readable; the live deck drives the decision. Different formats for different purposes." },
+            { id: "c", label: "Send a condensed 8-slide version of the deck with the same content.", description: "Still a deck, not a document. Slide bullets don't substitute for the narrative a pre-read requires. Executives reading slides without a presenter lose most of the context." },
+          ],
+          branches: { a: "ps_c3_terminal", b: "ps_c3_terminal", c: "ps_c3_terminal" },
+          terminal: true,
+          rationale: "B is correct. A pre-read is a document — dense, narrative, designed to be read silently in 5–10 minutes. The live deck is designed for a presenter to drive — sparse, visual, with the recommendation on slide 1. Sending the analysis deck as a pre-read means executives arrive unprepared because they couldn't parse 38 slides without you narrating. Sending a narrative memo means they arrive with the context loaded and you can spend the meeting on the decision, not the setup.",
+        },
       },
     },
+    knowledgeCheck: [
+      {
+        question: "A VP sees your slide: 'Model AUC improved from 0.81 to 0.87.' They ask: 'What does that mean for us?' What is the correct response?",
+        options: [
+          "Explain that AUC measures the model's ability to discriminate between positive and negative classes across all classification thresholds.",
+          "Translate to business impact: 'The higher AUC means we now correctly identify 73% of churners vs. 61% before — that's roughly 480 more at-risk customers flagged per month, worth approximately $290K in recoverable revenue.'",
+          "Tell them AUC 0.87 is considered 'good' by industry standards and qualifies the model for production.",
+        ],
+        correctIndex: 1,
+        explanation: "Technical metrics must be translated to business outcomes before an executive presentation. AUC → precision or recall improvement → operational impact → dollar value. The correct answer completes that translation chain. 'Good by industry standards' is meaningless to a VP; 480 more customers flagged per month at a given dollar value is actionable.",
+      },
+      {
+        question: "A product manager says: 'p=0.03 — so our new feature is definitely working, right?' What is the best response?",
+        options: [
+          "'Yes, p=0.03 is statistically significant, so the feature is confirmed to be working.'",
+          "'We have strong statistical evidence — there's less than a 3% chance the improvement happened by random chance. I'd say very likely working rather than definitely, but the evidence is strong enough to recommend shipping.'",
+          "'Not exactly — you need to understand that p-values represent the probability of observing results this extreme under the null hypothesis, which is not the same as the probability the null is true.'",
+        ],
+        correctIndex: 1,
+        explanation: "The second option validates the direction, corrects the overclaim gently ('very likely' vs. 'definitely'), and lands on a recommendation. The first overclaims and damages credibility if results regress. The third is technically accurate but delivers a statistics lecture instead of a useful answer — it loses the stakeholder.",
+      },
+      {
+        question: "What is the correct structure for an executive presentation following the pyramid principle?",
+        options: [
+          "Context and background → methodology → results → recommendation",
+          "Recommendation with business impact → supporting evidence → assumptions and risks → appendix with technical detail",
+          "Problem statement → analysis steps → findings → conclusion",
+        ],
+        correctIndex: 1,
+        explanation: "The pyramid principle: conclusion first, then evidence. Slide 1 is the recommendation and its business impact. Evidence supports it for those who want to verify. Technical detail lives in the appendix. The other two options build chronologically toward a conclusion — this structure loses executives who stop reading at the methodology slide.",
+      },
+    ],
   },
-  knowledgeCheck: [
-    {
-      question: "Explain a p-value of 0.03 in one sentence to a product manager.",
-      options: [
-        "The null hypothesis was rejected at a 3% significance level",
-        "If this feature had no real effect, there's only a 3% chance we'd see results this strong by random variation alone — so we're fairly confident the effect is real",
-        "We are 97% confident the feature will improve metrics in production",
-      ],
-      correctIndex: 1,
-      explanation: "The plain-language p-value explanation focuses on the false positive risk: how likely is this result if nothing was really happening? 3% means low — we're fairly confident. Note: a p-value is NOT a confidence in the effect existing (that's a Bayesian posterior). It's the probability of the observed result (or more extreme) under the null hypothesis.",
-    },
-    {
-      question: "How do you communicate a 95% confidence interval of [3%, 7%] revenue lift to a VP of Revenue?",
-      options: [
-        "Explain that the CI means the parameter lies within this range with 95% probability",
-        "Translate: 'We're 95% confident the true revenue impact is between $X and $Y' (using actual dollar values from current revenue), making the uncertainty actionable",
-        "Report only the midpoint (5%) to avoid confusing the audience with ranges",
-      ],
-      correctIndex: 1,
-      explanation: "Abstract percentages are hard to act on. Dollar ranges are concrete: 'The 95% confidence interval is $600K to $1.4M additional annual revenue.' A VP can evaluate: is even the low end ($600K) worth the implementation cost? This makes uncertainty tangible and the decision easy.",
-    },
-    {
-      question: "What is the recommended approach when a stakeholder asks 'why did the AI recommend this for this customer?'",
-      options: [
-        "Explain the full model architecture and training procedure",
-        "Report the top 3 SHAP feature contributions in plain language with direction and magnitude, then acknowledge the model's limitations",
-        "Decline to answer — model explanations are proprietary",
-      ],
-      correctIndex: 1,
-      explanation: "The prepared attribution answer: (1) top 3 features by magnitude, (2) direction (pushing prediction up or down), (3) magnitude in familiar units (not log-odds), (4) a limitation acknowledgment ('this reflects historical patterns — treat it as a signal to investigate, not a certainty'). This builds trust while remaining honest about model limitations.",
-    },
-  ],
-},
 
 "mo-c1": {
   durationLabel: "20 min",
