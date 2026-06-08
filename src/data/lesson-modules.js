@@ -33444,212 +33444,311 @@ This answer demonstrates you understand production ML is not just about model ac
 },
 
   "sd-m4": {
-    durationLabel: "25 min",
-    outcomes: [
-      "Explain the multi-stage recommendation pipeline and why candidate generation is necessary at scale",
-      "Describe two-tower models and approximate nearest neighbor search for efficient candidate retrieval",
-      "Address cold start for new users and new items using appropriate strategies",
+  durationLabel: "25 min",
+  outcomes: [
+    "Explain why naive full-catalog scoring is infeasible at scale and how multi-stage pipelines solve it",
+    "Describe how two-tower models enable fast ANN-based candidate retrieval",
+    "Distinguish the roles of retrieval, ranking, and re-ranking stages in a production recommendation system",
+    "Apply cold-start strategies for new users and new items with no engagement history",
+    "Use MMR or slot constraints to improve recommendation diversity and prevent echo chambers",
+  ],
+  learnMarkdown: `## The Scale Problem
+
+Imagine a platform with **1 billion users** and **10 million items**. A naive recommendation system scores every item for every user: 1B × 10M = **10^16 operations per request**. Even at 1 microsecond per score, satisfying one second of traffic would take 317 years of compute. This is not a latency problem — it is a mathematical impossibility that demands a different architectural approach.
+
+The solution is a **multi-stage pipeline** that progressively narrows the candidate set, with each stage handing off a smaller, higher-quality shortlist to the next. The final expensive model sees only a few hundred candidates, not millions.
+
+## Multi-Stage Pipeline
+
+Modern recommendation systems cascade through three main stages:
+
+**1. Candidate Generation (Retrieval)**
+Reduce the catalog from 10M items to roughly **500–2000 candidates** using lightweight models. The primary goal is *recall* — the good items must survive this stage. Common approaches: two-tower neural models with ANN search, matrix factorization, and popularity lists as a fallback. Retrieval must complete in under 10 ms.
+
+**2. Ranking**
+Score the ~1000 retrieved candidates with a *heavy* cross-feature model. This stage can afford expensive feature interactions because the candidate pool is small. Models like LightGBM, DeepFM, or DCN (Deep & Cross Network) combine user history, item metadata, context signals, and interaction features — things like "user A watches cooking videos on weekends" × "this item was posted on Saturday." The ranker outputs a predicted engagement score and re-orders candidates into a top-50 shortlist.
+
+**3. Re-ranking / Business Rules**
+The ML shortlist is adjusted for business goals before serving: inject sponsored content at designated slots, apply freshness boosts to surface new items, enforce content policy filters, and improve diversity so users do not see 10 near-identical items. Business rules are applied last so they operate on a high-quality ML output without contaminating model training signals.
+
+## Two-Tower Model
+
+The two-tower architecture is the workhorse of modern retrieval. It trains **two separate neural networks** — a user tower and an item tower — that embed both into the same vector space. Similarity is measured by dot product or cosine distance.
+
+- **Offline**: pre-compute item embeddings for all 10M items and load them into an ANN index (Faiss HNSW, ScaNN, Pinecone).
+- **Online**: compute the user embedding from real-time context, then query the ANN index to retrieve the top-K nearest items in sub-millisecond time.
+
+Because user and item towers are independent, item embeddings are computed *once* in batch after each model update. Only the user embedding is computed at serving time. This factorisation is what makes O(1) retrieval (with respect to catalog size) possible.
+
+Training uses **in-batch negatives**: treat all other items in a mini-batch as negatives. Hard negative mining — selecting near-miss items close in embedding space — sharpens the boundary.
+
+## Ranking Model
+
+With ~1000 candidates, the ranking model can afford **cross-feature interactions**. LightGBM handles tabular features efficiently with low serving latency and is easy to explain via SHAP values. DeepFM and DCN add learned feature crosses via neural components, capturing higher-order patterns. Key features include: user watch history embeddings, item genre/duration/freshness, time-of-day context, device type, and prior engagement signals (CTR, completion rate).
+
+## Cold Start
+
+New users and new items lack engagement history — the collaborative signal does not exist yet.
+
+- **New users**: fall back to popularity-based or trending lists; prompt for explicit preferences via an onboarding survey; use demographic or geographic priors.
+- **New items**: use content-based features (genre, description embeddings, cast) in the item tower; apply a freshness boost in re-ranking until enough clicks accumulate.
+
+## Diversity
+
+Without diversity controls, ranking by pure relevance causes **echo chambers** — users only see items similar to what they already watched, and engagement drops over sessions.
+
+- **MMR (Maximum Marginal Relevance)**: iteratively select the next item that maximises λ·relevance − (1−λ)·max_similarity(item, already_selected). The λ parameter controls the relevance-diversity trade-off.
+- **Slot-based constraints**: define diversity rules per result position, such as "at most 2 items from the same series" or "at least 1 item from a different genre."
+
+## Metrics
+
+| Metric | What it captures |
+|--------|-----------------|
+| CTR | Short-term engagement; gameable by clickbait |
+| Watch / dwell time | Depth of engagement |
+| Satisfaction surveys | Long-term user happiness |
+| Revenue per user | Business impact |
+| ILS (Intra-List Similarity) | Echo chamber degree |
+
+Optimising only CTR creates clickbait incentives. Production systems multi-objective optimise across several signals simultaneously, often using a weighted reward model.
+
+## Interview-Ready Summary
+
+- **Scale**: 1B users × 10M items per request is infeasible — multi-stage pipelines solve this by cascading Retrieval (10M → 1000) → Ranking (1000 → 50) → Re-ranking (50 → 10)
+- **Two-tower model**: separate user and item neural towers in a shared embedding space; item embeddings pre-computed offline and indexed in ANN (Faiss/ScaNN) for sub-millisecond retrieval
+- **Ranking model**: cross-feature models (LightGBM, DeepFM, DCN) score the shortlist with rich feature interactions that retrieval cannot afford
+- **Cold start**: content-based features in the item tower handle new items; popularity fallback and onboarding prompts handle new users; freshness boosts in re-ranking increase early visibility
+- **Diversity**: MMR or slot constraints prevent filter bubbles; pure CTR optimisation creates clickbait — multi-objective reward functions are the production standard
+- **Business rules last**: sponsored content, content policy, and freshness injected at re-ranking stage to decouple business logic from ML model training
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Two-Tower Architecture and ANN Search
+
+### Why Two Separate Towers?
+
+The key insight behind the two-tower design is **factorisation**. By training a user tower \`f(user_context) → ℝᵈ\` and an item tower \`g(item_features) → ℝᵈ\` independently, item embeddings can be computed *once offline* and stored in an ANN index. At serving time, only the user embedding requires a forward pass — a single ANN query returns nearest item vectors instantly regardless of catalog size. Without this separation, a joint model over every (user, item) pair at request time is exactly the O(N) bottleneck that makes naive ranking infeasible.
+
+Training uses **contrastive loss with in-batch negatives**: all other items in a mini-batch serve as negatives for the positive pair. **Hard negative mining** — selecting negatives that are close but wrong — sharpens the decision boundary and substantially improves recall@K.
+
+### ANN Search: Faiss HNSW vs Exact
+
+With 10M pre-computed item embeddings, even a simple brute-force dot-product search takes O(N·D) operations — about 1.3 billion multiply-adds for 128-dimensional vectors. At 1 microsecond per op that is 1.3 seconds per query. At high QPS this becomes cost-prohibitive.
+
+**HNSW (Hierarchical Navigable Small Worlds)** builds a multi-layer proximity graph over the embedding space. At query time, a greedy graph walk from the top (coarse) layer down finds approximate nearest neighbours in O(log N) steps.
+
+| | Exact Search | HNSW |
+|---|---|---|
+| Latency (10M items) | ~10 ms | <1 ms |
+| Recall@100 | 100% | 93–98% |
+| Index build time | None | Minutes |
+| Memory overhead | Low | Medium (graph edges) |
+
+Losing 2–5% recall is acceptable because the ranking stage re-scores candidates anyway. Always measure **recall@K** (not precision@K) — a missed true positive at retrieval can never be recovered. **Product Quantisation (PQ)** compresses 128-dim float32 embeddings (512 bytes) to 16–32 bytes, enabling billion-scale indexes on commodity hardware.
+
+### Designing a Rec-Sys in 30 Minutes
+
+A structured walk-through:
+
+1. **(0–5 min) Clarify scope**: catalog size, QPS, latency budget, freshness requirements, cold start expectations.
+2. **(5–12 min) Retrieval layer**: two-tower training, offline item indexing, ANN at serving, new-user fallback.
+3. **(12–20 min) Ranking layer**: feature store, cross-feature model (LightGBM vs DeepFM), latency budget.
+4. **(20–25 min) Re-ranking**: MMR diversity, freshness boost, sponsored injection, content policy.
+5. **(25–30 min) Metrics**: multi-objective reward, A/B experimentation, training data pipeline.
+
+Anchor every answer in concrete numbers — "retrieval narrows 10M to 1000," "ranking responds in under 20 ms." Quantitative reasoning differentiates strong candidates.
+`,
+  tryGuidance: "Step through the interview simulation. In the code stage, click the line responsible for the O(catalog_size) bottleneck. Then answer scenario questions covering pipeline stages, two-tower retrieval, ANN search, cold start for new items, diversity via MMR, and business rule placement.",
+  interviewGraph: {
+    initialStageId: "click_stage",
+    artifactDimensions: [
+      { label: "Retrieval vs Ranking", recoveryStageId: "retrieval_recovery" },
+      { label: "Scale Architecture", recoveryStageId: "scale_recovery" },
     ],
-    learnMarkdown: `## Recommendation Systems at Scale
+    stages: {
+      scale_recovery: {
+        id: "scale_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Scale Architecture",
+        prompt: "Let us revisit the scale problem. The core issue is O(catalog_size) model calls per user request. Which architectural pattern directly resolves this by reducing the number of items the heavy model must score?",
+        choices: [
+          { id: "a", label: "Multi-stage pipeline: a cheap retrieval model first narrows 6M items to ~1000 candidates, then the heavy ranking model scores only those 1000", description: "Candidate generation before ranking" },
+          { id: "b", label: "Model distillation: compress the cross-feature model to run 100× faster so it can score all 6M items within latency budget", description: "Speed up the model to handle full catalog" },
+          { id: "c", label: "Precompute all user-item scores nightly and store in a lookup table for O(1) serving", description: "Offline full scoring with online lookup" },
+        ],
+        branches: { a: "click_stage", b: "click_stage", c: "click_stage" },
+        rationale: "Only a multi-stage pipeline fundamentally changes the O(N) problem — retrieval reduces the input size so the heavy model sees 1000 items, not 6M. Model distillation still runs O(N) calls even if each is faster. Nightly precomputation cannot incorporate real-time context (current session, trending content) and produces stale personalisation.",
+      },
 
-Building a recommendation system is one of the most common ML system design interview topics. The core challenge is a **scale problem**: you cannot score every item for every user in real time. The multi-stage pipeline is the industry-standard solution.
-
-### The Scale Problem
-
-Netflix has 200M users and 15,000+ titles. Scoring every title for every user at page load time = 3 trillion model evaluations per day. Even at 1ms per evaluation, that's 3 billion seconds of compute. Clearly infeasible.
-
-Solution: **progressively narrow the candidate set** with increasingly expensive models.
-
-### Multi-Stage Pipeline
-
-\`\`\`
-All Items (200K)
-    ↓ Candidate Generation (ANN search, two-tower)
-Top 1000 Candidates
-    ↓ Coarse Ranking (fast model, limited features)
-Top 100 Candidates
-    ↓ Fine Ranking (full-featured model, expensive)
-Top 20 Candidates
-    ↓ Business Re-ranking (diversity, freshness, sponsored)
-Final 20 Shown to User
-\`\`\`
-
-### Stage 1: Candidate Generation
-
-Goal: retrieve the 1,000 most relevant items from 200K in < 10ms.
-
-**Two-Tower Model:**
-\`\`\`
-User Features → User Encoder → User Embedding (128-dim)
-Item Features → Item Encoder → Item Embedding (128-dim)
-\`\`\`
-Relevance score = dot product of user and item embeddings.
-
-**Approximate Nearest Neighbor (ANN) Search:**
-Pre-compute all item embeddings. At query time, find the top-K items closest to the user embedding using ANN search (FAISS, ScaNN, HNSW). ANN returns approximate results in O(log N) time instead of exact O(N).
-
-FAISS (Facebook AI Similarity Search) and Google's ScaNN are the standard libraries.
-
-### Stage 2: Coarse Ranking
-
-Scores top-1000 candidates with a fast model. Uses features readily available in memory: item popularity, category match, recency. Goal: prune to top-100. Must run in < 20ms for the full candidate set.
-
-### Stage 3: Fine Ranking
-
-The most expensive model. Applied to top-100 candidates only. Uses full feature set: user-item interaction features, contextual features (time of day, device, session context), cross-feature interactions. Typically a deep neural network or gradient-boosted tree.
-
-**Learning-to-Rank losses**: pairwise (RankNet) or listwise (LambdaRank/LambdaMart) losses that directly optimize ranking metrics (NDCG, MAP) rather than pointwise classification loss.
-
-### Stage 4: Business Re-Ranking
-
-Even after fine ranking, pure relevance optimization leads to problems:
-- **Over-promotion of popular items**: rich-get-richer effect
-- **Filter bubbles**: users see only one type of content
-- **Freshness**: new items deserve exposure even if engagement history is sparse
-- **Diversity**: the top-20 shouldn't be 20 similar action movies
-- **Business constraints**: sponsored content, legal restrictions, inventory constraints
-
-Rules and lightweight models handle these constraints after ranking.
-
-### Explore vs Exploit
-
-Pure exploitation (always show highest predicted relevance) leads to stagnation. The system needs exploration:
-
-- **Epsilon-greedy**: 10% of recommendations drawn randomly to collect unbiased signal
-- **Thompson Sampling**: sample reward probability from posterior; naturally explores uncertain items
-- **UCB (Upper Confidence Bound)**: recommend items whose upper confidence bound on expected reward is highest; forces exploration of items with few impressions
-
-### Cold Start
-
-**New User (no history):**
-1. Surface popular items in their selected genres (onboarding screen)
-2. Use demographics if available (age, country)
-3. Explore aggressively in early sessions to build a preference profile
-
-**New Item (no interaction history):**
-1. Use **content features** (genre, cast, duration, language) to build a cold-start embedding
-2. Content-based similarity to items with known engagement
-3. Promote in a small exploration slot to collect initial interaction signal
-4. Once sufficient interactions exist, transition to collaborative filtering embedding`,
-    video: null,
-    videoFallbackMarkdown: `## Deep Dive: Collaborative Filtering vs Content-Based
-
-### Matrix Factorization (Collaborative Filtering)
-
-Decompose the user-item interaction matrix into user and item latent factor matrices:
-\`\`\`
-R (users × items) ≈ U (users × k) × V^T (k × items)
-\`\`\`
-
-Training: minimize reconstruction error on observed ratings. Prediction: dot product of user and item latent vectors. Problem: cannot handle new users or new items (no row/column in the matrix).
-
-### Content-Based Filtering
-
-Represent items by their attributes (genre, cast, description embedding) and users by the aggregate of items they've interacted with. Predict relevance as similarity between user and item content vectors.
-
-Handles cold start naturally. Suffers from filter bubbles (only recommends more of what the user already likes).
-
-### Hybrid Systems
-
-Production systems combine both: content features initialize embeddings (cold start), collaborative signal refines them as interactions accumulate. Two-tower models naturally support this by accepting both content features and ID embeddings as inputs.`,
-    tryGuidance: "Explore the multi-stage recommendation pipeline in the interactive diagram.",
-    interviewGraph: {
-      initialStageId: "sd_m4_s1",
-      artifactDimensions: [
-        { label: "Pipeline Architecture", recoveryStageId: "sd_m4_r1" },
-        { label: "Cold Start Strategy", recoveryStageId: "sd_m4_r2" },
-      ],
-      stages: {
-        sd_m4_s1: {
-          id: "sd_m4_s1",
-          type: "scenario_choice",
-          badge: "Stage 1",
-          title: "Stage 1 · Scale Problem",
-          prompt: "You're designing a recommendation system for a marketplace with 50M users and 500K products. The product page must load in <200ms. An interviewer asks: 'Can you just run your ranking model against all 500K products for each user?' How do you respond?",
-          choices: [
-            { id: "a", label: "No — multi-stage pipeline: candidate generation retrieves ~1000 candidates via ANN, then rankers narrow to final recommendations", description: "Running a full ranker on 500K items per request is computationally infeasible. ANN search retrieves a manageable candidate set in milliseconds." },
-            { id: "b", label: "Yes — with enough GPU infrastructure you can rank all products in real time", description: "Scale out the inference infrastructure to handle the compute load." },
-            { id: "c", label: "Precompute rankings for all user-product pairs nightly", description: "Batch precompute every user's ranked list. Store in Redis for fast lookup." },
-          ],
-          branches: { a: "sd_m4_s2", b: "sd_m4_r1", c: "sd_m4_r1" },
-          rationale: "Even with massive GPU clusters, scoring 500K items per user per request is prohibitively expensive and slow. The multi-stage pipeline is the universal solution: cheap retrieval narrows the candidate set, expensive rankers run only on that subset.",
+      click_stage: {
+        id: "click_stage",
+        type: "click_target",
+        badge: "Stage 1",
+        title: "Stage 1 · Spot the Bottleneck",
+        prompt: "This function is running in production and timing out under load. Click the single line that causes the O(catalog_size) performance bottleneck.",
+        code_snippet: `def get_recommendations(user_id, catalog):
+    scores = []
+    for item_id in catalog:                          # -- ds-target:full_scan
+        features = get_cross_features(user_id, item_id)  # -- ds-target:expensive_features
+        score = ranking_model.predict(features)
+        scores.append((item_id, score))
+    return sorted(scores, reverse=True)[:10]`,
+        validationCopy: {
+          full_scan: "Correct. Iterating over the entire catalog calls the heavy ranking model on every item — O(catalog_size) per request. At 10M items this is completely infeasible. The fix is to add a candidate generation stage that narrows the catalog to ~1000 items before this ranker is invoked.",
+          expensive_features: "This line is expensive, but it is expensive precisely because it is called inside the full-catalog loop above. Fix the loop on the line above and this function only executes ~1000 times instead of 10 million — making the overall cost tractable.",
         },
-        sd_m4_r1: {
-          id: "sd_m4_r1",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Pipeline Stages",
-          prompt: "The multi-stage pipeline uses progressively more expensive models on progressively smaller candidate sets. What is the purpose of the candidate generation stage specifically?",
-          choices: [
-            { id: "a", label: "Retrieve the top ~1000 most relevant items from 500K using fast approximate nearest neighbor search", description: "ANN search on pre-computed embeddings retrieves candidates in milliseconds, making the subsequent expensive ranker feasible." },
-            { id: "b", label: "Filter out items the user has already purchased or seen", description: "Exclusion filtering is a post-processing step, not the purpose of candidate generation." },
-          ],
-          branches: { a: "sd_m4_s2", b: "sd_m4_s2" },
-          rationale: "Candidate generation is purely about scale: go from 500K to ~1000 candidates that are plausibly relevant. ANN search on two-tower embeddings is the standard approach — it runs in O(log N) vs the O(N) full scan that would be infeasible at serving time.",
-        },
-        sd_m4_s2: {
-          id: "sd_m4_s2",
-          type: "scenario_choice",
-          badge: "Stage 2",
-          title: "Stage 2 · Cold Start",
-          prompt: "Your marketplace launches in a new country. Thousands of new users sign up daily and dozens of new products are listed per hour. Neither has any interaction history. How do you handle recommendations?",
-          choices: [
-            { id: "a", label: "New users: popular items + onboarding questions. New items: content-based cold embedding + exploration slot", description: "New users see popular/trending items and declare preferences. New items are described by content features and surfaced in a small exploration allocation to collect initial interactions." },
-            { id: "b", label: "Don't recommend to new users until they have 10 interactions", description: "Gate recommendations behind a minimum interaction threshold to ensure quality." },
-            { id: "c", label: "Recommend the globally most popular items to everyone", description: "Use one global top-K list for all new users and items until enough history is collected." },
-          ],
-          branches: { a: "sd_m4_t", b: "sd_m4_r2", c: "sd_m4_r2" },
-          rationale: "Waiting for interactions creates a poor onboarding experience. Popularity + preference declarations (onboarding) quickly personalizes new user experience. Content features solve new item cold start by enabling similarity to known items before any interactions exist.",
-        },
-        sd_m4_r2: {
-          id: "sd_m4_r2",
-          type: "scenario_choice",
-          badge: "Recovery 2",
-          title: "Recovery 2 · Cold Start Detail",
-          prompt: "For new items with no interaction history, collaborative filtering cannot generate embeddings (no user interactions to factor in). What alternative allows the system to still recommend new items?",
-          choices: [
-            { id: "a", label: "Content-based features: use item attributes (category, description embedding, price range) to generate a cold-start embedding", description: "Content features enable similarity computation against known items. As interactions accumulate, the collaborative signal takes over." },
-            { id: "b", label: "Wait until the item has 100 interactions before including it in recommendations", description: "This creates a chicken-and-egg problem: items need exposure to get interactions, but they can't get recommended without interactions." },
-          ],
-          branches: { a: "sd_m4_t", b: "sd_m4_t" },
-          rationale: "Content-based cold start is the solution to the chicken-and-egg problem. A new laptop can be embedded based on its specs, brand, and price range — similar to laptops users have interacted with. The exploration slot (epsilon-greedy or similar) ensures new items get the initial interactions needed to build a collaborative embedding.",
-        },
-        sd_m4_t: {
-          id: "sd_m4_t",
-          type: "scenario_choice",
-          badge: "Complete",
-          title: "Complete · RecSys Architecture",
-          prompt: "A fine-ranker ranks purely by predicted CTR. After 3 months, users complain the feed is repetitive and full of similar items. What pipeline component addresses this?",
-          choices: [
-            { id: "a", label: "Business re-ranking with diversity constraints — limit items from same category, inject fresh content", description: "The re-ranking stage applies diversity rules, freshness boosts, and business constraints after relevance ranking to create a balanced recommendation list." },
-          ],
-          branches: { a: "sd_m4_t" },
-          terminal: true,
-          rationale: "Pure relevance optimization is a local optimum. Users report satisfaction declining when feeds are too homogeneous — the 'filter bubble' effect. Business re-ranking is the architectural solution: enforce diversity, freshness, and category limits as constraints applied post-ranking.",
-        },
+        branches: { full_scan: "retrieval_purpose", expensive_features: "retrieval_recovery" },
+      },
+
+      retrieval_recovery: {
+        id: "retrieval_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Retrieval vs Ranking",
+        prompt: "The root bottleneck is the loop iterating over the full catalog and invoking the heavy ranking model on every item. What is the correct architectural fix?",
+        choices: [
+          { id: "a", label: "Add a candidate generation stage before ranking — use a lightweight retrieval model to reduce 10M items to ~1000, then rank only those 1000 candidates", description: "Two-stage: retrieve then rank" },
+          { id: "b", label: "Swap the ranking model for a lighter model that can handle the full catalog within latency budget", description: "Use a simpler model to score all items" },
+          { id: "c", label: "Sort the catalog nightly by global popularity and serve the cached sorted list at request time", description: "Precompute a global ranking to avoid per-request scoring" },
+        ],
+        branches: { a: "retrieval_purpose", b: "retrieval_purpose", c: "retrieval_purpose" },
+        rationale: "Only candidate generation changes the fundamental complexity from O(catalog_size) to O(candidates). A lighter model on the full catalog is still O(10M) — you have shifted the constant but not the asymptotic problem. A cached global ranking is not personalised and goes stale quickly, missing real-time signals like trending content or session context.",
+      },
+
+      retrieval_purpose: {
+        id: "retrieval_purpose",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Two-Tower Retrieval",
+        prompt: "You propose a two-tower model for candidate generation. Your interviewer asks: 'What is the key architectural property that lets a two-tower model retrieve candidates from 10M items in under 5 ms?'",
+        choices: [
+          { id: "a", label: "User and item towers are independent — item embeddings are pre-computed offline and indexed in an ANN store; serving requires only a user embedding computation plus a fast ANN query", description: "Offline item indexing enables sub-millisecond ANN lookup" },
+          { id: "b", label: "The two towers run on separate GPU cores in parallel, halving the inference time compared to a single model", description: "Parallel hardware execution reduces latency" },
+          { id: "c", label: "Two-tower models use sparse feature representations that require far fewer FLOPs than dense cross-feature models", description: "Sparse inputs reduce computation at inference time" },
+          { id: "d", label: "The user tower is much smaller than the item tower, so computing the user side is extremely cheap", description: "Asymmetric tower sizing reduces user-side inference cost" },
+        ],
+        branches: { a: "ann_tradeoff", b: "ann_tradeoff", c: "ann_tradeoff", d: "ann_tradeoff" },
+        rationale: "The key is factorisation: because user and item towers never interact during inference, item embeddings are computed once in batch (offline) and loaded into an ANN index (Faiss, ScaNN). At request time, only the user embedding is computed — a single ANN query then finds nearest item embeddings in sub-millisecond time regardless of catalog size. Parallel GPUs (B) and sparse features (C) are real properties but are not the core architectural insight. Asymmetric sizing (D) is not a standard characteristic.",
+      },
+
+      ann_tradeoff: {
+        id: "ann_tradeoff",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · ANN vs Exact Search",
+        prompt: "You have 10M item embeddings at 128 dimensions. Your interviewer asks: 'Why does production retrieval use Approximate Nearest Neighbour search rather than exact nearest-neighbour search?'",
+        choices: [
+          { id: "a", label: "Exact search over 10M vectors requires O(N·D) dot products per query — too slow at high QPS; ANN (e.g. Faiss HNSW) returns 95%+ recall in under 1 ms via graph navigation", description: "Latency vs perfect accuracy trade-off" },
+          { id: "b", label: "ANN indexes compress embeddings so they fit in RAM, whereas exact search requires all vectors on disk making it I/O bound", description: "Memory footprint is the primary concern" },
+          { id: "c", label: "Approximate results are better for recommendations because slight randomness improves diversity in the candidate set", description: "Approximation as an intentional diversity mechanism" },
+          { id: "d", label: "ANN is required because item embeddings are updated continuously and cannot be fully indexed for exact search", description: "Continuous embedding updates make exact indexing impossible" },
+        ],
+        branches: { a: "cold_start", b: "cold_start", c: "cold_start", d: "cold_start" },
+        rationale: "The primary reason is latency. At 10M × 128 dimensions, exact search requires ~1.3 billion multiply-adds per query — around 5–10 ms on modern CPUs. At high QPS this is cost-prohibitive. HNSW navigates a proximity graph in O(log N) steps, returning approximate nearest neighbours in under 1 ms at 95%+ recall@100. The small recall loss is acceptable because the ranking stage re-scores and reorders candidates anyway. Memory footprint (B) is a secondary benefit handled by product quantisation. Diversity (C) is a separate concern addressed by MMR in re-ranking. Continuous updates (D) are handled by periodic batch re-indexing, not a fundamental ANN requirement.",
+      },
+
+      cold_start: {
+        id: "cold_start",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Cold Start for New Items",
+        prompt: "A new item has just been published. It has zero clicks and no engagement history — collaborative filtering produces no signal. How does a well-designed retrieval system handle this new item?",
+        choices: [
+          { id: "a", label: "Use content-based features (genre, description embeddings, metadata) in the item tower to generate an initial embedding, and apply a freshness boost in re-ranking to surface the item early", description: "Content features for embedding + freshness injection at re-ranking" },
+          { id: "b", label: "Exclude the item from the ANN index until it accumulates at least 100 clicks to ensure embedding quality", description: "Delay indexing until enough behavioral data exists" },
+          { id: "c", label: "Assign the new item the centroid embedding of all items in its category as a starting point", description: "Category centroid as a cold-start proxy embedding" },
+          { id: "d", label: "Duplicate the item's index entry multiple times to proportionally increase its ANN retrieval probability", description: "Index inflation to boost cold-start exposure" },
+        ],
+        branches: { a: "diversity_technique", b: "diversity_technique", c: "diversity_technique", d: "diversity_technique" },
+        rationale: "Option A is the production-standard approach. The item tower is trained on content features precisely so it can embed new items with no behavioral data. The content-based embedding is less precise than a behaviorally-learned one, but it keeps the item visible in retrieval. A freshness boost in re-ranking increases the item's exposure until enough clicks accumulate for collaborative signals to take over. Waiting for 100 clicks (B) creates a catch-22 — the item never gets seen, so clicks never accumulate. Category centroids (C) work as a simple fallback but lose item-specific signal. Index duplication (D) is unprincipled and degrades ANN index quality.",
+      },
+
+      diversity_technique: {
+        id: "diversity_technique",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Diversity in Re-ranking",
+        prompt: "Your ranking model is producing high-CTR results, but A/B tests show session-length declining — the top 10 recommendations are all near-identical crime dramas from the same series. Which technique in re-ranking directly addresses this?",
+        choices: [
+          { id: "a", label: "MMR (Maximum Marginal Relevance): iteratively select the next item maximising λ·relevance − (1−λ)·max_similarity(item, already_selected)", description: "Greedy diversity-aware selection with tunable λ" },
+          { id: "b", label: "Randomly shuffle the top-20 ranking outputs before taking the top-10", description: "Randomisation as a diversity mechanism" },
+          { id: "c", label: "Lower the ranking model's temperature parameter so score distributions are less peaked", description: "Flatten the score distribution to spread selections" },
+          { id: "d", label: "Remove all items from the same series after the first one is selected, then re-run ranking on the reduced set", description: "Hard deduplication by series before final selection" },
+        ],
+        branches: { a: "business_rules", b: "business_rules", c: "business_rules", d: "business_rules" },
+        rationale: "MMR (A) is the principled standard: it formalises the relevance-diversity trade-off with a tunable λ and iteratively builds a diverse yet high-quality result list. Slot-based constraints (like option D's series deduplication) are also valid and widely used in practice — though option D re-runs ranking which is wasteful; in reality the constraint is applied during the MMR selection pass. Random shuffling (B) is unprincipled and degrades quality. Ranking temperature (C) controls training score distributions, not serving diversity.",
+      },
+
+      business_rules: {
+        id: "business_rules",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · Business Rules Placement",
+        prompt: "Your team needs to inject sponsored content at specific positions and apply content policy filters that hard-block certain item categories. At which stage of the pipeline should these be applied, and why?",
+        choices: [
+          { id: "a", label: "Re-ranking stage only — applied after ML models produce scores, decoupling business logic from model training and allowing rule changes without retraining", description: "Post-scoring injection at final stage" },
+          { id: "b", label: "Retrieval stage — filter ineligible items from the ANN index before candidate generation to avoid wasting ranking compute on them", description: "Apply hard blocks as early as possible" },
+          { id: "c", label: "Ranking model — encode policy violations as a feature and sponsored status as a label, letting the model learn to apply these rules automatically", description: "Bake business rules into ML model training" },
+          { id: "d", label: "Both retrieval (hard content policy blocks) and re-ranking (sponsored injection and soft business rules)", description: "Split: early hard filtering at retrieval, rule-based injection at re-ranking" },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage", d: "terminal_stage" },
+        rationale: "Option D reflects production reality. Hard content policy blocks (legal compliance, safety) are applied at retrieval to avoid wasting ranking compute on ineligible items. Sponsored content injection and nuanced business rules are applied at re-ranking where you have explicit control over slot positions in the final ordered list. Option A alone misses the efficiency argument for early hard filtering. Option B alone cannot handle sponsored slot injection which requires knowledge of the final ranking order. Option C conflates business logic with ML objectives — rule changes would require expensive model retraining.",
+      },
+
+      terminal_stage: {
+        id: "terminal_stage",
+        type: "scenario_choice",
+        badge: "Stage 7",
+        title: "Stage 7 · Metrics and Multi-Objective Optimisation",
+        prompt: "Your team optimises the ranking model exclusively for CTR. Six months later, user retention is declining. What is the most likely cause, and how would you fix it?",
+        choices: [
+          { id: "a", label: "CTR incentivises clickbait — items that generate clicks but leave users unsatisfied. Fix: multi-objective optimisation combining CTR, watch/dwell time, and satisfaction signals", description: "Multi-objective reward to balance short-term and long-term engagement" },
+          { id: "b", label: "CTR is too noisy as a training signal. Fix: switch entirely to watch time as the sole optimisation target", description: "Replace CTR with a single deeper engagement metric" },
+          { id: "c", label: "The ranking model has overfit to training data. Fix: add more regularisation and retrain with a larger dataset", description: "Overfitting as the root cause of retention decline" },
+          { id: "d", label: "CTR optimisation works correctly — the retention decline is caused by an unrelated product change and should be investigated separately", description: "Attribute the issue to external factors, not the recommendation model" },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage", d: "terminal_stage" },
+        terminal: true,
+        rationale: "Option A identifies the well-known failure mode of CTR-only optimisation: it rewards attention-grabbing thumbnails and misleading titles that users click but quickly abandon — producing short-term CTR gains while eroding long-term satisfaction and retention. The industry solution is a multi-objective reward model that combines CTR, completion rate, dwell time, and explicit satisfaction signals (ratings, thumbs). Watch time alone (B) is an improvement but still gameable by very long videos. Overfitting (C) is a different issue and does not explain the specific pattern of high clicks with low retention. Option D ignores a direct causal mechanism.",
       },
     },
-    knowledgeCheck: [
-      {
-        question: "Why can't a single ranking model score all items for all users at request time in a large-scale recommendation system?",
-        options: ["Machine learning models can only handle a fixed number of inputs", "Scoring millions of items per user per request would exceed latency budgets and compute budgets by orders of magnitude", "Ranking models require items to be sorted alphabetically first"],
-        correctIndex: 1,
-        explanation: "At 50M users × 500K items, even 1ms per inference = 25 billion seconds of compute per day. The multi-stage pipeline solves this: fast ANN retrieval narrows candidates to ~1000, then expensive rankers run only on that subset.",
-      },
-      {
-        question: "In a two-tower model for recommendation, what does each tower encode?",
-        options: ["One tower encodes training data, the other encodes test data", "One tower encodes the user (user features → user embedding), the other encodes the item (item features → item embedding)", "One tower handles content features, the other handles collaborative filtering signals"],
-        correctIndex: 1,
-        explanation: "Two-tower models have separate encoder networks for users and items, each producing a dense embedding. Relevance is computed as the dot product (or cosine similarity) of these embeddings. Pre-computing item embeddings enables efficient ANN search at serving time.",
-      },
-      {
-        question: "What is the 'explore vs exploit' problem in recommendations, and how does epsilon-greedy address it?",
-        options: ["Epsilon-greedy randomly removes 10% of recommended items to reduce server load", "Pure exploitation (always show highest predicted relevance) leads to filter bubbles; epsilon-greedy recommends 10% of items randomly to collect unbiased signal from unexplored items", "Epsilon-greedy is a regularization technique that prevents overfitting in ranking models"],
-        correctIndex: 1,
-        explanation: "Exploitation shows what the model currently believes is best. But without exploration, the model never learns about items it's uncertain about, creating filter bubbles and missing opportunities. Epsilon-greedy allocates ~10% of recommendations to random items, collecting the interaction data needed to improve future recommendations.",
-      },
-    ],
   },
+  knowledgeCheck: [
+    {
+      question: "What is the primary purpose of the candidate generation (retrieval) stage in a multi-stage recommendation pipeline?",
+      options: [
+        "To apply business rules and inject sponsored content into the final recommendation list",
+        "To reduce the full item catalog (e.g. 10M items) to a manageable shortlist (e.g. 1000 items) before the expensive ranking model is applied",
+        "To compute high-order cross-feature interactions between users and items using a deep neural network",
+        "To enforce content policy filters and diversity constraints on the ML-ranked shortlist",
+      ],
+      correctIndex: 1,
+      explanation: "The retrieval stage uses a lightweight model (two-tower + ANN) to reduce the catalog from millions of items to roughly 1000 candidates. This makes the pipeline feasible — the heavy ranking model only scores the shortlist, not the full catalog, changing the complexity from O(catalog_size) to O(candidates).",
+    },
+    {
+      question: "Why can a two-tower model retrieve candidates from 10 million items in milliseconds at serving time?",
+      options: [
+        "The two towers run in parallel on separate GPU cores, halving inference latency compared to a single model",
+        "Two-tower models use sparse features that require far fewer floating-point operations than dense cross-feature models",
+        "Item embeddings are pre-computed offline and indexed in an ANN store; only the user embedding is computed at serving time, then a single ANN query retrieves nearest items",
+        "Product quantisation compresses item embeddings to 1-bit precision, enabling full-catalog scoring within latency budget",
+      ],
+      correctIndex: 2,
+      explanation: "The architectural insight is factorisation. Because the user and item towers are independent, item embeddings are computed once in batch (offline) and stored in an ANN index (Faiss HNSW, ScaNN). At request time, only the user embedding requires a forward pass — the ANN query finds nearest item embeddings in sub-millisecond time regardless of catalog size.",
+    },
+    {
+      question: "A new item has just been published with zero engagement history. Which strategy best handles this cold-start scenario in a two-tower retrieval system?",
+      options: [
+        "Exclude the item from the ANN index until it accumulates at least 100 clicks to ensure embedding quality",
+        "Assign the new item the mean embedding vector of all items in the catalog as an initial representation",
+        "Use content-based features (genre, description embeddings, metadata) in the item tower to generate an embedding, and apply a freshness boost in re-ranking to surface the item early",
+        "Route all users to a separate cold-start model that only recommends new items until sufficient interaction data is collected",
+      ],
+      correctIndex: 2,
+      explanation: "The item tower is trained on content features precisely to handle cold start. Even without behavioral data, it can embed a new item using its title (text embeddings), category, and metadata. This content-based embedding is indexed immediately in the ANN store. Re-ranking then applies a freshness boost to increase the item's visibility until enough clicks accumulate for collaborative signals to dominate.",
+    },
+  ],
+},
 
 "ps-m1": {
     durationLabel: "18 min",
@@ -37760,178 +37859,474 @@ stages:
 },
 
 "mo-c2": {
-  durationLabel: "15 min",
+  durationLabel: "18 min",
   outcomes: [
-    "List the four MLflow components and what each tracks",
-    "Explain the MLflow model registry lifecycle: staging → production → archived",
-    "Describe DVC and how it tracks large data files without storing them in Git",
-    "Define full reproducibility and its four required components",
+    "Distinguish **data drift**, **concept drift**, and **label drift** and explain why each degrades a production model differently.",
+    "Apply **PSI**, **KS test**, and **Jensen-Shannon divergence** to detect numerical feature drift; use chi-squared for categorical features.",
+    "Design a monitoring infrastructure with feature store logs, shadow deployments, and scheduled drift reports.",
+    "Interpret PSI thresholds (< 0.1 stable, 0.1–0.2 warning, > 0.2 retrain) and know when to retrain versus roll back.",
+    "Name production monitoring tools (Evidently AI, Whylogs, Arize, Fiddler, MLflow) and the alerts each surfaces.",
   ],
-  learnMarkdown: `## Model Versioning & Experiment Tracking
+  learnMarkdown: `## Why models degrade silently
 
-Reproducibility is the foundation of production ML. If you can't reproduce a model, you can't debug it, audit it, or improve it systematically.
+A trained model encodes a snapshot of the world at training time. Users adopt new behaviors, markets shift, data pipelines change schemas, fraud patterns evolve — but the deployed model never sees any of it. The result is **silent degradation**: accuracy erodes while dashboards still report metrics from months ago.
 
----
+Unlike a software bug that throws an exception, model decay is invisible until a business metric suddenly spikes. The defense is **proactive monitoring**: continuously measuring whether the model's inputs, outputs, and the data-to-label relationship still match what the model expects.
 
-## MLflow Components
+Three distinct failure modes each require a different detector.
 
-**1. Tracking**: logs parameters, metrics, and artifacts per run.
-\`\`\`python
-mlflow.log_param("n_estimators", 100)
-mlflow.log_metric("auc", 0.87)
-mlflow.log_artifact("feature_importance.png")
-\`\`\`
+## Data drift (covariate shift)
 
-**2. Experiments**: logical groupings of runs. Each experiment corresponds to a modeling task (e.g., "churn-model-v2").
+**Definition**: the distribution of input features P(X) changes, but the true relationship between features and the label P(y | X) remains the same.
 
-**3. Model Registry**: promotion workflow for models.
-- **Staging**: model passes evaluation gate; ready for human review
-- **Production**: human approves; live model serving from this version
-- **Archived**: replaced by newer production model; kept for rollback
+Example: a fraud model trained when 80% of transactions were card-present is deployed into a market where 60% are now card-not-present. The \`channel\` feature has a new distribution; the model's learned coefficients are systematically mis-weighted, though the underlying fraud signal is unchanged. Other triggers: a new app version changes how \`session_duration\` is computed; a CRM migration remaps \`customer_segment\` codes. Data drift is **detectable without labels**, making it fast and cheap to monitor.
 
-**4. Projects**: packaging code for reproducible runs (conda.yaml or Docker environment).
+## Concept drift
 
----
+**Definition**: the true relationship P(y | X) changes — the same input features now predict different outcomes.
 
-## DVC: Data Version Control
+Example: a fraud model trained before the rise of buy-now-pay-later (BNPL) has no learned association between BNPL patterns and fraud. As fraudsters exploit BNPL, the relationship between \`merchant_category\` and \`is_fraud\` shifts. The inputs look the same — no data drift — but the correct label for a given input has changed.
 
-Git tracks code well. Git is terrible at tracking large files (CSVs, Parquet, trained models). DVC solves this:
+Concept drift is harder to detect because it requires labels, which arrive with a lag in production. Monitoring **prediction score distributions** and **model calibration** over time can flag it faster than waiting for ground truth.
 
-1. \`dvc add data/train.csv\` — creates a \`data/train.csv.dvc\` pointer file
-2. The pointer file (small, text) is committed to Git
-3. The actual data is pushed to remote storage (S3, GCS, Azure Blob) with \`dvc push\`
+## Label drift (target drift)
 
-Result: Git contains the code + data pointers. DVC stores the actual data. Anyone with repo access + storage credentials can reproduce the exact data version.
+**Definition**: the marginal distribution P(y) shifts — the prevalence of the outcome changes.
 
----
+Example: a CTR model trained at 4% average click rate is deployed, then a UI redesign drops CTR to 1.5%. The model was calibrated to predict 4%; its scores are now inflated even if relative ranking is unchanged. Label drift typically accompanies a product or business change rather than a data pipeline problem.
 
-## Full Reproducibility Requirements
+## Detection methods
 
-To exactly reproduce a model trained 6 months ago, you need:
-1. **Code version**: exact Git commit hash
-2. **Data version**: DVC-tracked version of training data
-3. **Environment**: conda.yaml or requirements.txt with pinned versions
-4. **Hyperparameter config**: logged in MLflow (or config file committed to Git)
+### Numerical features
+- **PSI (Population Stability Index)**: buckets the feature distribution and computes Σ (% actual − % expected) × ln(% actual / % expected). Thresholds: **< 0.1** stable; **0.1–0.2** warning; **≥ 0.2** retrain signal.
+- **KS test**: non-parametric test comparing empirical CDFs; gives a maximum-distance statistic and p-value. Use when you want statistical significance rather than an index.
+- **Jensen-Shannon divergence**: symmetric, bounded [0, 1]; more numerically stable than KL divergence; applicable to both numerical and categorical features.
 
-Missing any one of these makes exact reproduction impossible.
+### Categorical features
+- **Chi-squared test**: tests whether observed category frequencies differ significantly from training-time expected frequencies. Suitable for low-cardinality features. PSI works too — buckets become category values.
 
----
+### Business and model-level metrics
+Track **prediction score distributions** and **downstream KPIs** (fraud-catch rate, revenue per prediction). These catch concept drift before labeled outcomes arrive.
 
-## The "model_v2_final_FINAL.pkl" Anti-Pattern
+## Monitoring infrastructure
 
-Naming model files manually is the anti-pattern MLflow prevents:
-- No record of hyperparameters used
-- No metric history to compare versions
-- No approval workflow before production
-- No rollback capability
+A production monitoring stack has three layers: (1) **Feature store logs** — every inference-time feature vector is logged; batch jobs compare rolling 7-day windows against training reference distributions using PSI or KS. (2) **Shadow deployment** — a candidate model runs in parallel with production but predictions are not served; output distributions are compared for sanity. (3) **Scheduled drift reports** — hourly or nightly jobs compute drift scores for every feature and push results to a dashboard; alerts fire when any feature crosses a threshold.
 
-Always use a model registry.
+## Alert thresholds and response playbook
+
+| PSI range | Status | Recommended action |
+|---|---|---|
+| < 0.1 | Stable | No action needed |
+| 0.1 – 0.2 | Warning | Investigate upstream pipeline; check for schema changes |
+| ≥ 0.2 | Retrain signal | Retrain with recent data or roll back to previous model |
+
+**Response playbook**: (1) Confirm the signal — is drift in one feature (pipeline bug?) or widespread (population shift)? (2) Check upstream for schema changes. (3) Retrain with recent data if the shift is genuine. (4) Roll back if a recent deployment caused the drift. (5) Expand monitoring after any drift incident.
+
+## Monitoring tools
+
+**Evidently AI** — open-source HTML drift reports, Airflow integration. **Whylogs** — lightweight statistical sketching; integrates with WhyLabs. **Arize** — real-time drift + SHAP-based explanation monitoring; strong on embedding drift. **Fiddler** — explainability-first; favored in regulated industries. **MLflow metrics** — log drift scores as MLflow runs alongside the model registry lifecycle.
+
+## Interview-Ready Summary
+
+- **Data drift** (covariate shift): P(X) changes — the input distribution shifts; detectable without labels using PSI, KS, or JS divergence.
+- **Concept drift**: P(y | X) changes — the same features now predict different outcomes; requires labels or proxy signals (score distribution, calibration) to detect.
+- **Label drift**: P(y) changes — outcome prevalence shifts; recalibrate the model's output scores even if ranking is unchanged.
+- **PSI thresholds**: < 0.1 stable, 0.1–0.2 warning, ≥ 0.2 retrain. Chi-squared for categorical; KS test for distributional hypothesis testing.
+- **Infrastructure**: feature store logs + shadow deployments + scheduled reports form the three-layer monitoring stack.
+- **Playbook**: confirm signal → check upstream pipeline → retrain with recent data or roll back; always expand monitoring after any drift incident.
 `,
   video: null,
-  videoFallbackMarkdown: `## Deep Dive: Model Cards
+  videoFallbackMarkdown: `## Deep Dive: PSI, KS Test, and Monitoring Dashboards
 
-A model card is a short document accompanying each model version in the registry:
-- **Model description**: what it predicts, training data period
-- **Performance metrics**: per-segment evaluation results
-- **Intended use**: what use cases it's designed for
-- **Limitations**: known failure modes, out-of-distribution risk
-- **Fairness evaluation**: performance by demographic group if applicable
+### PSI formula in detail
 
-Model cards are increasingly required for compliance (EU AI Act) and are good engineering practice regardless.
+Population Stability Index (PSI) is computed by bucketing a numerical feature into \`n\` bins (typically 10–20 equal-width or equal-frequency bins defined on the training/reference data) and comparing training-time proportions to production-time proportions:
+
+\`\`\`
+PSI = Σ_i  (Actual_i% − Expected_i%) × ln(Actual_i% / Expected_i%)
+\`\`\`
+
+Critical implementation details:
+- **Bins are fixed at training time** on the reference distribution. Never re-define bins on production data — that would make the comparison meaningless.
+- **Zero bins cause division errors**: add a small smoothing constant (e.g., 0.0001) to any bin with zero observations.
+- **Interpretation**: PSI of 0.25 on \`transaction_amount\` means the amount distribution has shifted significantly — 10% of transactions now fall in bins that used to be nearly empty.
+
+### KS test interpretation
+
+The two-sample KS statistic D is the maximum vertical distance between the two empirical CDFs. A large D with a small p-value means the two samples are unlikely to come from the same distribution.
+
+\`\`\`python
+from scipy.stats import ks_2samp
+stat, p_value = ks_2samp(train_feature, prod_feature)
+# stat: maximum CDF distance (0=identical, 1=completely different)
+# p_value: probability of seeing this distance by chance
+\`\`\`
+
+**KS vs PSI**: KS gives a statistical significance test (p-value), which is useful when sample sizes vary. PSI gives a magnitude index, which is easier to threshold and trending over time. In practice, use both: KS to confirm statistical significance, PSI to quantify severity.
+
+### Distinguishing data quality issues from concept drift
+
+A monitoring dashboard should separate three alarm types:
+
+1. **Data quality alarms** (upstream): sudden null-rate spikes, out-of-range values, schema mismatches. These fire before any drift computation. Fix in the pipeline, not in the model.
+
+2. **Data drift alarms** (distribution shift): PSI or KS crossing thresholds on input features. Investigate whether the population has genuinely changed or an upstream transformation changed. Retrain if population genuinely shifted.
+
+3. **Concept drift alarms** (model-level): prediction score mean shifts, calibration curve moves, or (with label lag) observed precision/recall degradation. These require model-level intervention — retraining with recent labeled data or switching to a different model architecture.
+
+A well-designed dashboard shows all three alarm types in separate panels with different escalation paths. Data quality issues route to the data engineering on-call; drift alarms route to the ML engineer; concept drift alarms route to the model owner for retraining decisions.
+
+Track metrics on **rolling windows** (7-day and 30-day) rather than cumulative statistics, so slow seasonal drift doesn't get washed out by a large historical average.
 `,
-  tryGuidance: "No interactive viz — work through the experiment tracking and reproducibility scenarios in the interview simulation.",
+  tryGuidance: "Use the interactive monitoring simulation to explore how PSI scores change as you shift a feature distribution. Try adjusting the transaction amount distribution to see when the PSI warning and retrain thresholds are crossed, and compare how KS and JS divergence respond to the same shift.",
   interviewGraph: {
-    initialStageId: "mo_c2_stage1",
+    initialStageId: "mo_c2_click_config",
     artifactDimensions: [
-      { label: "Reproducibility", recoveryStageId: "mo_c2_rec1" },
-      { label: "Registry Workflow", recoveryStageId: "mo_c2_terminal", passLabel: "ML Versioning" },
+      { label: "Drift Detection", recoveryStageId: "drift_recovery" },
+      { label: "Monitoring Design", recoveryStageId: "monitoring_recovery" },
     ],
     stages: {
-      mo_c2_stage1: {
-        id: "mo_c2_stage1",
-        type: "scenario_choice",
+      mo_c2_click_config: {
+        id: "mo_c2_click_config",
+        type: "click_target",
         badge: "Stage 1",
-        title: "Stage 1 · Reproducing a model",
-        prompt: "A model from 8 months ago is producing unexpected predictions. How do you reproduce it exactly to debug it?",
-        choices: [
-          { id: "a", label: "Reinstall the same Python version and re-run the training script from Git", description: "Python version alone isn't enough — library versions, data version, and hyperparameters are also required." },
-          { id: "b", label: "Retrieve: the Git commit hash, DVC data version, conda.yaml environment, and MLflow-logged hyperparameters — then reconstruct the exact training environment", description: "All four components are required for exact reproduction." },
-          { id: "c", label: "Use the model artifact stored in the MLflow registry and skip retraining", description: "This gets you the artifact, but if you need to debug training, you need to reproduce the training run." },
-        ],
-        branches: { a: "mo_c2_rec1", b: "mo_c2_stage2", c: "mo_c2_rec1" },
-        rationale: "B is correct. Full reproduction requires: code (Git hash) + data (DVC version) + environment (conda.yaml with pinned deps) + config (MLflow-logged hyperparameters). Without all four, you can't exactly reproduce the training run.",
+        title: "Stage 1 · Spot the monitoring config bug",
+        prompt: "The monitoring config below was written for a fraud classifier in production. One line contains the most critical bug — it causes the system to miss the vast majority of drift patterns. Click the line with the most critical bug.",
+        code_snippet: `monitoring_config = {
+    "model": "fraud_classifier",
+    "check_data_drift": True,
+    "drift_features": ["transaction_amount"],   # -- ds-target:incomplete_features
+    "alert_threshold_psi": 0.2,
+    "check_concept_drift": False,               # -- ds-target:no_concept_drift
+    "monitor_prediction_distribution": False,   # -- ds-target:no_pred_monitoring
+    "alert_channel": "slack",
+}`,
+        validationCopy: {
+          incomplete_features: "Correct. Monitoring only \`transaction_amount\` means the system is blind to drift in every other feature the model uses — merchant category, device type, location, card-present flag, and more. A fraud model typically uses 20-50 features; monitoring one feature will miss most real-world drift patterns. All features used by the model should be included in drift monitoring.",
+          no_concept_drift: "This is a real problem — disabling concept drift monitoring means you won't detect when fraud patterns change. But the single-feature issue in \`drift_features\` is the most critical bug because it makes the entire data drift check nearly useless regardless of the threshold.",
+          no_pred_monitoring: "Disabling prediction distribution monitoring is a meaningful gap, especially for detecting concept drift without label lag. But the root cause of the most widespread monitoring blindspot is the single-feature \`drift_features\` list, not this setting.",
+        },
+        branches: {
+          incomplete_features: "mo_c2_recovery_features",
+          no_concept_drift: "mo_c2_recovery_features",
+          no_pred_monitoring: "mo_c2_recovery_features",
+        },
       },
-      mo_c2_rec1: {
-        id: "mo_c2_rec1",
+      mo_c2_recovery_features: {
+        id: "mo_c2_recovery_features",
         type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · Four reproducibility pillars",
-        prompt: "What four things must be versioned to make an ML training run exactly reproducible?",
+        badge: "Stage 1 · Recovery",
+        title: "Stage 1 Recovery · What should drift_features contain?",
+        prompt: "You are fixing the monitoring config for the fraud classifier. What should \`drift_features\` contain?",
         choices: [
-          { id: "a", label: "Code (Git commit), data (DVC version), environment (conda.yaml/requirements.txt with pinned versions), hyperparameters (MLflow log)", description: "All four together = exact reproduction." },
+          {
+            id: "a",
+            label: "All input features the model uses at inference time",
+            description: "Correct. Every feature that influences the model's predictions should be monitored for drift. A shift in any one of them can degrade model performance. Monitoring a subset creates blind spots.",
+          },
+          {
+            id: "b",
+            label: "Transaction amount — it is the most predictive feature for fraud detection",
+            description: "Even if transaction amount is the single most predictive feature, drift in other features (merchant category, device, channel) can still cause significant model degradation. Partial feature monitoring is not sufficient.",
+          },
+          {
+            id: "c",
+            label: "Only features with PSI > 0.1 in the last month",
+            description: "This creates a circular dependency: you cannot filter by PSI without first computing PSI on all features. You need to monitor all features to know which ones are drifting.",
+          },
         ],
-        branches: { a: "mo_c2_stage2" },
-        rationale: "Missing any one makes exact reproduction impossible. Code changes subtly between commits; data distributions shift; library behavior changes between versions; hyperparameters are often undocumented.",
+        branches: {
+          a: "mo_c2_stage2",
+          b: "mo_c2_stage2",
+          c: "mo_c2_stage2",
+        },
+        rationale: "All features used by the model at inference time should be monitored. Partial feature monitoring creates blind spots — a model using 30 features that only monitors 1 has a 97% chance of missing any given drift event. Start with all features; add priority tiers (high-frequency alerts for the most predictive features) if alert volume is a concern.",
       },
       mo_c2_stage2: {
         id: "mo_c2_stage2",
         type: "scenario_choice",
         badge: "Stage 2",
-        title: "Stage 2 · Registry lifecycle",
-        prompt: "A new model passes the evaluation gate. What's the correct promotion path in the MLflow model registry?",
+        title: "Stage 2 · Accuracy drops 3 months after deployment",
+        prompt: "Your fraud classifier's precision drops from 0.87 to 0.71 in production, discovered 3 months after deployment. What is your first investigation step?",
         choices: [
-          { id: "a", label: "Direct to Production — it passed evaluation, no need for extra steps", description: "Human review before production is essential, especially for high-stakes models." },
-          { id: "b", label: "Staging first (for human review + staging environment validation) → Production (after approval) → old model moves to Archived", description: "The staging gate provides human oversight before production traffic is affected." },
-          { id: "c", label: "Archive the old model first, then promote the new one directly to Production", description: "Archiving before promotion removes the rollback option." },
+          {
+            id: "a",
+            label: "Immediately retrain the model on the most recent 3 months of data",
+            description: "Retraining before diagnosing may not fix the root cause. If an upstream data pipeline changed how a feature is computed, retraining on corrupted data will produce a worse model.",
+          },
+          {
+            id: "b",
+            label: "Check drift reports: review PSI scores and KS test results for all monitored features over the past 3 months to identify which features shifted and when",
+            description: "Correct. Drift reports give you a timeline — you can see exactly when drift started and which features are affected. This distinguishes a pipeline bug (sudden spike in one feature's PSI) from a genuine population shift (gradual drift across many features), which determines the correct fix.",
+          },
+          {
+            id: "c",
+            label: "Roll back to the previous model version immediately",
+            description: "Rolling back is appropriate when a recent deployment caused the degradation. But if the model has been in production for 3 months with gradual decay, the previous version may be equally stale.",
+          },
+          {
+            id: "d",
+            label: "File a ticket with the data engineering team to check for pipeline issues",
+            description: "Pipeline issues are one possible cause, but you should first review your own monitoring artifacts before escalating. Checking drift reports takes minutes and may immediately identify whether the issue is drift-related or pipeline-related.",
+          },
         ],
-        branches: { a: "mo_c2_rec1", b: "mo_c2_terminal" },
-        rationale: "B is correct. The registry lifecycle: Staging (evaluation gate passed, human reviews in staging env) → Production approval (human sign-off) → old Production moves to Archived (available for rollback). This maintains a rollback path and enforces human oversight.",
+        branches: {
+          a: "monitoring_recovery",
+          b: "mo_c2_stage3",
+          c: "monitoring_recovery",
+          d: "monitoring_recovery",
+        },
+        rationale: "Always diagnose before acting. Drift reports provide a timeline that distinguishes pipeline bugs (sudden PSI spike on one feature) from population shifts (gradual multi-feature drift). This determines whether to fix the pipeline, retrain, or roll back. Jumping straight to retraining or rollback without diagnosis wastes time and may not fix the root cause.",
+      },
+      monitoring_recovery: {
+        id: "monitoring_recovery",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · Monitoring investigation sequence",
+        prompt: "What is the correct sequence when you detect unexplained model degradation in production?",
+        choices: [
+          {
+            id: "a",
+            label: "Check drift reports → identify affected features and timeline → determine root cause (pipeline bug vs. population shift) → retrain or fix pipeline accordingly",
+            description: "Correct. This sequence uses your monitoring artifacts before taking action, which prevents misdiagnosing the cause and applying the wrong fix.",
+          },
+          {
+            id: "b",
+            label: "Retrain immediately with recent data, then check drift reports afterward to understand what happened",
+            description: "Retraining before diagnosis is dangerous — if the root cause is a pipeline bug, you will retrain on corrupted data and make the model worse.",
+          },
+          {
+            id: "c",
+            label: "Roll back to the previous model version and monitor for improvement",
+            description: "Rollback is the right action only when a recent deployment caused the degradation. For gradual 3-month decay, the previous version is likely also degraded.",
+          },
+          {
+            id: "d",
+            label: "Increase the PSI alert threshold to reduce false alarms, then monitor for further degradation",
+            description: "Raising alert thresholds in response to a degradation event suppresses the signal you need to catch future problems earlier.",
+          },
+        ],
+        branches: {
+          a: "mo_c2_stage3",
+          b: "mo_c2_stage3",
+          c: "mo_c2_stage3",
+          d: "mo_c2_stage3",
+        },
+        rationale: "Diagnose before acting. Use drift reports to build a timeline, identify which features are affected, and classify the root cause (pipeline vs. population). This makes the remediation decision — retrain, pipeline fix, or rollback — evidence-based rather than reactive.",
+      },
+      mo_c2_stage3: {
+        id: "mo_c2_stage3",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · PSI of 0.25 on a key feature",
+        prompt: "Your monitoring system reports PSI = 0.25 on the \`merchant_category_code\` feature for the fraud model. What is the correct immediate action?",
+        choices: [
+          {
+            id: "a",
+            label: "Retrain the model immediately using all available data",
+            description: "Retraining is likely the right eventual action, but first confirm whether this is a genuine population shift or an upstream data quality issue. Retraining on a pipeline bug produces a worse model.",
+          },
+          {
+            id: "b",
+            label: "Investigate whether the shift is a genuine population change or a data pipeline issue, then retrain with recent data if it is a real population shift",
+            description: "Correct. PSI ≥ 0.2 is a retrain signal, but the first step is always to confirm the signal is genuine. Check: did the data schema change? Is there a null-rate spike? Is the shift sudden (pipeline) or gradual (population)? Then act accordingly.",
+          },
+          {
+            id: "c",
+            label: "Ignore it — PSI of 0.25 is within normal statistical variance for a production model",
+            description: "PSI ≥ 0.2 is the defined retrain threshold; it is not within normal variance. The PSI thresholds (< 0.1 stable, 0.1–0.2 warning, ≥ 0.2 action) are specifically calibrated to flag meaningful distribution shifts.",
+          },
+          {
+            id: "d",
+            label: "Lower the PSI alert threshold to 0.15 so future alerts fire earlier",
+            description: "Adjusting thresholds is a separate calibration decision and should not be the immediate response to an active alert. Address the current 0.25 PSI first.",
+          },
+        ],
+        branches: {
+          a: "drift_recovery",
+          b: "mo_c2_stage4",
+          c: "drift_recovery",
+          d: "drift_recovery",
+        },
+        rationale: "PSI ≥ 0.2 is a retrain signal, not an automatic retrain trigger. Always confirm the signal is genuine before retraining: a sudden PSI spike often indicates a pipeline bug (upstream schema change, null introduction) rather than a real population shift. Retraining on a corrupted pipeline produces a model trained on garbage. Confirm → diagnose root cause → act.",
+      },
+      drift_recovery: {
+        id: "drift_recovery",
+        type: "scenario_choice",
+        badge: "Recovery 3",
+        title: "Recovery · PSI thresholds and response",
+        prompt: "A PSI monitoring report shows PSI = 0.08 for \`age\`, PSI = 0.14 for \`income_band\`, and PSI = 0.31 for \`device_type\`. What actions do you take for each?",
+        choices: [
+          {
+            id: "a",
+            label: "age (PSI 0.08): no action — stable. income_band (PSI 0.14): investigate — warning zone. device_type (PSI 0.31): urgent action — confirm the shift, investigate pipeline, then retrain",
+            description: "Correct. PSI < 0.1 = stable (no action). PSI 0.1–0.2 = warning (investigate). PSI ≥ 0.2 = significant shift (confirm and retrain). Applying the thresholds correctly to each feature.",
+          },
+          {
+            id: "b",
+            label: "Retrain the model immediately since at least one feature has PSI > 0.2",
+            description: "One high-PSI feature does not automatically require retraining. First investigate whether \`device_type\`'s shift is a genuine population change or a data quality issue.",
+          },
+          {
+            id: "c",
+            label: "All three PSI scores are below 0.5, so all are within acceptable range",
+            description: "The thresholds are PSI < 0.1 (stable), 0.1–0.2 (warning), ≥ 0.2 (action required). PSI = 0.31 is significantly above the retrain threshold.",
+          },
+          {
+            id: "d",
+            label: "Monitor all three features for another 30 days before taking action",
+            description: "Waiting 30 days on a PSI of 0.31 means operating with a degrading model for a month. High-PSI features require investigation within hours, not weeks.",
+          },
+        ],
+        branches: {
+          a: "mo_c2_stage4",
+          b: "mo_c2_stage4",
+          c: "mo_c2_stage4",
+          d: "mo_c2_stage4",
+        },
+        rationale: "Apply PSI thresholds per-feature: < 0.1 stable, 0.1–0.2 investigate, ≥ 0.2 urgent action. For the action-required feature, always confirm the signal before retraining — a sudden jump to 0.31 often indicates a pipeline issue. Gradual drift to 0.31 over weeks is more likely a genuine population shift requiring retraining.",
+      },
+      mo_c2_stage4: {
+        id: "mo_c2_stage4",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Concept drift vs data drift",
+        prompt: "A fraud model's feature distributions are all stable (PSI < 0.1 for every feature), but the model's precision has dropped from 0.89 to 0.64 over 6 weeks. What type of drift is most likely occurring?",
+        choices: [
+          {
+            id: "a",
+            label: "Data drift — PSI is just not sensitive enough to catch it",
+            description: "If all features have PSI < 0.1, data drift is unlikely. PSI is designed specifically to detect distribution shifts in features.",
+          },
+          {
+            id: "b",
+            label: "Concept drift — P(y | X) has changed. The same feature values now associate with different fraud outcomes, likely because fraud patterns evolved",
+            description: "Correct. Stable features (no data drift) + degrading model performance = concept drift. The relationship between the features and the label has changed — in fraud, this typically means fraudsters have adopted new tactics that the model was not trained to recognize.",
+          },
+          {
+            id: "c",
+            label: "Label drift — the fraud rate has decreased, making the task easier and inflating precision",
+            description: "Label drift (changing prevalence) can affect calibration, but here precision is dropping — the model is generating more false positives relative to true positives, which is the signature of the model's decision boundary being wrong for current patterns.",
+          },
+          {
+            id: "d",
+            label: "This is expected variance — precision fluctuates naturally in production",
+            description: "A 25-point precision drop (0.89 → 0.64) over 6 weeks is not normal variance. It represents a severe degradation requiring investigation.",
+          },
+        ],
+        branches: {
+          a: "drift_recovery",
+          b: "mo_c2_stage5",
+          c: "drift_recovery",
+          d: "drift_recovery",
+        },
+        rationale: "The diagnostic pattern: stable input distributions (low PSI) + degrading model performance = concept drift. The world the model was trained on still looks the same, but the mapping from features to outcomes has changed. For a fraud model, this means fraudsters have evolved their patterns. The fix is retraining with recently labeled data that captures the new fraud patterns — not retraining on old data.",
+      },
+      mo_c2_stage5: {
+        id: "mo_c2_stage5",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Recall drops while precision stays stable",
+        prompt: "A fraud model's precision stays at 0.88 (no change) but recall drops from 0.72 to 0.41 over 2 months. No data drift is detected. What is the most likely cause and recommended response?",
+        choices: [
+          {
+            id: "a",
+            label: "The model's threshold is too high — lower the threshold to recover recall",
+            description: "Lowering the threshold would recover recall, but it would also lower precision. The prompt states precision is stable, not that it has room to drop. More importantly, the root cause needs diagnosis: why did recall drop without data drift?",
+          },
+          {
+            id: "b",
+            label: "Concept drift — new fraud patterns are emerging that the model doesn't recognize. Response: collect labels for recent fraud cases and retrain the model to capture the new patterns",
+            description: "Correct. Stable precision + dropping recall without data drift is the signature of emerging fraud patterns the model has not seen. The model correctly rejects non-fraud (precision stable) but is missing new types of fraud (recall dropping). Retraining with recent labeled fraud cases that include the new patterns is the right fix.",
+          },
+          {
+            id: "c",
+            label: "Label drift — the fraud rate is increasing, making the task harder",
+            description: "Increasing fraud rate (label drift) would typically cause precision to drop (more fraud cases triggering decisions that were previously non-fraud), not recall. The pattern here — stable precision, dropping recall — points to new fraud patterns the model misses.",
+          },
+          {
+            id: "d",
+            label: "Data quality issue — some fraud cases are being dropped by the data pipeline before reaching the model",
+            description: "A pipeline that drops fraud cases would reduce the number of fraud transactions the model sees, but would not affect model precision or recall at inference time since those measure the model's accuracy on the cases it does see.",
+          },
+        ],
+        branches: {
+          a: "monitoring_recovery",
+          b: "mo_c2_terminal",
+          c: "monitoring_recovery",
+          d: "monitoring_recovery",
+        },
+        rationale: "Stable precision + dropping recall + no data drift = concept drift via new unrecognized patterns. The model correctly classifies known fraud patterns (precision stable) but misses new patterns it was never trained on (recall dropping). The fix is not threshold tuning — that would just trade recall for precision on the same learned boundary. The fix is retraining with recently labeled data that includes examples of the new fraud patterns.",
       },
       mo_c2_terminal: {
         id: "mo_c2_terminal",
         type: "scenario_choice",
         badge: "Complete",
-        title: "Complete · Versioning principle",
-        prompt: "Why is DVC needed alongside Git for ML projects?",
+        title: "Complete · Monitoring infrastructure design",
+        prompt: "You are designing a monitoring stack for a high-stakes production ML model. Which combination gives you the earliest warning of both data drift and concept drift?",
         choices: [
-          { id: "a", label: "Git stores code efficiently but fails on large binary files (data, models) — DVC tracks these with pointer files in Git while storing actual data in object storage", description: "DVC extends Git's versioning to large ML artifacts without bloating the repository." },
+          {
+            id: "a",
+            label: "PSI on all input features (logged from the feature store) + prediction score distribution monitoring + lagged label comparison when outcomes arrive",
+            description: "Correct. Feature-level PSI catches data drift early (no labels needed). Prediction score distribution monitoring catches concept drift proxy signals fast. Lagged label comparison catches concept drift definitively once outcomes arrive. Together they cover all three drift types.",
+          },
+          {
+            id: "b",
+            label: "Scheduled weekly accuracy reports comparing model output to ground truth labels",
+            description: "Weekly cadence is too slow — significant drift can occur within days. Waiting for labels also means concept drift is invisible until a week after it starts.",
+          },
+          {
+            id: "c",
+            label: "PSI on the three most important features only, checked daily",
+            description: "Monitoring only the top three features misses drift in the remaining features. Important features can remain stable while less-predictive features drift enough to degrade performance.",
+          },
+          {
+            id: "d",
+            label: "Monitor only business KPIs (revenue, fraud loss) and retrain when they drop",
+            description: "Business KPIs are a lagging indicator. By the time fraud loss spikes, the model may have been degraded for weeks. Proactive feature and prediction monitoring catches drift before it becomes business impact.",
+          },
         ],
-        branches: { a: "mo_c2_terminal" },
+        branches: {
+          a: "mo_c2_terminal",
+          b: "mo_c2_terminal",
+          c: "mo_c2_terminal",
+          d: "mo_c2_terminal",
+        },
         terminal: true,
-        rationale: "Git is optimized for text files. Adding a 10GB training dataset to Git would make the repository unusable. DVC's pointer approach — small .dvc files in Git, actual data in S3/GCS — gives you version control semantics without the storage overhead.",
+        rationale: "A robust monitoring stack uses leading indicators (feature PSI, prediction distribution) and lagging confirmation (labels). Feature PSI catches data drift within hours without labels. Prediction score shifts are a proxy for concept drift that fires days before lagged labels arrive. Lagged label evaluation provides ground-truth confirmation. Relying solely on business KPIs or weekly reports means you are always reacting to impact rather than preventing it.",
       },
     },
   },
   knowledgeCheck: [
     {
-      question: "What does MLflow's model registry provide that a file system with named model files cannot?",
+      question: "A churn model trained in January is deployed in March. By June, churn rates have dropped significantly due to a new retention program. Which type of drift best describes this situation?",
       options: [
-        "Faster model loading at inference time",
-        "A structured lifecycle (staging → production → archived) with a promotion workflow, version history, and rollback capability",
-        "Automatic hyperparameter optimization",
+        "Data drift (covariate shift) — the input feature distributions have shifted",
+        "Concept drift — P(y | X) has changed because the retention program altered which customers churn",
+        "Label drift (target drift) — the marginal distribution P(y) has shifted because the overall churn rate dropped",
       ],
-      correctIndex: 1,
-      explanation: "The model registry provides: (1) lifecycle management with human approval gates, (2) version history linked to experiments, (3) rollback capability (revert to previous production version), and (4) a single source of truth for which model version is serving. File naming (model_v2_final.pkl) provides none of these.",
+      correctIndex: 2,
+      explanation: "Label drift (target drift) occurs when the marginal distribution P(y) changes — in this case, the churn rate itself dropped from, say, 8% to 3%. The model's calibration is now wrong: it was trained to predict 8% average churn and will systematically over-predict. This is distinct from concept drift (same features → different outcomes) and data drift (input distributions shift). The fix is recalibration of the model's output scores to match the new churn prevalence.",
     },
     {
-      question: "What does 'dvc push' do?",
+      question: "PSI monitoring reports PSI = 0.08 for feature A, PSI = 0.15 for feature B, and PSI = 0.27 for feature C. What is the correct interpretation and next step for feature C?",
       options: [
-        "Pushes code changes to GitHub",
-        "Uploads the actual data files tracked by DVC to remote storage (S3, GCS), making them available for teammates to pull with 'dvc pull'",
-        "Pushes model artifacts to the MLflow registry",
+        "PSI = 0.27 is within acceptable range since it is below 0.5. No action needed.",
+        "PSI = 0.27 exceeds the 0.2 retrain threshold. Investigate whether this is a genuine population shift or a pipeline issue, then retrain with recent data if confirmed as real drift.",
+        "PSI = 0.27 requires immediate model rollback to the previous version.",
       ],
       correctIndex: 1,
-      explanation: "After 'dvc add', DVC tracks the file locally. 'dvc push' uploads the actual data to the configured remote storage. Teammates run 'git pull' (to get the .dvc pointer files) and 'dvc pull' (to download the actual data). This separates code versioning (Git) from data versioning (DVC + object storage).",
+      explanation: "PSI thresholds: < 0.1 = stable (no action), 0.1–0.2 = warning (investigate), ≥ 0.2 = significant shift (act). PSI = 0.27 is a retrain signal, but the correct first step is to investigate whether it reflects a genuine population shift or a pipeline/data quality issue. A sudden PSI jump often indicates a schema change or null introduction upstream. If the shift is genuine, retrain with recent data. Rollback is appropriate when a recent model deployment caused the degradation, not when upstream data has shifted.",
     },
     {
-      question: "A colleague says 'I reproduced the model — I used the same training script and got AUC 0.85, which is close to the original 0.87.' Is this a successful reproduction?",
+      question: "Your monitoring system shows stable feature distributions (all PSI < 0.08) but precision has dropped from 0.91 to 0.69 over 8 weeks. Which response is most appropriate?",
       options: [
-        "Yes — AUC within 2 points is close enough for production purposes",
-        "No — exact reproduction requires the same code hash, data version, environment, and hyperparameters to produce bit-for-bit identical results; 'close' is not reproducible",
-        "Yes — some variance is expected in ML models",
+        "Collect recently labeled examples of the new outcome patterns and retrain the model — stable features + degrading performance indicates concept drift",
+        "Lower the classification threshold to recover precision by reducing false positives",
+        "Expand the PSI monitoring to more features — the current feature set is missing the drift",
       ],
-      correctIndex: 1,
-      explanation: "In debugging and auditing contexts, 'close' is not the same as 'reproduced.' The 2-point AUC gap could be caused by a different data version (data was updated), a different library version (sklearn behavior changed), or a different random seed — each points to a different bug. True reproduction means identifying and fixing all four components to get the exact original result.",
+      correctIndex: 0,
+      explanation: "Stable input features (low PSI) combined with degrading model performance is the hallmark of concept drift: P(y | X) has changed. The model's learned decision boundary is no longer aligned with actual outcomes. Lowering the threshold would trade precision for recall but would not fix the underlying misalignment. Expanding PSI monitoring won't help if the drift is in the label relationship, not the input distributions. The correct fix is to retrain using recently labeled data that reflects the new patterns — in fraud, this means including recent fraud cases that capture the evolved fraud tactics the model doesn't yet recognize.",
     },
   ],
 },
@@ -38644,780 +39039,1471 @@ def get_online_features(user_id):
 "mo-t1": {
   durationLabel: "18 min",
   outcomes: [
-    "Compare trunk-based development and Git Flow for data science teams",
-    "Write a PR checklist appropriate for data science changes",
-    "Use DVC alongside Git to manage data and model artifacts",
-    "Apply semantic versioning to ML models",
+    "Explain why containers solve the reproducibility problem in ML deployments",
+    "Write a production-quality Dockerfile for a Python ML model server",
+    "Apply layer-caching best practices to minimize Docker build times",
+    "Configure a Kubernetes Deployment with HPA for an ML serving workload",
+    "Schedule GPU workloads in Kubernetes using the NVIDIA device plugin",
   ],
-  learnMarkdown: `## Git Workflows for Data Teams
+  learnMarkdown: `## Why Containers for ML?
 
-Data science work creates unique Git challenges: large binary files, non-deterministic code, Jupyter notebooks with embedded outputs, and model artifacts. Standard software Git practices need adaptation.
+Machine learning models are notoriously environment-sensitive. A model trained on Python 3.11 with PyTorch 2.2 and CUDA 12.1 may silently produce wrong predictions — or crash entirely — when run on a colleague's laptop with Python 3.9 and PyTorch 1.13. This is the **reproducibility crisis** at the heart of ML deployment.
 
----
+Containers solve three intertwined problems:
 
-## Branching Strategy
+- **Dependency isolation** — every container carries its own Python interpreter, packages, and system libraries. Your NumPy 1.26 never conflicts with another service's NumPy 1.23.
+- **Environment parity** — the exact same image runs on a developer's MacBook, a CI pipeline, and a production Kubernetes cluster. "Works on my machine" becomes a non-issue.
+- **Reproducible artifacts** — container images are immutable, content-addressed snapshots. You can re-deploy the same image six months later and get bit-for-bit identical behaviour.
 
-### Trunk-Based Development
-All work happens on short-lived feature branches (< 2 days) merged frequently to main.
+## Docker Concepts
 
-- **Pros**: less merge conflict, better CI/CD integration, continuous integration is continuous
-- **Cons**: requires feature flags for large incomplete features
-- **Best for**: mature data teams with strong CI/CD culture
+| Concept | Meaning |
+|---------|---------|
+| **Image** | A read-only blueprint — a layered filesystem snapshot built from a Dockerfile |
+| **Container** | A running instance of an image — an isolated process with its own filesystem view |
+| **Dockerfile** | A plain-text build script; each instruction (\`RUN\`, \`COPY\`, \`FROM\`) adds a layer |
+| **Layer caching** | Docker reuses unchanged layers from previous builds, skipping expensive steps like \`pip install\` |
 
-### Git Flow
-Feature → develop → release → main, with hotfix branches.
+Because layers are cached independently, **instruction order matters enormously**. Change a layer near the top and everything below re-executes.
 
-- **Pros**: structured release process, good for versioned model releases
-- **Cons**: long-lived branches cause painful merge conflicts
-- **Best for**: teams with formal model release cycles (e.g., quarterly model updates)
+## Writing an ML Dockerfile
 
-**Recommendation**: trunk-based for analysis and pipeline code; Git Flow or a simplified version for model releases with formal governance.
+**Choosing a base image** is the first decision:
 
----
+- \`python:3.11-slim\` — Debian-based, ~130 MB, no CUDA. Use for CPU-only inference.
+- \`nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04\` — includes CUDA runtime and cuDNN. Use when the model runs on GPU.
+- Avoid \`python:3.11\` (full Debian, ~900 MB) — it carries compilers and dev headers you don't need at runtime.
 
-## PR Checklist for Data Science
-
-Before merging a data science PR:
-- [ ] Data validation tests pass
-- [ ] Notebook outputs stripped (\`nbstripout\` or \`jupyter nbconvert --clear-output\`)
-- [ ] No secrets or API keys in code
-- [ ] \`.gitignore\` excludes \`*.pkl\`, \`*.csv\`, \`*.parquet\`, \`data/\`, \`models/\`
-- [ ] Model card updated (if model version changed)
-- [ ] DVC files committed (if data version changed)
-- [ ] CI pipeline green (unit tests + data validation)
-
----
-
-## Why Strip Notebook Outputs?
-
-Jupyter notebooks embed execution outputs (plots, data samples, tensor values) in the JSON file. This:
-- Bloats Git history (images stored as base64)
-- Creates merge conflicts on every re-run
-- May expose sensitive data
-
-\`nbstripout\` is a git filter that automatically strips outputs on commit.
-
----
-
-## Semantic Versioning for Models
-
-\`MAJOR.MINOR.PATCH\`:
-- **MAJOR**: backwards-incompatible interface change (new feature set, different output schema)
-- **MINOR**: backwards-compatible improvement (same features, better accuracy)
-- **PATCH**: bug fix (data processing error, numerical stability fix)
-
-Store the version in the MLflow registry and reference it in model serving infrastructure.
-`,
-  video: null,
-  videoFallbackMarkdown: `## Deep Dive: Monorepo vs Polyrepo for ML
-
-**Monorepo** (one repo for everything: data pipelines, models, serving): easier cross-team refactoring, single CI/CD system, atomic commits across systems. Harder to scale (large repo, slow CI), requires careful ownership rules.
-
-**Polyrepo** (separate repos for data, models, serving): independent deployment, clear ownership, smaller repos. Harder to coordinate changes that span repos, versioning interfaces between repos requires care.
-
-Most large ML teams use a middle path: one repo per major system (data platform, ML platform, product) with versioned interfaces between them.
-`,
-  tryGuidance: "No interactive viz — work through the Git workflow and PR checklist scenarios in the interview simulation.",
-  interviewGraph: {
-    initialStageId: "mo_t1_stage1",
-    artifactDimensions: [
-      { label: "Large File Handling", recoveryStageId: "mo_t1_rec1" },
-      { label: "PR Quality", recoveryStageId: "mo_t1_terminal", passLabel: "DS Git Workflow" },
-    ],
-    stages: {
-      mo_t1_stage1: {
-        id: "mo_t1_stage1",
-        type: "scenario_choice",
-        badge: "Stage 1",
-        title: "Stage 1 · Large file commit",
-        prompt: "A data scientist committed a 500MB trained model file to Git. What went wrong and how do you prevent it?",
-        choices: [
-          { id: "a", label: "Nothing — version controlling models in Git is best practice", description: "Large binary files bloat Git history and slow all operations." },
-          { id: "b", label: "Model files should be tracked with DVC and stored in object storage, not Git. Add *.pkl and models/ to .gitignore and use DVC for model artifact versioning.", description: "DVC handles large artifacts; Git handles code and .dvc pointer files." },
-          { id: "c", label: "Use Git LFS to store the large file inside Git", description: "Git LFS still stores the file in Git's object model — better than vanilla Git but still grows the repo and adds cost. DVC with S3/GCS is the standard ML approach." },
-        ],
-        branches: { a: "mo_t1_rec1", b: "mo_t1_stage2", c: "mo_t1_stage2" },
-        rationale: "B is the standard approach. DVC tracks model artifacts with lightweight pointer files in Git; actual binaries go to object storage. This keeps the Git repository fast and manageable.",
-      },
-      mo_t1_rec1: {
-        id: "mo_t1_rec1",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · Binary files in Git",
-        prompt: "Why are large binary files (models, datasets) problematic in Git?",
-        choices: [
-          { id: "a", label: "Git stores every version of every file — large binaries make the repository huge, slow to clone, and slow on every git operation", description: "Git's object store grows with every committed version of a file." },
-        ],
-        branches: { a: "mo_t1_stage2" },
-        rationale: "Git stores the full content of every version of every tracked file. A 500MB model committed 10 times = 5GB of Git history. This makes clone, fetch, and checkout slow for everyone on the team.",
-      },
-      mo_t1_stage2: {
-        id: "mo_t1_stage2",
-        type: "scenario_choice",
-        badge: "Stage 2",
-        title: "Stage 2 · Notebook outputs",
-        prompt: "A notebook PR has merge conflicts on every re-run even though the code didn't change. What's the cause and fix?",
-        choices: [
-          { id: "a", label: "The CI system is misconfigured and re-running notebooks on every PR", description: "CI running notebooks could cause this, but the core issue is notebook output storage." },
-          { id: "b", label: "Jupyter stores execution outputs (cell outputs, timestamps, execution counts) in the notebook JSON — these change on every run and cause conflicts; fix: use nbstripout to clear outputs before commit", description: "nbstripout removes outputs automatically as a Git filter." },
-        ],
-        branches: { a: "mo_t1_rec1", b: "mo_t1_terminal" },
-        rationale: "B is correct. Jupyter notebook files are JSON with embedded outputs. Every re-execution updates output content, execution counts, and metadata — generating merge conflicts even for unchanged code cells. nbstripout strips outputs as a pre-commit hook.",
-      },
-      mo_t1_terminal: {
-        id: "mo_t1_terminal",
-        type: "scenario_choice",
-        badge: "Complete",
-        title: "Complete · DS PR checklist",
-        prompt: "What items belong on a data science PR checklist that aren't on a standard software PR checklist?",
-        choices: [
-          { id: "a", label: "Notebook outputs stripped, .gitignore covers data/model files, DVC files committed if data changed, no secrets in code, model card updated", description: "Data science has unique artifacts that require unique PR checks." },
-        ],
-        branches: { a: "mo_t1_terminal" },
-        terminal: true,
-        rationale: "Standard software PRs check code correctness. DS PRs additionally check data artifact management (DVC), secret hygiene (API keys), notebook cleanliness (stripped outputs), and documentation (model card).",
-      },
-    },
-  },
-  knowledgeCheck: [
-    {
-      question: "What does nbstripout do and why is it important for data science teams?",
-      options: [
-        "It compresses notebook file sizes for faster loading in Jupyter",
-        "It removes cell outputs (plots, data, execution counts) from Jupyter notebooks before committing, preventing merge conflicts and avoiding sensitive data exposure in Git history",
-        "It converts notebooks to Python scripts for production deployment",
-      ],
-      correctIndex: 1,
-      explanation: "Jupyter notebooks store execution outputs as embedded JSON. These change on every re-run, creating constant merge conflicts and potentially exposing sensitive data (printed dataframes, API responses) in Git history. nbstripout runs as a Git filter, automatically clearing outputs when files are staged for commit.",
-    },
-    {
-      question: "What should a .gitignore file for a data science project exclude?",
-      options: [
-        "Only Python __pycache__ directories and .pyc files",
-        "Large binary files: *.pkl, *.h5, *.csv, *.parquet, data/, models/, .env, credentials files — anything tracked by DVC or containing secrets",
-        "All data processing scripts to protect proprietary algorithms",
-      ],
-      correctIndex: 1,
-      explanation: "The .gitignore should exclude: model artifacts (*.pkl, *.h5, *.joblib), raw data (*.csv, *.parquet, data/), trained model directories (models/), and secrets (.env, credentials.json, *.key). These should be tracked by DVC (for data/models) or kept out of version control entirely (for secrets).",
-    },
-    {
-      question: "A model version is released as 2.1.0, then a bug in the data preprocessing is fixed with no change to features or output schema. What should the new version be?",
-      options: [
-        "3.0.0 — any change to the model code is a major version bump",
-        "2.2.0 — bug fixes increment the minor version",
-        "2.1.1 — a bug fix with no interface change is a patch version increment",
-      ],
-      correctIndex: 2,
-      explanation: "Semantic versioning: MAJOR.MINOR.PATCH. A bug fix that doesn't change the input/output interface or significantly change predictions is a patch (2.1.0 → 2.1.1). Minor version bumps (2.1.0 → 2.2.0) are for backwards-compatible improvements (better accuracy, same interface). Major version bumps are for breaking changes (new features required, different output schema).",
-    },
-  ],
-},
-
-"mo-t2": {
-  durationLabel: "12 min",
-  outcomes: [
-    "Choose between venv, conda, and Poetry for a given project type and explain the rationale",
-    "Create a reproducible environment specification that includes non-Python dependencies",
-    "Explain why pinned versions in requirements files are critical for reproducibility",
-    "Describe the environment portability problem and how conda solves it for GPU workstations",
-  ],
-  learnMarkdown: `## Virtual Environments: venv, conda, poetry
-
-Every Python project should have an isolated virtual environment. Without isolation, packages from different projects conflict, and you can't reproduce results on another machine.
-
----
-
-## Why Environments Matter
-
-Without virtual environments:
-- Project A needs numpy 1.21, Project B needs numpy 1.26 — only one can be installed globally
-- Your code works on your machine but fails for a colleague because they have different library versions
-- Library upgrades break old projects silently
-
-With isolated environments, each project gets its own dependency tree.
-
----
-
-## venv (Python Standard Library)
-
-\`\`\`bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-\`\`\`
-
-- **Handles**: Python packages only
-- **Does not handle**: CUDA, cuDNN, C libraries
-- **Reproduce with**: \`pip freeze > requirements.txt\` (pin exact versions)
-- **Best for**: simple scripts, production API services, CI environments
-
-**Critical**: use \`pip freeze\` (exact pinned versions), not a hand-written requirements file without pins. \`requests\` without a version can resolve to any version.
-
----
-
-## conda
-
-\`\`\`bash
-conda env create -f environment.yml
-conda activate myenv
-\`\`\`
-
-- **Handles**: Python packages + non-Python dependencies (CUDA, cuDNN, MKL, R packages)
-- **Reproduce with**: \`environment.yml\` with pinned versions
-- **Best for**: data science workstations with GPU, mixed Python/non-Python stacks
-
-**When conda is essential**: installing PyTorch or TensorFlow with CUDA requires matching CUDA and cuDNN versions. conda manages these C libraries as first-class packages — pip cannot.
-
----
-
-## Poetry
-
-\`\`\`bash
-poetry install  # creates venv, installs deps from pyproject.toml
-poetry add numpy  # adds + pins to pyproject.toml + poetry.lock
-\`\`\`
-
-- **Handles**: Python packages + dependency resolution with a lock file
-- **Key feature**: \`poetry.lock\` pins the complete dependency tree (every transitive dependency), ensuring exact same installation anywhere
-- **Best for**: production Python libraries, microservices, teams that publish packages
-
----
-
-## Choosing Between Them
-
-| Scenario | Tool |
-|----------|------|
-| GPU deep learning workstation | conda |
-| Production REST API | Poetry or venv with pinned requirements.txt |
-| Quick script or notebook | venv |
-| Python library you publish | Poetry |
-| Mixed Python + R or CUDA | conda |
-`,
-  video: null,
-  videoFallbackMarkdown: `## Deep Dive: Docker as the Ultimate Environment
-
-For production deployments, a Docker image is a self-contained environment that includes the Python installation, all packages, and the application code. It solves the environment portability problem completely — if the Docker image runs on your laptop, it runs in production.
-
-The relationship: development uses conda/venv for iteration speed; staging and production use Docker for portability. Your conda environment.yml or pip requirements.txt becomes the INPUT to your Dockerfile.
-`,
-  tryGuidance: "No interactive viz — work through the environment selection scenarios in the interview simulation.",
-  interviewGraph: {
-    initialStageId: "mo_t2_stage1",
-    artifactDimensions: [
-      { label: "Tool Selection", recoveryStageId: "mo_t2_rec1" },
-      { label: "Reproducibility", recoveryStageId: "mo_t2_terminal", passLabel: "Env Management" },
-    ],
-    stages: {
-      mo_t2_stage1: {
-        id: "mo_t2_stage1",
-        type: "scenario_choice",
-        badge: "Stage 1",
-        title: "Stage 1 · GPU workstation",
-        prompt: "A new teammate joins and needs to run your PyTorch deep learning code on a GPU workstation. What environment tool do you recommend and why?",
-        choices: [
-          { id: "a", label: "venv — it's the simplest option and comes with Python", description: "venv can't manage CUDA and cuDNN versions — critical for PyTorch GPU." },
-          { id: "b", label: "conda — it manages CUDA/cuDNN as packages alongside Python, ensuring the GPU stack versions are compatible", description: "conda install pytorch cudatoolkit=11.8 handles the full CUDA dependency chain." },
-          { id: "c", label: "pip install torch — direct install without a virtual environment", description: "Global installs conflict with other projects." },
-        ],
-        branches: { a: "mo_t2_rec1", b: "mo_t2_stage2", c: "mo_t2_rec1" },
-        rationale: "B is correct. PyTorch GPU requires matching CUDA toolkit, cuDNN, and driver versions. conda manages these non-Python C libraries as first-class packages in the environment.yml. pip/venv cannot install or version-lock CUDA — you'd need to install it separately with no coordination.",
-      },
-      mo_t2_rec1: {
-        id: "mo_t2_rec1",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · Non-Python deps",
-        prompt: "Why can't pip/venv manage CUDA for GPU deep learning?",
-        choices: [
-          { id: "a", label: "pip only manages Python packages — CUDA is a C/C++ toolkit that pip can't install or version-lock; conda handles both Python and system-level C libraries", description: "This is the fundamental limitation that makes conda necessary for GPU work." },
-        ],
-        branches: { a: "mo_t2_stage2" },
-        rationale: "pip's package ecosystem is limited to Python-installable packages. CUDA is a system-level toolkit. conda extends package management to the system level.",
-      },
-      mo_t2_stage2: {
-        id: "mo_t2_stage2",
-        type: "scenario_choice",
-        badge: "Stage 2",
-        title: "Stage 2 · Pinning versions",
-        prompt: "A colleague shares requirements.txt with just 'pandas' (no version pin). What's the problem?",
-        choices: [
-          { id: "a", label: "Unversioned requirements are fine — pip will install the latest stable version", description: "Latest version today may not be available or may behave differently next year." },
-          { id: "b", label: "Without a pin, different installs get different pandas versions — code using pandas 1.5 API may break with pandas 2.0, making the environment non-reproducible", description: "pandas 2.0 had breaking API changes from 1.x. Unpinned = non-reproducible." },
-        ],
-        branches: { a: "mo_t2_rec1", b: "mo_t2_terminal" },
-        rationale: "B is correct. Unpinned requirements are non-reproducible by definition. A colleague installing the same requirements.txt 6 months later may get a different pandas version with breaking changes. Always use pip freeze to generate pinned requirements with exact versions.",
-      },
-      mo_t2_terminal: {
-        id: "mo_t2_terminal",
-        type: "scenario_choice",
-        badge: "Complete",
-        title: "Complete · Environment portability",
-        prompt: "You need to ensure a Python API service runs identically in dev, staging, and production. What's the best environment approach?",
-        choices: [
-          { id: "a", label: "Poetry with poetry.lock for development + Docker for deployment — Poetry pins the full transitive dependency tree, Docker packages the environment into a portable image", description: "Poetry lock file = exact reproducibility. Docker image = portability across machines." },
-        ],
-        branches: { a: "mo_t2_terminal" },
-        terminal: true,
-        rationale: "The layered approach: Poetry (or pip with pinned requirements.txt) defines the Python dependency tree. Docker packages the environment + code into an immutable image that runs identically anywhere.",
-      },
-    },
-  },
-  knowledgeCheck: [
-    {
-      question: "When should you use conda instead of venv for a data science project?",
-      options: [
-        "Always — conda is strictly better than venv for all Python projects",
-        "When the project requires non-Python dependencies like CUDA/cuDNN for GPU computing, or mixed language stacks (Python + R)",
-        "When the project has more than 20 Python dependencies",
-      ],
-      correctIndex: 1,
-      explanation: "Use conda when you need non-Python system-level dependencies — especially CUDA/cuDNN for GPU deep learning, or mixed-language environments. For pure-Python projects (APIs, web services, scripts), venv or Poetry are simpler and more portable. Conda's overhead isn't worth it for pure-Python work.",
-    },
-    {
-      question: "What is the difference between pip freeze and a hand-written requirements.txt?",
-      options: [
-        "pip freeze is faster to run but produces less accurate results",
-        "pip freeze outputs every installed package with exact pinned versions; a hand-written file typically lists only direct dependencies without version pins, leading to non-reproducible installs",
-        "pip freeze only works inside conda environments",
-      ],
-      correctIndex: 1,
-      explanation: "pip freeze captures the exact installed state: every package including transitive dependencies, with exact version pins. A hand-written requirements.txt like 'requests\\npandas' resolves to whatever current versions pip finds — different installations on different days get different versions. For reproducibility, use pip freeze.",
-    },
-    {
-      question: "What advantage does Poetry's lock file have over a standard requirements.txt?",
-      options: [
-        "The lock file is smaller and faster to parse than requirements.txt",
-        "The lock file pins every transitive dependency (not just direct deps) to exact versions, ensuring identical installation environments across all machines and times",
-        "Poetry's lock file automatically updates dependencies weekly",
-      ],
-      correctIndex: 1,
-      explanation: "requirements.txt typically lists direct dependencies (what you explicitly installed). Poetry's poetry.lock records every package in the full dependency tree — including the dependencies of your dependencies — at exact versions. This ensures that a colleague running 'poetry install' 6 months later gets bit-for-bit the same environment.",
-    },
-  ],
-},
-
-"mo-t3": {
-  durationLabel: "22 min",
-  outcomes: [
-    "Build a FastAPI model-serving endpoint with Pydantic validation",
-    "Explain why loading the model inside the predict function is a critical performance anti-pattern",
-    "Implement async endpoints correctly for I/O-bound vs CPU-bound workloads",
-    "Add a health check endpoint and structured logging to a serving API",
-  ],
-  learnMarkdown: `## Building APIs with FastAPI
-
-FastAPI is the standard choice for serving ML models as REST APIs. It's faster than Flask for I/O-bound workloads, generates OpenAPI docs automatically from type hints, and validates requests via Pydantic.
-
----
-
-## The Model Loading Anti-Pattern
-
-**Never do this**:
-\`\`\`python
-@app.post("/predict")
-def predict(request: PredictRequest):
-    model = joblib.load("model.pkl")  # WRONG — reloads on every request
-    return {"prediction": model.predict([request.features])[0]}
-\`\`\`
-
-This reloads the model from disk on every single request. For a 100MB model, that's ~1-2 seconds of overhead per prediction. At 100 RPS, this is 100 model loads per second — your server immediately falls over.
-
-**Correct pattern**: load once at startup as a module-level global:
-\`\`\`python
-import joblib
-model = joblib.load("model.pkl")  # loaded once at startup
-
-@app.post("/predict")
-def predict(request: PredictRequest):
-    return {"prediction": model.predict([request.features])[0]}
-\`\`\`
-
----
-
-## Pydantic Request/Response Models
-
-\`\`\`python
-from pydantic import BaseModel, Field
-from typing import List
-
-class PredictRequest(BaseModel):
-    user_id: str
-    features: List[float] = Field(..., min_length=10, max_length=10)
-
-class PredictResponse(BaseModel):
-    prediction: float
-    confidence: float
-\`\`\`
-
-FastAPI validates incoming requests against the schema automatically. Invalid requests return 422 Unprocessable Entity before reaching your handler.
-
----
-
-## async vs def Endpoints
-
-\`\`\`python
-@app.post("/predict")
-async def predict_async(request: PredictRequest):
-    # async for I/O-bound operations: DB lookups, HTTP calls to other services
-    user_history = await db.fetch_user(request.user_id)
-    return model.predict(features)
-
-@app.post("/predict-sync")
-def predict_sync(request: PredictRequest):
-    # def for CPU-bound operations: model inference
-    # FastAPI runs def endpoints in a thread pool automatically
-    return model.predict(request.features)
-\`\`\`
-
-Key rule: use \`async def\` for I/O-bound handlers. Use \`def\` (not async def) for CPU-bound handlers — FastAPI automatically runs these in a thread pool.
-
----
-
-## Health Check + Structured Logging
-
-\`\`\`python
-@app.get("/health")
-def health():
-    return {"status": "ok", "model_version": MODEL_VERSION}
-
-import structlog
-log = structlog.get_logger()
-
-@app.post("/predict")
-def predict(request: PredictRequest):
-    result = model.predict(request.features)
-    log.info("prediction", user_id=request.user_id,
-              prediction=result, latency_ms=elapsed)
-    return {"prediction": result}
-\`\`\`
-
-Health endpoints are polled by load balancers and Kubernetes. Structured logs (JSON format) enable querying by field in observability platforms.
-`,
-  video: null,
-  videoFallbackMarkdown: `## Deep Dive: Background Tasks and Model Caching
-
-FastAPI's \`BackgroundTasks\` allow post-response work without blocking the client response:
-\`\`\`python
-@app.post("/predict")
-async def predict(request: PredictRequest, background_tasks: BackgroundTasks):
-    result = model.predict(request.features)
-    background_tasks.add_task(log_prediction, request, result)
-    return {"prediction": result}
-\`\`\`
-
-For expensive feature lookups (Redis, database), use a TTL cache at the application level. \`functools.lru_cache\` for in-memory; Redis for distributed caching. Cache feature vectors with a TTL appropriate for your feature freshness requirements.
-`,
-  tryGuidance: "No interactive viz — work through the API design and error handling scenarios in the interview simulation.",
-  interviewGraph: {
-    initialStageId: "mo_t3_stage1",
-    artifactDimensions: [
-      { label: "Model Loading", recoveryStageId: "mo_t3_rec1" },
-      { label: "Request Validation", recoveryStageId: "mo_t3_terminal", passLabel: "FastAPI Design" },
-    ],
-    stages: {
-      mo_t3_stage1: {
-        id: "mo_t3_stage1",
-        type: "scenario_choice",
-        badge: "Stage 1",
-        title: "Stage 1 · Slow predictions",
-        prompt: "Your FastAPI model endpoint takes 2 seconds per prediction. The model inference itself takes 5ms. What's likely wrong?",
-        choices: [
-          { id: "a", label: "The model is too complex — use a simpler model", description: "5ms inference is fast — the bottleneck isn't model complexity." },
-          { id: "b", label: "The model is probably being loaded from disk inside the predict function on every request — move the model load to module level (startup)", description: "Loading a model from disk on each request adds seconds of overhead." },
-          { id: "c", label: "FastAPI is slower than Flask for model serving", description: "FastAPI is generally faster than Flask, not slower." },
-        ],
-        branches: { a: "mo_t3_rec1", b: "mo_t3_stage2", c: "mo_t3_rec1" },
-        rationale: "B is the most likely cause. 5ms inference + 2s total = ~1.995s overhead. Loading a model from disk (joblib.load, pickle.load, torch.load) takes 0.5-3 seconds depending on model size. Moving the load to module level eliminates this entirely.",
-      },
-      mo_t3_rec1: {
-        id: "mo_t3_rec1",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · Startup loading",
-        prompt: "Where should model loading happen in a FastAPI application?",
-        choices: [
-          { id: "a", label: "At module level (once when the application starts), not inside the request handler which runs on every request", description: "Module-level load = O(1) loads total. Handler-level load = O(requests) loads." },
-        ],
-        branches: { a: "mo_t3_stage2" },
-        rationale: "Module-level initialization runs once when the application process starts. Handler functions run on every incoming request. Model loading belongs at startup.",
-      },
-      mo_t3_stage2: {
-        id: "mo_t3_stage2",
-        type: "scenario_choice",
-        badge: "Stage 2",
-        title: "Stage 2 · async vs def",
-        prompt: "Your predict endpoint does: (1) database lookup for user features, (2) model inference. Should the handler be async def or def?",
-        choices: [
-          { id: "a", label: "def — model inference is CPU-bound, FastAPI handles threading automatically", description: "Correct reasoning for inference, but misses the I/O step." },
-          { id: "b", label: "async def — the database lookup is I/O-bound and should be awaited; model inference can run in a thread pool via run_in_executor if needed", description: "async def correctly handles awaitable I/O; CPU-bound inference can be offloaded." },
-          { id: "c", label: "It doesn't matter — FastAPI handles both identically", description: "async def and def have different execution models in FastAPI." },
-        ],
-        branches: { a: "mo_t3_stage2", b: "mo_t3_terminal" },
-        rationale: "B is correct. The DB lookup is I/O-bound and should be awaited with async. Using def would block the event loop during the DB call. Note: model inference (CPU-bound) inside an async def will block the event loop — wrap it in run_in_executor or use a def endpoint (FastAPI runs def handlers in a thread pool).",
-      },
-      mo_t3_terminal: {
-        id: "mo_t3_terminal",
-        type: "scenario_choice",
-        badge: "Complete",
-        title: "Complete · FastAPI advantages",
-        prompt: "Why choose FastAPI over Flask for a new ML serving endpoint?",
-        choices: [
-          { id: "a", label: "Type hints → automatic OpenAPI docs + Pydantic request validation + native async support + better throughput for I/O-bound workloads", description: "FastAPI's type system drives documentation, validation, and IDE support automatically." },
-        ],
-        branches: { a: "mo_t3_terminal" },
-        terminal: true,
-        rationale: "FastAPI's key advantages: (1) OpenAPI docs auto-generated from type hints — no separate documentation to maintain, (2) Pydantic validation — invalid requests caught before handlers, (3) async-first design — higher throughput for I/O-heavy endpoints, (4) better IDE support from type annotations.",
-      },
-    },
-  },
-  knowledgeCheck: [
-    {
-      question: "What is wrong with this FastAPI endpoint: 'def predict(): model = load_model(path); return model.predict(data)'?",
-      options: [
-        "The function is missing a return type annotation",
-        "The model is loaded from disk on every request — this adds seconds of latency per prediction and will cause the service to fail under load",
-        "FastAPI doesn't support synchronous def handlers",
-      ],
-      correctIndex: 1,
-      explanation: "Loading the model inside the request handler means every prediction request incurs the full model deserialization cost (0.5-3+ seconds). The fix: load at module level once at application startup. The loaded model object is then reused across all requests with no additional I/O.",
-    },
-    {
-      question: "What does Pydantic BaseModel provide for FastAPI request validation?",
-      options: [
-        "It encrypts request payloads for security",
-        "It defines expected request fields, types, and constraints — FastAPI validates incoming JSON against the schema and returns 422 Unprocessable Entity for invalid requests before they reach your handler",
-        "It compresses request bodies to reduce network overhead",
-      ],
-      correctIndex: 1,
-      explanation: "Pydantic models define the expected structure of requests. FastAPI automatically validates incoming requests against the model: wrong types, missing required fields, and constraint violations (min/max) are caught and returned as 422 errors. This eliminates manual input validation code in handlers.",
-    },
-    {
-      question: "Why add a /health endpoint to a model serving API?",
-      options: [
-        "FastAPI requires a /health endpoint to function",
-        "Load balancers and Kubernetes use health endpoints to determine if a pod/instance is ready to serve traffic — unhealthy instances are removed from the load balancer pool automatically",
-        "Health endpoints reduce prediction latency by warming up the model",
-      ],
-      correctIndex: 1,
-      explanation: "Kubernetes liveness and readiness probes call the /health endpoint. A 200 response means the pod is healthy and ready for traffic. A non-200 response triggers restart (liveness) or temporary removal from load balancing (readiness). Without a health endpoint, Kubernetes can't distinguish a healthy pod from one that's stuck at startup loading the model.",
-    },
-  ],
-},
-
-"mo-t4": {
-  durationLabel: "20 min",
-  outcomes: [
-    "Explain Docker's layer caching and why requirements should be copied before source code",
-    "Write a Dockerfile for a Python ML serving application",
-    "Use multi-stage builds to reduce production image size",
-    "Configure Docker resource limits for ML inference containers",
-  ],
-  learnMarkdown: `## Docker for Data Scientists
-
-Docker packages your application + environment into a portable image. It solves the classic "works on my machine" problem.
-
----
-
-## Dockerfile Anatomy
+A well-structured CPU Dockerfile:
 
 \`\`\`dockerfile
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# COPY requirements FIRST — before source code
+# Copy only the dependency manifest first — maximises cache reuse
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# COPY source code second
-COPY . .
+# Now copy source and model artifacts
+COPY src/ ./src/
+COPY model_weights.pkl .
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+EXPOSE 8080
+CMD ["python", "src/serve.py"]
 \`\`\`
 
----
+## Dockerfile Best Practices
 
-## Layer Caching: The Critical Insight
+1. **Pin every version** — \`torch==2.2.0\`, \`fastapi==0.110.0\`. Unpinned dependencies make builds non-reproducible.
+2. **Copy requirements first** — as shown above. A pip install layer is expensive (~minutes); a source code change shouldn't invalidate it.
+3. **Multi-stage builds** — use a \`builder\` stage to compile wheels or download model weights, then copy only the final artifacts into a slim \`runtime\` stage. Cuts image size by 50–80 %.
+4. **Non-root user** — add \`RUN useradd -m appuser && chown -R appuser /app\` and \`USER appuser\`. Reduces blast radius if the container is compromised.
+5. **.dockerignore** — list \`.git\`, \`__pycache__\`, \`*.pyc\`, \`notebooks/\`, large datasets. Keeps the build context small and prevents secrets leaking into layers.
 
-Each Dockerfile instruction creates a **layer**. Layers are cached. If a layer's inputs haven't changed, Docker reuses the cached layer instead of rebuilding it.
+## Docker Compose for Local ML Stacks
 
-If you copy ALL source code before installing dependencies:
-\`\`\`dockerfile
-COPY . .  # Any code change invalidates cache
-RUN pip install -r requirements.txt  # Re-runs on every code change
-\`\`\`
-
-Every code edit triggers a full \`pip install\` — slow. The correct order: copy requirements first, install, then copy code. Dependency installation is cached as long as requirements.txt doesn't change. Code changes only rebuild the fast "copy source" layer.
-
----
-
-## Multi-Stage Builds
-
-\`\`\`dockerfile
-# Stage 1: Build
-FROM python:3.11 AS builder
-COPY requirements.txt .
-RUN pip install --user -r requirements.txt
-
-# Stage 2: Runtime (slim)
-FROM python:3.11-slim
-COPY --from=builder /root/.local /root/.local
-COPY . .
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-\`\`\`
-
-The builder stage has full build tools (compilers for C extensions). The final image is slim — no build tools, smaller attack surface, faster pull. Typical size reduction: 800MB → 150MB.
-
----
-
-## .dockerignore
-
-Like .gitignore for Docker builds. Exclude:
-\`\`\`
-data/
-models/
-*.ipynb
-__pycache__/
-.git/
-.env
-*.pyc
-\`\`\`
-
-Without .dockerignore, Docker sends your entire working directory (including 10GB data files) to the Docker daemon as build context — very slow.
-
----
-
-## Resource Limits
-
-\`\`\`bash
-docker run --memory=4g --cpus=2 my-model-server
-\`\`\`
-
-Without limits, a single runaway ML inference job can consume all host memory and starve other containers. Always set resource limits for ML containers.
-
----
-
-## docker-compose for Local Development
+Docker Compose lets you spin up a multi-service ML stack with one command:
 
 \`\`\`yaml
 services:
   model-server:
     build: .
-    ports: ["8000:8000"]
+    ports: ["8080:8080"]
     environment:
-      - MODEL_PATH=/models/churn_v3.pkl
-  redis:
-    image: redis:7-alpine
+      MODEL_PATH: /models/weights.pkl
+  feature-server:
+    image: my-feature-store:latest
+    ports: ["8081:8081"]
+  monitoring:
+    image: prom/prometheus:v2.50.1
+    ports: ["9090:9090"]
 \`\`\`
 
-Compose orchestrates multi-container local development (model server + Redis feature cache + database).
+Run \`docker compose up\` and all three services start together with a shared network.
+
+## Kubernetes for Production
+
+Kubernetes (K8s) is the standard platform for running containerised ML services at scale. Key concepts:
+
+- **Pod** — the smallest deployable unit; one or more containers sharing network and storage.
+- **Deployment** — declares the desired replica count and rolling-update strategy. K8s reconciles the actual state to match.
+- **Service** — a stable virtual IP / DNS name that load-balances traffic across Pod replicas.
+- **HPA (Horizontal Pod Autoscaler)** — watches a metric (CPU %, custom RPS) and automatically adjusts the replica count. Essential for ML services with spiky traffic.
+
+## GPU Scheduling in Kubernetes
+
+NVIDIA GPUs are exposed to Pods via the **NVIDIA device plugin**, a DaemonSet that runs on every GPU node and advertises \`nvidia.com/gpu\` as a schedulable resource.
+
+In your Pod spec:
+
+\`\`\`yaml
+resources:
+  limits:
+    nvidia.com/gpu: 1
+\`\`\`
+
+K8s only schedules the Pod on nodes with a free GPU, and the container sees exactly that device.
+
+## Container Registries
+
+Before K8s can pull your image, it must be pushed to a registry:
+
+- **Amazon ECR** — deep AWS IAM integration; natural choice if running EKS.
+- **Google GCR / Artifact Registry** — pairs with GKE.
+- **Docker Hub** — public default; rate-limited for free accounts; avoid for proprietary models.
+
+Tag images with immutable identifiers (git SHA, semantic version) — never rely on \`:latest\` in production.
+
+## Interview-Ready Summary
+
+- Containers solve ML reproducibility by bundling the interpreter, packages, and system libraries into an immutable image.
+- Copy \`requirements.txt\` before application code so the expensive \`pip install\` layer is cached across code-only changes.
+- Multi-stage builds separate build-time dependencies from the runtime image, dramatically reducing image size.
+- The NVIDIA device plugin exposes GPU resources (\`nvidia.com/gpu\`) to Kubernetes Pod schedulers.
+- HPA automatically scales ML Deployment replicas based on CPU, memory, or custom metrics like requests-per-second.
+- Always pin dependency versions and use a non-root user for production ML containers.
 `,
   video: null,
-  videoFallbackMarkdown: `## Deep Dive: Container Security for ML
+  videoFallbackMarkdown: `## Deep Dive: Multi-Stage Builds, K8s Rolling Updates, and GPU Scheduling
 
-**Don't run as root**: the default Docker container runs as root. If the container is compromised, root access to the host is possible. Add a non-root user:
+### Multi-Stage Docker Builds for Production ML
+
+A single-stage ML Dockerfile often balloons to 4–6 GB because it retains build tools, compilers, and intermediate download artefacts. Multi-stage builds eliminate this:
+
 \`\`\`dockerfile
-RUN useradd -m appuser
+# Stage 1 — builder: compile wheels and download large model weights
+FROM python:3.11 AS builder
+WORKDIR /build
+COPY requirements.txt .
+RUN pip wheel --no-cache-dir -r requirements.txt -w /wheels
+RUN python -c "from huggingface_hub import hf_hub_download; hf_hub_download(...)"
+
+# Stage 2 — runtime: only what the server needs
+FROM python:3.11-slim AS runtime
+WORKDIR /app
+COPY --from=builder /wheels /wheels
+RUN pip install --no-cache-dir --no-index --find-links=/wheels /wheels/*.whl
+COPY --from=builder /build/model_weights /app/model_weights
+COPY src/ ./src/
+RUN useradd -m appuser && chown -R appuser /app
 USER appuser
+EXPOSE 8080
+CMD ["python", "src/serve.py"]
 \`\`\`
 
-**Scan for vulnerabilities**: use \`docker scout cves\` or Trivy to scan images for CVEs in base images and installed packages. Rebuild regularly to pick up security patches.
+The runtime image inherits nothing from the builder except the files you explicitly \`COPY --from=builder\`. Compilers, pip cache, and intermediate files are discarded. A 5 GB builder stage can become a 600 MB runtime image.
 
-**Secret management**: never embed secrets in Dockerfile (they persist in image layers). Inject at runtime via environment variables or Docker secrets.
+### Kubernetes Deployment Rolling Updates
+
+When you push a new model version, you want zero-downtime updates. A K8s Deployment with a rolling update strategy achieves this:
+
+\`\`\`yaml
+spec:
+  replicas: 4
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1        # spin up 1 extra Pod before terminating old ones
+      maxUnavailable: 0  # never reduce below 4 healthy Pods
+\`\`\`
+
+K8s increments through Pods: new Pod starts → readiness probe passes → old Pod terminates. At no point does traffic hit an unready container. Combined with a readiness probe that hits your model's \`/health\` endpoint, this guarantees smooth canary-style rollouts.
+
+### GPU Resource Scheduling Deep Dive
+
+GPU scheduling in K8s involves three layers:
+
+1. **Node labelling** — GPU nodes get labels like \`accelerator: nvidia-tesla-a100\`. Use \`nodeSelector\` or \`nodeAffinity\` to pin GPU Pods to the right hardware tier.
+2. **Resource limits** — \`nvidia.com/gpu: 1\` is both a request and a limit; the GPU is exclusively allocated (no sharing by default). For time-sliced sharing, the NVIDIA MIG (Multi-Instance GPU) feature partitions an A100 into up to 7 independent slices.
+3. **RuntimeClass** — set \`runtimeClassName: nvidia\` in the Pod spec so containerd uses the NVIDIA container runtime, which mounts the CUDA libraries and device files into the container namespace.
+
+Pair GPU Pods with the **Cluster Autoscaler**: when all GPU nodes are full and a new GPU Pod is pending, the autoscaler provisions a new GPU node from the cloud provider's node group, schedules the Pod, then terminates the node when demand drops — keeping expensive GPU capacity tightly matched to actual workload.
 `,
-  tryGuidance: "Use the Dockerfile layer diagram to see how caching speeds up rebuilds when source code changes vs when dependencies change.",
+  tryGuidance: "Step through each stage of the interview graph. In the Dockerfile bug stage, inspect each annotated line and click the one that causes a layer-cache inefficiency. In the scenario stages, reason through the trade-offs before selecting your answer — the rationale is revealed only after you commit.",
   interviewGraph: {
-    initialStageId: "mo_t4_stage1",
+    initialStageId: "dockerfile_bug",
     artifactDimensions: [
-      { label: "Layer Caching", recoveryStageId: "mo_t4_rec1" },
-      { label: "Production Best Practices", recoveryStageId: "mo_t4_terminal", passLabel: "Docker Mastery" },
+      { label: "Dockerfile Best Practices", recoveryStageId: "docker_recovery" },
+      { label: "Kubernetes for ML", recoveryStageId: "k8s_recovery" },
     ],
     stages: {
-      mo_t4_stage1: {
-        id: "mo_t4_stage1",
-        type: "scenario_choice",
+      dockerfile_bug: {
+        id: "dockerfile_bug",
+        type: "click_target",
         badge: "Stage 1",
-        title: "Stage 1 · Slow builds",
-        prompt: "Every time you change one line of Python code, docker build takes 4 minutes to reinstall all dependencies. Why and how do you fix it?",
-        choices: [
-          { id: "a", label: "Install fewer dependencies to speed up builds", description: "Removing needed packages isn't the fix." },
-          { id: "b", label: "COPY . . comes before RUN pip install — any code change invalidates the pip install cache layer. Fix: copy requirements.txt first, run pip install, then copy source code.", description: "Layer cache invalidation cascades: changing an early layer rebuilds all subsequent layers." },
-          { id: "c", label: "Use a faster base image", description: "Faster base image helps but doesn't fix the caching problem." },
-        ],
-        branches: { a: "mo_t4_rec1", b: "mo_t4_stage2", c: "mo_t4_rec1" },
-        rationale: "B is correct. Docker caches each layer. COPY . . copies all source files — any change invalidates this layer and all subsequent layers including pip install. Moving requirements.txt copy + pip install before COPY . . means pip install is cached unless requirements.txt changes.",
+        title: "Stage 1 · Spot the Dockerfile cache bug",
+        prompt: "A teammate pushed this Dockerfile for your model server. Every code change triggers a full `pip install`, slowing CI to 8 minutes. Click the line that is the root cause of the cache invalidation problem.",
+        code_snippet: `FROM python:3.11
+
+COPY . /app                          # -- ds-target:copy_all_first
+WORKDIR /app
+
+RUN pip install -r requirements.txt  # -- ds-target:install_after_copy
+
+COPY model_weights.pkl /app/         # -- ds-target:model_copy
+
+CMD ["python", "serve.py"]           # -- ds-target:cmd_line`,
+        validationCopy: {
+          copy_all_first: "Correct! `COPY . /app` copies ALL source files before `pip install`. Any code change — even a one-line edit in serve.py — invalidates this layer and forces Docker to re-run pip install from scratch. Fix: `COPY requirements.txt .` first, then `RUN pip install`, then `COPY . /app`.",
+          install_after_copy: "Close — pip install is expensive, but it is not the root cause. The problem is what comes *before* it: `COPY . /app` copies everything, so any source file change busts the cache. The fix is to reorder the COPY instructions, not move pip install.",
+          model_copy: "Not quite. Copying model weights after pip install is actually fine — model weights rarely change. The cache problem is higher up: `COPY . /app` before `pip install` means every source edit re-triggers the install step.",
+          cmd_line: "The CMD line is correct and well-formed. The cache issue is earlier in the file — look at what gets copied before the expensive `pip install` step.",
+        },
+        branches: {
+          copy_all_first: "slim_base",
+          install_after_copy: "docker_recovery",
+          model_copy: "docker_recovery",
+          cmd_line: "docker_recovery",
+        },
       },
-      mo_t4_rec1: {
-        id: "mo_t4_rec1",
+      docker_recovery: {
+        id: "docker_recovery",
         type: "scenario_choice",
         badge: "Recovery",
-        title: "Recovery · Cache invalidation",
-        prompt: "Why does the order of instructions in a Dockerfile matter for build performance?",
+        title: "Recovery · Fixing the layer cache",
+        prompt: "To fix the Dockerfile so that `pip install` is only re-run when dependencies actually change, which approach is correct?",
         choices: [
-          { id: "a", label: "When a layer changes, all subsequent layers are rebuilt — expensive operations (pip install) should come before frequently changing content (source code)", description: "Stable layers before volatile layers maximizes cache hits." },
+          { id: "a", label: "COPY requirements.txt first", description: "Copy only requirements.txt, run pip install, then COPY the rest of the source code and model artefacts." },
+          { id: "b", label: "Order doesn't matter", description: "The COPY order has no effect on build time — it only affects runtime file availability." },
+          { id: "c", label: "Use --no-cache on first build", description: "Run docker build --no-cache once to pre-warm the layers; subsequent builds will cache correctly regardless of COPY order." },
         ],
-        branches: { a: "mo_t4_stage2" },
-        rationale: "Docker's layer cache is invalidated by any change in the instruction or its inputs. Put stable, expensive steps early; put frequently-changing steps late.",
+        branches: { a: "slim_base", b: "slim_base", c: "slim_base" },
+        rationale: "Answer A is correct. Docker caches each layer independently. By copying requirements.txt first and running pip install before copying source code, a source-only change hits a cached pip layer and skips the expensive install. --no-cache (C) defeats caching entirely and does not help with ordering. COPY order is fundamental to cache behaviour (B is wrong).",
       },
-      mo_t4_stage2: {
-        id: "mo_t4_stage2",
+      slim_base: {
+        id: "slim_base",
         type: "scenario_choice",
         badge: "Stage 2",
-        title: "Stage 2 · Image size",
-        prompt: "Your Docker image is 2.8GB. How do you reduce it significantly?",
+        title: "Stage 2 · Choosing the right base image",
+        prompt: "You are packaging a CPU-only scikit-learn model server. Your current Dockerfile starts with `FROM python:3.11`. A reviewer asks you to switch to `python:3.11-slim`. What is the primary reason to prefer the slim variant?",
         choices: [
-          { id: "a", label: "Compress the image with docker save", description: "Compression reduces storage but not the actual layer count or content." },
-          { id: "b", label: "Multi-stage build: use a full image for building (compiling C extensions), copy only the installed packages to a slim runtime image — no build tools in final image", description: "Multi-stage builds routinely reduce images from 800MB to 100-200MB." },
-          { id: "c", label: "Remove the .dockerignore file so Docker has less to process", description: ".dockerignore reduces build context size, not the final image size." },
+          { id: "a", label: "python:3.11-slim has faster Python startup time", description: "The slim image uses a tuned interpreter that boots in under 100 ms versus ~400 ms for the full image." },
+          { id: "b", label: "python:3.11-slim omits compilers and dev headers, reducing image size by ~700 MB", description: "The slim variant strips build tools and documentation, resulting in a much smaller image that is faster to push, pull, and scan." },
+          { id: "c", label: "python:3.11-slim is required for Kubernetes — the full image does not run in Pods", description: "Kubernetes has no such restriction; any valid OCI image runs in a Pod." },
+          { id: "d", label: "python:3.11-slim automatically pins all dependency versions", description: "Image variant selection has no effect on dependency pinning inside requirements.txt." },
         ],
-        branches: { a: "mo_t4_rec1", b: "mo_t4_terminal" },
-        rationale: "B is correct. Multi-stage builds separate the build environment (which needs compilers, build tools, dev headers) from the runtime environment (which only needs the installed packages and application code). The final image gets only what's needed for runtime.",
+        branches: { a: "hpa_stage", b: "hpa_stage", c: "hpa_stage", d: "hpa_stage" },
+        rationale: "B is correct. The full python:3.11 image (~900 MB) includes GCC, make, header files, and documentation useful for building packages from source. The slim variant strips these, landing around 130–150 MB. For a scikit-learn model server all packages come as pre-built wheels, so no compiler is needed at runtime. Smaller images reduce pull time, storage costs, and attack surface.",
       },
-      mo_t4_terminal: {
-        id: "mo_t4_terminal",
+      hpa_stage: {
+        id: "hpa_stage",
         type: "scenario_choice",
-        badge: "Complete",
-        title: "Complete · Resource limits",
-        prompt: "Why should you always set --memory and --cpus limits when running ML inference containers?",
+        badge: "Stage 3",
+        title: "Stage 3 · Kubernetes autoscaling",
+        prompt: "Your model service is deployed as a Kubernetes Deployment with a single replica. Traffic spikes to 10 000 requests per second during business hours but drops to near-zero at night. Which Kubernetes feature should you configure to handle this automatically?",
         choices: [
-          { id: "a", label: "Without limits, a single ML container can consume all host memory and CPU, starving co-located containers and potentially crashing the host", description: "Resource limits protect host stability and neighbor containers." },
+          { id: "a", label: "StatefulSet with persistent volumes", description: "StatefulSets are for stateful applications like databases; they don't provide automatic scaling." },
+          { id: "b", label: "Horizontal Pod Autoscaler (HPA)", description: "HPA watches a metric — CPU utilisation, memory, or a custom RPS metric — and adjusts the Deployment's replica count automatically." },
+          { id: "c", label: "DaemonSet", description: "DaemonSets run exactly one Pod per node; they don't scale based on load." },
+          { id: "d", label: "CronJob scheduled every hour", description: "CronJobs run batch tasks on a schedule; they don't respond dynamically to real-time traffic." },
         ],
-        branches: { a: "mo_t4_terminal" },
+        branches: { a: "multistage_stage", b: "multistage_stage", c: "multistage_stage", d: "multistage_stage" },
+        rationale: "B is correct. The Horizontal Pod Autoscaler continuously monitors a target metric and scales the Deployment's replicas up or down to meet a target threshold. Combined with the Cluster Autoscaler (which adds or removes nodes), HPA is the standard pattern for cost-efficient ML serving: scale out for traffic spikes, scale down to near-zero overnight.",
+      },
+      multistage_stage: {
+        id: "multistage_stage",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Multi-stage builds",
+        prompt: "Your ML model image weighs 4.8 GB because the build stage downloads PyTorch source, compiles CUDA extensions, and caches pip wheels. What is the primary benefit of refactoring this into a multi-stage Dockerfile?",
+        choices: [
+          { id: "a", label: "Multi-stage builds allow parallel layer execution, speeding up build time by 4x", description: "Layers within a single stage are still sequential; multi-stage does not inherently parallelise them." },
+          { id: "b", label: "The final runtime image excludes build tools and intermediate artefacts, reducing image size significantly", description: "Only files explicitly copied with COPY --from=builder survive into the runtime stage; compilers, caches, and source code are discarded." },
+          { id: "c", label: "Multi-stage builds automatically push both stages to the registry for rollback purposes", description: "Only the final stage is tagged and pushed by default; intermediate stages stay local." },
+          { id: "d", label: "Multi-stage builds enforce that the runtime stage uses a different OS than the builder stage", description: "You can use the same or different base images; there is no enforcement." },
+        ],
+        branches: { a: "gpu_stage", b: "gpu_stage", c: "gpu_stage", d: "gpu_stage" },
+        rationale: "B is correct. In a multi-stage build the final stage starts from a fresh slim base image and only receives files copied from earlier stages via COPY --from=. Build tools, pip wheel caches, compiled intermediates, and downloaded source stay in the builder layer which is never shipped. A 4.8 GB build stage routinely produces a 500–800 MB runtime image.",
+      },
+      gpu_stage: {
+        id: "gpu_stage",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · GPU access in Kubernetes",
+        prompt: "You are deploying a PyTorch inference service that requires one GPU per replica. Your cluster has GPU nodes. What must you configure so that Kubernetes schedules the Pod on a GPU node and the container can use it?",
+        choices: [
+          { id: "a", label: "Set an environment variable NVIDIA_VISIBLE_DEVICES=all in the Deployment spec", description: "Environment variables alone do not cause K8s to schedule on GPU nodes or allocate the device." },
+          { id: "b", label: "Request `nvidia.com/gpu: 1` in the container resource limits, enabled by the NVIDIA device plugin DaemonSet", description: "The device plugin advertises GPU capacity; setting the limit causes the scheduler to place the Pod on a node with a free GPU and mount the device into the container." },
+          { id: "c", label: "Add a GPU toleration to the Pod spec — no device plugin is needed", description: "Tolerations allow a Pod to be scheduled on tainted nodes but do not allocate the GPU device or mount CUDA libraries." },
+          { id: "d", label: "Use a HostPath volume that mounts /dev/nvidia0 from the node", description: "Direct HostPath mounts are a security anti-pattern and bypass the device plugin's accounting — other Pods could grab the same device simultaneously." },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "k8s_recovery", d: "k8s_recovery" },
+        rationale: "B is correct. The NVIDIA device plugin runs as a DaemonSet on every GPU node. It detects the GPUs and registers them with the kubelet as the custom resource nvidia.com/gpu. When a Pod declares `resources.limits['nvidia.com/gpu']: 1`, the K8s scheduler only places the Pod on a node with a free GPU slot, and the device plugin mounts the CUDA runtime and device files into the container.",
+      },
+      k8s_recovery: {
+        id: "k8s_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Kubernetes GPU scheduling",
+        prompt: "Which combination correctly gives a Kubernetes Pod exclusive access to one GPU?",
+        choices: [
+          { id: "a", label: "Install the NVIDIA device plugin DaemonSet AND set `nvidia.com/gpu: 1` in container resource limits", description: "The device plugin registers GPUs as schedulable resources; the resource limit tells the scheduler to allocate one." },
+          { id: "b", label: "Mount /dev/nvidia0 as a HostPath volume", description: "HostPath mounts are a security risk and bypass device accounting — multiple Pods could claim the same GPU." },
+          { id: "c", label: "Set CUDA_VISIBLE_DEVICES=0 as an environment variable in the Pod spec", description: "This env var selects a GPU inside a process, but K8s still has no knowledge of GPU allocation without the device plugin." },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage" },
+        rationale: "A is correct. The NVIDIA device plugin is the official Kubernetes mechanism for GPU scheduling. It registers nvidia.com/gpu as an extended resource, enabling the scheduler to track allocation and prevent double-booking.",
+      },
+      terminal_stage: {
+        id: "terminal_stage",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · Container registry selection",
+        prompt: "Your team is deploying ML model containers to Amazon EKS. You need a private registry that integrates with AWS IAM roles for authentication — no long-lived credentials. Which registry is the natural choice?",
+        choices: [
+          { id: "a", label: "Docker Hub (private repository)", description: "Docker Hub uses username/password or access tokens — not AWS IAM — and rate-limits free-tier pulls." },
+          { id: "b", label: "Amazon ECR (Elastic Container Registry)", description: "ECR authenticates via IAM roles; EKS nodes can pull images using their instance role with no stored credentials. ECR also runs in the same AWS region, minimising pull latency." },
+          { id: "c", label: "GitHub Container Registry", description: "GHCR uses GitHub personal access tokens or GITHUB_TOKEN — not AWS IAM. Cross-cloud pull adds egress latency." },
+          { id: "d", label: "Self-hosted Harbor registry on EC2", description: "Harbor is a valid option but requires manual setup, TLS management, and credential rotation — none of which is needed when ECR + IAM handles it natively." },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage", d: "terminal_stage" },
+        rationale: "B is correct. Amazon ECR is the native registry for AWS workloads. EKS worker nodes authenticate using their IAM instance profile — no Docker login credentials to rotate or leak. ECR images reside in the same AWS region as your cluster, so pulls are fast and free of inter-region egress fees. The ECR lifecycle policy also automates deletion of old image tags to control storage costs.",
         terminal: true,
-        rationale: "ML models can be memory-hungry. Without limits, a memory leak or unexpectedly large batch causes the container to consume all available host memory (OOM kill or host crash). Explicit limits protect the host and enable predictable resource planning.",
       },
     },
   },
   knowledgeCheck: [
     {
-      question: "Why copy requirements.txt and run pip install before copying the rest of the application code?",
+      question: "You change a single line in `serve.py` and rebuild your Docker image. The Dockerfile has `COPY . /app` before `RUN pip install -r requirements.txt`. What happens?",
       options: [
-        "pip install requires requirements.txt to be in the root directory before other files exist",
-        "This order maximizes layer cache reuse: pip install is cached when only requirements.txt is unchanged, even if source code changes — making iterative development builds much faster",
-        "Docker requires dependencies to be installed before source files can be copied",
+        "Docker detects that requirements.txt is unchanged and skips the pip install layer",
+        "Docker invalidates the COPY layer and all subsequent layers, re-running pip install from scratch",
+        "Docker only re-copies the changed file and leaves the pip install layer intact",
+        "Docker uses a content hash of requirements.txt to decide whether to re-run pip install",
       ],
       correctIndex: 1,
-      explanation: "Docker's layer cache is invalidated when a layer's inputs change. Placing pip install after COPY requirements.txt means: if only source code changed (not requirements.txt), the pip install layer is unchanged and cached. Without this ordering, every code change would trigger a full pip install.",
+      explanation: "Docker layer caching is based on the instruction and the state of the filesystem at that point. `COPY . /app` changes whenever any file in the build context changes, invalidating itself and every downstream layer including `RUN pip install`. The fix is to `COPY requirements.txt` first so the pip install layer is only busted when dependencies actually change.",
     },
     {
-      question: "What does a .dockerignore file do?",
+      question: "Your Kubernetes ML service experiences traffic that varies from 50 to 5 000 RPS throughout the day. Which resource should you configure to automatically scale the number of Pods?",
       options: [
-        "It prevents Docker from running certain commands inside the container",
-        "It excludes files and directories from the build context sent to the Docker daemon, reducing build time and preventing accidental inclusion of large data files or secrets",
-        "It specifies which container images should be ignored by docker-compose",
+        "A DaemonSet so one model Pod runs on every node",
+        "A StatefulSet with a fixed replica count of 20",
+        "A Horizontal Pod Autoscaler targeting CPU or a custom RPS metric",
+        "A CronJob that recreates the Deployment every 30 minutes",
       ],
-      correctIndex: 1,
-      explanation: "When you run 'docker build', Docker sends the entire build context (current directory) to the daemon. Without .dockerignore, this includes data directories, model files, .git/, and .env — potentially gigabytes of content. .dockerignore tells Docker which paths to exclude, keeping the build context small and preventing accidental secret exposure.",
+      correctIndex: 2,
+      explanation: "The Horizontal Pod Autoscaler (HPA) continuously monitors a metric and adjusts Deployment replicas between a configured minimum and maximum. For ML serving, you can target built-in metrics like CPU utilisation or register a custom metric (e.g. requests-per-second via Prometheus Adapter). DaemonSets, StatefulSets with fixed replicas, and CronJobs do not respond dynamically to real-time load.",
     },
     {
-      question: "What is the benefit of a multi-stage Docker build for an ML serving application?",
+      question: "What is the primary purpose of a multi-stage Docker build for an ML model service?",
       options: [
-        "Multi-stage builds allow running multiple applications in one container",
-        "The build stage uses a full image with compilers to build C extensions; the final stage uses a slim image with only runtime dependencies — dramatically reducing the production image size",
-        "Multi-stage builds enable parallel compilation of Python packages",
+        "To run multiple containers from a single Dockerfile in parallel",
+        "To automatically push each build stage as a separate image tag for rollback",
+        "To produce a slim runtime image by discarding build-time tools and intermediate artefacts",
+        "To enforce that unit tests pass before the final image layer is written",
+      ],
+      correctIndex: 2,
+      explanation: "Multi-stage builds let you use a full build environment (with compilers, pip wheel cache, model download tools) in an early stage, then start a fresh slim image and copy only the compiled/downloaded artefacts into the runtime stage via `COPY --from=<stage>`. Build tools, caches, and source files are never shipped, cutting image sizes from several GB to a few hundred MB.",
+    },
+  ],
+},
+
+"mo-t2": {
+  durationLabel: "20 min",
+  outcomes: [
+    "Explain core Kubernetes primitives: cluster, node, pod, namespace, deployment, service, ingress",
+    "Describe why Kubernetes is suited for ML workloads: auto-scaling, self-healing, resource isolation",
+    "Configure resource requests and limits correctly, including GPU limits",
+    "Set up Horizontal Pod Autoscaler using custom metrics like inference latency",
+    "Distinguish Seldon Core / KServe model serving from Argo / Kubeflow training pipelines",
+    "Use ConfigMaps, Secrets, and PersistentVolumes for ML configuration and artifacts",
+  ],
+  learnMarkdown: `## Kubernetes Fundamentals
+
+Kubernetes (K8s) is an open-source container orchestration platform. Understanding its building blocks is essential before applying it to ML:
+
+- **Cluster**: a set of machines (nodes) managed together by a control plane
+- **Node**: a single machine (VM or physical) that runs pods; nodes have CPU, memory, and optionally GPU capacity
+- **Pod**: the smallest deployable unit — one or more containers sharing a network namespace and storage
+- **Namespace**: a virtual partition of a cluster used to isolate teams, environments, or services
+- **Deployment**: a controller that declares the desired state (e.g., 3 replicas of a pod) and reconciles reality to match
+- **Service**: a stable network endpoint that load-balances traffic across matching pods
+- **Ingress**: an HTTP/HTTPS routing layer that maps external hostnames and paths to internal services
+
+## Why Kubernetes for ML
+
+ML systems have demanding operational requirements that Kubernetes addresses directly:
+
+- **Auto-scaling**: the Horizontal Pod Autoscaler (HPA) adjusts replica counts based on CPU, memory, or custom metrics such as requests-per-second or inference latency. Traffic spikes during batch scoring or online prediction are handled automatically.
+- **Self-healing**: Kubernetes restarts failed containers, reschedules pods on healthy nodes, and replaces pods that fail liveness probes — reducing manual intervention during training runs or serving outages.
+- **Rolling updates**: new model versions can be rolled out pod-by-pod with zero downtime; rollback is a single command if error rates spike.
+- **Resource isolation**: namespaces and resource quotas prevent a runaway training job from starving a production inference service.
+
+## ML-Specific Patterns
+
+**Model Serving — KServe and Seldon Core**
+
+KServe (formerly KFServing) and Seldon Core are Kubernetes-native model serving frameworks. They extend Kubernetes with custom resources like \`InferenceService\`:
+
+\`\`\`yaml
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: fraud-model
+spec:
+  predictor:
+    sklearn:
+      storageUri: "s3://models/fraud-v3"
+      resources:
+        requests: { cpu: "1", memory: "2Gi" }
+        limits:   { cpu: "2", memory: "4Gi" }
+\`\`\`
+
+Both frameworks support **A/B testing** (traffic split between model versions), **canary deployments** (route 5% of traffic to a new version), and **autoscaling to zero** when traffic is idle.
+
+**Training Pipelines — Argo Workflows and Kubeflow Pipelines**
+
+Argo Workflows schedules DAGs of containers as Kubernetes pods, making it natural for multi-step training pipelines (data prep → feature engineering → train → evaluate → register). Kubeflow Pipelines is a higher-level abstraction built on Argo that adds a UI and experiment tracking.
+
+## Resource Requests vs Limits
+
+Kubernetes separates *scheduling* from *enforcement* through requests and limits:
+
+- **Requests**: the amount of CPU/memory the scheduler *reserves* on a node. A pod is only placed on a node that has at least this much available.
+- **Limits**: the maximum the container is allowed to consume. Exceeding the memory limit causes an OOM kill. Exceeding the CPU limit causes **throttling** — the container is paused until the next scheduling period.
+
+A common mistake is setting the CPU limit far below the CPU request. The pod gets scheduled assuming 2 CPUs but is throttled to a fraction of that, causing severe latency degradation.
+
+**GPU limits** use the extended resource key \`nvidia.com/gpu\`. Unlike CPU, GPU limits must equal GPU requests (fractional GPUs are not supported in standard Kubernetes).
+
+## Horizontal Pod Autoscaler
+
+HPA watches a metric and adjusts the replica count between a configured min and max:
+
+\`\`\`yaml
+metrics:
+- type: Pods
+  pods:
+    metric:
+      name: inference_latency_p99_ms
+    target:
+      type: AverageValue
+      averageValue: 200m
+\`\`\`
+
+Custom metrics (latency, queue depth, RPS) require the Prometheus Adapter or KEDA, which expose them through the Kubernetes custom metrics API.
+
+## ConfigMaps, Secrets, and PersistentVolumes
+
+- **ConfigMaps** store non-sensitive configuration: model thresholds, feature flag values, preprocessing parameters.
+- **Secrets** store sensitive values: API keys, database credentials, cloud storage tokens. They are base64-encoded and can be mounted as files or environment variables.
+- **PersistentVolumes (PV/PVC)**: pods are ephemeral, so model artifacts and training datasets must be stored in PersistentVolumes backed by cloud storage (EBS, GCS Filestore) or distributed filesystems (NFS, Rook-Ceph).
+
+## Pod Disruption Budgets
+
+A PodDisruptionBudget (PDB) limits how many pods of a deployment can be unavailable simultaneously during voluntary disruptions (node drains, rolling updates). Setting \`minAvailable: 2\` on a 3-replica inference deployment ensures at least 2 replicas are always serving traffic.
+
+## Namespace-Based Team Isolation
+
+Separating data science workloads (training jobs), backend services, and analytics dashboards into distinct namespaces allows per-team resource quotas, separate RBAC policies, and independent network policies — preventing accidental interference between teams.
+
+## Interview-Ready Summary
+
+- Kubernetes manages containerized workloads through a hierarchy: cluster → node → pod; Deployments and Services provide resilience and discoverability.
+- KServe/Seldon Core enable production model serving with A/B testing, canary rollouts, and autoscaling; Argo/Kubeflow handle training DAGs.
+- Resource *requests* drive scheduling; resource *limits* enforce throttling/OOM behavior — setting CPU limits far below requests causes silent performance degradation.
+- HPA can scale on custom ML metrics (latency, RPS) via the Prometheus Adapter or KEDA.
+- Secrets store credentials; ConfigMaps store configuration; PersistentVolumes provide durable storage for model artifacts.
+- PodDisruptionBudgets and rolling update strategies together guarantee zero-downtime model deployments.
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: KServe, HPA with Custom Metrics, and Resource Trade-offs
+
+### KServe InferenceService Configuration
+
+KServe wraps model serving in a Kubernetes custom resource. A minimal production configuration includes three sections:
+
+**Predictor** specifies the framework runtime (sklearn, xgboost, pytorch, custom container) and the \`storageUri\` pointing to your model artifact in S3, GCS, or Azure Blob. KServe injects a storage initializer init-container that downloads the model before the predictor starts.
+
+**Transformer** (optional) sits in front of the predictor and handles pre/post-processing, feature lookup, or payload transformation. It runs as a separate container, allowing independent scaling and versioning.
+
+**Explainer** (optional) attaches a model explanation service (SHAP, Alibi) alongside the predictor.
+
+Traffic splitting for canary rollouts is declared directly in the spec:
+
+\`\`\`yaml
+canaryTrafficPercent: 10   # 10% to new version, 90% to stable
+\`\`\`
+
+KServe automatically creates the underlying Kubernetes Deployment, Service, and (if using Knative) a Knative Service with scale-to-zero support.
+
+### HPA with Custom Metrics for ML
+
+Standard HPA on CPU is insufficient for inference workloads — a model may be CPU-idle but saturated at the GPU or blocked on I/O. Custom metric HPA requires:
+
+1. **Prometheus** scraping inference metrics (e.g., \`seldon_api_executor_server_requests_seconds_bucket\`)
+2. **Prometheus Adapter** translating Prometheus queries into the Kubernetes custom metrics API
+3. An HPA object referencing the custom metric by name
+
+Alternatively, **KEDA** (Kubernetes Event-Driven Autoscaling) provides pre-built scalers for Prometheus, Kafka, SQS, and more, with simpler configuration than the Prometheus Adapter. KEDA can also scale to zero, which is not supported by standard HPA.
+
+A key tuning decision is the **stabilization window**: HPA by default waits 5 minutes before scaling down to avoid flapping. For bursty ML workloads, this may need to be increased.
+
+### Resource Requests vs Limits: Trade-offs
+
+The safest starting point is setting limits equal to requests (Guaranteed QoS class). This prevents throttling but reduces cluster utilization — nodes appear full even when pods are mostly idle.
+
+Setting limits higher than requests (Burstable QoS) improves utilization: pods can burst above their request when the node has spare capacity. The risk is noisy-neighbor effects during contention.
+
+Omitting limits entirely (also Burstable if requests are set) maximizes burst headroom but means a misbehaving container can consume all node resources, causing OOM kills on neighboring pods.
+
+For GPU workloads, fractional GPU allocation requires third-party device plugins (e.g., NVIDIA MIG, AWS Neuron). Without these, GPU limits must be whole integers.
+
+The practical recommendation for ML serving: set memory limit equal to request (OOM kills are fatal), set CPU limit at 2–4× the CPU request to allow burst without uncapped consumption, and always set GPU limit equal to GPU request.
+`,
+  tryGuidance: "Use the interactive interview simulator to practice identifying Kubernetes misconfigurations in ML deployment manifests and answering common interview questions about resource management, HPA strategy, and model serving patterns.",
+  interviewGraph: {
+    initialStageId: "k8s_intro",
+    artifactDimensions: [
+      { label: "Resource Management", recoveryStageId: "resource_recovery" },
+      { label: "ML Serving Patterns", recoveryStageId: "serving_k8s_recovery" },
+    ],
+    stages: {
+      k8s_intro: {
+        id: "k8s_intro",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · K8s Building Blocks",
+        prompt: "A new data scientist asks: 'What is the smallest unit of deployment in Kubernetes, and why does it matter for ML model serving?' Which answer is most accurate?",
+        choices: [
+          { id: "a", label: "A container", description: "Containers are the smallest unit; Kubernetes schedules containers directly onto nodes." },
+          { id: "b", label: "A Pod", description: "A Pod is the smallest deployable unit; it wraps one or more containers sharing network and storage, and is what the scheduler places on a node." },
+          { id: "c", label: "A Deployment", description: "A Deployment is the smallest unit; it defines the container image and replica count." },
+          { id: "d", label: "A Node", description: "A Node is the smallest unit; each node runs exactly one containerized workload." },
+        ],
+        branches: { a: "resource_recovery", b: "resource_bug", c: "resource_recovery", d: "resource_recovery" },
+        rationale: "A Pod is the atomic scheduling unit in Kubernetes. Containers inside a Pod share the same IP address and can mount the same volumes, which is why sidecar patterns (e.g., a logging agent alongside a model server) are implemented at the Pod level rather than the container level.",
+      },
+      resource_recovery: {
+        id: "resource_recovery",
+        type: "scenario_choice",
+        badge: "Recovery A",
+        title: "Recovery · Resource Management Basics",
+        prompt: "Let's reinforce Kubernetes fundamentals. Which of the following correctly describes the relationship between a Pod and a Deployment in Kubernetes?",
+        choices: [
+          { id: "a", label: "A Deployment IS a Pod with extra networking rules attached", description: "Deployments and Pods are the same resource type, just configured differently." },
+          { id: "b", label: "A Deployment manages a ReplicaSet which manages Pods", description: "The Deployment controller creates and updates a ReplicaSet, which in turn ensures the desired number of Pod replicas are running." },
+          { id: "c", label: "A Pod manages multiple Deployments to enable A/B testing", description: "Pods are at a lower level than Deployments; a Pod cannot manage Deployments." },
+        ],
+        branches: { a: "resource_bug", b: "resource_bug", c: "resource_bug" },
+        rationale: "Deployments manage ReplicaSets, which manage Pods. This three-tier hierarchy lets Kubernetes perform rolling updates: it creates a new ReplicaSet for the new version and scales down the old one incrementally.",
+      },
+      resource_bug: {
+        id: "resource_bug",
+        type: "click_target",
+        badge: "Stage 2",
+        title: "Stage 2 · Spot the Misconfiguration",
+        prompt: "This Deployment manifest is for a fraud-detection model server. Something in the resource configuration will cause severe performance degradation in production. Click the problematic line.",
+        code_snippet: `# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+spec:
+  replicas: 3
+  template:
+    spec:
+      containers:
+      - name: model-server
+        image: myregistry/fraud-model:v1.2
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2"        # requests 2 full CPUs
+          limits:
+            memory: "4Gi"    # -- ds-target:mem_limit_equal
+            cpu: "100m"      # -- ds-target:cpu_throttle`,
+        validationCopy: {
+          mem_limit_equal: "Memory limit equal to request is correct — this prevents OOM kills without wasting capacity. The bug is elsewhere in the resource block.",
+          cpu_throttle: "Correct! cpu: '100m' means 100 millicores = 0.1 CPU. The pod requests 2 CPUs for scheduling but is throttled to 5% of that at runtime. This will cause extreme latency spikes. The CPU limit should be at least equal to the CPU request (2 CPUs, or '2000m').",
+        },
+        branches: { mem_limit_equal: "cpu_limit_recovery", cpu_throttle: "hpa_stage" },
+      },
+      cpu_limit_recovery: {
+        id: "cpu_limit_recovery",
+        type: "scenario_choice",
+        badge: "Recovery B",
+        title: "Recovery · CPU Limits vs Requests",
+        prompt: "You set cpu request: '2' and cpu limit: '100m' on a model serving container. What happens at runtime?",
+        choices: [
+          { id: "a", label: "The CPU limit should be at least as large as the CPU request to avoid throttling the model", description: "Setting limit < request causes the scheduler to reserve 2 CPUs but throttle execution to 100m, degrading performance severely." },
+          { id: "b", label: "Setting a low CPU limit saves cluster resources and helps other pods", description: "A low CPU limit does not free up the reserved request capacity — the scheduler still treats 2 CPUs as unavailable on that node." },
+          { id: "c", label: "Kubernetes automatically adjusts limits when actual usage exceeds the limit", description: "Kubernetes enforces limits strictly; it does not raise them automatically. CPU throttling occurs deterministically when usage exceeds the limit." },
+        ],
+        branches: { a: "hpa_stage", b: "hpa_stage", c: "hpa_stage" },
+        rationale: "CPU limits that are lower than requests create a dangerous inconsistency: the node reserves 2 CPUs for scheduling purposes, but the container's CPU time is capped at 100m. The pod appears to have capacity but runs at a fraction of expected speed. Always set CPU limits >= CPU requests for latency-sensitive workloads.",
+      },
+      hpa_stage: {
+        id: "hpa_stage",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · HPA Metric Selection",
+        prompt: "Your fraud model's inference latency (p99) spikes above 500ms during peak traffic even though average CPU utilization is only 30%. Which HPA configuration is most appropriate?",
+        choices: [
+          { id: "a", label: "Scale on CPU utilization with target 80%", description: "CPU is already at 30% and not the bottleneck — scaling on CPU would not trigger until CPU climbs, missing the latency spike entirely." },
+          { id: "b", label: "Scale on a custom metric: p99 inference latency exported from Prometheus", description: "A custom metric based on latency directly reflects user-visible performance, triggering scale-out as soon as latency exceeds the threshold regardless of CPU state." },
+          { id: "c", label: "Scale on memory utilization with target 70%", description: "Memory utilization reflects buffer/cache usage, not request throughput or latency — it is not a reliable proxy for inference load." },
+          { id: "d", label: "Disable HPA and use a fixed replica count sized for peak load", description: "Over-provisioning avoids latency spikes but wastes significant cluster resources during off-peak hours and increases cost." },
+        ],
+        branches: { a: "secrets_stage", b: "secrets_stage", c: "secrets_stage", d: "secrets_stage" },
+        rationale: "When CPU is not the bottleneck (GPU saturation, I/O wait, thread pool exhaustion), CPU-based HPA is blind to the actual performance problem. Custom metrics exposed via Prometheus Adapter or KEDA allow HPA to react directly to business-relevant signals like latency percentiles or request queue depth.",
+      },
+      secrets_stage: {
+        id: "secrets_stage",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Secrets Management",
+        prompt: "Your model server needs to call an external feature store API that requires an API key. Where should this API key be stored and how should it be injected into the pod?",
+        choices: [
+          { id: "a", label: "Hardcode it in the container image at build time", description: "Hardcoding secrets in images means they are visible in image layers, Docker history, and any registry that stores the image." },
+          { id: "b", label: "Store it in a Kubernetes Secret and mount it as an environment variable or file", description: "Kubernetes Secrets keep sensitive values out of the image and source code, allow rotation without rebuilding, and integrate with RBAC to restrict which pods can access them." },
+          { id: "c", label: "Store it in a ConfigMap since ConfigMaps are designed for application configuration", description: "ConfigMaps are not encrypted at rest by default and are visible to anyone with read access to the namespace — they should never store sensitive credentials." },
+          { id: "d", label: "Pass it as a command-line argument in the Deployment spec", description: "Command-line arguments appear in plain text in the Deployment manifest, kubectl describe output, and audit logs." },
+        ],
+        branches: { a: "pdb_stage", b: "pdb_stage", c: "pdb_stage", d: "pdb_stage" },
+        rationale: "Kubernetes Secrets are the correct primitive for sensitive values. In production, they should be backed by an external secrets manager (HashiCorp Vault, AWS Secrets Manager) via a CSI driver or operator to enable rotation, auditing, and encryption at rest beyond Kubernetes' base64 encoding.",
+      },
+      pdb_stage: {
+        id: "pdb_stage",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Pod Disruption Budgets",
+        prompt: "Your inference Deployment has 4 replicas. During a node maintenance window, Kubernetes evicts pods from the draining node. What does setting minAvailable: 3 in a PodDisruptionBudget achieve?",
+        choices: [
+          { id: "a", label: "It prevents any pods from being evicted, blocking node maintenance", description: "PDBs limit disruption but do not block it indefinitely — cluster administrators can override them. They coordinate voluntary disruptions, not prevent them entirely." },
+          { id: "b", label: "It ensures at least 3 of the 4 replicas remain running during the disruption, limiting simultaneous evictions to 1", description: "The PDB tells the eviction API to only proceed when 3 replicas are available, so at most 1 pod is evicted at a time, keeping the service live throughout maintenance." },
+          { id: "c", label: "It schedules a new replica on a fresh node before any eviction begins", description: "PDBs do not proactively create pods — they constrain the pace of eviction. The Deployment controller handles rescheduling after eviction." },
+          { id: "d", label: "It allocates 3 reserved node slots so evicted pods have guaranteed placement", description: "PDBs have no interaction with node capacity reservation — that is handled by resource requests, Node Affinity, or dedicated node pools." },
+        ],
+        branches: { a: "serving_k8s_recovery", b: "terminal_stage", c: "serving_k8s_recovery", d: "serving_k8s_recovery" },
+        rationale: "A PodDisruptionBudget with minAvailable: 3 means the Kubernetes eviction API will refuse to evict a pod if doing so would drop available replicas below 3. This effectively serializes voluntary disruptions and ensures the service never loses more than 1/4 of its capacity at once during maintenance.",
+      },
+      serving_k8s_recovery: {
+        id: "serving_k8s_recovery",
+        type: "scenario_choice",
+        badge: "Recovery C",
+        title: "Recovery · ML Serving Patterns",
+        prompt: "You want to roll out a new version of your recommendation model to 10% of production traffic while keeping 90% on the stable version, with automatic rollback if error rate exceeds 1%. Which Kubernetes-native approach best fits this requirement?",
+        choices: [
+          { id: "a", label: "Deploy two separate Kubernetes Services and update DNS weights manually", description: "Manual DNS changes are error-prone, slow to propagate, and provide no automated rollback capability." },
+          { id: "b", label: "Use KServe canaryTrafficPercent with a Prometheus-based AnalysisTemplate for automated rollback", description: "KServe's canary traffic split combined with Argo Rollouts or Flagger analysis rules provides declarative traffic shifting with automated metric-based promotion or rollback." },
+          { id: "c", label: "Run both versions in the same pod as separate processes sharing the container network", description: "Running multiple model servers in one pod couples their lifecycles, making independent scaling and rollback impossible." },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage" },
+        rationale: "KServe's canary traffic percentage declaratively routes a fraction of requests to the new predictor. Paired with Flagger or Argo Rollouts, analysis rules can continuously evaluate error rates or latency and automatically promote or roll back without human intervention.",
+      },
+      terminal_stage: {
+        id: "terminal_stage",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · Namespace Isolation",
+        prompt: "Your organization has data science, backend engineering, and analytics teams all sharing one Kubernetes cluster. Which isolation strategy best prevents a runaway training job from impacting the production inference service?",
+        choices: [
+          { id: "a", label: "Put all workloads in the default namespace and rely on container resource limits", description: "Container limits prevent individual containers from overusing resources, but do not limit aggregate consumption by a team or prevent API server flooding from many pods." },
+          { id: "b", label: "Use separate namespaces per team with ResourceQuotas limiting aggregate CPU and memory per namespace", description: "Namespace-level ResourceQuotas cap the total compute a team can claim. A training job in the data science namespace cannot consume quota allocated to the production namespace, providing strong blast-radius isolation." },
+          { id: "c", label: "Use node labels to pin each team's pods to dedicated nodes and disable namespace creation", description: "Node affinity alone does not prevent resource exhaustion on shared nodes if labels are misconfigured. Separate namespaces with quotas provide a stronger, more auditable boundary." },
+          { id: "d", label: "Deploy three separate Kubernetes clusters, one per team", description: "Separate clusters provide the strongest isolation but at significant operational overhead (3× control plane cost, 3× upgrade burden). Namespace isolation achieves most of the benefit at far lower cost." },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage", d: "terminal_stage" },
+        rationale: "Namespace-based isolation with ResourceQuotas is the standard multi-tenant pattern in Kubernetes. Combined with LimitRanges (per-pod defaults), NetworkPolicies (traffic isolation), and RBAC (access control), namespaces provide team-level blast-radius control without the operational cost of separate clusters.",
+        terminal: true,
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "A model serving pod has cpu request: '4' and cpu limit: '500m'. What is the most likely runtime symptom?",
+      options: [
+        "The pod fails to schedule because limits cannot be lower than requests",
+        "The pod schedules normally but its CPU is throttled to 12.5% of its requested allocation, causing high inference latency",
+        "Kubernetes automatically raises the CPU limit to match the request at runtime",
+        "The pod is OOM-killed because CPU and memory limits interact",
       ],
       correctIndex: 1,
-      explanation: "Build tools (gcc, g++, python-dev, cmake) needed to compile C extensions (numpy, scipy, some ML libraries) add hundreds of MB to images. Multi-stage builds install everything in a build image, then copy only the compiled packages into a minimal runtime image. Production images can go from 800MB+ to under 200MB.",
+      explanation: "Kubernetes allows limits to be lower than requests (it is a misconfiguration, not a validation error). The scheduler reserves 4 CPUs on a node, but the container's CPU time is capped at 500m (0.5 CPU) — 12.5% of what was reserved. This produces severe throttling and latency degradation without any obvious error.",
+    },
+    {
+      question: "Which combination correctly configures HPA to scale a model serving Deployment based on inference latency rather than CPU?",
+      options: [
+        "Set targetCPUUtilizationPercentage: 50 in the HPA spec — Kubernetes infers latency from CPU automatically",
+        "Deploy Prometheus + Prometheus Adapter to expose a custom metric, then reference it in the HPA spec under metrics[].type: Pods",
+        "Use a CronJob to periodically adjust the Deployment's replica count based on time of day",
+        "Set resource limits very high so the HPA never needs to scale on CPU",
+      ],
+      correctIndex: 1,
+      explanation: "Custom metric HPA requires an adapter that bridges Prometheus (or another metrics source) to the Kubernetes custom metrics API (metrics.k8s.io). Once the metric is registered, the HPA spec can reference it by name under the Pods or External metric type. KEDA is a popular alternative that simplifies this setup.",
+    },
+    {
+      question: "Your training job requires 2 NVIDIA GPUs. Which resource specification is correct in the pod spec?",
+      options: [
+        "resources: { requests: { cpu: '8', memory: '32Gi' }, limits: { nvidia.com/gpu: '2' } } — GPU limits only, no GPU request needed",
+        "resources: { requests: { nvidia.com/gpu: '2' }, limits: { nvidia.com/gpu: '2' } } — GPU request must equal GPU limit",
+        "resources: { requests: { nvidia.com/gpu: '0.5' }, limits: { nvidia.com/gpu: '2' } } — fractional GPU requests are supported natively",
+        "resources: { limits: { gpu: '2' } } — use the shorthand 'gpu' key supported by all Kubernetes versions",
+      ],
+      correctIndex: 1,
+      explanation: "GPU resources in Kubernetes are integer-only extended resources. The request must equal the limit (the scheduler enforces this). The correct resource key is 'nvidia.com/gpu' (or the vendor-specific key for AMD/Intel GPUs). Fractional GPU allocation requires third-party device plugins like NVIDIA MIG or time-slicing configurations.",
+    },
+  ],
+},
+
+"mo-t3": {
+  durationLabel: "18 min",
+  outcomes: [
+    "Explain what Apache Airflow is and why it's used for ML pipeline orchestration",
+    "Design an ML pipeline as a DAG with proper task separation and dependencies",
+    "Use BranchPythonOperator for conditional model deployment",
+    "Describe XCom best practices and limitations",
+    "Choose between Airflow, Prefect, Kubeflow Pipelines, and Dagster for a given use case",
+  ],
+  learnMarkdown: `## What Airflow Does
+
+Apache Airflow is an open-source workflow orchestration platform that **schedules, monitors, and retries** directed acyclic graphs (DAGs) of tasks. You define pipelines as Python code — not YAML, not a GUI — which makes them version-controllable and testable.
+
+Airflow's scheduler constantly parses your DAG files, determines which task instances are ready to run (all upstream dependencies met, schedule_interval elapsed), and hands them to workers. The web UI gives you a real-time view of every run, every task's logs, and the dependency graph.
+
+---
+
+## Core Concepts
+
+**DAG (Directed Acyclic Graph)** — a collection of tasks with defined dependencies. "Acyclic" means no loops. You create a DAG object and assign tasks to it.
+
+**Task** — one unit of work inside a DAG. Each task maps to an Operator.
+
+**Operators** — pre-built task templates:
+- \`PythonOperator\` — runs a Python callable
+- \`BashOperator\` — runs a shell command
+- \`SparkSubmitOperator\` — submits a Spark job to a cluster
+- \`KubernetesPodOperator\` — launches an isolated Kubernetes pod (great for heavy ML workloads)
+
+**schedule_interval** — how often the DAG runs. Accepts cron strings (\`"0 2 * * *"\`) or presets like \`"@daily"\`.
+
+**execution_date** — the logical date the DAG run *represents*, not when it actually ran. A DAG scheduled \`@daily\` for 2024-01-15 will have \`execution_date = 2024-01-15T00:00:00\` even if it ran at 2:03 AM. This distinction is critical for backfills.
+
+**XCom (Cross-Communication)** — a lightweight key-value store that lets tasks share small results. Task A can \`xcom_push\` a model evaluation score; Task B can \`xcom_pull\` it to decide whether to deploy. XCom values are stored in the Airflow metadata database — keep them small (strings, numbers, paths) and never push large DataFrames or model artifacts through XCom.
+
+---
+
+## Why Airflow for ML
+
+ML pipelines have unique orchestration needs that Airflow handles well:
+
+- **Retries with exponential backoff** — transient failures in data extraction or API calls are retried automatically (\`retries=3, retry_delay=timedelta(minutes=5)\`)
+- **Explicit dependencies** — \`extract >> validate >> train >> evaluate\` makes the execution order unambiguous and the graph visible
+- **Visibility** — the Airflow UI shows every run's status, task duration, and logs without custom dashboarding
+- **Alerting** — \`email_on_failure=True\` and \`on_failure_callback\` hooks integrate with PagerDuty, Slack, or any webhook
+
+---
+
+## ML Pipeline as a DAG
+
+A canonical ML retraining pipeline maps directly to a DAG:
+
+\`\`\`
+extract_data → validate_data → feature_engineering → train_model → evaluate_model → deploy_model
+\`\`\`
+
+Each arrow is an Airflow dependency (\`>>\`). If \`validate_data\` fails, nothing downstream runs. The scheduler retries failed tasks up to the configured limit before marking the DAG run as failed and sending alerts.
+
+**Branching** with \`BranchPythonOperator\` enables conditional deployment. The branch callable returns a task ID (or list of task IDs) to execute next:
+
+\`\`\`python
+def check_metrics(**context):
+    accuracy = context["ti"].xcom_pull(task_ids="evaluate_model")
+    return "deploy_model" if accuracy >= 0.85 else "skip_deploy"
+
+branch = BranchPythonOperator(task_id="branch_on_accuracy", python_callable=check_metrics)
+evaluate >> branch >> [deploy_model, skip_deploy]
+\`\`\`
+
+---
+
+## Sensors
+
+**ExternalTaskSensor** — waits for a task in another DAG to succeed before proceeding. Useful when your feature engineering DAG must wait for an upstream data-ingestion DAG.
+
+**S3KeySensor** — polls until a specific S3 key exists. Use this to wait for a data export to land before kicking off training.
+
+Sensors consume a worker slot while waiting. For long waits, set \`mode="reschedule"\` so the slot is released between polls.
+
+---
+
+## Backfill and Catchup
+
+When a DAG is paused or newly deployed, Airflow can **backfill** historical \`execution_date\` slots. With \`catchup=True\` (the default), Airflow will create DAG runs for every missed interval going back to \`start_date\`. For a daily retraining DAG that was paused for a week, enabling it will queue 7 runs simultaneously.
+
+Backfill is essential for retraining pipelines that need consistent feature windows — but always set \`max_active_runs\` to avoid flooding your infrastructure.
+
+---
+
+## Alternatives
+
+| Tool | Best for |
+|---|---|
+| **Prefect** | Simpler setup, Python-native, better dynamic task mapping |
+| **Kubeflow Pipelines** | Kubernetes-native, container-first ML workflows |
+| **Vertex Pipelines** | Fully managed on GCP, integrates with Vertex AI |
+| **Dagster** | Asset-oriented pipelines, strong type system, great observability |
+
+Airflow wins on ecosystem maturity and provider integrations. Kubeflow wins when every task needs isolated containers with GPU access.
+
+---
+
+## Common Pitfalls
+
+- **Business logic in DAG files** — Airflow parses DAG files frequently; heavy computations at module level slow the scheduler
+- **Not using Task Groups** — large DAGs become unreadable; \`TaskGroup\` organizes related tasks visually
+- **Giant XCom values** — pushing a 500 MB DataFrame through XCom will crash the metadata database; use S3/GCS paths instead
+
+---
+
+## Interview-Ready Summary
+
+- Airflow schedules, monitors, and retries DAGs; tasks are defined as Python code with explicit upstream/downstream dependencies
+- \`execution_date\` is the logical date of the run interval, not the actual run time — critical for backfills and idempotency
+- Use \`BranchPythonOperator\` to gate deployment on evaluation metrics; only tasks returned by the branch callable are executed
+- XCom is for small metadata (paths, scores, flags) — never push large objects; store data in object storage and pass the path
+- \`KubernetesPodOperator\` is preferred for heavy ML workloads because each task runs in an isolated, resource-limited container
+- Prefer \`catchup=False\` with explicit backfill commands in production to avoid accidentally flooding the queue`,
+
+  video: null,
+
+  videoFallbackMarkdown: `## Deep Dive: Branching, XCom, and Airflow vs Kubeflow
+
+### Conditional Deployment with BranchPythonOperator
+
+The \`BranchPythonOperator\` is Airflow's mechanism for control flow. Its Python callable receives the task context and must return exactly one task ID (or a list of task IDs) that should run next. All other downstream tasks are **skipped** — not failed.
+
+A key subtlety: if you use \`trigger_rule="none_failed_min_one_success"\` on the task after the branch merge point, it will run as long as at least one path succeeded. The default \`trigger_rule="all_success"\` means the merge task would be skipped if any upstream branch was skipped — usually not what you want.
+
+\`\`\`python
+branch = BranchPythonOperator(
+    task_id="evaluate_gate",
+    python_callable=lambda **ctx: "deploy" if ctx["ti"].xcom_pull("evaluate") > 0.85 else "notify_failure"
+)
+notify_done = EmptyOperator(task_id="done", trigger_rule="none_failed_min_one_success")
+branch >> [deploy, notify_failure] >> notify_done
+\`\`\`
+
+### XCom Best Practices
+
+XCom values are serialized to the Airflow metadata database (typically PostgreSQL). The hard rules:
+
+1. **Pass paths, not data** — store your DataFrame in S3 and XCom the S3 URI
+2. **Use typed returns** — with the TaskFlow API (\`@task\` decorator), return values are automatically pushed as XComs with type hints
+3. **Avoid cross-DAG XCom pulls** — they create hidden coupling; prefer a shared external store
+4. **Clear XComs on rerun** — stale XCom values from a previous run can corrupt downstream logic if tasks are partially re-executed
+
+### Airflow vs Kubeflow Pipelines
+
+| Dimension | Airflow | Kubeflow Pipelines |
+|---|---|---|
+| Task isolation | Shared worker process | Separate container per step |
+| GPU scheduling | Manual pod overrides | Native via KFP SDK |
+| Setup complexity | Moderate | High (requires K8s cluster) |
+| ML-specific features | None built-in | Experiment tracking, model registry |
+| Best fit | General ETL + ML hybrid | Pure ML workflows on K8s |
+
+Choose Airflow when your team already uses it for data pipelines and you want a single orchestrator. Choose Kubeflow when each ML step needs different Python environments, GPU resources, or tight integration with a model registry. Vertex Pipelines and SageMaker Pipelines are the managed equivalents if you're locked into GCP or AWS respectively.`,
+
+  tryGuidance: "Inspect the DAG definition code and click the highlighted line that represents a critical Airflow anti-pattern. Then work through the scenario questions to test your understanding of Airflow operators, XCom, and backfill behavior.",
+
+  interviewGraph: {
+    initialStageId: "dag_bug",
+    artifactDimensions: [
+      { label: "DAG Design", recoveryStageId: "dag_recovery" },
+      { label: "Airflow Operators", recoveryStageId: "operator_recovery" },
+    ],
+    stages: {
+      dag_bug: {
+        id: "dag_bug",
+        type: "click_target",
+        badge: "Stage 1",
+        title: "Stage 1 · DAG file anti-pattern",
+        prompt: "This DAG definition contains a critical anti-pattern that slows down the Airflow scheduler. Click the line that causes the problem.",
+        code_snippet: `from airflow import DAG
+from airflow.operators.python import PythonOperator
+import pandas as pd  # -- ds-target:heavy_import
+
+# Load training data at module level
+training_data = pd.read_csv("s3://data/training.csv")  # -- ds-target:module_level_load
+
+def train_model(**context):
+    model = fit_model(training_data)
+    return model
+
+with DAG("ml_training", schedule_interval="@daily") as dag:
+    train = PythonOperator(task_id="train", python_callable=train_model)`,
+        validationCopy: {
+          heavy_import: "Close — the pandas import itself is fine; imports are needed at the top. The real problem is one line below. Look for what runs expensive I/O at parse time.",
+          module_level_load: "Correct! Airflow's scheduler parses every DAG file on every heartbeat (every few seconds). Any code at module level — outside functions — runs during that parse. Loading a CSV from S3 at parse time means a network call hundreds of times per hour, consuming scheduler memory and slowing DAG discovery for all pipelines.",
+        },
+        branches: {
+          heavy_import: "dag_recovery",
+          module_level_load: "branch_deploy",
+        },
+      },
+
+      dag_recovery: {
+        id: "dag_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Module-level code in DAGs",
+        prompt: "Why is it harmful to load data at the top level of a DAG file (outside any function), and what is the correct fix?",
+        choices: [
+          { id: "a", label: "Move loading inside the task function", description: "All data loading must happen inside the task callable, not at DAG file import time — the scheduler parses DAG files repeatedly." },
+          { id: "b", label: "Module-level loading is an optimization", description: "Loading at module level caches the data so the task doesn't have to reload it each run." },
+          { id: "c", label: "DAG files are only parsed once on startup", description: "Airflow only reads DAG files when the service starts, so module-level loading is acceptable." },
+        ],
+        branches: {
+          a: "branch_deploy",
+          b: "operator_recovery",
+          c: "operator_recovery",
+        },
+        rationale: "Airflow's DagFileProcessor re-parses every DAG file on every scheduler heartbeat (by default every 30 seconds). Any code at module scope — including file reads, database queries, or network calls — executes during each parse cycle. This causes severe scheduler slowdowns and resource exhaustion. All I/O and computation must be inside the task callable, executed only when the task actually runs.",
+      },
+
+      branch_deploy: {
+        id: "branch_deploy",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Conditional model deployment",
+        prompt: "Your evaluate_model task computes a test accuracy and pushes it via XCom. You want to deploy only if accuracy ≥ 0.85, otherwise send a Slack alert. Which Airflow approach handles this correctly?",
+        choices: [
+          { id: "a", label: "BranchPythonOperator returning task IDs", description: "Use BranchPythonOperator; its callable pulls the XCom accuracy and returns 'deploy_model' or 'slack_alert' depending on the threshold." },
+          { id: "b", label: "ShortCircuitOperator on the deploy task", description: "Add a ShortCircuitOperator before deploy_model that checks the accuracy — if False, it skips all downstream tasks including slack_alert." },
+          { id: "c", label: "if/else inside the train task", description: "Put the branching logic inside the train_model function and call the deploy function directly when accuracy is high enough." },
+          { id: "d", label: "Two separate DAGs triggered conditionally", description: "Create a deploy DAG and a notify DAG; use TriggerDagRunOperator to trigger the right one based on accuracy." },
+        ],
+        branches: {
+          a: "xcom_limits",
+          b: "operator_recovery",
+          c: "operator_recovery",
+          d: "xcom_limits",
+        },
+        rationale: "BranchPythonOperator is the idiomatic solution. Its Python callable receives task context, pulls XCom values, and returns exactly one task ID (or list) to execute next — all other downstream tasks are marked Skipped, not Failed. ShortCircuitOperator only short-circuits a single linear path; it cannot route to an alternative task. Putting deploy logic inside a task function bypasses Airflow's dependency graph entirely, making the branch invisible in the UI.",
+      },
+
+      xcom_limits: {
+        id: "xcom_limits",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · XCom limitations",
+        prompt: "A data engineer suggests using XCom to pass a 200 MB feature matrix from the feature_engineering task to the train_model task. What is the correct response?",
+        choices: [
+          { id: "a", label: "XCom is stored in the metadata DB — use object storage instead", description: "XCom values are serialized into Airflow's metadata database (Postgres/MySQL). Passing large objects will bloat the DB and may exceed column size limits. Store the matrix in S3/GCS and XCom the path." },
+          { id: "b", label: "Use XCom with compression to reduce size", description: "Compress the matrix before pushing to XCom — Airflow supports gzip-compressed XCom values natively." },
+          { id: "c", label: "Use a custom XCom backend to handle large values", description: "Configure Airflow's custom XCom backend to store large values in S3 automatically — this is the standard enterprise pattern." },
+          { id: "d", label: "Split the matrix into smaller chunks across multiple XCom keys", description: "Push the matrix in 10 MB chunks across multiple XCom keys and reassemble in the train task." },
+        ],
+        branches: {
+          a: "execution_date",
+          b: "operator_recovery",
+          c: "execution_date",
+          d: "operator_recovery",
+        },
+        rationale: "XCom values are stored as BLOBs in the Airflow metadata database. The correct pattern is always to store large artifacts in external object storage (S3, GCS) and XCom only the URI. A custom XCom backend (option c) is technically valid in Airflow 2.x and does auto-offload to S3, but requires explicit configuration — it is not on by default. The primary answer every interviewer expects is: keep XCom for small metadata like paths, scores, and flags.",
+      },
+
+      execution_date: {
+        id: "execution_date",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · execution_date vs start_date",
+        prompt: "Your daily retraining DAG has start_date='2024-01-01'. On January 3rd the scheduler runs the DAG. What is its execution_date?",
+        choices: [
+          { id: "a", label: "2024-01-03 — the date the DAG actually ran", description: "execution_date matches the wall-clock date when the scheduler triggered the run." },
+          { id: "b", label: "2024-01-02 — the start of the interval being processed", description: "For a @daily DAG, the run covering the Jan 2nd interval has execution_date=2024-01-02, even if it runs at 00:00:05 on Jan 3rd." },
+          { id: "c", label: "2024-01-01 — the DAG's start_date", description: "execution_date always equals start_date for the first run." },
+          { id: "d", label: "It depends on the catchup setting", description: "catchup=True sets execution_date to start_date; catchup=False sets it to today." },
+        ],
+        branches: {
+          a: "backfill_behavior",
+          b: "backfill_behavior",
+          c: "dag_recovery",
+          d: "dag_recovery",
+        },
+        rationale: "In Airflow, execution_date represents the *logical* start of the schedule interval being processed, not when the task actually runs. A @daily DAG runs at the end of each day's interval: the run for the period covering 2024-01-02 will have execution_date=2024-01-02, and it triggers just after midnight on 2024-01-03. This distinction matters enormously for backfills and for writing idempotent data queries using execution_date as a partition filter.",
+      },
+
+      backfill_behavior: {
+        id: "backfill_behavior",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Catchup and backfill",
+        prompt: "A @daily retraining DAG with catchup=True was paused for 7 days due to a bug. When the bug is fixed and the DAG is unpaused, what happens?",
+        choices: [
+          { id: "a", label: "Airflow queues 7 DAG runs immediately for the missed intervals", description: "With catchup=True, Airflow creates a DAG run for every missed execution_date between the last successful run and now — all 7 queued at once." },
+          { id: "b", label: "Airflow runs only the most recent missed interval", description: "Airflow is smart enough to run only the latest missed interval to avoid flooding the queue." },
+          { id: "c", label: "Airflow skips missed intervals and runs from today forward", description: "Paused DAGs mark missed intervals as skipped; only future runs are scheduled." },
+          { id: "d", label: "The DAG waits for the next scheduled interval before running", description: "Airflow never retroactively queues runs; it only acts on the next future schedule_interval after unpausing." },
+        ],
+        branches: {
+          a: "airflow_terminal",
+          b: "operator_recovery",
+          c: "operator_recovery",
+          d: "operator_recovery",
+        },
+        rationale: "With catchup=True (the default), Airflow will create and queue DAG runs for every missed execution_date between the last run and now — in this case 7 runs fire simultaneously. This can overwhelm your infrastructure. Best practice for production ML pipelines: set catchup=False and trigger explicit backfills with the 'airflow dags backfill' CLI command when you actually need historical runs. Also set max_active_runs=1 to prevent concurrent retraining jobs from stepping on each other.",
+      },
+
+      operator_recovery: {
+        id: "operator_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Airflow Operators",
+        prompt: "Your ML training step requires a specific Python environment with GPU drivers and 32 GB RAM, different from the Airflow worker environment. Which operator is most appropriate?",
+        choices: [
+          { id: "a", label: "KubernetesPodOperator with a custom container image", description: "Launches an isolated Kubernetes pod with the exact container image, resource requests (GPU, RAM), and environment variables needed — completely decoupled from the Airflow worker." },
+          { id: "b", label: "PythonOperator with a virtualenv_callable", description: "Use PythonOperator with a separate virtualenv to isolate dependencies from the Airflow worker environment." },
+          { id: "c", label: "BashOperator running a Docker command", description: "Use BashOperator to call 'docker run' with the correct image and resource flags on the worker node." },
+          { id: "d", label: "SparkSubmitOperator with GPU configuration", description: "SparkSubmitOperator can submit a job to a Spark cluster configured with GPU nodes." },
+        ],
+        branches: {
+          a: "airflow_terminal",
+          b: "airflow_terminal",
+          c: "airflow_terminal",
+          d: "airflow_terminal",
+        },
+        rationale: "KubernetesPodOperator is the canonical answer for workloads that need environments different from the Airflow worker. It launches a fresh Kubernetes pod with a custom container image, configurable CPU/GPU/memory requests, and clean isolation — the task runs and the pod is cleaned up. PythonVirtualenvOperator is a lighter alternative for pure Python dependency isolation but can't provide GPU access or different system-level dependencies. BashOperator + docker run is a fragile anti-pattern that ties you to a specific worker node.",
+      },
+
+      airflow_terminal: {
+        id: "airflow_terminal",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · Airflow vs Kubeflow Pipelines",
+        prompt: "Your team is designing a new ML platform. Every pipeline step needs a different container image with GPU access, and you want native model versioning and experiment tracking. Which orchestrator fits best?",
+        choices: [
+          { id: "a", label: "Kubeflow Pipelines — container-first, ML-native features", description: "KFP runs every step as a separate Kubernetes container, supports GPU scheduling natively, and integrates with the KF model registry and experiment tracker out of the box." },
+          { id: "b", label: "Airflow with KubernetesPodOperator for each step", description: "Airflow can use KubernetesPodOperator for every task to achieve container isolation and GPU access, combining Airflow's scheduling with Kubernetes execution." },
+          { id: "c", label: "Prefect — simpler Python-native orchestration", description: "Prefect's simpler API and dynamic task mapping make it easier to adopt than Airflow for teams without existing Airflow expertise." },
+          { id: "d", label: "Dagster — asset-oriented pipelines with strong observability", description: "Dagster models pipelines around data assets rather than tasks, with built-in lineage and type checking for ML data artifacts." },
+        ],
+        branches: {
+          a: "airflow_terminal",
+          b: "airflow_terminal",
+          c: "airflow_terminal",
+          d: "airflow_terminal",
+        },
+        rationale: "When every step needs a distinct container with GPU access AND you want built-in ML features (experiment tracking, model registry, lineage), Kubeflow Pipelines is the strongest fit. Airflow + KubernetesPodOperator (option b) achieves the container isolation but requires third-party integrations for ML-specific tracking — it's a valid production architecture but more work to set up. Prefect and Dagster are excellent for teams that find Airflow's complexity too high, but neither has native GPU-aware Kubernetes scheduling built in.",
+        terminal: true,
+      },
+    },
+  },
+
+  knowledgeCheck: [
+    {
+      question: "Airflow's scheduler parses DAG files repeatedly. What is the main risk of placing a pd.read_csv() call at module level (outside any function) in a DAG file?",
+      options: [
+        "The CSV data will be stale because it's only loaded once at startup",
+        "The file read executes on every scheduler heartbeat, causing memory bloat and network overhead that slows DAG discovery",
+        "Module-level code is not allowed in DAG files and will cause a syntax error",
+        "The data will not be accessible to PythonOperator callables since it's defined outside the task",
+      ],
+      correctIndex: 1,
+      explanation: "Airflow's DagFileProcessor re-parses every DAG file continuously (every 30 seconds by default). Any code at module scope — including I/O, database queries, or heavy computations — runs during each parse cycle, not just once. This can cause massive scheduler slowdown, memory exhaustion, and S3/DB rate limiting. All data loading must be inside task callables so it only runs when the task is actually executed.",
+    },
+    {
+      question: "You use BranchPythonOperator to route to either 'deploy_model' or 'skip_deploy'. Both tasks connect to a final 'notify_done' EmptyOperator. What trigger_rule should 'notify_done' use to ensure it always runs regardless of which branch was taken?",
+      options: [
+        "all_success (the default) — it will run once the chosen branch task succeeds",
+        "none_failed_min_one_success — it runs as long as at least one upstream task succeeded and none failed",
+        "all_done — it runs after all upstream tasks complete regardless of state",
+        "one_success — it runs as soon as any single upstream task succeeds",
+      ],
+      correctIndex: 1,
+      explanation: "With the default 'all_success' trigger rule, 'notify_done' would be Skipped because the branch task that wasn't chosen is in Skipped state — Airflow propagates the skip. Using 'none_failed_min_one_success' tells Airflow to run the task as long as at least one upstream succeeded and none failed outright, correctly handling the branch-and-merge pattern. 'all_done' also works but runs even when upstream tasks fail, which is usually not desired for a success notification.",
+    },
+    {
+      question: "Which statement about XCom in Apache Airflow is correct?",
+      options: [
+        "XCom values are stored in distributed task worker memory and are automatically garbage collected after 7 days",
+        "XCom supports arbitrarily large values because they are stored in object storage by default",
+        "XCom values are serialized into the Airflow metadata database; large objects (DataFrames, model weights) should never be passed through XCom",
+        "XCom can only be used to pass string values; numeric types must be serialized to JSON first",
+      ],
+      correctIndex: 2,
+      explanation: "XCom values are stored as BLOBs in the Airflow metadata database (typically PostgreSQL). This makes XCom inappropriate for large objects — pushing a 100 MB DataFrame will bloat the DB, potentially exceed column size limits, and degrade scheduler performance. The correct pattern is to store large artifacts in external object storage (S3, GCS) and XCom only the URI or a small summary dict. Airflow 2.x supports custom XCom backends to auto-offload to S3, but this requires explicit configuration.",
+    },
+  ],
+},
+
+"mo-t4": {
+  durationLabel: "16 min",
+  outcomes: [
+    "Distinguish between blue/green, canary, shadow mode, and A/B testing deployment strategies",
+    "Identify rollback criteria and when to trigger them",
+    "Choose the right deployment strategy given risk tolerance and validation goals",
+    "Spot dangerous canary configuration bugs like missing rollback criteria",
+  ],
+  learnMarkdown: `## Why Deployment Strategy Matters
+
+When a web server crashes, you get a 500 error. When a machine learning model degrades, you get **silent failures** — wrong recommendations, missed fraud, biased predictions — all returned with HTTP 200. This makes ML deployment fundamentally different from traditional software. A flawed model can cause real business damage for hours before anyone notices a metric has moved.
+
+Choosing the right deployment strategy is your primary defense. It controls **how much user traffic is exposed** to a new model, **how fast you can roll back**, and **whether users feel any impact at all** during validation.
+
+---
+
+## Blue/Green Deployment
+
+Blue/Green maintains **two identical production environments**. Blue is currently serving all traffic; green is the new model version, fully warmed up and ready.
+
+When you're ready to release, you **flip all traffic at once** from blue to green — typically a single DNS or load balancer change. If something goes wrong, you flip back instantly.
+
+**Strengths:** zero downtime, near-instant rollback, simple mental model.
+**Weaknesses:** doubles infrastructure cost (two full environments must run simultaneously), and the switch exposes 100% of users to any problems at once.
+
+Blue/Green is ideal when you need a **clean, fast cutover** and your validation happened elsewhere (e.g., shadow mode or staging).
+
+---
+
+## Canary Deployment
+
+Canary deployment routes a **small percentage of live traffic** to the new model — starting at 1–5% — and gradually increases over time: 1% → 5% → 25% → 100%. At each stage you observe metrics (latency, error rate, model-specific KPIs) before proceeding.
+
+If any metric degrades beyond a threshold, you roll back immediately. The "canary in a coal mine" analogy is apt: a small population absorbs any risk before the full population is exposed.
+
+**Strengths:** lower blast radius, continuous monitoring, gradual confidence building.
+**Weaknesses:** slower rollout, requires robust metric collection, canary and production must run in parallel.
+
+Starting canary traffic too high (e.g., 50%) defeats the purpose — the blast radius is already large.
+
+---
+
+## Shadow Mode
+
+In shadow mode, the new model receives **exact copies of production requests** but its predictions are **never shown to users**. The old model continues serving responses. You're simply logging what the new model *would have* predicted.
+
+This is the **safest possible validation** — zero user impact, real production traffic patterns, full visibility into model behavior before any exposure.
+
+**Strengths:** no user risk, real traffic distribution, great for catching data drift issues.
+**Weaknesses:** infrastructure cost (running two models), no feedback on user reactions, cannot measure business impact.
+
+Shadow mode is typically the **first step** before any live rollout.
+
+---
+
+## A/B Testing
+
+A/B testing routes **different user cohorts** to different model versions simultaneously — not by percentage of requests, but by user identity. You compare business metrics (click-through rate, conversion, revenue) between cohorts.
+
+Unlike canary (which is about safely rolling out *one* model), A/B testing is about **measuring which model produces better business outcomes**. You might run it for weeks to accumulate statistical significance.
+
+---
+
+## When to Use Each Strategy
+
+| Strategy | Best For |
+|----------|----------|
+| Shadow Mode | Early validation, zero user impact, first look at a new model |
+| Canary | Gradual rollout with risk control and real metric monitoring |
+| Blue/Green | Fast, clean cutover with instant rollback capability |
+| A/B Testing | Measuring business metric impact on real user cohorts |
+
+---
+
+## Rollback Criteria
+
+Automated rollback should trigger on: **performance degradation** (accuracy, F1, NDCG drop), **latency spikes** (p99 latency exceeds SLA), **error rate increase** (prediction service errors), or **business metric drop** (conversion, revenue, engagement).
+
+Never deploy a canary with an empty rollback criteria list — you lose the entire safety benefit.
+
+---
+
+## Tools
+
+- **Argo Rollouts** — Kubernetes-native canary and blue/green controller
+- **Flagger** — automated canary analysis with Prometheus metrics gates
+- **Seldon Core** — ML-specific model serving with traffic splitting
+- **KServe** — Kubernetes-native model inference with canary support
+
+---
+
+## Interview-Ready Summary
+
+- ML failures are silent — deployment strategy is your first line of defense
+- Shadow mode = safest, zero user impact, predictions never served; use first
+- Canary = gradual traffic shift (start 1–5%), monitor metrics, rollback on degradation
+- Blue/Green = instant full switch, instant rollback, doubles infra cost
+- A/B testing = measure business impact on user cohorts, not just model metrics
+- Always define rollback criteria before deploying — empty criteria means no safety net
+`,
+
+  video: null,
+
+  videoFallbackMarkdown: `## Automated Canary Analysis with Flagger
+
+Running a canary manually — watching dashboards and deciding when to promote — doesn't scale. **Flagger** is a Kubernetes operator that automates the entire canary lifecycle using your existing metrics infrastructure.
+
+### How Flagger Works
+
+Flagger watches a Deployment resource and automatically creates a canary Deployment alongside it. It then progressively shifts traffic (via Istio, Linkerd, or NGINX ingress) while querying Prometheus for health metrics at each interval.
+
+You define a **canary analysis block** with three key elements:
+
+1. **Metrics** — which Prometheus queries must pass (e.g., request success rate ≥ 99%, p99 latency ≤ 500ms)
+2. **Threshold** — how many consecutive failures trigger a rollback
+3. **Interval and stepWeight** — how often to evaluate and by how much to increment traffic
+
+If metrics pass at each step, Flagger promotes automatically. If they fail repeatedly, it rolls back and alerts.
+
+### Defining Good Rollout Criteria
+
+A common mistake is only monitoring infrastructure metrics (CPU, memory). For ML models you need **model-specific metrics**: prediction latency, null prediction rate, class distribution drift, and downstream business signals if available.
+
+Define your metrics before you write your deployment config. If you cannot measure it, you cannot gate on it.
+
+### Choosing a Strategy by Risk Tolerance
+
+| Scenario | Recommended Strategy |
+|----------|---------------------|
+| Brand-new model, unknown behavior | Shadow mode first, then canary |
+| Incremental update, high confidence | Canary starting at 1% |
+| Rollback must be instant, validated elsewhere | Blue/Green |
+| Comparing two model architectures | A/B test with cohort splitting |
+| Regulated environment, audit trail needed | Blue/Green with tagged environments |
+
+### The Golden Rule
+
+Never start a canary above 5% of traffic. The entire value of canary deployment is the **small blast radius**. Starting at 50% means half your users experience any degradation before you can react. One percent gives you enough signal with minimal exposure — especially for high-traffic services where even 1% is thousands of requests per hour.
+`,
+
+  tryGuidance: "Use the interactive visualization to walk through each deployment strategy. Toggle between strategies to compare traffic routing patterns, rollback speeds, and risk profiles. Pay attention to how canary traffic percentage affects the blast radius if the new model degrades.",
+
+  interviewGraph: {
+    initialStageId: "canary_bug",
+    artifactDimensions: [
+      { label: "Deployment Strategy Selection", recoveryStageId: "strategy_recovery" },
+      { label: "Rollback and Safety", recoveryStageId: "rollback_recovery" },
+    ],
+    stages: {
+      canary_bug: {
+        id: "canary_bug",
+        type: "click_target",
+        badge: "Stage 1",
+        title: "Stage 1 · Spot the Canary Config Bug",
+        prompt: "A teammate submitted this canary deployment config for a new recommendation model. Click the single most dangerous bug that would defeat the purpose of using a canary strategy.",
+        code_snippet: `deployment_plan = {
+    "strategy": "canary",
+    "initial_traffic_percent": 50,    # -- ds-target:aggressive_start
+    "increment_percent": 25,
+    "evaluation_window_hours": 1,     # -- ds-target:short_eval
+    "rollback_on": [],                # -- ds-target:no_rollback_criteria
+    "model_version": "v2.1",
+}`,
+        validationCopy: {
+          aggressive_start: "Correct! Starting at 50% defeats the entire purpose of canary deployment. The blast radius is already enormous — half your users will be affected by any degradation before you can react. Canary should start at 1–5% to limit exposure.",
+          short_eval: "A 1-hour evaluation window can be too short for some metrics, but it is not the most dangerous bug here. The real problem is elsewhere in this config.",
+          no_rollback_criteria: "Empty rollback criteria is genuinely dangerous, but the most fundamental canary mistake here is the 50% initial traffic split — that is what makes this config defeat its own purpose first.",
+        },
+        branches: {
+          aggressive_start: "aggressive_recovery",
+          short_eval: "aggressive_recovery",
+          no_rollback_criteria: "aggressive_recovery",
+        },
+      },
+
+      aggressive_recovery: {
+        id: "aggressive_recovery",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Why Does the Starting Percentage Matter?",
+        prompt: "Why should a canary deployment start at 1–5% of traffic rather than 50%?",
+        choices: [
+          { id: "a", label: "Limit blast radius", description: "Starting low means only a tiny fraction of users are exposed to any degradation before you can detect it and roll back." },
+          { id: "b", label: "Statistical significance", description: "50% is a standard canary starting point — you need large groups to get statistically significant metric comparisons quickly." },
+          { id: "c", label: "Infrastructure cost", description: "Starting higher means the canary environment is more expensive to run, so you keep it small to save money." },
+        ],
+        branches: {
+          a: "shadow_vs_canary",
+          b: "strategy_recovery",
+          c: "strategy_recovery",
+        },
+        rationale: "The blast radius argument is the core reason: if the new model is degraded, only 1–5% of users are impacted while you detect the problem. At 50%, half your users experience the issue. Statistical significance is handled by time (even 1% of high-traffic production generates plenty of data). Infrastructure cost is not the driver — both environments run regardless of traffic split.",
+      },
+
+      strategy_recovery: {
+        id: "strategy_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Strategy Selection Fundamentals",
+        prompt: "You are about to deploy a new model for the first time and have no prior production data on its behavior. What is the SAFEST first step before any users see its predictions?",
+        choices: [
+          { id: "a", label: "Shadow mode", description: "Run the new model in parallel on real traffic but never serve its predictions to users." },
+          { id: "b", label: "1% canary", description: "Start routing 1% of live traffic to the new model and monitor metrics." },
+          { id: "c", label: "Blue/Green", description: "Cut all traffic over to the new model instantly, with the old model ready to switch back." },
+          { id: "d", label: "A/B test", description: "Split user cohorts 50/50 between old and new model to measure business impact." },
+        ],
+        branches: {
+          a: "shadow_vs_canary",
+          b: "shadow_vs_canary",
+          c: "shadow_vs_canary",
+          d: "shadow_vs_canary",
+        },
+        rationale: "Shadow mode is the safest first step: zero user impact, real production traffic patterns, full visibility into model behavior. Even a 1% canary exposes some users to risk. For a brand-new model with unknown production behavior, shadow mode lets you validate before any exposure.",
+      },
+
+      shadow_vs_canary: {
+        id: "shadow_vs_canary",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Shadow Mode vs Canary",
+        prompt: "What is the fundamental difference between shadow mode and canary deployment?",
+        choices: [
+          { id: "a", label: "Shadow predictions are never served to users; canary predictions are", description: "Shadow mode logs what the model would predict without affecting users. Canary actually serves a fraction of users with the new model." },
+          { id: "b", label: "Shadow mode uses less infrastructure than canary", description: "Running two models in parallel is more expensive, not less, compared to a canary split." },
+          { id: "c", label: "Shadow mode is only used for A/B testing", description: "Shadow mode and A/B testing are distinct strategies with different purposes." },
+          { id: "d", label: "Canary never serves users — it only logs predictions", description: "This is backwards: canary serves a percentage of real users, shadow does not." },
+        ],
+        branches: {
+          a: "blue_green_advantage",
+          b: "strategy_recovery",
+          c: "strategy_recovery",
+          d: "strategy_recovery",
+        },
+        rationale: "The defining characteristic of shadow mode is that predictions are never served — there is zero user impact. Canary actually routes a small percentage of real users to the new model, so there is some user exposure. This is why shadow mode is safer but cannot measure business impact the way canary or A/B testing can.",
+      },
+
+      blue_green_advantage: {
+        id: "blue_green_advantage",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Blue/Green's Key Advantage",
+        prompt: "What is the primary advantage of Blue/Green deployment compared to canary deployment?",
+        choices: [
+          { id: "a", label: "Instant rollback by switching traffic back", description: "Blue/Green lets you flip all traffic back to the previous environment in seconds — no gradual ramp-down needed." },
+          { id: "b", label: "Lower infrastructure cost", description: "Blue/Green requires two full identical environments running simultaneously — it actually costs more." },
+          { id: "c", label: "Smaller blast radius on failure", description: "Blue/Green switches all traffic at once, so the blast radius is 100% — larger than canary." },
+          { id: "d", label: "Built-in automated metric gates", description: "Blue/Green has no built-in metric gating — that comes from tools like Flagger, which is typically used with canary." },
+        ],
+        branches: {
+          a: "fraud_model_scenario",
+          b: "rollback_recovery",
+          c: "rollback_recovery",
+          d: "rollback_recovery",
+        },
+        rationale: "Blue/Green's primary value is the instant rollback: switching from green back to blue is a single load balancer change that takes effect in seconds. Canary rollback requires gradually draining traffic. The tradeoff is doubled infrastructure cost and the full blast radius on the initial switch — which is why you want high confidence in the new model before going Blue/Green.",
+      },
+
+      rollback_recovery: {
+        id: "rollback_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Rollback and Safety",
+        prompt: "Your canary deployment config has `rollback_on: []` — an empty list. What does this mean in practice?",
+        choices: [
+          { id: "a", label: "No automatic rollback will trigger — human must intervene manually", description: "With no rollback criteria defined, automated systems have nothing to gate on." },
+          { id: "b", label: "The deployment will fail immediately at validation", description: "Most deployment tools do not validate rollback criteria at config parse time." },
+          { id: "c", label: "The system will roll back on any metric change", description: "The opposite — with no criteria defined, nothing triggers a rollback." },
+        ],
+        branches: {
+          a: "fraud_model_scenario",
+          b: "fraud_model_scenario",
+          c: "fraud_model_scenario",
+        },
+        rationale: "An empty rollback_on list means no automated safety net. The canary will continue promoting regardless of metric degradation, and only a human watching dashboards can stop it. This completely defeats the purpose of using an automated canary strategy. Always define explicit rollback criteria before starting a canary.",
+      },
+
+      fraud_model_scenario: {
+        id: "fraud_model_scenario",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Fraud Model Upgrade Strategy",
+        prompt: "You are upgrading a fraud detection model. Silent prediction errors (missed fraud or false positives) could have significant financial impact. Which strategy BEST catches these errors before users are impacted?",
+        choices: [
+          { id: "a", label: "Shadow mode to compare predictions against production model", description: "Run both models on real transactions, compare decisions, and find discrepancies — without affecting any user or transaction outcome." },
+          { id: "b", label: "Blue/Green with instant rollback", description: "Fast rollback is good, but the initial switch exposes all transactions to the new model immediately." },
+          { id: "c", label: "A/B test two user cohorts", description: "A/B testing measures business outcomes, but fraud model errors might not surface clearly in cohort metrics before damage occurs." },
+          { id: "d", label: "Deploy directly to production with detailed logging", description: "This provides no safety net — errors affect real transactions before you can act." },
+        ],
+        branches: {
+          a: "rollback_criteria",
+          b: "strategy_recovery",
+          c: "strategy_recovery",
+          d: "strategy_recovery",
+        },
+        rationale: "Shadow mode is the right first step for a fraud model upgrade. You can directly compare the new model's decisions against the production model on real transactions with zero financial risk. Once you confirm behavior matches (or improves) in shadow, you can then use canary to gradually roll out live. The key insight: fraud errors are silent and financial — you want zero user impact during validation.",
+      },
+
+      rollback_criteria: {
+        id: "rollback_criteria",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · Valid Rollback Criteria",
+        prompt: "Which of the following is a valid automatic rollback criterion for a canary deployment of a recommendation model?",
+        choices: [
+          { id: "a", label: "p99 prediction latency exceeds 200ms SLA for 5 consecutive minutes", description: "Latency regression is a concrete, measurable signal that the new model is not meeting production requirements." },
+          { id: "b", label: "The new model was trained on data from last month", description: "Data recency is a model quality concern, but not an automatic rollback criterion — it is evaluated before deployment." },
+          { id: "c", label: "The engineering team has not reviewed the model card", description: "A process gate, not a production metric signal — handled in pre-deployment review." },
+          { id: "d", label: "The canary has been running for more than 2 hours", description: "Time alone is not a rollback criterion — it might be a promotion criterion if metrics pass, but not a reason to roll back." },
+        ],
+        branches: {
+          a: "terminal",
+          b: "rollback_recovery",
+          c: "rollback_recovery",
+          d: "rollback_recovery",
+        },
+        rationale: "Latency exceeding a defined SLA threshold for a sustained window is a perfect automatic rollback criterion: it is observable, measurable, threshold-based, and directly impacts users. Good rollback criteria are always production signals — latency, error rate, prediction null rate, or downstream business metric degradation. Pre-deployment concerns (data recency, model cards) are handled before the canary starts.",
+      },
+
+      terminal: {
+        id: "terminal",
+        type: "scenario_choice",
+        badge: "Stage 7",
+        title: "Stage 7 · Deployment Strategy Synthesis",
+        prompt: "You have validated a new model in shadow mode and are ready to roll it out. Your service handles 500,000 requests per day and you have strong Prometheus monitoring. Which rollout sequence is most appropriate?",
+        choices: [
+          { id: "a", label: "Canary at 1% → 5% → 25% → 100% with metric gates", description: "Gradual exposure with automated gates and rollback criteria — textbook safe rollout for a validated model." },
+          { id: "b", label: "Blue/Green immediate cutover", description: "Shadow validation is complete, so Blue/Green is viable — but 500k req/day means even a short outage window has impact. Canary is safer." },
+          { id: "c", label: "Keep in shadow mode indefinitely", description: "Shadow mode alone never delivers value — at some point you must serve the new model's predictions." },
+          { id: "d", label: "A/B test 50/50 without rollback criteria", description: "No rollback criteria is always dangerous, regardless of split percentage." },
+        ],
+        branches: {
+          a: "terminal",
+          b: "terminal",
+          c: "terminal",
+          d: "terminal",
+        },
+        rationale: "After shadow validation, a gradual canary with metric gates is the ideal next step for a high-traffic service. You have already validated correctness in shadow — canary now validates production performance and business metrics with minimal blast radius. Blue/Green is a reasonable choice post-shadow for lower-traffic or simpler services where instant rollback outweighs gradual exposure benefits.",
+        terminal: true,
+      },
+    },
+  },
+
+  knowledgeCheck: [
+    {
+      question: "What is the key difference between shadow mode and canary deployment?",
+      options: [
+        "Shadow mode serves predictions to a small percentage of users; canary serves to all users",
+        "Shadow mode never serves predictions to users; canary routes a percentage of real traffic to the new model",
+        "Shadow mode is cheaper to run than canary because only one model is active",
+        "Canary requires two full identical environments while shadow mode does not",
+      ],
+      correctIndex: 1,
+      explanation: "In shadow mode, the new model receives real requests and makes predictions, but those predictions are never shown to users — they are only logged for comparison. Canary deployment actually routes a fraction of live users to the new model, meaning some users see the new model's predictions. Shadow mode has zero user impact; canary has limited but real user exposure.",
+    },
+    {
+      question: "What is the primary advantage of Blue/Green deployment?",
+      options: [
+        "It uses less infrastructure than canary deployment",
+        "It limits the blast radius when the new model fails",
+        "It allows instant rollback by switching all traffic back to the previous environment",
+        "It automatically gates rollout on Prometheus metrics",
+      ],
+      correctIndex: 2,
+      explanation: "Blue/Green's defining advantage is instant rollback: switching traffic back to the blue environment is a single load balancer change that takes seconds. This makes it ideal when you need a clean, fast cutover with guaranteed quick recovery. The tradeoff is doubled infrastructure cost (both environments must run simultaneously) and the fact that the initial switch exposes 100% of users at once.",
+    },
+    {
+      question: "A canary deployment config sets `initial_traffic_percent: 50`. Why is this dangerous?",
+      options: [
+        "Canary deployments must always start at exactly 1% — 50% is invalid syntax",
+        "Starting at 50% means half your users experience any model degradation before you can detect and roll back, defeating the low blast-radius benefit of canary",
+        "50% requires double the infrastructure cost compared to 1%",
+        "Monitoring tools cannot compare metrics when traffic is split equally",
+      ],
+      correctIndex: 1,
+      explanation: "The entire value of canary deployment is the small blast radius: only a tiny percentage of users are exposed to any degradation while you collect enough signal to decide whether to proceed. Starting at 50% means half your users are impacted by any problems before you can detect and roll back. Canary should start at 1–5% — even 1% of a high-traffic service generates thousands of requests per hour, which is plenty of signal.",
     },
   ],
 },
