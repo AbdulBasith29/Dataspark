@@ -87,6 +87,27 @@ import DLTransferLearningViz from "../visualizations/DLTransferLearningViz.jsx";
 import ChunkingStrategyViz from "../visualizations/ChunkingStrategyViz.jsx";
 import RAGPipelineViz from "../visualizations/RAGPipelineViz.jsx";
 import AdvancedRAGViz from "../visualizations/AdvancedRAGViz.jsx";
+import MLDriftMonitorViz from "../visualizations/MLDriftMonitorViz.jsx";
+import AirflowDAGViz from "../visualizations/AirflowDAGViz.jsx";
+import CanaryDeploymentViz from "../visualizations/CanaryDeploymentViz.jsx";
+import ARIMACFViz from "../visualizations/ARIMACFViz.jsx";
+import ProphetDecompositionViz from "../visualizations/ProphetDecompositionViz.jsx";
+import MatrixFactorizationViz from "../visualizations/MatrixFactorizationViz.jsx";
+import MatplotlibAnatomyViz from "../visualizations/MatplotlibAnatomyViz.jsx";
+import RecEvalMetricsViz from "../visualizations/RecEvalMetricsViz.jsx";
+import TextPreprocessingPipelineViz from "../visualizations/TextPreprocessingPipelineViz.jsx";
+import MLCICDPipelineViz from "../visualizations/MLCICDPipelineViz.jsx";
+import GitWorkflowViz from "../visualizations/GitWorkflowViz.jsx";
+import AWSDataScienceViz from "../visualizations/AWSDataScienceViz.jsx";
+import DriftConceptViz from "../visualizations/DriftConceptViz.jsx";
+import AutoRetrainingViz from "../visualizations/AutoRetrainingViz.jsx";
+import PlotlyInteractiveViz from "../visualizations/PlotlyInteractiveViz.jsx";
+import DashboardDesignViz from "../visualizations/DashboardDesignViz.jsx";
+import ContentBasedRecViz from "../visualizations/ContentBasedRecViz.jsx";
+import LSTMSequenceViz from "../visualizations/LSTMSequenceViz.jsx";
+import NERViz from "../visualizations/NERViz.jsx";
+import VenvCondaViz from "../visualizations/VenvCondaViz.jsx";
+import SentimentAnalysisViz from "../visualizations/SentimentAnalysisViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import LessonModule from "../components/platform/LessonModule.jsx";
 import PracticeQuestion from "../components/platform/PracticeQuestion.jsx";
@@ -556,9 +577,9 @@ const CURRICULUM = [
         title: "Essential Tools",
         lessons: [
           { id: "mo-t1", title: "Git Workflows for Data Teams", duration: "18 min", hasViz: true },
-          { id: "mo-t2", title: "Virtual Environments: venv, conda, poetry", duration: "12 min", hasViz: false },
-          { id: "mo-t3", title: "Building APIs with FastAPI", duration: "22 min", hasViz: false },
-          { id: "mo-t4", title: "Docker for Data Scientists", duration: "20 min", hasViz: true },
+          { id: "mo-t2", title: "Virtual Environments: venv, conda, poetry", duration: "12 min", hasViz: true },
+          { id: "mo-t3", title: "ML Pipeline Orchestration with Airflow", duration: "22 min", hasViz: true },
+          { id: "mo-t4", title: "Deployment Strategies: Canary & Blue/Green", duration: "20 min", hasViz: true },
           { id: "mo-t5", title: "Cloud Basics: AWS for DS", duration: "25 min", hasViz: true },
         ]
       },
@@ -568,7 +589,7 @@ const CURRICULUM = [
         lessons: [
           { id: "mo-v1", title: "Matplotlib & Seaborn: Static Viz Done Right", duration: "20 min", hasViz: true },
           { id: "mo-v2", title: "Plotly: Interactive Visualizations", duration: "18 min", hasViz: true },
-          { id: "mo-v3", title: "Dashboard Design Principles", duration: "15 min", hasViz: false },
+          { id: "mo-v3", title: "Dashboard Design Principles", duration: "15 min", hasViz: true },
         ]
       }
     ],
@@ -612,7 +633,7 @@ const CURRICULUM = [
         lessons: [
           { id: "sp-n1", title: "Text Preprocessing & Tokenization", duration: "15 min", hasViz: true },
           { id: "sp-n2", title: "Word Embeddings: Word2Vec to BERT", duration: "25 min", hasViz: true },
-          { id: "sp-n3", title: "Sentiment Analysis & Text Classification", duration: "18 min", hasViz: false },
+          { id: "sp-n3", title: "Sentiment Analysis & Text Classification", duration: "18 min", hasViz: true },
           { id: "sp-n4", title: "Named Entity Recognition", duration: "15 min", hasViz: true },
         ]
       }
@@ -1033,6 +1054,15 @@ const VISUALIZATIONS = {
   "sd-m2": FeatureStoreViz,
   "sd-m3": BatchVsStreaming,
   "sd-m4": RecSysCollaborativeFiltering,
+  "mo-c1": MLCICDPipelineViz,
+  "mo-t3": AirflowDAGViz,
+  "mo-t4": CanaryDeploymentViz,
+  "mo-v1": MatplotlibAnatomyViz,
+  "sp-r3": MatrixFactorizationViz,
+  "sp-r4": RecEvalMetricsViz,
+  "sp-t2": ARIMACFViz,
+  "sp-t3": ProphetDecompositionViz,
+  "sp-n1": TextPreprocessingPipelineViz,
   "sql-found-01": SQLOrderOfExecution,
   "sql-found-02": SQLNullLogic,
   "sql-found-03": SQLGroupByViz,
@@ -1059,6 +1089,17 @@ const VISUALIZATIONS = {
   "st-a2": StatMultipleTestingViz,
   "st-a3": StatBootstrapViz,
   "st-a4": StatBayesFrequentistViz,
+  "mo-t1": GitWorkflowViz,
+  "mo-t2": VenvCondaViz,
+  "mo-t5": AWSDataScienceViz,
+  "mo-c3": DriftConceptViz,
+  "mo-c4": AutoRetrainingViz,
+  "mo-v2": PlotlyInteractiveViz,
+  "mo-v3": DashboardDesignViz,
+  "sp-r2": ContentBasedRecViz,
+  "sp-t4": LSTMSequenceViz,
+  "sp-n3": SentimentAnalysisViz,
+  "sp-n4": NERViz,
 };
 
 const ML_VIZ_FALLBACK = [
