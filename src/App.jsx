@@ -6,6 +6,7 @@ import PrivacyPage from "./pages/PrivacyPage.jsx";
 import TermsPage from "./pages/TermsPage.jsx";
 import ThankYouPage from "./pages/ThankYouPage.jsx";
 import PreviewPage from "./pages/PreviewPage.jsx";
+import CertificatePage from "./pages/CertificatePage.jsx";
 import { DS, dsGlassCard } from "./lib/ds-platform-tokens.js";
 import AppErrorBoundary from "./components/AppErrorBoundary.jsx";
 
@@ -47,6 +48,7 @@ export default function App() {
               </Suspense>
             )}
           />
+          <Route path="/certificate/:certId" element={<CertificatePage />} />
           <Route path="/dashboard" element={<Navigate to="/platform" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

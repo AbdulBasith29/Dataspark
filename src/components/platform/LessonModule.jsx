@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { DS, dsGlassCard } from "../../lib/ds-platform-tokens.js";
 import { renderInlineMarkdown } from "../../lib/inline-markdown.jsx";
 import { SimpleMarkdown } from "../../lib/simple-markdown.jsx";
@@ -62,10 +63,27 @@ function buildDecisionArtifact({ graph, branchPath, clickedTargets, graphChoices
   };
 }
 
-function DecisionArtifactCard({ graph, branchPath, clickedTargets, graphChoices, lessonTitle, accent }) {
+function DecisionArtifactCard({ graph, branchPath, clickedTargets, graphChoices, lessonTitle, accent, lessonId, courseId }) {
   const artifact = buildDecisionArtifact({ graph, branchPath, clickedTargets, graphChoices, lessonTitle });
   const artifactJson = JSON.stringify(artifact, null, 2);
   const filename = `${(lessonTitle || "dataspark").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-decision-artifact.json`;
+
+  const navigate = useNavigate();
+  const isCapstone = lessonId === "sql-capstone-01";
+  const [certName, setCertName] = useState("");
+
+  const handleGetCertificate = () => {
+    const certData = {
+      id: btoa(`${lessonId}-${Date.now()}`).slice(0, 16),
+      name: certName.trim() || "Dataspark Learner",
+      title: "StreamCore Analytics Challenge",
+      course: courseId || "sql",
+      date: new Date().toISOString(),
+      dimensions: artifact.performanceMatrix,
+    };
+    const encoded = btoa(JSON.stringify(certData));
+    navigate(`/certificate/${encoded}`);
+  };
 
   const handleDownload = () => {
     const blob = new Blob([artifactJson], { type: "application/json" });
@@ -153,11 +171,60 @@ function DecisionArtifactCard({ graph, branchPath, clickedTargets, graphChoices,
       >
         Download artifact →
       </button>
+
+      {isCapstone && (
+        <div style={{ borderTop: `1px solid ${DS.border}`, paddingTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontSize: 11, fontFamily: "var(--ds-mono), monospace", fontWeight: 700, letterSpacing: "0.12em", color: "#F59E0B", textTransform: "uppercase" }}>
+            Course Certificate
+          </div>
+          <p style={{ margin: 0, fontSize: 13, color: DS.t3, lineHeight: 1.5 }}>
+            Generate a shareable certificate you can add directly to your LinkedIn profile.
+          </p>
+          <input
+            type="text"
+            placeholder="Your name (for the certificate)"
+            value={certName}
+            onChange={(e) => setCertName(e.target.value)}
+            style={{
+              background: "rgba(255,255,255,0.04)",
+              border: `1px solid ${DS.border}`,
+              borderRadius: DS.radiusSm,
+              padding: "10px 14px",
+              color: DS.t1,
+              fontSize: 14,
+              fontFamily: "var(--ds-sans), sans-serif",
+              outline: "none",
+              width: "100%",
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleGetCertificate}
+            disabled={!certName.trim()}
+            style={{
+              background: certName.trim() ? "#F59E0B" : "rgba(245,158,11,0.2)",
+              border: "none",
+              borderRadius: DS.radiusSm,
+              padding: "13px 18px",
+              color: certName.trim() ? "#000" : DS.dim,
+              fontSize: 14,
+              fontWeight: 800,
+              cursor: certName.trim() ? "pointer" : "default",
+              fontFamily: "var(--ds-sans), sans-serif",
+              minHeight: 44,
+              width: "100%",
+              transition: "background 0.2s",
+            }}
+          >
+            Get my certificate →
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-function InterviewGraphStage({ graph, stage, branchPath, clickedTargets, graphChoices, selectedTarget, selectedChoice, onTargetClick, onChoiceSelect, accent, lessonTitle }) {
+function InterviewGraphStage({ graph, stage, branchPath, clickedTargets, graphChoices, selectedTarget, selectedChoice, onTargetClick, onChoiceSelect, accent, lessonTitle, lessonId, courseId }) {
   if (!graph || !stage) return null;
   const codeLines = parseTargetedCodeSnippet(stage.code_snippet);
   const choices = Array.isArray(stage.choices) ? stage.choices : [];
@@ -324,6 +391,8 @@ function InterviewGraphStage({ graph, stage, branchPath, clickedTargets, graphCh
           graphChoices={graphChoices}
           lessonTitle={lessonTitle}
           accent={accent}
+          lessonId={lessonId}
+          courseId={courseId}
         />
       )}
     </div>
@@ -711,6 +780,8 @@ export default function LessonModule({
             onChoiceSelect={handleGraphChoiceSelect}
             accent={course.accent}
             lessonTitle={lesson.title}
+            lessonId={lesson.id}
+            courseId={course.id}
           />
         ) : checks.length === 0 ? (
           <p style={{ color: DS.t3, fontSize: 14, margin: 0 }}>No checks for this module yet.</p>

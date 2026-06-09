@@ -901,6 +901,254 @@ Implement a row-wise baseline transform, profile it, rewrite with vectorized/bat
       { question: "What interview response best demonstrates optimization maturity?", options: ["Present before/after metrics, explain mechanism, and discuss tradeoffs.","Claim a big speedup without method.","Say optimization is unnecessary if code runs."], correctIndex: 0, explanation: "Evidence plus tradeoff clarity is the strongest signal." },
     ],
   },
+
+  "sql-capstone-01": {
+  durationLabel: "45 min",
+  outcomes: [
+    "Diagnose silent JOIN bugs that return zero rows by recognising INNER vs LEFT JOIN semantics under anti-join patterns.",
+    "Apply window functions with PARTITION BY correctly to produce per-group rankings without collapsing result sets.",
+    "Architect multi-step queries with chained CTEs for readability, maintainability, and clear debugging surfaces.",
+    "Select composite index strategies that match query filter column order to eliminate full-table scans.",
+  ],
+  learnMarkdown: `## StreamCore Analytics Challenge
+
+You have just been hired as StreamCore's first data analyst. StreamCore is a music streaming startup with 8 million users across 42 countries. The CEO has a board meeting in two hours and needs four data questions answered — now.
+
+This capstone does not teach new syntax. It tests whether you can apply what you know under pressure, in context, and explain your reasoning the way an interviewer will demand.
+
+## What this capstone assesses
+
+### 1 · JOIN and filtering accuracy
+
+Anti-join patterns — finding users who did NOT do something — are among the most common sources of silent data bugs. A wrong JOIN type returns zero rows with no error message. Interviewers test this because it surfaces understanding of set semantics, not just syntax recall.
+
+### 2 · Window function fluency
+
+Window functions let you compute per-group rankings without collapsing rows. The most common mistake is confusing PARTITION BY with GROUP BY, or applying RANK/ROW_NUMBER globally when the business question requires a per-dimension ranking (e.g. top-3 per country, not top-3 globally).
+
+### 3 · Query architecture
+
+As queries grow to three or more logical steps, nested subqueries become hard to read, test, and debug. Chained CTEs give each step a name and a clear interface to the next step. Interviewers use multi-step problems to distinguish engineers who can write SQL from those who can design it.
+
+### 4 · Performance and index instinct
+
+A composite index on (user_id, streamed_at) differs from an index on (streamed_at, user_id) in ways that directly affect whether the optimizer uses the index for your specific query. Interviewers at data-intensive companies expect you to explain index column order without needing to look it up.
+
+## What the final artifact represents
+
+Completing this capstone earns you four verified skill signals that map to real job-description requirements: anti-join correctness, window function design, CTE architecture, and index strategy. Together these cover the majority of SQL questions that appear in mid-to-senior data analyst and analytics engineer interviews.`,
+  video: null,
+  videoFallbackMarkdown: `## Applied SQL in real analyst roles
+
+The gap between knowing SQL syntax and doing analyst work is almost entirely a problem of query design under ambiguity. A real business question rarely maps cleanly to a single JOIN or aggregate. The analyst job is to translate a vague request into a precise, reproducible query sequence.
+
+### The four patterns that appear in almost every senior SQL interview
+
+**Anti-join correctness** is tested because it catches engineers who learned SQL by example rather than by set semantics. LEFT JOIN with IS NULL and NOT EXISTS are the two idiomatic forms, and you need to know when each is preferred.
+
+**Window functions** became mainstream in analytics after Redshift and BigQuery popularised them. ROW_NUMBER() OVER (PARTITION BY country ORDER BY total_streams DESC) immediately signals to an interviewer that the candidate has shipped production analytics.
+
+**CTE architecture** is the difference between SQL that works and SQL that can be reviewed, debugged, and extended by a team. If you cannot name each subquery step, the query is doing too much in one place.
+
+**Index instinct** matters at any company with more than a few million rows. Composite indexes are column-order sensitive because the B-tree is sorted left to right. Equality predicates lead, range predicates trail.`,
+  tryGuidance: "Work through four real StreamCore data challenges — each simulates a pressure question from a board-meeting prep session.",
+  interviewGraph: {
+    initialStageId: "cap_s1_join_bug",
+    artifactDimensions: [
+      { label: "JOIN & Filtering Accuracy", recoveryStageId: "cap_s1_recovery" },
+      { label: "Window Function Fluency", recoveryStageId: "cap_s2_recovery" },
+      { label: "Query Architecture", recoveryStageId: "cap_s3_recovery" },
+      { label: "Performance & Index Instinct", recoveryStageId: "cap_s4_recovery" },
+    ],
+    stages: {
+      cap_s1_join_bug: {
+        id: "cap_s1_join_bug",
+        type: "click_target",
+        badge: "Stage 1",
+        title: "Stage 1 · Find the JOIN bug",
+        prompt: "The head of growth asks: 'Which users signed up in the last 90 days but have never streamed a single song?' This query is supposed to answer that — but it returns 0 rows. Click the exact line that contains the bug.",
+        code_snippet: `SELECT
+  u.user_id,
+  u.email,
+  u.created_at
+FROM users u
+INNER JOIN streams s          -- ds-target:wrong_join_type
+  ON u.user_id = s.user_id
+WHERE u.created_at >= NOW() - INTERVAL '90 days'
+  AND s.user_id IS NULL;`,
+        validationCopy: {
+          wrong_join_type: "Correct. INNER JOIN only keeps rows where a match exists in both tables. Users who have never streamed have no matching row in streams, so INNER JOIN silently discards exactly the users you are looking for. Change this to LEFT JOIN.",
+        },
+        branches: {
+          wrong_join_type: "cap_s2_window",
+        },
+        rationale: "The LEFT JOIN anti-join pattern: keep all users even with no streams row (NULL in stream columns), then IS NULL filters to only non-streamers. INNER JOIN eliminates those rows before IS NULL can act — zero results, no error.",
+      },
+      cap_s1_recovery: {
+        id: "cap_s1_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · LEFT JOIN anti-join pattern",
+        prompt: "Anti-join pattern requires a specific structure. Which explanation correctly describes why LEFT JOIN is required here?",
+        code_snippet: `-- Anti-join pattern (correct):
+SELECT u.user_id
+FROM users u
+LEFT JOIN streams s ON u.user_id = s.user_id
+WHERE u.created_at >= NOW() - INTERVAL '90 days'
+  AND s.user_id IS NULL;`,
+        choices: [
+          { id: "a", label: "LEFT JOIN preserves non-matching rows", description: "LEFT JOIN keeps all users even if they have no streams row, placing NULL in stream columns — then IS NULL filters to only those users." },
+          { id: "b", label: "INNER JOIN also works with IS NULL", description: "INNER JOIN discards rows with no match before IS NULL can filter them — so zero rows result." },
+        ],
+        branches: { a: "cap_s2_window", b: "cap_s1_recovery" },
+        rationale: "INNER JOIN eliminates non-matching rows before IS NULL has any chance to act. LEFT JOIN keeps them, exposing the NULL you need to filter on.",
+      },
+      cap_s2_window: {
+        id: "cap_s2_window",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Top artists by country",
+        prompt: "The CEO wants the top 3 most-streamed artists in each country this month for the board deck. Which query design is correct and production-grade?",
+        code_snippet: `-- Table: streams(user_id, artist_id, country, streamed_at)
+-- Table: artists(artist_id, artist_name)
+-- Goal: top 3 artists per country by stream count, current month`,
+        choices: [
+          { id: "a", label: "ROW_NUMBER() OVER (PARTITION BY country)", description: "Aggregate streams per artist+country, rank within each country partition — keeps exactly 3 per country." },
+          { id: "b", label: "Correlated subquery with COUNT(*)", description: "Correct result but O(n²) on large tables — not production-grade." },
+          { id: "c", label: "GROUP BY country ORDER BY streams DESC LIMIT 3", description: "LIMIT 3 applies globally — returns 3 rows total, not 3 per country." },
+        ],
+        branches: { a: "cap_s3_cte", b: "cap_s2_recovery", c: "cap_s2_recovery" },
+        rationale: "ROW_NUMBER() OVER (PARTITION BY country ORDER BY total_streams DESC) assigns rank within each country independently. LIMIT 3 without partitioning caps the entire result set — the classic top-N-per-group mistake.",
+      },
+      cap_s2_recovery: {
+        id: "cap_s2_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · PARTITION BY vs GROUP BY",
+        prompt: "The key insight for per-group top-N is understanding what PARTITION BY does differently from GROUP BY.",
+        code_snippet: `WITH ranked AS (
+  SELECT
+    country, artist_id,
+    COUNT(*) AS total_streams,
+    ROW_NUMBER() OVER (
+      PARTITION BY country
+      ORDER BY COUNT(*) DESC
+    ) AS rn
+  FROM streams
+  WHERE streamed_at >= DATE_TRUNC('month', NOW())
+  GROUP BY country, artist_id
+)
+SELECT country, artist_id, total_streams
+FROM ranked WHERE rn <= 3;`,
+        choices: [
+          { id: "a", label: "Got it — move on →", description: "PARTITION BY divides rows into groups for window calculation without collapsing them. Each row keeps its rank within its partition." },
+          { id: "b", label: "PARTITION BY collapses rows like GROUP BY", description: "Incorrect — GROUP BY reduces N rows to M groups. PARTITION BY keeps all N rows and computes a window value per row." },
+        ],
+        branches: { a: "cap_s3_cte", b: "cap_s2_recovery" },
+        rationale: "GROUP BY reduces N rows to M groups. PARTITION BY keeps all N rows and annotates each one with a computation scoped to its group. Top-N per group requires the latter.",
+      },
+      cap_s3_cte: {
+        id: "cap_s3_cte",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Re-engagement query architecture",
+        prompt: "Find premium users who streamed more than 100 songs this month but have not streamed in the last 7 days — the re-engagement target list. Which architecture do you recommend?",
+        code_snippet: `-- Tables: users(user_id, plan_type)
+--         streams(user_id, song_id, streamed_at)
+-- Need: premium, >100 streams this month, 0 streams last 7 days`,
+        choices: [
+          { id: "a", label: "3-level nested subqueries", description: "Correct result but three levels of nesting is unreadable and nearly impossible to debug incrementally." },
+          { id: "b", label: "Two chained CTEs: active_month then recent_7d", description: "First CTE: monthly active premium users. Second CTE: recently active. Outer query anti-joins them. Each step is named and testable." },
+          { id: "c", label: "Single CTE filtering only >100 streams", description: "Cannot capture the no-streams-last-7-days exclusion cleanly in a single CTE." },
+        ],
+        branches: { a: "cap_s3_recovery", b: "cap_s4_index", c: "cap_s3_recovery" },
+        rationale: "Two chained CTEs give every logical step a name. You can SELECT * FROM each CTE independently to verify output before adding the next step — essential for a query this complex.",
+      },
+      cap_s3_recovery: {
+        id: "cap_s3_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · CTE architecture",
+        prompt: "Why are two chained CTEs preferred over deeply nested subqueries for multi-step filtering?",
+        code_snippet: `WITH active_this_month AS (
+  SELECT u.user_id
+  FROM users u
+  JOIN streams s ON u.user_id = s.user_id
+  WHERE u.plan_type = 'premium'
+    AND s.streamed_at >= DATE_TRUNC('month', NOW())
+  GROUP BY u.user_id HAVING COUNT(*) > 100
+),
+recent_streamers AS (
+  SELECT DISTINCT user_id FROM streams
+  WHERE streamed_at >= NOW() - INTERVAL '7 days'
+)
+SELECT a.user_id
+FROM active_this_month a
+LEFT JOIN recent_streamers r ON a.user_id = r.user_id
+WHERE r.user_id IS NULL;`,
+        choices: [
+          { id: "a", label: "Got it — move on →", description: "Each CTE has a single responsibility and a descriptive name — you can inspect any intermediate result to verify it before adding the next step." },
+          { id: "b", label: "Nested subqueries are equally readable", description: "Three levels of anonymous nesting makes debugging nearly impossible — you cannot inspect a middle step in isolation." },
+        ],
+        branches: { a: "cap_s4_index", b: "cap_s3_recovery" },
+        rationale: "CTEs trade a small amount of verbosity for large gains in readability and debuggability. Named steps communicate intent; anonymous subqueries force the reader to reverse-engineer it.",
+      },
+      cap_s4_index: {
+        id: "cap_s4_index",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Index strategy",
+        prompt: "The streams table has grown to 50 million rows. This query runs in 8 seconds: WHERE user_id = ? AND streamed_at > ?. What index do you recommend?",
+        code_snippet: `-- Table: streams (50M rows, no indexes except PK)
+SELECT song_id, streamed_at
+FROM streams
+WHERE user_id = 123456           -- equality filter
+  AND streamed_at > '2025-11-01'; -- range filter
+-- Runtime: 8.2 seconds (full table scan)`,
+        choices: [
+          { id: "a", label: "Composite index on (user_id, streamed_at)", description: "Leading equality column jumps directly to one user's rows, then range scan on streamed_at within that narrow subset." },
+          { id: "b", label: "Index on user_id only", description: "Reduces to one user's rows, but still scans all of that user's history for the date range." },
+          { id: "c", label: "Index on (streamed_at, user_id)", description: "Wrong column order — range on the leading column means scanning all dates across all users before applying user_id." },
+        ],
+        branches: { a: "cap_terminal", b: "cap_s4_recovery", c: "cap_s4_recovery" },
+        rationale: "Composite index (user_id, streamed_at): user_id is an equality filter on the leading column so the B-tree jumps precisely to that user's section, then range-scans only their streamed_at values. Rule: equality predicates lead, range predicates trail.",
+      },
+      cap_s4_recovery: {
+        id: "cap_s4_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Composite index column order",
+        prompt: "Why does column order in a composite index matter for this query?",
+        code_snippet: `-- Index on (user_id, streamed_at):
+-- 1. Jump to leaf for user_id = 123456  → O(log n)
+-- 2. Range scan on streamed_at within that user's leaf section
+
+-- Index on (streamed_at, user_id):
+-- 1. Range scan ALL dates > '2025-11-01' across ALL users
+-- 2. Filter user_id = 123456 — massive initial scan`,
+        choices: [
+          { id: "a", label: "Got it — move on →", description: "Equality filters on the leading column give the B-tree a precise entry point. Range filters trail so they narrow within an already-selective subset." },
+          { id: "b", label: "Column order does not affect performance", description: "Incorrect — the B-tree is physically sorted by the leading column. Wrong order means the optimizer cannot use the index efficiently." },
+        ],
+        branches: { a: "cap_terminal", b: "cap_s4_recovery" },
+        rationale: "The rule is memorable: equality predicates lead, range predicates trail. This maximises selectivity at the first B-tree traversal step.",
+      },
+      cap_terminal: {
+        id: "cap_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · StreamCore Analytics Challenge",
+        prompt: "The board meeting starts in five minutes. You just answered four high-pressure analyst questions: the never-streamed subscriber cohort, country-level top-artist rankings, the re-engagement target list, and a concrete index recommendation that will cut query time from 8 seconds to under 200ms. These four skills — anti-join correctness, window function design, CTE architecture, and composite index strategy — appear together in the majority of analytics engineering and senior data analyst interviews. Generate your certificate and add it to your portfolio.",
+        choices: [],
+        branches: { default: "cap_terminal" },
+        terminal: true,
+        rationale: "Stage 1: JOIN semantics under anti-join patterns — the silent zero-row bug that catches candidates who learned SQL by imitation. Stage 2: window function partitioning — the per-group ranking that separates tutorial SQL from production analytics. Stage 3: CTE architecture — decomposing a multi-step problem into named, reviewable units. Stage 4: composite index instinct — the column-order rule that determines whether an index actually gets used.",
+      },
+    },
+  },
+  knowledgeCheck: [],
+},
+
 };
 
 /**

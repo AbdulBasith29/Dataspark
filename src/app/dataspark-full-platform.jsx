@@ -268,6 +268,13 @@ const CURRICULUM = [
           { id: "sq-d3", title: "Star Schema vs Snowflake Schema", duration: "15 min", hasViz: true },
           { id: "sq-d4", title: "OLTP vs OLAP: Choosing the Right DB", duration: "12 min", hasViz: true },
         ]
+      },
+      {
+        id: "sql-capstone",
+        title: "Capstone Assessment",
+        lessons: [
+          { id: "sql-capstone-01", title: "StreamCore Analytics Challenge", duration: "45 min", hasViz: false, isCapstone: true },
+        ]
       }
     ],
     questions: SQL_QUESTIONS,
