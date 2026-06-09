@@ -65,7 +65,25 @@ function buildDecisionArtifact({ graph, branchPath, clickedTargets, graphChoices
 function DecisionArtifactCard({ graph, branchPath, clickedTargets, graphChoices, lessonTitle, accent }) {
   const artifact = buildDecisionArtifact({ graph, branchPath, clickedTargets, graphChoices, lessonTitle });
   const artifactJson = JSON.stringify(artifact, null, 2);
-  const downloadHref = `data:application/json;charset=utf-8,${encodeURIComponent(artifactJson)}`;
+  const filename = `${(lessonTitle || "dataspark").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-decision-artifact.json`;
+
+  const handleDownload = () => {
+    const blob = new Blob([artifactJson], { type: "application/json" });
+    const canShareFile = typeof navigator !== "undefined" && "canShare" in navigator &&
+      navigator.canShare({ files: [new File([blob], filename, { type: "application/json" })] });
+    if (canShareFile) {
+      navigator.share({ files: [new File([blob], filename, { type: "application/json" })] });
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div style={{
@@ -89,10 +107,11 @@ function DecisionArtifactCard({ graph, branchPath, clickedTargets, graphChoices,
         {artifact.performanceMatrix.map((row) => (
           <div
             key={row.dimension}
+            className="ds-artifact-row"
             style={{
               display: "grid",
               gridTemplateColumns: "minmax(0, 1fr) auto",
-              gap: 12,
+              gap: 8,
               alignItems: "center",
               padding: "10px 12px",
               borderRadius: DS.radiusSm,
@@ -101,7 +120,7 @@ function DecisionArtifactCard({ graph, branchPath, clickedTargets, graphChoices,
             }}
           >
             <span style={{ color: DS.t2, fontSize: 13, lineHeight: 1.4 }}>{row.dimension}</span>
-            <span style={{
+            <span className="ds-artifact-tier" style={{
               color: row.result.includes("Recovery") ? "#FCD34D" : DS.grn,
               fontSize: 11,
               fontFamily: "var(--ds-mono), monospace",
@@ -114,24 +133,26 @@ function DecisionArtifactCard({ graph, branchPath, clickedTargets, graphChoices,
         ))}
       </div>
 
-      <a
-        href={downloadHref}
-        download={`${(lessonTitle || "dataspark").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-decision-artifact.json`}
+      <button
+        type="button"
+        onClick={handleDownload}
         style={{
           alignSelf: "flex-start",
           background: `${accent}22`,
           border: `1px solid ${accent}66`,
           borderRadius: DS.radiusSm,
-          padding: "10px 14px",
+          padding: "12px 18px",
           color: DS.t1,
           fontSize: 13,
           fontWeight: 700,
-          textDecoration: "none",
+          cursor: "pointer",
           fontFamily: "var(--ds-sans), sans-serif",
+          minHeight: 44,
+          width: "100%",
         }}
       >
         Download artifact →
-      </a>
+      </button>
     </div>
   );
 }
@@ -204,6 +225,7 @@ function InterviewGraphStage({ graph, stage, branchPath, clickedTargets, graphCh
                 type="button"
                 disabled={!clickable}
                 onClick={() => clickable && onTargetClick(targetId)}
+                className={clickable ? "ds-code-line ds-code-line--tap" : "ds-code-line"}
                 style={{
                   display: "grid",
                   gridTemplateColumns: "42px 1fr",

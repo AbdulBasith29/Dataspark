@@ -1667,6 +1667,9 @@ export default function DataSparkPlatform() {
           .ds-nav-right { max-width: 100% !important; width: 100%; padding-bottom: 4px; }
           .ds-g2 { grid-template-columns: 1fr !important; }
           .ds-g3 { grid-template-columns: 1fr !important; }
+          .ds-artifact-row { grid-template-columns: 1fr !important; }
+          .ds-artifact-tier { text-align: left !important; }
+          .ds-code-line--tap { min-height: 44px !important; align-items: center; }
         }
       `}</style>
 
