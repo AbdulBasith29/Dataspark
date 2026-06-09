@@ -44169,748 +44169,1279 @@ X_train, X_test = X[:800], X[800:]`,
 },
 
   "sp-n1": {
-    durationLabel: "15 min",
-    outcomes: [
-      "Apply standard text preprocessing steps: tokenization, stemming, lemmatization",
-      "Explain subword tokenization (BPE, WordPiece) and why transformers use it",
-      "Contrast bag-of-words, TF-IDF, and contextual representations",
+  durationLabel: "15 min",
+  outcomes: [
+    "Build a correct text preprocessing pipeline for a given task.",
+    "Explain when stop word removal hurts instead of helps.",
+    "Choose between stemming and lemmatization based on task requirements.",
+  ],
+  learnMarkdown: `## Why preprocessing matters
+
+Raw text is messy. A single corpus might contain HTML tags, ALL-CAPS HEADERS, contractions like "don't", Unicode em-dashes, trailing whitespace, and inconsistent punctuation. A model that sees \`"Running"\`, \`"running"\`, and \`"RUNNING"\` as three separate tokens wastes capacity learning that they mean the same thing. Preprocessing normalises this noise so your model or feature extractor can focus on meaning.
+
+## Tokenization
+
+Tokenization splits a character stream into units a model can process. There are three main strategies:
+
+**Word tokenization** splits on whitespace and punctuation. NLTK's \`word_tokenize\` does this well, turning \`"I can't wait"\` into \`["I", "ca", "n't", "wait"]\`. Notice how contractions are split into meaningful sub-tokens.
+
+**Sentence tokenization** (e.g. \`nltk.sent_tokenize\`) splits a document into sentences — useful for translation, summarisation, and building training examples.
+
+**Subword / BPE tokenization** is used by transformer models (BERT, GPT). Instead of fixed vocabulary words, the algorithm learns frequent character sequences: \`"unhappiness"\` might split to \`["un", "##happ", "##iness"]\`. This lets BERT handle rare and misspelled words without an OOV (out-of-vocabulary) problem. **For transformers, always use the model's own tokenizer** — never apply word tokenization before feeding BERT.
+
+## Normalization
+
+Several cheap transforms dramatically reduce vocabulary size:
+
+- **Lowercasing**: \`"Apple"\` and \`"apple"\` collapse to one token. Cheap win for most tasks; skip for NER where case signals proper nouns.
+- **Expand contractions**: replace \`"don't"\` → \`"do not"\` before tokenizing to preserve negation.
+- **Remove punctuation**: strip \`.,!?;:\` when they carry no signal (bag-of-words). Keep them for dependency parsing or code analysis.
+- **Strip HTML**: \`BeautifulSoup.get_text()\` removes \`<b>\`, \`&amp;\`, etc. before any NLP step.
+
+## Stop word removal
+
+Stop words are high-frequency, low-information words: \`the\`, \`is\`, \`and\`, \`of\`. Removing them reduces feature dimensionality and often improves TF-IDF and document retrieval precision.
+
+**The trap**: stop word lists include \`not\`, \`no\`, and other negation words. For a **sentiment analysis** pipeline, removing \`"not"\` turns \`"not bad"\` into \`"bad"\` — a catastrophic semantic inversion. Always audit your stop word list against your task before applying it.
+
+NLTK's default English stop list has 179 words; spaCy's has around 326. Custom lists are common in domain-specific pipelines (finance, medicine).
+
+## Stemming
+
+Stemming applies rule-based suffix stripping to reduce inflected words to a common stem:
+
+\`\`\`python
+from nltk.stem import PorterStemmer
+s = PorterStemmer()
+print(s.stem("studies"))   # → "studi"
+print(s.stem("running"))   # → "run"
+print(s.stem("happiness")) # → "happi"
+\`\`\`
+
+The Porter stemmer is fast and deterministic. Its outputs are not real words (\`"studi"\` is not in any dictionary), which is fine for information retrieval where the goal is grouping, not readability. It can over-stem (\`"university"\` and \`"universe"\` may collapse together) or under-stem (\`"data"\` and \`"datum"\` may stay separate).
+
+## Lemmatization
+
+Lemmatization uses a morphological dictionary to reduce words to their canonical form (the *lemma*):
+
+\`\`\`python
+import spacy
+nlp = spacy.load("en_core_web_sm")
+doc = nlp("studies running happiness")
+print([token.lemma_ for token in doc])  # → ["study", "run", "happiness"]
+\`\`\`
+
+Lemmatization is slower (requires POS tagging for disambiguation — \`"meeting"\` the noun vs \`"meeting"\` the verb have different lemmas) but produces real words and is more accurate. Use it when text will be read or when downstream models need correct vocabulary.
+
+## When to use each
+
+| Technique | Best for | Avoid when |
+|-----------|----------|-----------|
+| Stemming | TF-IDF, search indices, large-scale retrieval | Meaning matters, output is shown to users |
+| Lemmatization | Topic modelling, interpretable features, QA | Latency is critical, dataset is huge |
+| Neither | Transformer fine-tuning (BERT, GPT) | — always use the model's own tokenizer |
+| Stop removal | Bag-of-words, TF-IDF | Sentiment analysis, any task where negation matters |
+
+## Pipeline order
+
+Order is not arbitrary. The correct canonical sequence is:
+
+1. **HTML / encoding cleaning** — remove tags, normalise Unicode
+2. **Lowercase** — before tokenization to unify casing
+3. **Expand contractions** — before tokenization to preserve negation
+4. **Tokenize** — split into tokens
+5. **Stop word removal** (task-dependent)
+6. **Stem or lemmatize** (task-dependent)
+
+If you lemmatize before lowercasing, the POS tagger may misfire on ALL-CAPS tokens. If you remove stop words before expanding contractions, \`"don't"\` disappears as a unit instead of splitting to \`"do"\` + \`"not"\`.
+
+## Interview-Ready Summary
+
+- **Tokenization** converts raw text to discrete units; subword (BPE) is standard for transformers.
+- **Normalization** (lowercase, contractions, HTML) reduces vocabulary noise before feature extraction.
+- **Stop word removal** helps TF-IDF but can destroy negation semantics for sentiment analysis.
+- **Stemming** (Porter) is fast, language-agnostic, imprecise — good for information retrieval.
+- **Lemmatization** (spaCy) is slower, accurate, produces real words — good for meaning-sensitive tasks.
+- **For transformers, skip both** — use the model's bundled tokenizer which handles subwords natively.`,
+  video: null,
+  videoFallbackMarkdown: `## Deep dive: build the pipeline
+
+Run this exercise to lock in the concepts:
+
+1. Take a short paragraph containing HTML tags, contractions, and mixed case.
+2. Write a preprocessing pipeline in the order: strip HTML → lowercase → expand contractions → tokenize → inspect.
+3. Apply stop word removal and note which words disappear.
+4. Apply Porter stemming. Compare outputs to spaCy lemmatization.
+5. Write one sentence explaining why you would or would not use stop removal for a sentiment classifier.`,
+  tryGuidance: "Click the bug in the preprocessing code below, then work through the scenario choices to defend your pipeline decisions under interview pressure.",
+  interviewGraph: {
+    initialStageId: "nlp_preprocess_click",
+    artifactDimensions: [
+      { label: "Preprocessing Pipeline", recoveryStageId: "pipeline_recovery" },
+      { label: "Stemming vs Lemmatization", recoveryStageId: "stem_recovery" },
     ],
-    learnMarkdown: `## Text Preprocessing & Tokenization
+    stages: {
+      nlp_preprocess_click: {
+        id: "nlp_preprocess_click",
+        type: "click_target",
+        badge: "Stage 1 target",
+        title: "Stage 1 · Find the sentiment pipeline bug",
+        prompt: "This preprocessing function is intended for a sentiment classifier. One line will silently invert the meaning of sentences like 'not bad'. Click the exact line that causes the bug.",
+        code_snippet: `stop_words = set(stopwords.words('english'))
 
-Before any NLP model can process text, raw text must be converted into a structured numerical representation.
+def preprocess_sentiment(text):
+    tokens = nltk.word_tokenize(text.lower())
+    tokens = [t for t in tokens if t not in stop_words]  # -- ds-target:remove_stops
+    tokens = [stemmer.stem(t) for t in tokens]            # -- ds-target:stem_sentiment
+    return ' '.join(tokens)
 
-### Classical Preprocessing Pipeline
-\`\`\`python
-import re
-from nltk.tokenize import word_tokenize
-from nltk.corpus import stopwords
-from nltk.stem import WordNetLemmatizer
-
-def preprocess(text):
-    text = text.lower()
-    text = re.sub(r'[^a-z\\s]', '', text)          # remove punctuation
-    tokens = word_tokenize(text)
-    tokens = [t for t in tokens if t not in stopwords.words('english')]
-    lemmatizer = WordNetLemmatizer()
-    tokens = [lemmatizer.lemmatize(t) for t in tokens]
-    return tokens
-\`\`\`
-
-### Stemming vs Lemmatization
-| | Stemming | Lemmatization |
-|--|---------|--------------|
-| Method | Chop suffix heuristically | Dictionary-based, uses POS |
-| "running" → | "run" | "run" |
-| "better" → | "better" | "good" |
-| Speed | Fast | Slower |
-| Use case | Search/IR | High-quality NLP |
-
-### From Tokens to Vectors
-**Bag of Words (BoW)**: count of each token in a fixed vocabulary
-- High-dimensional, sparse, no word order, no semantics
-
-**TF-IDF**: BoW weighted by inverse document frequency
-- Highlights distinctive terms, still sparse and positional-ignorant
-
-**Word embeddings** (Word2Vec, GloVe): dense semantic vectors — see sp-n2
-
-### Subword Tokenization (Transformers)
-\`\`\`python
-from transformers import AutoTokenizer
-tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-tokens = tokenizer("unhappiness")  # → ['un', '##happi', '##ness']
-\`\`\`
-
-**Byte-Pair Encoding (BPE)**: starts with characters, merges frequent pairs iteratively. Used by GPT models.
-**WordPiece**: similar but merges based on likelihood. Used by BERT.
-
-Advantages: handles OOV words gracefully, fixed vocabulary size regardless of language`,
-
-    video: null,
-    videoFallbackMarkdown: `## Text Normalization Pitfalls
-
-- **Stopword removal**: useful for IR/BoW, harmful for sentiment ("not good" → "good")
-- **Lowercasing**: useful generally, harmful for NER ("Apple" company vs "apple" fruit)
-- **Aggressive stemming**: "organization" → "organ" — loses meaning
-
-Modern transformers often apply minimal preprocessing (just subword tokenization + normalization) because they learn contextual representations that handle capitalization, morphology, etc. internally.`,
-
-    tryGuidance: "No interactive visualization. Focus on the tokenization examples and preprocessing decision rules.",
-
-    interviewGraph: {
-      initialStageId: "sp_n1_stage1",
-      artifactDimensions: [
-        { label: "Tokenization", recoveryStageId: "sp_n1_rec1" },
-        { label: "Text Representations", recoveryStageId: "sp_n1_rec2", passLabel: "NLP Preprocessor" },
-      ],
-      stages: {
-        sp_n1_stage1: {
-          id: "sp_n1_stage1",
-          type: "scenario_choice",
-          badge: "Stage 1",
-          title: "Stage 1 · Preprocessing Decisions",
-          prompt: "You're building a sentiment analysis model for tweets. Tweets contain emojis, slang, and abbreviations like 'lol', 'imo', 'brb'. Which preprocessing approach is best?",
-          choices: [
-            { id: "a", label: "Use a transformer with tweet-specific tokenizer (e.g., BERTweet)", description: "Pre-trained on tweets — handles slang, emojis, abbreviations natively" },
-            { id: "b", label: "Remove all emojis and lowercase + lemmatize", description: "Emojis carry strong sentiment signal — removing them loses information" },
-            { id: "c", label: "Replace all slang with formal equivalents before modeling", description: "Slang dictionaries are incomplete and can't keep up with new terms" },
-            { id: "d", label: "Split on spaces only — no further processing", description: "Space tokenization misses punctuation attachment and subword structure" },
-          ],
-          branches: { a: "sp_n1_stage2", b: "sp_n1_rec1", c: "sp_n1_rec1", d: "sp_n1_rec1" },
-          rationale: "Domain-specific pretrained tokenizers and models (BERTweet, roBERTa-base) outperform generic preprocessing on noisy social media text. They were trained on millions of tweets and learned to handle emoji sentiment, abbreviations, and hashtags. Removing emojis is particularly harmful — 😊 is a strong positive signal.",
+# "not bad" → "bad" after stop word removal!`,
+        validationCopy: {
+          remove_stops: "Correct. NLTK's stop word list includes 'not', 'no', 'never', and other negation words. Removing them turns 'not bad' into 'bad', inverting the sentiment label. Stop word removal is harmful for sentiment analysis.",
+          stem_sentiment: "Stemming reduces words to stems, but it does not delete negation words. The dangerous line is the stop word filter that removes 'not' before stemming even gets a chance to run.",
         },
-        sp_n1_rec1: {
-          id: "sp_n1_rec1",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Tokenization",
-          prompt: "BPE tokenization splits 'unhappiness' into ['un', '##happi', '##ness']. A previously unseen word 'unthinkability' appears at inference. How does BPE handle it?",
-          choices: [
-            { id: "a", label: "Splits into known subwords: ['un', '##think', '##ability'] — no OOV issue", description: "BPE falls back to known subword pieces, never truly OOV" },
-            { id: "b", label: "Replaces the entire word with [UNK] token", description: "Character-level fallback prevents full OOV in BPE" },
-            { id: "c", label: "The model crashes — it can't handle words not in training vocabulary", description: "BPE was specifically designed to avoid this" },
-            { id: "d", label: "The word is ignored and removed from the sequence", description: "BPE decomposes — it doesn't ignore unknown words" },
-          ],
-          branches: { a: "sp_n1_stage2", b: "sp_n1_stage2", c: "sp_n1_stage2", d: "sp_n1_stage2" },
-          rationale: "BPE's key advantage: no true out-of-vocabulary (OOV) words because it decomposes into known subwords, down to individual characters if needed. This makes it excellent for morphologically rich languages and technical domains with novel terminology.",
+        branches: {
+          remove_stops: "nlp_preprocess_fix_choice",
+          stem_sentiment: "pipeline_recovery",
+          default: "pipeline_recovery",
         },
-        sp_n1_stage2: {
-          id: "sp_n1_stage2",
-          type: "scenario_choice",
-          badge: "Stage 2",
-          title: "Stage 2 · BoW vs TF-IDF vs Embeddings",
-          prompt: "You're building a document similarity search for 10,000 legal contracts. Documents are long (~10,000 words). Which representation would you choose?",
-          choices: [
-            { id: "a", label: "Sentence-BERT embeddings averaged over document chunks", description: "Dense semantic embeddings capture meaning; chunking handles length limits" },
-            { id: "b", label: "Bag of Words with cosine similarity", description: "BoW misses synonyms, legal jargon context, and word order" },
-            { id: "c", label: "TF-IDF vectors with a 50,000-word vocabulary", description: "Sparse, high-dimensional; misses semantics ('indemnify' ≠ 'compensate' in BoW)" },
-            { id: "d", label: "Character n-grams of length 3", description: "Character n-grams are good for spelling/typo similarity, not semantic legal similarity" },
-          ],
-          branches: { a: "sp_n1_end", b: "sp_n1_rec2", c: "sp_n1_rec2", d: "sp_n1_rec2" },
-          rationale: "Legal contract similarity requires semantic understanding — 'indemnify', 'compensate', 'hold harmless' are related legal concepts that BoW/TF-IDF treats as completely different. Sentence-BERT embeddings (or legal-specific BERT variants like LegalBERT) capture these relationships. Chunk long docs and aggregate embeddings.",
+      },
+      pipeline_recovery: {
+        id: "pipeline_recovery",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Why does stop removal break sentiment?",
+        prompt: "The interviewer asks you to explain why applying a standard stop word list to a sentiment pipeline is dangerous. Which answer is correct?",
+        code_snippet: `# NLTK English stop words include:
+# 'no', 'not', 'nor', 'neither', 'never', 'nobody', 'nothing', 'nowhere'`,
+        choices: [
+          { id: "a", label: "Stop lists include negation words that carry sentiment", description: "Removing 'not' turns 'not bad' into 'bad', flipping the polarity." },
+          { id: "b", label: "Stop words slow down training", description: "Speed is not the issue; the problem is semantic destruction." },
+          { id: "c", label: "Stop word removal only affects TF-IDF, not classifiers", description: "Any text feature that depends on token presence is affected." },
+          { id: "d", label: "Stemming is the dangerous step, not stop removal", description: "Stemming maps forms to stems but does not delete negation words." },
+        ],
+        branches: {
+          a: "nlp_preprocess_fix_choice",
+          b: "pipeline_recovery",
+          c: "pipeline_recovery",
+          d: "pipeline_recovery",
         },
-        sp_n1_rec2: {
-          id: "sp_n1_rec2",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Text Representations",
-          prompt: "TF-IDF gives the word 'the' a near-zero weight in most documents. Why?",
-          choices: [
-            { id: "a", label: "IDF is low because 'the' appears in almost every document — common words are penalized", description: "IDF = log(N / df); if df ≈ N, IDF → 0" },
-            { id: "b", label: "'The' is filtered by the stopword list before TF-IDF is computed", description: "TF-IDF itself penalizes common words; stopword filtering is separate" },
-            { id: "c", label: "TF is low because 'the' appears rarely within any single document", description: "The opposite — 'the' has high TF; it's the IDF that tanks the score" },
-            { id: "d", label: "TF-IDF uses character counts, not word counts", description: "TF-IDF uses word (or n-gram) counts" },
-          ],
-          branches: { a: "sp_n1_end", b: "sp_n1_end", c: "sp_n1_end", d: "sp_n1_end" },
-          rationale: "IDF = log(N / df_t). For 'the': df_t ≈ N (appears in almost all documents) → IDF ≈ log(1) = 0. TF × IDF ≈ 0 regardless of how often 'the' appears in a single document. TF-IDF inherently implements the stopword concept mathematically — though explicit stopword removal is often still applied for efficiency.",
+        rationale: "The risk is not speed or scope — it is semantic inversion. Negation words are in every standard stop list but carry critical polarity information for sentiment tasks.",
+      },
+      nlp_preprocess_fix_choice: {
+        id: "nlp_preprocess_fix_choice",
+        type: "scenario_choice",
+        badge: "Stage 1 choice",
+        title: "Stage 1 · Choose the correct fix",
+        prompt: "You identified the bug. Which fix is best for a production sentiment classifier?",
+        code_snippet: `# Candidate repairs for preprocess_sentiment()`,
+        choices: [
+          { id: "a", label: "Remove the stop word filter entirely for sentiment tasks", description: "Preserve all tokens including negation words; sentiment classifiers benefit from these signals." },
+          { id: "b", label: "Use a custom stop list that excludes negation words", description: "Remove only truly function words (articles, prepositions) while keeping 'not', 'no', 'never'." },
+          { id: "c", label: "Apply stop removal after stemming", description: "Reordering does not fix the semantic destruction; 'not' is still removed." },
+          { id: "d", label: "Replace stemming with lemmatization first, then remove stops", description: "Lemmatization does not protect negation words from stop word removal." },
+        ],
+        branches: {
+          a: "nlp_stem_vs_lemma_choice",
+          b: "nlp_stem_vs_lemma_choice",
+          c: "pipeline_recovery",
+          d: "pipeline_recovery",
         },
-        sp_n1_end: {
-          id: "sp_n1_end",
-          type: "scenario_choice",
-          badge: "Complete",
-          title: "NLP Preprocessing Mastered",
-          prompt: "For a multilingual NLP application (English, Spanish, German, Chinese), which tokenization approach works best?",
-          choices: [
-            { id: "a", label: "Multilingual BPE (mBERT, XLM-R tokenizer) trained on all languages jointly", description: "Shared subword vocabulary handles all languages without per-language preprocessing" },
-            { id: "b", label: "Separate tokenizers per language, then concatenate", description: "Vocabulary mismatch and different sequence lengths cause problems" },
-            { id: "c", label: "Translate everything to English first, then use English tokenizer", description: "Translation adds error and latency; not scalable" },
-            { id: "d", label: "Character-level tokenization for all languages", description: "Very long sequences for logographic languages (Chinese); inefficient" },
-          ],
-          branches: { a: "sp_n1_end", b: "sp_n1_end", c: "sp_n1_end", d: "sp_n1_end" },
-          terminal: true,
-          rationale: "Multilingual BPE (used by mBERT, XLM-RoBERTa) learns a shared vocabulary across 100+ languages. It handles Chinese characters, German compound words, and Spanish morphology in a single unified tokenizer. XLM-R with its 250K vocabulary is the current standard for multilingual NLP tasks.",
+        rationale: "Both A and B are defensible. Removing stops entirely is simplest. A custom list that keeps negation words is more principled but requires maintenance. The wrong fix is reordering without addressing the deletion of 'not'.",
+      },
+      nlp_stem_vs_lemma_choice: {
+        id: "nlp_stem_vs_lemma_choice",
+        type: "scenario_choice",
+        badge: "Stage 2 comparison",
+        title: "Stage 2 · Stemming vs Lemmatization",
+        prompt: "The interviewer asks: 'Porter stemming produces outputs like \"studi\" and \"happi\". When would you use lemmatization instead?'",
+        code_snippet: `# Porter stem vs spaCy lemma
+# "studies" → "studi"  (Porter)
+# "studies" → "study"  (spaCy lemma)
+# "running" → "run"    (both)
+# "better"  → "better" (Porter) vs "good" (spaCy lemma — uses POS)`,
+        choices: [
+          { id: "a", label: "Use lemmatization when output is human-readable or meaning matters", description: "Topic models shown to users, QA systems, or interpretable features benefit from real dictionary forms." },
+          { id: "b", label: "Always prefer stemming because it is deterministic", description: "Determinism is a property of both; the question is accuracy and output quality." },
+          { id: "c", label: "Use stemming for BERT because it reduces vocabulary", description: "BERT uses its own subword tokenizer; you should never pre-stem before feeding BERT." },
+          { id: "d", label: "Lemmatization is always worse because it uses a dictionary", description: "Dictionary-based look-ups are more accurate, not worse, for morphological normalization." },
+        ],
+        branches: {
+          a: "nlp_pipeline_order_choice",
+          b: "stem_recovery",
+          c: "stem_recovery",
+          d: "stem_recovery",
         },
+        rationale: "Lemmatization produces real words and handles POS-sensitive forms like 'better' → 'good'. Use it for interpretable pipelines. Use stemming when speed and grouping matter more than precision.",
+      },
+      stem_recovery: {
+        id: "stem_recovery",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · Stemming misconceptions",
+        prompt: "Which statement correctly describes the difference between stemming and lemmatization?",
+        code_snippet: `# Key question: which produces a valid English word?
+# Porter: "happiness" → "happi"
+# spaCy:  "happiness" → "happiness" (no morphological simplification for nouns)`,
+        choices: [
+          { id: "a", label: "Stemming is rule-based and fast but may produce non-words; lemmatization is dictionary-based and slower but produces valid lemmas", description: "This is the core distinction interviewers expect." },
+          { id: "b", label: "Stemming uses part-of-speech tags; lemmatization does not", description: "It is the other way around — lemmatization uses POS for disambiguation." },
+          { id: "c", label: "Both techniques are required before transformer fine-tuning", description: "Transformers use subword tokenizers; neither stemming nor lemmatization should precede them." },
+          { id: "d", label: "Lemmatization and stemming always produce the same output", description: "They frequently differ, especially for irregular forms and adjective comparatives." },
+        ],
+        branches: {
+          a: "nlp_pipeline_order_choice",
+          b: "stem_recovery",
+          c: "stem_recovery",
+          d: "stem_recovery",
+        },
+        rationale: "The interviewer wants to hear: stemming is fast, rule-based, non-words are fine for retrieval; lemmatization is slower, dictionary-based, produces real words, requires POS tagging.",
+      },
+      nlp_pipeline_order_choice: {
+        id: "nlp_pipeline_order_choice",
+        type: "scenario_choice",
+        badge: "Stage 3 pipeline",
+        title: "Stage 3 · Correct pipeline order",
+        prompt: "A new engineer proposes this preprocessing order: tokenize → lowercase → expand contractions → strip HTML → stop words. What is wrong?",
+        code_snippet: `# Proposed order (contains a bug):
+# 1. Tokenize
+# 2. Lowercase
+# 3. Expand contractions
+# 4. Strip HTML
+# 5. Stop word removal`,
+        choices: [
+          { id: "a", label: "HTML stripping and contraction expansion must happen before tokenization", description: "HTML tags will tokenize into garbage tokens; contractions should be expanded before splitting so 'don't' → 'do not' as two clean tokens." },
+          { id: "b", label: "Lowercasing should come after stop word removal", description: "Lowercasing before stop removal is correct; stop word lists are typically lowercase." },
+          { id: "c", label: "Stop word removal must happen before tokenization", description: "You cannot filter by token before you have tokens." },
+          { id: "d", label: "The order is correct; step order does not matter for text preprocessing", description: "Order absolutely matters — it determines what each step receives as input." },
+        ],
+        branches: {
+          a: "nlp_preprocess_terminal",
+          b: "pipeline_recovery",
+          c: "pipeline_recovery",
+          d: "pipeline_recovery",
+        },
+        rationale: "HTML → lowercase → expand contractions → tokenize → stop words → stem/lemmatize. Each step assumes clean input from the previous one. Getting the order wrong creates corrupt tokens or misses stop words.",
+      },
+      nlp_preprocess_terminal: {
+        id: "nlp_preprocess_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Simulation complete · Preprocessing locked in",
+        prompt: "You identified the negation bug, chose the correct fix, explained stemming vs lemmatization, and defended pipeline order.",
+        code_snippet: `# Canonical pipeline:
+# strip HTML → lowercase → expand contractions → tokenize
+#   → [stop removal — skip for sentiment] → [stem or lemmatize — skip for transformers]`,
+        choices: [],
+        branches: {},
+        terminal: true,
+        rationale: "Interview-ready answer: stop words harm sentiment by removing negation; stemming is fast but imprecise; lemmatization uses POS and produces real words; transformers need neither — use the bundled tokenizer.",
       },
     },
-
-    knowledgeCheck: [
-      {
-        question: "Why might removing stopwords harm a sentiment analysis model?",
-        options: [
-          "Stopwords contain important frequency information",
-          "Negation words like 'not', 'never', 'hardly' are often in stopword lists and reverse sentiment",
-          "Stopword removal creates out-of-vocabulary issues for transformers",
-          "Removing stopwords increases dimensionality",
-        ],
-        correctIndex: 1,
-        explanation: "'Not good', 'never satisfied', 'hardly worth it' — removing 'not', 'never', 'hardly' from these phrases completely reverses the sentiment. Stopword lists were designed for information retrieval (find documents about 'X') not sentiment analysis. For sentiment, preserve negation words or use a transformer that handles them contextually.",
-      },
-      {
-        question: "What is the vocabulary size trade-off in BPE tokenization?",
-        options: [
-          "Larger vocabulary = faster training, smaller vocabulary = slower training",
-          "Smaller vocabulary = shorter token sequences (efficient); larger vocabulary = longer sequences but closer to word-level",
-          "Larger vocabulary = more OOV tokens; smaller = fewer OOV tokens",
-          "Vocabulary size doesn't affect sequence length or model behavior",
-        ],
-        correctIndex: 1,
-        explanation: "Smaller BPE vocab: more aggressive splitting → longer sequences (more subword pieces per word) → slower attention in transformers. Larger vocab: words kept intact more often → shorter sequences → faster attention but larger embedding matrix. GPT-2 uses 50K vocab; mBERT uses 30K for 104 languages — a tight compression.",
-      },
-    ],
   },
+  knowledgeCheck: [
+    {
+      question: "Why is applying NLTK's default stop word list dangerous for sentiment analysis?",
+      options: [
+        "The stop list includes negation words like 'not' and 'no', which carry polarity information",
+        "Stop word removal always increases vocabulary size",
+        "NLTK's stop words are only safe for Spanish text",
+      ],
+      correctIndex: 0,
+      explanation: "Removing 'not' turns 'not bad' into 'bad', silently inverting the sentiment label. Stop word removal should either be skipped or use a custom list that preserves negation.",
+    },
+    {
+      question: "What is the primary advantage of lemmatization over Porter stemming?",
+      options: [
+        "Lemmatization produces valid dictionary forms by using POS tags and a morphological database",
+        "Lemmatization is always faster because it uses a hash lookup",
+        "Lemmatization handles stop words automatically",
+      ],
+      correctIndex: 0,
+      explanation: "Porter stemming is rule-based and fast but produces non-words like 'studi'. Lemmatization consults a dictionary and uses POS context to return the canonical form 'study'.",
+    },
+    {
+      question: "When should you apply stemming or lemmatization before feeding text to a BERT model?",
+      options: [
+        "Never — always use BERT's bundled WordPiece tokenizer directly on normalized text",
+        "Always apply lemmatization to reduce BERT's vocabulary load",
+        "Apply Porter stemming to reduce sequence length",
+      ],
+      correctIndex: 0,
+      explanation: "Transformer models use learned subword tokenizers (WordPiece, BPE). Pre-stemming destroys morphological information that BERT's attention mechanism uses. Use the model's own tokenizer.",
+    },
+  ],
+},
 
   "sp-n2": {
-    durationLabel: "18 min",
-    outcomes: [
-      "Explain Word2Vec skip-gram training objective",
-      "Contrast static (Word2Vec/GloVe) vs contextual (BERT) embeddings",
-      "Describe how BERT uses masked language modeling for pretraining",
+  durationLabel: "18 min",
+  outcomes: [
+    "Explain the CBOW vs Skip-gram trade-off for rare vs common words.",
+    "Articulate why contextual embeddings outperform static ones for polysemous words.",
+    "Choose the right embedding strategy for a given production constraint.",
+  ],
+  learnMarkdown: `## The problem with one-hot encoding
+
+Before embeddings, the dominant representation was one-hot vectors: a vocabulary of 50,000 words means each word is a 50,000-dimensional binary vector with exactly one 1. This is:
+
+- **Sparse**: 99.998% zeros waste memory and compute.
+- **Orthogonal**: \`cosine_similarity("king", "queen") = 0\`. The model cannot leverage the fact that kings and queens are both royalty.
+- **Fixed-size vocabulary**: unknown words have no representation.
+
+Word embeddings solve all three problems by mapping words to dense, low-dimensional vectors (typically 50–300 dimensions) where **semantic similarity corresponds to geometric proximity**.
+
+## Word2Vec
+
+Word2Vec (Mikolov et al., 2013) learns embeddings by training a shallow neural network on a self-supervised prediction task. There are two architectures:
+
+### CBOW (Continuous Bag of Words)
+
+Given the surrounding context words, predict the center word:
+
+\`\`\`
+context: ["The", "cat", "on", "the"] → predict: "sat"
+\`\`\`
+
+CBOW is faster to train and works well for frequent words because it averages context signals.
+
+### Skip-gram
+
+Given the center word, predict each surrounding context word:
+
+\`\`\`
+center: "sat" → predict: "The", "cat", "on", "the"
+\`\`\`
+
+Skip-gram trains more slowly but produces better embeddings for **rare words** because each training example focuses the gradient on a single center word.
+
+### Negative sampling
+
+Naïve training requires a softmax over the entire vocabulary at each step — prohibitively slow for large corpora. **Negative sampling** approximates this by training a binary classifier: for each positive (word, context) pair, sample k random "negative" words and train the model to distinguish real context from noise. This reduces per-step cost from O(V) to O(k), typically k=5–20.
+
+## Semantic arithmetic
+
+After training, Word2Vec vectors encode semantic relationships:
+
+\`\`\`
+"king" − "man" + "woman" ≈ "queen"
+"Paris" − "France" + "Italy" ≈ "Rome"
+\`\`\`
+
+This happens because the model learns distributional patterns: words appearing in similar contexts get similar vectors.
+
+## GloVe
+
+GloVe (Pennington et al., 2014) takes a different approach. Rather than a local sliding window, it builds a global co-occurrence matrix X where X_{ij} is the number of times word j appears in the context of word i across the entire corpus, then applies matrix factorization.
+
+**Result**: GloVe captures both local (Word2Vec-style window) and global (corpus-wide) statistics. Pre-trained GloVe vectors (6B tokens, 300d) are widely used for transfer learning in classical NLP pipelines.
+
+## FastText
+
+FastText (Bojanowski et al., 2017) extends Word2Vec by representing each word as a bag of character n-grams:
+
+\`\`\`
+"apple" → ["<ap", "app", "ppl", "ple", "le>", "<apple>"]
+\`\`\`
+
+The word embedding is the sum of its character n-gram embeddings. This gives FastText a critical advantage: **it can produce embeddings for out-of-vocabulary (OOV) words** like typos, brand names, or neologisms by composing known character n-grams.
+
+## Contextual embeddings — BERT
+
+Word2Vec, GloVe, and FastText are **static**: the word "bank" always maps to the same vector regardless of whether the sentence is about river banks or financial institutions.
+
+BERT (Devlin et al., 2018) is a transformer pre-trained on masked language modeling. For every token, BERT produces a vector that depends on the **entire surrounding context**:
+
+\`\`\`python
+# "I went to the bank to deposit money"
+# "The boat drifted to the river bank"
+# BERT gives "bank" a DIFFERENT vector in each sentence.
+\`\`\`
+
+This eliminates polysemy ambiguity. BERT's 12 transformer layers each refine the contextual representation. The \`[CLS]\` token's output aggregates sentence-level meaning and is commonly used for classification tasks.
+
+## Choosing an embedding strategy
+
+| Method | Handles OOV | Contextual | Speed (inference) | Best for |
+|--------|-------------|-----------|-------------------|----------|
+| Word2Vec | No | No | Very fast | Search, lightweight similarity |
+| GloVe | No | No | Very fast | Pre-trained transfer, small teams |
+| FastText | Yes (via subwords) | No | Fast | Noisy text, product names, social media |
+| BERT | Yes (subword tokenizer) | Yes | Slow (GPU needed) | High-accuracy NLP, semantic search |
+
+## Interview-Ready Summary
+
+- **One-hot vectors** are sparse and orthogonal — no semantic structure.
+- **Word2Vec** uses CBOW (fast, common words) or Skip-gram (better for rare words) with negative sampling.
+- **Semantic arithmetic** works because distributional context encodes relational meaning.
+- **GloVe** factorizes a global co-occurrence matrix; often stronger than Word2Vec on analogy benchmarks.
+- **FastText** uses character n-grams — the only static embedding that handles OOV words.
+- **BERT** produces context-dependent vectors per token — different senses of "bank" get different embeddings.`,
+  video: null,
+  videoFallbackMarkdown: `## Deep dive: embeddings in practice
+
+1. Load a pre-trained Word2Vec or GloVe model using \`gensim\`.
+2. Compute \`model.wv.most_similar("king", topn=10)\` and inspect the cluster.
+3. Test the analogy: \`model.wv.most_similar(positive=["king","woman"], negative=["man"])\`.
+4. Try \`model.wv["iPhone15ProMax"]\` and observe the KeyError for OOV.
+5. Load a FastText model and repeat — note how OOV is handled via subword composition.
+6. Summarize: for a product recommendation system with new SKU names every week, which embedding would you choose and why?`,
+  tryGuidance: "Click the bug in the Word2Vec training code, then navigate the scenario choices to defend your embedding strategy decisions.",
+  interviewGraph: {
+    initialStageId: "nlp_embed_click",
+    artifactDimensions: [
+      { label: "Embedding Architecture", recoveryStageId: "embed_recovery" },
+      { label: "Static vs Contextual", recoveryStageId: "context_recovery" },
     ],
-    learnMarkdown: `## Word Embeddings: Word2Vec to BERT
-
-Word embeddings map tokens to dense vectors in a semantic space where similar words are close together.
-
-### Word2Vec: Skip-Gram
-Predict surrounding words given a center word:
-\`\`\`
-Objective: maximize Σ Σ log P(w_c | w_t)
-            t  c ∈ context(t)
-\`\`\`
-
-\`\`\`python
-from gensim.models import Word2Vec
-
-model = Word2Vec(sentences, vector_size=100, window=5,
-                 min_count=5, sg=1)  # sg=1: skip-gram
-vector = model.wv['king']            # (100,) vector
-similar = model.wv.most_similar('king', topn=5)
-# Classic result: king - man + woman ≈ queen
-\`\`\`
-
-### GloVe: Global Vectors
-Factorize the word co-occurrence matrix directly:
-\`\`\`
-Objective: Σᵢⱼ f(X_ij)(wᵢᵀw̃ⱼ + bᵢ + b̃ⱼ - log Xᵢⱼ)²
-\`\`\`
-GloVe captures global statistical structure; Word2Vec captures local context windows.
-
-### Problem with Static Embeddings
-"bank" has one vector regardless of context:
-- "river bank" → same embedding as "bank account" ❌
-
-### BERT: Contextual Embeddings
-\`\`\`python
-from transformers import AutoModel, AutoTokenizer
-tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
-model = AutoModel.from_pretrained('bert-base-uncased')
-
-inputs = tokenizer("The bank is by the river", return_tensors='pt')
-outputs = model(**inputs)
-# outputs.last_hidden_state: (1, seq_len, 768) — contextual embeddings
-# 'bank' embedding differs based on surrounding context
-\`\`\`
-
-### BERT Pretraining
-1. **Masked Language Modeling (MLM)**: Mask 15% of tokens, predict masked tokens from context
-2. **Next Sentence Prediction (NSP)**: Predict if sentence B follows sentence A
-
-### Embedding Comparison
-| Method | Dim | Contextual | OOV | Training |
-|--------|-----|-----------|-----|---------|
-| Word2Vec | 50-300 | No | UNK | Yours |
-| GloVe | 50-300 | No | UNK | Pre-trained |
-| BERT | 768 | Yes | Subwords | Fine-tune |
-| GPT | 768-12288 | Yes | BPE | Prompt/fine-tune |`,
-
-    video: null,
-    videoFallbackMarkdown: `## Sentence Embeddings
-
-For downstream tasks like semantic search and clustering:
-- **Sentence-BERT (SBERT)**: Fine-tuned BERT with siamese network for sentence-level similarity
-- **OpenAI text-embedding-ada-002**: 1536-dim embeddings; good general-purpose retrieval
-- **E5, GTE, BGE**: Open-source embedding models competitive with OpenAI for RAG pipelines
-
-For cosine similarity in high dimensions: normalize embeddings to unit vectors first (dot product = cosine similarity after normalization).`,
-
-    tryGuidance: "Explore the word embeddings visualization. See how words cluster in 2D and observe analogical reasoning (king - man + woman).",
-
-    interviewGraph: {
-      initialStageId: "sp_n2_stage1",
-      artifactDimensions: [
-        { label: "Word2Vec Intuition", recoveryStageId: "sp_n2_rec1" },
-        { label: "BERT vs Static", recoveryStageId: "sp_n2_rec2", passLabel: "Embeddings Expert" },
-      ],
-      stages: {
-        sp_n2_stage1: {
-          id: "sp_n2_stage1",
-          type: "scenario_choice",
-          badge: "Stage 1",
-          title: "Stage 1 · Word2Vec Training",
-          prompt: "Word2Vec skip-gram is trained on the sentence 'The cat sat on the mat'. Center word = 'sat', window = 2. What are the positive training pairs?",
-          choices: [
-            { id: "a", label: "(sat, cat), (sat, on) — 2 words left and right of 'sat'", description: "Window=2 means 2 words each side: [cat, sat, on, the]" },
-            { id: "b", label: "(sat, The), (sat, cat), (sat, on), (sat, the) — all words in sentence", description: "Window=2 limits context to 2 words each direction from center" },
-            { id: "c", label: "Only (sat, on) — only immediately adjacent word", description: "Window=2 means 2 positions each direction, not 1" },
-            { id: "d", label: "No pairs — skip-gram predicts the center word from context", description: "Skip-gram predicts CONTEXT from center; CBOW predicts center from context" },
-          ],
-          branches: { a: "sp_n2_stage2", b: "sp_n2_rec1", c: "sp_n2_rec1", d: "sp_n2_rec1" },
-          rationale: "Skip-gram center='sat', window=2: context = 2 words left ['cat'] + 2 words right ['on', 'the'] (limited by sentence boundaries on left). Positive pairs: (sat, cat), (sat, on), (sat, the). Skip-gram predicts context given center — the opposite of CBOW (predicts center from context).",
+    stages: {
+      nlp_embed_click: {
+        id: "nlp_embed_click",
+        type: "click_target",
+        badge: "Stage 1 target",
+        title: "Stage 1 · Identify the embedding quality bug",
+        prompt: "This Word2Vec training script will produce noisy, unreliable embeddings for most words. Click the exact line that is the primary cause.",
+        code_snippet: `model = Word2Vec(sentences, vector_size=100, window=5, min_count=1, epochs=5)  # -- ds-target:low_min_count
+embedding = model.wv["iPhone15ProMax"]  # -- ds-target:oov_word`,
+        validationCopy: {
+          low_min_count: "Correct. min_count=1 means even words that appear only once in the entire corpus get trained embeddings. Words need multiple co-occurrence examples to produce meaningful vectors; rare singletons add noise and bloat the vocabulary without learning useful geometry.",
+          oov_word: "Word2Vec without FastText cannot embed OOV words — this line will raise a KeyError at runtime. However, the primary quality bug is min_count=1, which creates unreliable embeddings for thousands of low-frequency tokens.",
         },
-        sp_n2_rec1: {
-          id: "sp_n2_rec1",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Word2Vec Intuition",
-          prompt: "Word2Vec learns that king - man + woman ≈ queen. What property of the embedding space makes this analogy work?",
-          choices: [
-            { id: "a", label: "Linear structure: the gender direction is consistent across royalty pairs", description: "Vector(king) - Vector(man) ≈ Vector(queen) - Vector(woman) — a consistent offset" },
-            { id: "b", label: "The model was explicitly trained on analogy pairs", description: "Word2Vec learns from co-occurrence only — analogies emerge implicitly" },
-            { id: "c", label: "King and queen share exactly 50% of their embedding dimensions", description: "No such constraint exists; similarity is measured by cosine, not shared dimensions" },
-            { id: "d", label: "The vocabulary is sorted alphabetically, placing similar words close", description: "Vocabulary ordering has no effect on embedding geometry" },
-          ],
-          branches: { a: "sp_n2_stage2", b: "sp_n2_stage2", c: "sp_n2_stage2", d: "sp_n2_stage2" },
-          rationale: "Word2Vec learns a linear geometry where semantic relationships correspond to vector offsets. The gender direction (man→woman) is a consistent vector offset that applies across many pairs: king→queen, actor→actress, uncle→aunt. This parallelogram structure emerges from co-occurrence patterns in the training corpus.",
+        branches: {
+          low_min_count: "nlp_embed_fix_choice",
+          oov_word: "embed_recovery",
+          default: "embed_recovery",
         },
-        sp_n2_stage2: {
-          id: "sp_n2_stage2",
-          type: "scenario_choice",
-          badge: "Stage 2",
-          title: "Stage 2 · Static vs Contextual",
-          prompt: "Your NLP system must classify legal contract clauses. 'Party' means 'contracting entity' in legal text but 'celebration event' in social media. Static Word2Vec embeddings give both uses the same vector. What's the fix?",
-          choices: [
-            { id: "a", label: "Use BERT — it produces different 'party' embeddings based on surrounding context", description: "Contextual embeddings solve polysemy by encoding the full sentence context" },
-            { id: "b", label: "Train separate Word2Vec models on legal vs social text", description: "Still produces a single static 'party' vector per model — no disambiguation at inference" },
-            { id: "c", label: "Increase Word2Vec dimension from 100 to 1000", description: "Larger dimensions don't add contextual disambiguation" },
-            { id: "d", label: "Add 'legal_party' and 'social_party' as separate vocabulary entries", description: "This requires pre-disambiguated training data — defeats the purpose" },
-          ],
-          branches: { a: "sp_n2_end", b: "sp_n2_rec2", c: "sp_n2_rec2", d: "sp_n2_rec2" },
-          rationale: "BERT's contextual embeddings produce a different vector for 'party' depending on surrounding words: 'party of the first part' (legal context) gets a different embedding than 'party on Saturday' (social context). This polysemy resolution is the core advantage of contextual embeddings over static ones.",
+      },
+      embed_recovery: {
+        id: "embed_recovery",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Why does min_count matter?",
+        prompt: "The interviewer asks: 'A word appears exactly once in your training corpus. Why should you exclude it from Word2Vec training?'",
+        code_snippet: `# min_count filters words below a frequency threshold
+# Typical values: 2-10 for small corpora, 10-100 for large`,
+        choices: [
+          { id: "a", label: "A word seen once has no distributional context to learn geometry from", description: "Word2Vec needs repeated co-occurrence patterns to position a word meaningfully in vector space." },
+          { id: "b", label: "Words appearing once are always stop words", description: "Low-frequency words are typically rare content words, not stop words." },
+          { id: "c", label: "min_count only affects training speed, not embedding quality", description: "It affects vocabulary size, noise in the embedding space, and gradient quality." },
+          { id: "d", label: "Rare words should use zero vectors", description: "Zero vectors collapse all rare words to the same point, losing any signal." },
+        ],
+        branches: {
+          a: "nlp_embed_fix_choice",
+          b: "embed_recovery",
+          c: "embed_recovery",
+          d: "embed_recovery",
         },
-        sp_n2_rec2: {
-          id: "sp_n2_rec2",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · BERT Pretraining",
-          prompt: "In BERT's Masked Language Model pretraining, 15% of tokens are masked. Of these, what happens to each masked token?",
-          choices: [
-            { id: "a", label: "80% [MASK], 10% random token, 10% unchanged — to prevent [MASK]-only exposure bias", description: "BERT uses this 80/10/10 split to make the model robust" },
-            { id: "b", label: "100% replaced with [MASK] token for consistency", description: "[MASK] never appears at inference — models trained this way see a train/test mismatch" },
-            { id: "c", label: "50% [MASK], 50% random token", description: "Not the BERT split — too much random replacement adds noise" },
-            { id: "d", label: "The token is simply deleted from the sequence", description: "Deletion changes sequence length; BERT keeps length constant" },
-          ],
-          branches: { a: "sp_n2_end", b: "sp_n2_end", c: "sp_n2_end", d: "sp_n2_end" },
-          rationale: "BERT's masking strategy: of the 15% selected tokens, 80% get [MASK], 10% get a random token, 10% stay unchanged. This prevents the model from learning 'if I see [MASK] I need to predict something' — a bias that hurts fine-tuning since [MASK] doesn't appear in real text.",
+        rationale: "Distributional semantics requires multiple co-occurrence examples. A word seen once has essentially one context window — not enough signal to place it correctly relative to semantically similar words.",
+      },
+      nlp_embed_fix_choice: {
+        id: "nlp_embed_fix_choice",
+        type: "scenario_choice",
+        badge: "Stage 1 choice",
+        title: "Stage 1 · CBOW vs Skip-gram",
+        prompt: "Your dataset contains product descriptions with many rare product codes. Which Word2Vec architecture should you use?",
+        code_snippet: `# CBOW: context → center (averages context signals)
+# Skip-gram: center → context (each rare word gets direct gradient)`,
+        choices: [
+          { id: "a", label: "Skip-gram — better embeddings for rare words", description: "Each center word is the direct prediction target, giving rare words more focused gradient updates." },
+          { id: "b", label: "CBOW — faster and covers rare words equally well", description: "CBOW averages context; rare center words receive diluted gradient and end up with noisier vectors." },
+          { id: "c", label: "GloVe — handles rare words through global statistics", description: "GloVe's co-occurrence matrix still has sparse rows for rare words; it does not solve rarity better than Skip-gram." },
+          { id: "d", label: "Increase vector_size to 500 to fix rare word quality", description: "Dimensionality does not compensate for insufficient training examples." },
+        ],
+        branches: {
+          a: "nlp_static_vs_contextual_choice",
+          b: "embed_recovery",
+          c: "nlp_static_vs_contextual_choice",
+          d: "embed_recovery",
         },
-        sp_n2_end: {
-          id: "sp_n2_end",
-          type: "scenario_choice",
-          badge: "Complete",
-          title: "Embeddings Mastered",
-          prompt: "For semantic search over 1M product descriptions, you need to find the most similar items to a query in <50ms. What's the production architecture?",
-          choices: [
-            { id: "a", label: "Precompute all product embeddings → index in FAISS → ANN search at query time", description: "Offline embedding + fast ANN retrieval is the standard production pattern" },
-            { id: "b", label: "Compute cosine similarity between query and all 1M products at query time", description: "1M × 768-dim cosines at 50ms = ~7 billion operations — not feasible" },
-            { id: "c", label: "Use BM25 keyword search — embeddings are too slow for 1M items", description: "Precomputed embeddings + FAISS are fast; BM25 misses semantic similarity" },
-            { id: "d", label: "Fine-tune BERT on every query for personalized embeddings", description: "Fine-tuning at query time is seconds to minutes per request" },
-          ],
-          branches: { a: "sp_n2_end", b: "sp_n2_end", c: "sp_n2_end", d: "sp_n2_end" },
-          terminal: true,
-          rationale: "Production semantic search: (1) embed all products offline with a sentence transformer; (2) index embeddings in FAISS (Flat, HNSW, or IVF indexes); (3) at query time, embed the query (~10ms) and run ANN search (~5ms) → total <20ms for 1M items. FAISS with HNSW index achieves ~95% recall vs brute force.",
+        rationale: "Skip-gram is the standard recommendation when rare words matter. Each center word is the direct optimization target, so even low-frequency words receive focused gradient updates per training step.",
+      },
+      nlp_static_vs_contextual_choice: {
+        id: "nlp_static_vs_contextual_choice",
+        type: "scenario_choice",
+        badge: "Stage 2 contextual",
+        title: "Stage 2 · Static vs Contextual",
+        prompt: "A product team needs to disambiguate sentences like 'Apple stock fell today' (company) vs 'An apple a day keeps the doctor away' (fruit). Which embedding approach is necessary?",
+        code_snippet: `# Static: model.wv["apple"] → same 100-dim vector in both sentences
+# Contextual: bert_model("apple stock fell") → different vector than bert_model("an apple a day")`,
+        choices: [
+          { id: "a", label: "BERT — it produces different vectors for the same word in different contexts", description: "BERT's attention mechanism encodes surrounding tokens, so polysemous words get context-specific representations." },
+          { id: "b", label: "FastText with larger n-gram window", description: "FastText adds subword information but still produces a single static vector per word form." },
+          { id: "c", label: "GloVe with 300 dimensions", description: "Higher dimensions give more capacity but the vector is still static — one 'apple' regardless of context." },
+          { id: "d", label: "Word2Vec Skip-gram with window=10", description: "A wider window captures more context at training time but produces a single averaged static vector." },
+        ],
+        branches: {
+          a: "nlp_embed_oov_choice",
+          b: "context_recovery",
+          c: "context_recovery",
+          d: "context_recovery",
         },
+        rationale: "Word sense disambiguation requires contextual embeddings. Static methods collapse all senses into one point; BERT's bidirectional attention encodes the full sentence, giving each token instance a unique representation.",
+      },
+      context_recovery: {
+        id: "context_recovery",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · Why static embeddings fail polysemy",
+        prompt: "Which description best explains why Word2Vec cannot disambiguate 'bank' in different sentences?",
+        code_snippet: `# Word2Vec training objective:
+# Maximize P(context | center) across ALL occurrences of "bank"
+# → embedding is the weighted average of ALL senses`,
+        choices: [
+          { id: "a", label: "Training averages all contexts, blending river-bank and financial-bank into one vector", description: "The resulting embedding is a compromise that represents neither sense well." },
+          { id: "b", label: "Word2Vec does not train on sentences with ambiguous words", description: "Word2Vec trains on all tokens; it has no mechanism to identify ambiguity." },
+          { id: "c", label: "The issue is vocabulary size, not architecture", description: "A larger vocabulary does not create per-instance context sensitivity." },
+          { id: "d", label: "Static embeddings are fine for polysemy if window size is large enough", description: "A wider window averages more contexts but still collapses to one vector." },
+        ],
+        branches: {
+          a: "nlp_embed_oov_choice",
+          b: "context_recovery",
+          c: "context_recovery",
+          d: "context_recovery",
+        },
+        rationale: "The training loss minimizes prediction error across every sentence containing 'bank'. The gradient from financial contexts and river contexts partially cancel, producing a blended embedding that serves neither sense optimally.",
+      },
+      nlp_embed_oov_choice: {
+        id: "nlp_embed_oov_choice",
+        type: "scenario_choice",
+        badge: "Stage 3 OOV",
+        title: "Stage 3 · Handling new product names",
+        prompt: "Your e-commerce NLP pipeline encounters new product SKUs like 'SamsungGalaxyS25Ultra' every week that were never in the training corpus. Which embedding handles this without retraining?",
+        code_snippet: `# Weekly new SKUs: "SamsungGalaxyS25Ultra", "NikeAirMax2026", "XiaomiPad7Pro"`,
+        choices: [
+          { id: "a", label: "FastText — character n-grams compose vectors for unseen words", description: "FastText decomposes the new SKU into known character n-grams and sums their embeddings." },
+          { id: "b", label: "GloVe — global statistics cover all word forms", description: "GloVe requires the word in the training corpus; it has no mechanism for OOV." },
+          { id: "c", label: "Word2Vec with min_count=1 to learn every token", description: "Even with min_count=1, new tokens not in the training data cannot be embedded at inference time." },
+          { id: "d", label: "Increase vector_size to 1000 to generalize to new words", description: "Dimensionality does not give Word2Vec or GloVe OOV capability." },
+        ],
+        branches: {
+          a: "nlp_embed_terminal",
+          b: "embed_recovery",
+          c: "embed_recovery",
+          d: "embed_recovery",
+        },
+        rationale: "FastText is the only static embedding that gracefully handles OOV. By summing character n-gram embeddings, it can approximate a vector for any new token from its morphological components.",
+      },
+      nlp_embed_terminal: {
+        id: "nlp_embed_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Simulation complete · Embeddings mastered",
+        prompt: "You diagnosed the min_count quality bug, chose the right architecture for rare words, explained polysemy failure, and selected the correct OOV strategy.",
+        code_snippet: `# Decision tree:
+# OOV words at inference → FastText
+# Polysemy / word sense → BERT (contextual)
+# Lightweight similarity / search → Word2Vec Skip-gram or GloVe
+# Always: min_count ≥ 5 for clean embedding geometry`,
+        choices: [],
+        branches: {},
+        terminal: true,
+        rationale: "The interview rubric: min_count filters noise; Skip-gram > CBOW for rare words; FastText solves OOV via n-grams; BERT solves polysemy via contextual attention. Choosing between static and contextual depends on latency budget and disambiguation requirements.",
       },
     },
-
-    knowledgeCheck: [
-      {
-        question: "Negative sampling in Word2Vec training speeds up training. What does it do?",
-        options: [
-          "Randomly samples negative (non-context) words to contrast against positive context words during training",
-          "Removes negative sentiment words from the training corpus",
-          "Samples words with negative TF-IDF scores as training examples",
-          "Reduces the learning rate when loss is negative",
-        ],
-        correctIndex: 0,
-        explanation: "The full softmax over the entire vocabulary (50K+ words) at each training step is expensive. Negative sampling replaces this with k (typically 5-20) randomly sampled non-context words. The model learns to distinguish true context words from random 'noise' words. This reduces computational complexity from O(V) to O(k) per update.",
-      },
-      {
-        question: "You extract the [CLS] token embedding from BERT for document classification. What does [CLS] represent?",
-        options: [
-          "The embedding of the first real word in the sentence",
-          "A special classification token whose final-layer embedding aggregates sequence-level information",
-          "The average of all token embeddings in the sequence",
-          "A mask token used to indicate the start of classification",
-        ],
-        correctIndex: 1,
-        explanation: "[CLS] is prepended to every BERT input. The model learns (through NSP pretraining and fine-tuning) to pack sequence-level information into the [CLS] token's final hidden state. This makes it useful as a fixed-size representation for classification tasks. Note: for sentence similarity tasks, mean-pooling over all tokens often outperforms [CLS] alone.",
-      },
-    ],
   },
+  knowledgeCheck: [
+    {
+      question: "Why does Skip-gram produce better embeddings for rare words than CBOW?",
+      options: [
+        "Skip-gram uses the center word as the direct prediction target, giving rare words focused gradient updates",
+        "Skip-gram uses a larger context window by default",
+        "CBOW cannot process sentences shorter than 5 words",
+      ],
+      correctIndex: 0,
+      explanation: "CBOW averages context signals to predict the center word, diluting the gradient for rare center words. Skip-gram predicts each context word from the center, so rare words receive a direct gradient signal at every training step.",
+    },
+    {
+      question: "Which static embedding method handles out-of-vocabulary words at inference time?",
+      options: [
+        "FastText — it decomposes words into character n-grams and sums their embeddings",
+        "GloVe — it uses global co-occurrence statistics to generalize",
+        "Word2Vec with min_count=1 — training on all tokens prevents OOV",
+      ],
+      correctIndex: 0,
+      explanation: "FastText represents words as bags of character n-grams. For an unseen word, it composes a vector from its known character subsequences. Word2Vec and GloVe require the exact word in the training vocabulary.",
+    },
+    {
+      question: "Why can BERT give 'bank' two different vectors in two different sentences?",
+      options: [
+        "BERT's transformer layers encode the full bidirectional context, producing a unique representation per token instance",
+        "BERT trains on 10x more data than Word2Vec",
+        "BERT uses a 768-dimensional space, which is large enough for multiple word senses",
+      ],
+      correctIndex: 0,
+      explanation: "Dimensionality is not the answer — you could have a 768-dim static embedding that still collapses all senses. BERT's attention mechanism attends to every other token in the sentence, making each token's representation depend on its specific context.",
+    },
+  ],
+},
 
   "sp-n3": {
-    durationLabel: "15 min",
-    outcomes: [
-      "Build a text classification pipeline using BERT fine-tuning",
-      "Explain aspect-based sentiment analysis vs document-level sentiment",
-      "Handle class imbalance in sentiment datasets",
-    ],
-    learnMarkdown: `## Sentiment Analysis & Text Classification
+  durationLabel: "15 min",
+  outcomes: [
+    "Explain what BERT fine-tuning does differently from training from scratch.",
+    "Choose the correct learning rate and epoch count for sentiment fine-tuning.",
+    "Identify when VADER is preferable to a fine-tuned transformer.",
+  ],
+  learnMarkdown: `## The evolution of sentiment analysis
 
-Sentiment analysis is the most applied NLP task — from product reviews to social media monitoring.
+Sentiment analysis has gone through three generations:
 
-### Document-Level Sentiment
-\`\`\`python
-from transformers import pipeline
+**Lexicon-based (VADER)**: assigns sentiment scores using a hand-crafted dictionary of words with polarity weights. "Great" = +0.8, "terrible" = −0.9. No training data required. VADER includes special rules for emphasis (ALL CAPS), negation, and punctuation boosters ("great!!!" scores higher than "great"). Fast, interpretable, no GPU needed.
 
-classifier = pipeline("sentiment-analysis",
-                       model="distilbert-base-uncased-finetuned-sst-2-english")
-result = classifier("The product works great but delivery was awful")
-# → [{'label': 'POSITIVE', 'score': 0.71}]  ← misses the nuance!
+**ML classifiers**: TF-IDF features + logistic regression or SVM. Requires labeled data. Much better at domain-specific patterns but lacks deep language understanding.
+
+**BERT fine-tuning**: the current state of the art for most sentiment benchmarks. Leverages deep contextual representations pre-trained on billions of tokens.
+
+## BERT's sentence representation
+
+BERT prepends a special \`[CLS]\` token to every input:
+
+\`\`\`
+Input: [CLS] "The movie was surprisingly good" [SEP]
 \`\`\`
 
-### Aspect-Based Sentiment Analysis (ABSA)
-Document-level misses: "The **food** was excellent but the **service** was terrible"
-- Extract aspects: food (positive), service (negative)
-- Models: sequence tagging (BIO scheme) or span extraction
+After passing through 12 (BERT-base) transformer layers, the \`[CLS]\` token's hidden state captures a pooled sentence-level representation because every layer allows every token to attend to every other token — including attending to the CLS token itself.
 
-### Fine-tuning BERT for Classification
+For classification, a small linear head sits on top of \`[CLS]\`:
+
+\`\`\`
+h_CLS ∈ ℝ^768 → Linear(768 → num_labels) → softmax → probability
+\`\`\`
+
+## What fine-tuning actually does
+
+Pre-training gives BERT a rich language model. Fine-tuning adapts it to your specific task and domain with a tiny supervised dataset (as few as 1,000 labeled examples can work for sentiment).
+
+The typical approach:
+
+1. **Load pre-trained BERT** (all 110M parameters stay initialized from pre-training).
+2. **Attach a classification head** (a new linear layer with random weights).
+3. **Train all parameters** end-to-end on your labeled data, but with a very small learning rate so BERT's knowledge is updated gradually, not overwritten.
+
 \`\`\`python
-from transformers import AutoModelForSequenceClassification, Trainer, TrainingArguments
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
 
-model = AutoModelForSequenceClassification.from_pretrained(
-    "bert-base-uncased", num_labels=3  # neg/neutral/pos
-)
+tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+model = AutoModelForSequenceClassification.from_pretrained("bert-base-uncased", num_labels=3)
+# num_labels=3 → positive, negative, neutral
 
 training_args = TrainingArguments(
-    output_dir="./results",
-    num_train_epochs=3,
+    output_dir="./sentiment_model",
+    num_train_epochs=3,          # 2–4 epochs typical
     per_device_train_batch_size=16,
-    warmup_steps=500,
-    weight_decay=0.01,
-    evaluation_strategy="epoch",
-)
-
-trainer = Trainer(model=model, args=training_args,
-                  train_dataset=train_data, eval_dataset=val_data)
-trainer.train()
-\`\`\`
-
-### Handling Class Imbalance
-\`\`\`python
-# Weighted loss
-from torch.nn import CrossEntropyLoss
-class_weights = torch.tensor([1.0, 3.0, 2.0])  # weight minority classes more
-loss_fn = CrossEntropyLoss(weight=class_weights)
-
-# Or: oversample minority class with WeightedRandomSampler
-# Or: use macro F1 as evaluation metric (not accuracy)
-\`\`\`
-
-### Evaluation Metrics for Imbalanced Classes
-- **Accuracy**: misleading when 90% of reviews are positive
-- **Macro F1**: average F1 across all classes equally → reflects minority class performance
-- **Confusion matrix**: reveals which classes are confused`,
-
-    video: null,
-    videoFallbackMarkdown: `## Prompt-Based Classification (Zero/Few-Shot)
-
-For low-resource scenarios, LLMs enable classification without fine-tuning:
-\`\`\`python
-response = client.messages.create(
-    model="claude-sonnet-4-6",
-    max_tokens=10,
-    messages=[{"role": "user", "content":
-        f"Classify as positive, negative, or neutral:\\n\\n{review}\\n\\nSentiment:"}]
+    learning_rate=2e-5,          # CRITICAL: 2e-5 to 5e-5 for fine-tuning
 )
 \`\`\`
-Few-shot prompting with 5-10 labeled examples often matches fine-tuned small BERT models. Cost vs. latency vs. accuracy trade-off determines which to use in production.`,
 
-    tryGuidance: "No interactive visualization. Work through the fine-tuning code pattern and focus on the class imbalance discussion.",
+## The catastrophic forgetting problem
 
-    interviewGraph: {
-      initialStageId: "sp_n3_stage1",
-      artifactDimensions: [
-        { label: "Sentiment Modeling", recoveryStageId: "sp_n3_rec1" },
-        { label: "Evaluation & Imbalance", recoveryStageId: "sp_n3_rec2", passLabel: "NLP Practitioner" },
-      ],
-      stages: {
-        sp_n3_stage1: {
-          id: "sp_n3_stage1",
-          type: "scenario_choice",
-          badge: "Stage 1",
-          title: "Stage 1 · Choosing the Right Approach",
-          prompt: "A hotel chain wants to monitor reviews and identify: (1) which specific aspects (room, food, staff, location) are mentioned negatively, and (2) the overall hotel rating. Which approach handles BOTH needs?",
-          choices: [
-            { id: "a", label: "ABSA model for aspects + document-level classifier for overall rating", description: "Two-model system: one for fine-grained aspects, one for document-level" },
-            { id: "b", label: "Document-level sentiment only — aggregate per aspect using keywords", description: "Keyword matching misses context: 'the room wasn't dirty' would incorrectly flag negative" },
-            { id: "c", label: "Count negative words near each aspect keyword", description: "Lexicon-based approaches miss negation, sarcasm, and contextual sentiment" },
-            { id: "d", label: "Summarize each review with an LLM and extract sentiment from summary", description: "Summaries lose granular aspect-level information" },
-          ],
-          branches: { a: "sp_n3_stage2", b: "sp_n3_rec1", c: "sp_n3_rec1", d: "sp_n3_rec1" },
-          rationale: "ABSA handles fine-grained aspect-level sentiment ('room: negative, staff: positive'); document-level BERT handles the overall rating. A unified model (like SentiBERT or LLM prompting with structured output) can do both, but the two-model approach is more controllable and interpretable.",
+BERT was pre-trained with a learning rate that starts at ~1e-4 and decays. Fine-tuning with a learning rate of 1e-3 (100× too high) pushes the optimizer to make large updates — BERT's carefully learned contextual representations are overwritten in the first few batches. This is called **catastrophic forgetting**.
+
+The canonical fine-tuning learning rates are **2e-5 to 5e-5**. These are small enough to nudge BERT toward the target distribution without erasing its language knowledge.
+
+Similarly, fine-tuning for 20 epochs on a small dataset causes severe overfitting. BERT can memorize 1,000 labeled examples in 5–10 epochs. The sweet spot is **2–4 epochs**.
+
+## Evaluation: F1, not accuracy
+
+For imbalanced sentiment datasets (common in real-world review data: 70% positive, 20% neutral, 10% negative):
+
+- **Accuracy** is misleading: predicting "positive" always gives 70% accuracy.
+- **Macro F1** averages F1 across all classes equally — penalizes you for ignoring the minority.
+- **Weighted F1** weights by class frequency — less sensitive to minority class performance.
+
+Always report macro F1 alongside accuracy for sentiment tasks. Include a confusion matrix to identify specific class confusions.
+
+## Aspect-based sentiment
+
+Sentence-level sentiment fails for nuanced reviews:
+
+> "The food was absolutely amazing but the service was shockingly rude."
+
+A sentence-level classifier may return "neutral" (positive and negative signals average out). Aspect-based sentiment analysis (ABSA) extracts opinions at the entity + attribute level: \`(food, positive)\`, \`(service, negative)\`. This requires specialized models (e.g., fine-tuning with aspect span annotations) or LLM prompting.
+
+## When VADER beats BERT
+
+- **No labeled training data**: VADER needs zero examples.
+- **Speed and latency**: VADER runs in microseconds; BERT inference on CPU takes 50–200ms per sentence.
+- **Interpretability**: VADER score is a dictionary lookup; BERT's attention is difficult to explain to non-technical stakeholders.
+- **Domain mismatch**: If your domain is far from BERT's pre-training data (e.g., specialized legal or clinical text) and you cannot fine-tune, VADER may outperform an out-of-the-box BERT.
+
+## Interview-Ready Summary
+
+- **VADER** is lexicon-based, zero-shot, fast, interpretable — best when labeled data is scarce.
+- **BERT fine-tuning** attaches a classification head to the \`[CLS]\` token and trains end-to-end.
+- **Learning rate must be tiny (2e-5 to 5e-5)** to avoid catastrophic forgetting.
+- **2–4 epochs** is the typical sweet spot; more causes overfitting.
+- **Macro F1** is the right metric for imbalanced sentiment; accuracy alone is misleading.
+- **Aspect-based sentiment** is needed when a single sentence contains opposing opinions on different entities.`,
+  video: null,
+  videoFallbackMarkdown: `## Deep dive: fine-tuning drill
+
+1. Load \`bert-base-uncased\` via Hugging Face \`transformers\`.
+2. Fine-tune on SST-2 (binary sentiment) for 3 epochs with learning rate \`2e-5\`.
+3. Re-run with learning rate \`1e-3\` and compare validation F1 after epoch 1. Observe catastrophic forgetting.
+4. Compute accuracy, macro F1, and a confusion matrix. Explain why the numbers diverge.
+5. Run VADER on the same test set and compare speed vs accuracy.`,
+  tryGuidance: "Click the hyperparameter bug in the fine-tuning code, then defend your training configuration choices against the interviewer's probing questions.",
+  interviewGraph: {
+    initialStageId: "nlp_finetune_click",
+    artifactDimensions: [
+      { label: "Fine-tuning Configuration", recoveryStageId: "finetune_recovery" },
+      { label: "Metric Selection", recoveryStageId: "metric_recovery" },
+    ],
+    stages: {
+      nlp_finetune_click: {
+        id: "nlp_finetune_click",
+        type: "click_target",
+        badge: "Stage 1 target",
+        title: "Stage 1 · Find the catastrophic forgetting trigger",
+        prompt: "This BERT fine-tuning configuration will erase BERT's language knowledge within the first few batches. Click the exact line responsible.",
+        code_snippet: `optimizer = AdamW(model.parameters(), lr=1e-3)  # -- ds-target:high_lr
+for epoch in range(20):                          # -- ds-target:too_many_epochs
+    ...`,
+        validationCopy: {
+          high_lr: "Correct. lr=1e-3 is 100-500x larger than the recommended fine-tuning range of 2e-5 to 5e-5. Large updates overwrite BERT's pre-trained representations in the first few batches — this is catastrophic forgetting.",
+          too_many_epochs: "Training for 20 epochs causes overfitting but not immediate catastrophic forgetting. The learning rate is the primary culprit — it causes the weights to diverge from the pre-trained distribution in batch 1.",
         },
-        sp_n3_rec1: {
-          id: "sp_n3_rec1",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Sentiment Modeling",
-          prompt: "A rule-based sentiment system assigns +1 to positive words and -1 to negative words, then sums the score. It fails on: 'I wouldn't say the service was bad.' Why?",
-          choices: [
-            { id: "a", label: "Negation scope: 'wouldn't say ... was bad' means positive, but rule counts 'bad' as -1", description: "Double negation and negation scope are invisible to simple lexicon counts" },
-            { id: "b", label: "The sentence is too long for the rule system", description: "Length is not the issue — it's linguistic negation handling" },
-            { id: "c", label: "The word 'service' is not in the sentiment lexicon", description: "Neutral nouns don't affect lexicon scores" },
-            { id: "d", label: "The rule system assigns 0 to all sentences without exclamation marks", description: "Not a standard rule — lexicon systems don't use punctuation this way" },
-          ],
-          branches: { a: "sp_n3_stage2", b: "sp_n3_stage2", c: "sp_n3_stage2", d: "sp_n3_stage2" },
-          rationale: "Lexicon-based systems fail at negation scope, irony, and complex grammatical constructions. 'Wouldn't say ... was bad' is positive but contains 'bad'. ML models (fine-tuned BERT) learn these patterns from data. Negation handling is a major motivation for sequence models over bag-of-words approaches.",
+        branches: {
+          high_lr: "nlp_finetune_lr_choice",
+          too_many_epochs: "finetune_recovery",
+          default: "finetune_recovery",
         },
-        sp_n3_stage2: {
-          id: "sp_n3_stage2",
-          type: "scenario_choice",
-          badge: "Stage 2",
-          title: "Stage 2 · Class Imbalance",
-          prompt: "Your sentiment training set: 10,000 positive, 2,000 neutral, 500 negative reviews. The model achieves 89% accuracy but recall for 'negative' class is only 12%. What went wrong?",
-          choices: [
-            { id: "a", label: "The model learned to predict 'positive' for most inputs — optimizing accuracy at the cost of minority classes", description: "89% accuracy ≈ predicting positive for 89% of samples — ignoring negative class" },
-            { id: "b", label: "Negative reviews are harder to write so the model is confused by them", description: "Writing difficulty is not the issue — training distribution is" },
-            { id: "c", label: "The model overfits to neutral examples", description: "Overfitting to neutral would hurt positive class recall more" },
-            { id: "d", label: "BERT's maximum sequence length cuts off negative reviews", description: "Sequence length affects all classes equally" },
-          ],
-          branches: { a: "sp_n3_end", b: "sp_n3_rec2", c: "sp_n3_rec2", d: "sp_n3_rec2" },
-          rationale: "Classic class imbalance failure: the model learns that predicting 'positive' is correct 80% of the time, so negative class recall collapses. Fix: class-weighted loss (weight negative class ~20x), oversample negative reviews, undersample positive, or use macro F1 as the training metric to penalize ignoring minority classes.",
+      },
+      finetune_recovery: {
+        id: "finetune_recovery",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Why is learning rate critical for fine-tuning?",
+        prompt: "The interviewer asks: 'BERT was pre-trained with a slowly decaying learning rate. What happens to the pre-trained weights if you fine-tune with lr=1e-3?'",
+        code_snippet: `# BERT pre-training: lr starts at ~1e-4, decays over 1M+ steps
+# Fine-tuning target: gently adapt, do not overwrite`,
+        choices: [
+          { id: "a", label: "Large gradient steps overwrite pre-trained contextual representations — catastrophic forgetting", description: "The optimizer makes such large parameter changes that BERT's language knowledge is lost." },
+          { id: "b", label: "A high learning rate only affects the classification head, not BERT layers", description: "AdamW applied to all parameters updates BERT layers just as aggressively as the head." },
+          { id: "c", label: "The learning rate affects speed but not the final quality of the representations", description: "Too high a learning rate can send training to a poor local minimum or diverge entirely." },
+          { id: "d", label: "Only epoch count matters; learning rate is a secondary concern", description: "Learning rate is the single most important hyperparameter for BERT fine-tuning stability." },
+        ],
+        branches: {
+          a: "nlp_finetune_lr_choice",
+          b: "finetune_recovery",
+          c: "finetune_recovery",
+          d: "finetune_recovery",
         },
-        sp_n3_rec2: {
-          id: "sp_n3_rec2",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Evaluation & Imbalance",
-          prompt: "Why is macro F1 preferred over accuracy for imbalanced multi-class sentiment classification?",
-          choices: [
-            { id: "a", label: "Macro F1 averages F1 per class equally, so poor minority class performance directly lowers the score", description: "Macro averaging gives equal weight to each class regardless of support" },
-            { id: "b", label: "Macro F1 is always higher than accuracy, making results look better", description: "Macro F1 can be lower than accuracy when minority classes have low F1" },
-            { id: "c", label: "Macro F1 only considers the majority class", description: "That's weighted F1; macro gives equal weight to ALL classes" },
-            { id: "d", label: "Accuracy is not computable for multi-class problems", description: "Accuracy is computable but misleading when classes are imbalanced" },
-          ],
-          branches: { a: "sp_n3_end", b: "sp_n3_end", c: "sp_n3_end", d: "sp_n3_end" },
-          rationale: "Macro F1 = mean(F1_negative, F1_neutral, F1_positive). If F1_negative = 0.12, the macro F1 can't hide this — it directly pulls the average down. Accuracy of 89% hides the 12% negative recall because 80% of data is positive. Use macro F1 (or per-class F1 table) to evaluate imbalanced classifiers.",
+        rationale: "Catastrophic forgetting is the canonical risk in transfer learning. The safe learning rate window (2e-5 to 5e-5) is empirically established to nudge BERT toward the task without overwriting its language priors.",
+      },
+      nlp_finetune_lr_choice: {
+        id: "nlp_finetune_lr_choice",
+        type: "scenario_choice",
+        badge: "Stage 1 choice",
+        title: "Stage 1 · Choose the correct hyperparameters",
+        prompt: "Which training configuration is appropriate for fine-tuning BERT-base on a 5,000 sample sentiment dataset?",
+        code_snippet: `# Dataset: 5,000 labeled reviews (3-class: positive, neutral, negative)`,
+        choices: [
+          { id: "a", label: "lr=2e-5, epochs=3, batch_size=16", description: "Safe learning rate, few epochs to prevent overfitting, standard batch size." },
+          { id: "b", label: "lr=1e-3, epochs=20, batch_size=16", description: "Learning rate 100x too high; 20 epochs will overfit a 5,000-sample dataset." },
+          { id: "c", label: "lr=1e-5, epochs=50, batch_size=4", description: "Learning rate is safe but 50 epochs is extreme overfitting; small batch introduces excessive gradient noise." },
+          { id: "d", label: "lr=5e-4, epochs=2, batch_size=32", description: "Learning rate is still 25x too high for fine-tuning even with only 2 epochs." },
+        ],
+        branches: {
+          a: "nlp_finetune_metric_choice",
+          b: "finetune_recovery",
+          c: "finetune_recovery",
+          d: "finetune_recovery",
         },
-        sp_n3_end: {
-          id: "sp_n3_end",
-          type: "scenario_choice",
-          badge: "Complete",
-          title: "Sentiment Analysis Mastered",
-          prompt: "You need to classify customer support tickets into 8 categories with only 50 labeled examples per category. What's the best approach?",
-          choices: [
-            { id: "a", label: "Few-shot prompting with an LLM or zero-shot with a NLI classifier", description: "400 total examples is too few for fine-tuning; LLMs excel at few-shot classification" },
-            { id: "b", label: "Fine-tune BERT from scratch on the 400 examples", description: "BERT needs thousands of examples per class to fine-tune reliably from scratch" },
-            { id: "c", label: "Use TF-IDF + logistic regression for speed", description: "Better than BERT-from-scratch on tiny data, but LLM few-shot typically wins" },
-            { id: "d", label: "Collect more data before attempting any modeling", description: "Valid advice, but LLMs enable modeling even at this scale today" },
-          ],
-          branches: { a: "sp_n3_end", b: "sp_n3_end", c: "sp_n3_end", d: "sp_n3_end" },
-          terminal: true,
-          rationale: "With 50 examples/class, LLM few-shot prompting (pass 5-10 labeled examples in the prompt) or zero-shot NLI (using a model like cross-encoder/nli-deberta-v3-large) is most practical. Fine-tuning BERT on 400 total examples typically overfits. If you must fine-tune, use parameter-efficient methods (LoRA) or a smaller model.",
+        rationale: "The empirically validated fine-tuning recipe is: learning rate 2e-5 to 5e-5, 2-4 epochs, batch size 16-32. Deviate from this range and results become unreliable — the original BERT paper tested this extensively.",
+      },
+      nlp_finetune_metric_choice: {
+        id: "nlp_finetune_metric_choice",
+        type: "scenario_choice",
+        badge: "Stage 2 evaluation",
+        title: "Stage 2 · Choosing the right evaluation metric",
+        prompt: "Your sentiment dataset has 65% positive, 25% neutral, and 10% negative reviews. A baseline model predicts 'positive' for every input. What score does it get on accuracy, and which metric should you use instead?",
+        code_snippet: `# Class distribution:
+# positive: 6,500 samples (65%)
+# neutral:  2,500 samples (25%)
+# negative: 1,000 samples (10%)`,
+        choices: [
+          { id: "a", label: "65% accuracy — use macro F1 to catch negative class failure", description: "A naive majority classifier scores 65%. Macro F1 averages F1 across all three classes, penalizing zero recall on negative." },
+          { id: "b", label: "65% accuracy — accuracy is still the right primary metric", description: "65% accuracy from always predicting 'positive' is a misleading success signal." },
+          { id: "c", label: "100% accuracy on positive class — use AUC-ROC", description: "AUC-ROC is designed for binary classification; macro F1 is more natural for multi-class." },
+          { id: "d", label: "Accuracy and F1 are always equivalent for balanced datasets", description: "This dataset is explicitly imbalanced — the premise of the question." },
+        ],
+        branches: {
+          a: "nlp_vader_vs_bert_choice",
+          b: "metric_recovery",
+          c: "metric_recovery",
+          d: "metric_recovery",
         },
+        rationale: "Always ask: what does a dumb baseline score? If a majority classifier gets 65% accuracy, that's not a model — it's a heuristic. Macro F1 forces the model to earn recall on every class including minorities.",
+      },
+      metric_recovery: {
+        id: "metric_recovery",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · Metric for imbalanced sentiment",
+        prompt: "Which statement correctly describes the difference between accuracy and macro F1 for imbalanced sentiment classification?",
+        code_snippet: `# Macro F1 = average of F1(positive), F1(neutral), F1(negative)
+# Each class gets equal weight regardless of frequency`,
+        choices: [
+          { id: "a", label: "Macro F1 penalizes equally for failing each class; accuracy rewards frequent-class dominance", description: "This is the core distinction for imbalanced evaluation." },
+          { id: "b", label: "Macro F1 and weighted F1 are equivalent for multi-class tasks", description: "Weighted F1 weights by class frequency; macro F1 weights equally — they diverge on imbalanced data." },
+          { id: "c", label: "Accuracy should always be the primary metric because it is interpretable", description: "Interpretability of a misleading metric does not make it correct." },
+          { id: "d", label: "Use precision only — recall is less important for sentiment", description: "For production systems, failing to detect negative reviews has real business consequences." },
+        ],
+        branches: {
+          a: "nlp_vader_vs_bert_choice",
+          b: "metric_recovery",
+          c: "metric_recovery",
+          d: "metric_recovery",
+        },
+        rationale: "Macro F1 is the standard metric for imbalanced multi-class classification because it gives each class equal standing in the final score, exposing models that ignore minority classes.",
+      },
+      nlp_vader_vs_bert_choice: {
+        id: "nlp_vader_vs_bert_choice",
+        type: "scenario_choice",
+        badge: "Stage 3 trade-off",
+        title: "Stage 3 · VADER vs BERT — choose the right tool",
+        prompt: "A startup asks you to build a real-time sentiment monitor for customer support chat. They have 200 labeled examples and a latency requirement of <10ms per message. What do you recommend?",
+        code_snippet: `# Constraints:
+# - 200 labeled examples available
+# - Latency budget: <10ms per message (CPU deployment)
+# - Team: 2 engineers, no GPU infrastructure`,
+        choices: [
+          { id: "a", label: "VADER — zero training data needed, microsecond latency, no GPU", description: "VADER is the pragmatic choice when labels are scarce and latency is tight." },
+          { id: "b", label: "Fine-tune BERT on the 200 examples and deploy on CPU", description: "200 examples is too small for reliable fine-tuning; CPU BERT inference is 50-200ms, violating the <10ms constraint." },
+          { id: "c", label: "Use bert-large for higher accuracy with the same latency", description: "BERT-large is even slower than BERT-base on CPU." },
+          { id: "d", label: "Collect more data first — sentiment models require at least 10,000 examples", description: "While more data helps BERT, VADER requires zero labeled examples and could ship today." },
+        ],
+        branches: {
+          a: "nlp_finetune_terminal",
+          b: "finetune_recovery",
+          c: "finetune_recovery",
+          d: "finetune_recovery",
+        },
+        rationale: "Engineering judgment means matching tool to constraints. VADER ships immediately, has no latency issue, and requires no training data. The correct interview answer acknowledges BERT is more powerful in general, but VADER wins under these specific constraints.",
+      },
+      nlp_finetune_terminal: {
+        id: "nlp_finetune_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Simulation complete · Fine-tuning strategy locked",
+        prompt: "You caught the catastrophic forgetting trigger, set correct hyperparameters, chose the right metric, and made the VADER vs BERT trade-off.",
+        code_snippet: `# Fine-tuning checklist:
+# - lr: 2e-5 to 5e-5 (NOT 1e-3)
+# - epochs: 2-4 (NOT 20)
+# - metric: macro F1 for imbalanced classes
+# - VADER: when labels are scarce, latency is tight, or interpretability required`,
+        choices: [],
+        branches: {},
+        terminal: true,
+        rationale: "Interview-ready answer: fine-tuning BERT requires a carefully small learning rate because large updates cause catastrophic forgetting; 2-4 epochs prevents overfitting; macro F1 exposes minority class failures; VADER is not worse than BERT — it wins under specific constraints.",
       },
     },
-
-    knowledgeCheck: [
-      {
-        question: "What is the difference between 'fine-tuning' and 'prompt engineering' for text classification?",
-        options: [
-          "Fine-tuning updates model weights on task-specific data; prompt engineering uses a frozen model with carefully crafted inputs",
-          "Fine-tuning only works for BERT; prompt engineering only works for GPT",
-          "Fine-tuning requires more data but always outperforms prompting",
-          "They are the same technique described with different terminology",
-        ],
-        correctIndex: 0,
-        explanation: "Fine-tuning: update all (or some) model weights on labeled training data → creates a specialized model. Prompt engineering: keep model frozen, craft the input text to guide behavior → no weight updates. Prompting is faster and requires no labeled data; fine-tuning typically wins with sufficient data (1000+ examples) and needs consistent performance.",
-      },
-    ],
   },
+  knowledgeCheck: [
+    {
+      question: "Why must the learning rate for BERT fine-tuning be very small (2e-5 to 5e-5)?",
+      options: [
+        "Large learning rates cause catastrophic forgetting by overwriting BERT's pre-trained representations",
+        "Small learning rates reduce GPU memory consumption",
+        "BERT's optimizer only supports learning rates below 1e-4",
+      ],
+      correctIndex: 0,
+      explanation: "BERT's value comes from its pre-trained language knowledge. A learning rate of 1e-3 makes gradient steps large enough to overwrite these representations in the first few batches, destroying the transfer learning benefit.",
+    },
+    {
+      question: "Your sentiment dataset is 70% positive, 20% neutral, 10% negative. Why is accuracy a misleading primary metric?",
+      options: [
+        "A model that always predicts 'positive' achieves 70% accuracy without learning anything",
+        "Accuracy cannot be computed for datasets with more than 2 classes",
+        "Accuracy always equals F1 score for text classification tasks",
+      ],
+      correctIndex: 0,
+      explanation: "Class imbalance creates a degenerate baseline. Macro F1 averages F1 across all classes with equal weight, penalizing models that ignore the negative minority class.",
+    },
+    {
+      question: "When should you prefer VADER over a fine-tuned BERT for sentiment analysis?",
+      options: [
+        "When labeled training data is scarce, latency must be very low, or interpretability is required",
+        "When the dataset has more than 100,000 examples",
+        "When working with non-English text",
+      ],
+      correctIndex: 0,
+      explanation: "VADER is zero-shot (no labeled data needed), runs in microseconds, and produces interpretable polarity scores. These properties make it the better choice under data scarcity, latency, or interpretability constraints.",
+    },
+  ],
+},
 
   "sp-n4": {
-    durationLabel: "15 min",
-    outcomes: [
-      "Define the NER task and explain BIO/BIOES tagging schemes",
-      "Compare rule-based, CRF, and transformer-based NER approaches",
-      "Evaluate NER with entity-level F1 metrics",
-    ],
-    learnMarkdown: `## Named Entity Recognition
+  durationLabel: "15 min",
+  outcomes: [
+    "Correctly apply BIO tagging to annotate named entity spans.",
+    "Handle subword tokenization for NER without corrupting label alignment.",
+    "Evaluate NER with entity-level F1 rather than token accuracy.",
+  ],
+  learnMarkdown: `## What is Named Entity Recognition?
 
-NER identifies and classifies named entities in text: people (PER), organizations (ORG), locations (LOC), dates (DATE), products, etc.
+NER is the task of identifying and classifying named entities in text: people, organizations, locations, dates, monetary amounts, and more.
 
-### BIO Tagging Scheme
+Input: \`"Barack Obama visited Google's headquarters in Mountain View last Tuesday."\`
+
+Output:
+- \`Barack Obama\` → PERSON
+- \`Google\` → ORG
+- \`Mountain View\` → GPE (geopolitical entity)
+- \`last Tuesday\` → DATE
+
+NER is foundational for information extraction, knowledge graph construction, question answering, and document redaction.
+
+## BIO tagging
+
+NER is typically framed as a **sequence labeling** task. Each token gets a tag from a label set. The most common scheme is **BIO**:
+
+- **B-TAG**: the Beginning of an entity of type TAG
+- **I-TAG**: Inside (continuation of) an entity of type TAG
+- **O**: Outside any entity
+
+Example:
+
 \`\`\`
-"Apple Inc. was founded in Cupertino"
- B-ORG I-ORG  O   O       O  B-LOC
-
-B = Beginning of entity
-I = Inside (continuation) of entity
-O = Outside (not an entity)
+Token:    Barack  Obama   visited  Google   headquarters  in   Mountain  View
+BIO tag:  B-PER   I-PER   O        B-ORG    O             O    B-GPE     I-GPE
 \`\`\`
 
-**BIOES** extends BIO with:
-- **S** = Single-token entity ("Apple" alone)
-- **E** = End of multi-token entity
+The B/I distinction is critical for distinguishing adjacent entities of the same type:
 
-### NER Approaches
+\`\`\`
+"Google Apple" → B-ORG B-ORG   (two separate entities)
+"Mountain View" → B-GPE I-GPE  (one multi-token entity)
+\`\`\`
+
+Without B/I, you could not tell where one entity ends and another begins.
+
+## BIOES
+
+BIOES is an extended scheme adding:
+- **S-TAG**: Single-token entity (stands alone)
+- **E-TAG**: End of a multi-token entity
+
+\`\`\`
+Token:    Barack  Obama   visited  Google
+BIOES:    B-PER   E-PER   O        S-ORG
+\`\`\`
+
+BIOES provides richer boundary information that can improve model performance slightly. BIO is more common in practice due to its simplicity and widespread tool support.
+
+## Classical NER: CRF
+
+Before deep learning, the dominant approach was **Conditional Random Fields (CRF)** trained on hand-crafted features:
+
+- Word shape: \`"Obama"\` → \`"Xxxxx"\`
+- Prefix/suffix: \`"tion"\`, \`"ly"\`
+- Is capitalized, is all caps, is digit
+- Surrounding word context, POS tags
+- Gazetteer lookup (dictionary of known entity names)
+
+CRF models the conditional probability of the entire label sequence given the input, capturing label dependencies (e.g., I-PER cannot follow B-ORG).
+
+## Modern NER: BERT + linear head
+
+BERT dramatically simplified feature engineering. The architecture is:
+
+1. Tokenize input with BERT's WordPiece tokenizer.
+2. Pass through BERT layers → hidden states H ∈ ℝ^{T × 768}.
+3. Apply a linear classification head to each token position:
+   \`\`\`
+   logits = W · H[t] + b     (W ∈ ℝ^{num_labels × 768})
+   \`\`\`
+4. Softmax → predicted BIO label for each token.
+
+No hand-crafted features needed. BERT's contextual representations already encode capitalization, context, and syntactic role.
+
+## The subword alignment problem
+
+This is the most common NER bug in BERT-based systems.
+
+BERT's WordPiece tokenizer splits words into subword units:
+
+\`\`\`
+"Obama" → ["Ob", "##ama"]       (2 subword tokens)
+"headquarters" → ["head", "##quarters"]  (2 subword tokens)
+\`\`\`
+
+You have one label per **word** in your training data, but BERT produces multiple tokens per word. You must align labels to subwords:
+
+**Correct approach**: label the **first subword** with the original BIO label; label continuation subwords with **-100** (PyTorch's special "ignore this token in loss computation").
+
 \`\`\`python
-# spaCy rule-based + statistical
+for word, label in zip(words, word_labels):
+    word_tokens = tokenizer.tokenize(word)
+    labels.append(label)          # label for first subword
+    labels.extend([-100] * (len(word_tokens) - 1))  # ignore rest
+\`\`\`
+
+**Wrong approach**: extending the same label to all subwords. This gives the model an inconsistent signal — a word that splits into 3 subwords now contributes 3 loss terms instead of 1, and the I-TAG labeling on continuation subwords contradicts the BIO contract.
+
+\`\`\`python
+# BUG: labels all subwords with the word-level label
+labels.extend([label] * len(word_tokens))  # WRONG
+\`\`\`
+
+At **inference time**, you need to aggregate subword predictions back to word level. The standard approach is to take the predicted label of the first subword of each original word.
+
+## Evaluation: entity-level F1 with seqeval
+
+**Token accuracy** is a misleading metric for NER. If 80% of tokens are O-tags, always predicting O gives 80% token accuracy while detecting zero entities.
+
+The correct metric is **entity-level F1** using the \`seqeval\` library:
+
+\`\`\`python
+from seqeval.metrics import f1_score, classification_report
+# Operates on sequences of BIO tags
+# A prediction is correct only if BOTH the span AND the type match exactly
+print(f1_score(true_labels, pred_labels))
+print(classification_report(true_labels, pred_labels))
+\`\`\`
+
+Partial span matches count as false positives AND false negatives. If the true entity is \`[B-PER, I-PER]\` but you predict \`[B-PER, O]\`, that is 0 F1 for that entity — not partial credit.
+
+## Using spaCy and Hugging Face
+
+**spaCy** (rule-based + statistical NER):
+\`\`\`python
 import spacy
-nlp = spacy.load("en_core_web_trf")  # transformer-based
-doc = nlp("Tim Cook joined Apple in 1998 in California")
+nlp = spacy.load("en_core_web_sm")
+doc = nlp("Barack Obama visited Google.")
 for ent in doc.ents:
     print(ent.text, ent.label_)
-# → Tim Cook PERSON, Apple ORG, 1998 DATE, California GPE
+# Barack Obama PERSON
+# Google ORG
+\`\`\`
 
-# HuggingFace fine-tuned NER
+**Hugging Face pipeline** (BERT-based NER):
+\`\`\`python
 from transformers import pipeline
-ner = pipeline("ner", model="dslim/bert-base-NER", aggregation_strategy="simple")
-results = ner("Elon Musk founded SpaceX in 2002")
+ner = pipeline("ner", model="dslim/bert-base-NER",
+               aggregation_strategy="simple")
+results = ner("Barack Obama visited Google.")
+# aggregation_strategy='simple' merges subword tokens back into word spans
 \`\`\`
 
-### CRF for Sequence Labeling
-Conditional Random Fields model label dependencies:
-\`\`\`
-P(y|x) ∝ exp(Σₜ Σₖ λₖ fₖ(y_{t-1}, y_t, x, t))
-\`\`\`
-Key advantage: knows that B-PER → I-ORG is impossible; enforces valid tag transitions.
+\`aggregation_strategy="simple"\` is important — without it, you see subword-level predictions including \`##ama\` as a separate token.
 
-BERT + CRF head is a common architecture: BERT encodes context → CRF ensures valid tag sequences.
+## Interview-Ready Summary
 
-### Evaluation
-\`\`\`
-Entity-level F1 (not token-level):
-- "Tim Cook" must be correctly labeled AS A WHOLE to count as correct
-- Correctly labeling "Tim" but not "Cook" = incorrect entity
+- **BIO tagging** encodes entity spans: B starts an entity, I continues it, O is outside.
+- **BIOES** adds S (single-token) and E (end) for richer boundary information.
+- **BERT NER** applies a linear head to each token's contextual representation.
+- **Subword alignment**: label only the first subword of each word; set continuation subwords to -100.
+- **Entity-level F1** (seqeval) is the correct metric; token accuracy is misleading because most tokens are O.
+- **spaCy** \`doc.ents\` and Hugging Face pipeline with \`aggregation_strategy="simple"\` handle span reconstruction automatically.`,
+  video: null,
+  videoFallbackMarkdown: `## Deep dive: BIO labeling drill
 
-Precision = correct entities / predicted entities
-Recall    = correct entities / gold entities
-F1        = harmonic mean
-\`\`\`
+1. Take the sentence: "Elon Musk founded SpaceX in Hawthorne, California in 2002."
+2. Write out the BIO tags manually for each word.
+3. Tokenize the same sentence with \`bert-base-uncased\` tokenizer.
+4. Write the aligned label sequence with -100 for continuation subwords.
+5. Predict: what would token accuracy be on this sentence if a model predicted all O? What would entity F1 be?`,
+  tryGuidance: "Click the subword labeling bug in the NER alignment code, then work through the scenario choices to defend your BIO tagging and evaluation decisions.",
+  interviewGraph: {
+    initialStageId: "nlp_ner_click",
+    artifactDimensions: [
+      { label: "BIO Tagging", recoveryStageId: "bio_recovery" },
+      { label: "BERT-NER Pipeline", recoveryStageId: "ner_recovery" },
+    ],
+    stages: {
+      nlp_ner_click: {
+        id: "nlp_ner_click",
+        type: "click_target",
+        badge: "Stage 1 target",
+        title: "Stage 1 · Find the subword label alignment bug",
+        prompt: "This BERT NER preprocessing code contains a critical alignment bug that will corrupt the training signal. Click the exact line that is wrong.",
+        code_snippet: `for word, label in zip(text.split(), word_labels):
+    word_tokens = tokenizer.tokenize(word)
+    expanded_labels.extend([label] * len(word_tokens))  # -- ds-target:label_all_subtokens
 
-### Domain-Specific NER Challenges
-- **Medical NER**: drug names, dosages, symptoms — use BioBERT
-- **Legal NER**: clause types, parties — use LegalBERT
-- **Nested NER**: "Bank of [America] → ORG and [Bank of America] → ORG overlap
-- **Low-resource**: few labeled examples → use LLM-based few-shot NER`,
-
-    video: null,
-    videoFallbackMarkdown: `## Relation Extraction Beyond NER
-
-NER identifies entities; Relation Extraction (RE) links them:
-- "[Apple] **acquired** [Beats Electronics]" → (Apple, acquired, Beats Electronics)
-
-Combined Information Extraction pipeline:
-1. NER: identify entities
-2. Coreference resolution: "Apple...it...the company" → all refer to Apple
-3. Relation extraction: classify relationships between entity pairs
-4. Knowledge graph population: store as (subject, predicate, object) triples
-
-Modern end-to-end models (REBEL, TANL) do NER + RE simultaneously.`,
-
-    tryGuidance: "No interactive visualization. Practice the BIO tagging exercise in the knowledge check.",
-
-    interviewGraph: {
-      initialStageId: "sp_n4_stage1",
-      artifactDimensions: [
-        { label: "NER Mechanics", recoveryStageId: "sp_n4_rec1" },
-        { label: "Evaluation & Edge Cases", recoveryStageId: "sp_n4_rec2", passLabel: "NLP Engineer" },
-      ],
-      stages: {
-        sp_n4_stage1: {
-          id: "sp_n4_stage1",
-          type: "scenario_choice",
-          badge: "Stage 1",
-          title: "Stage 1 · BIO Tagging",
-          prompt: "Label the entities in: 'Microsoft acquired GitHub for $7.5 billion in 2018.' The entities are Microsoft (ORG), GitHub (ORG), $7.5 billion (MONEY), 2018 (DATE). What is the BIO tag for '$7.5'?",
-          choices: [
-            { id: "a", label: "B-MONEY — it's the beginning of the money entity '$7.5 billion'", description: "'$7.5' starts the multi-token money span" },
-            { id: "b", label: "I-MONEY — it continues a money entity", description: "There's no prior B-MONEY token — 'I' can't start an entity" },
-            { id: "c", label: "O — numbers are not named entities", description: "Money amounts are a named entity type in many NER schemas" },
-            { id: "d", label: "B-DATE — currency and dates are often confused", description: "DATE applies to time expressions; '$7.5 billion' is monetary" },
-          ],
-          branches: { a: "sp_n4_stage2", b: "sp_n4_rec1", c: "sp_n4_rec1", d: "sp_n4_rec1" },
-          rationale: "Full BIO labels: Microsoft(B-ORG) acquired(O) GitHub(B-ORG) for(O) $(B-MONEY) 7.5(I-MONEY) billion(I-MONEY) in(O) 2018(B-DATE). '$7.5 billion' is a 3-token MONEY entity: B-MONEY, I-MONEY, I-MONEY. The 'B' always marks the first token of any entity regardless of type.",
+# Use token-level accuracy  # -- ds-target:token_accuracy
+accuracy = correct / len(expanded_labels)`,
+        validationCopy: {
+          label_all_subtokens: "Correct. Applying the same BIO label to every subword is wrong. For a word like 'Obama' → ['Ob', '##ama'], only 'Ob' should get the B-PER label. '##ama' should get -100 (ignored in loss) because it is not a real token boundary — it is a subword continuation.",
+          token_accuracy: "Token accuracy is a misleading metric for NER — most tokens are O-tags so a model predicting all-O can score 80%+ accuracy while detecting zero entities. Use entity-level F1 via seqeval. But the primary bug is on the label extension line.",
         },
-        sp_n4_rec1: {
-          id: "sp_n4_rec1",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · NER Mechanics",
-          prompt: "Why does a CRF layer on top of BERT improve NER performance compared to BERT with a simple softmax classification head?",
-          choices: [
-            { id: "a", label: "CRF models transition probabilities between tags, preventing invalid sequences like B-PER → I-ORG", description: "CRF enforces globally consistent label sequences" },
-            { id: "b", label: "CRF is faster at inference than softmax", description: "CRF adds Viterbi decoding overhead — it's slightly slower" },
-            { id: "c", label: "CRF requires less training data than a softmax head", description: "CRF doesn't significantly reduce data requirements" },
-            { id: "d", label: "CRF allows the model to process bidirectional context", description: "BERT already provides bidirectional context; CRF handles label dependencies" },
-          ],
-          branches: { a: "sp_n4_stage2", b: "sp_n4_stage2", c: "sp_n4_stage2", d: "sp_n4_stage2" },
-          rationale: "A softmax head predicts each token's tag independently — it might output B-PER, B-ORG, I-PER (a valid sequence starts with I before B). The CRF transition matrix learns P(y_t | y_{t-1}) and via Viterbi decoding finds the globally optimal valid tag sequence. This is especially important for the B/I/O constraints.",
+        branches: {
+          label_all_subtokens: "nlp_ner_fix_choice",
+          token_accuracy: "ner_recovery",
+          default: "bio_recovery",
         },
-        sp_n4_stage2: {
-          id: "sp_n4_stage2",
-          type: "scenario_choice",
-          badge: "Stage 2",
-          title: "Stage 2 · Entity-Level Evaluation",
-          prompt: "NER system predicts 'New York City' as B-LOC I-LOC O (tagging 'City' as O). The gold label is B-LOC I-LOC I-LOC. How does this affect entity-level evaluation?",
-          choices: [
-            { id: "a", label: "Entire entity is counted as incorrect — partial matches don't count at entity level", description: "Entity-level F1: the full span 'New York City' must be correctly labeled" },
-            { id: "b", label: "2/3 tokens correct → 67% partial credit", description: "Entity-level evaluation uses exact span matching, not token-level credit" },
-            { id: "c", label: "Token-level: 2 of 3 tokens correct — system gets 0.67 credit", description: "Token-level F1 gives partial credit; entity-level does not" },
-            { id: "d", label: "Only the first token matters — getting B-LOC right is sufficient", description: "The entire span must match for entity-level evaluation" },
-          ],
-          branches: { a: "sp_n4_end", b: "sp_n4_rec2", c: "sp_n4_rec2", d: "sp_n4_rec2" },
-          rationale: "Entity-level F1 (the standard NER metric) requires exact boundary AND type match. 'New York City' predicted as [New York] = wrong. This is stricter than token-level F1 (which would give 2/3 credit). Entity-level is preferred because it reflects actual usability — extracting 'New York' when the entity is 'New York City' is often wrong downstream.",
+      },
+      bio_recovery: {
+        id: "bio_recovery",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Why can't you label all subwords?",
+        prompt: "The interviewer asks: 'Obama' tokenizes to ['Ob', '##ama']. If you give both tokens B-PER, what incorrect signal does the model learn?",
+        code_snippet: `# WordPiece tokenization:
+# "Obama" → ["Ob", "##ama"]
+# Both labeled B-PER (wrong)
+# vs
+# "Ob" → B-PER, "##ama" → -100 (correct)`,
+        choices: [
+          { id: "a", label: "The model learns that B-PER can appear consecutively, confusing entity boundaries with continuation subwords", description: "B-PER B-PER suggests two separate entities starting in the same word." },
+          { id: "b", label: "Subword labeling only affects inference, not training", description: "Label consistency during training directly shapes what the model learns to predict." },
+          { id: "c", label: "Using -100 removes tokens from the vocabulary", description: "-100 is a PyTorch convention that masks those positions from the cross-entropy loss computation." },
+          { id: "d", label: "All subwords must have the same label for the tokenizer to work", description: "The tokenizer is agnostic to labels; label assignment is a training decision." },
+        ],
+        branches: {
+          a: "nlp_ner_fix_choice",
+          b: "bio_recovery",
+          c: "bio_recovery",
+          d: "bio_recovery",
         },
-        sp_n4_rec2: {
-          id: "sp_n4_rec2",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Edge Cases",
-          prompt: "Your NER system is deployed for a pharmaceutical company. It struggles with drug names like 'Enbrel', 'Humira', and new drug names it has never seen. What's the best fix?",
-          choices: [
-            { id: "a", label: "Fine-tune on medical text (BioBERT) + add drug name dictionary as features or post-processing", description: "Domain pretraining + gazetteer (drug name list) handles known and new drugs" },
-            { id: "b", label: "Add more general BERT pretraining data", description: "General pretraining won't help with rare pharmaceutical terms" },
-            { id: "c", label: "Switch to character-level n-grams — drug names have distinctive subword patterns", description: "Useful signal but insufficient alone without domain context" },
-            { id: "d", label: "Use larger BERT-large instead of BERT-base", description: "Scale alone doesn't solve domain vocabulary gaps" },
-          ],
-          branches: { a: "sp_n4_end", b: "sp_n4_end", c: "sp_n4_end", d: "sp_n4_end" },
-          rationale: "Medical NER requires: (1) domain-pretrained model (BioBERT, PubMedBERT) that has seen drug names in context, (2) a drug name gazetteer (list of all known drugs) as features or post-processing correction layer. New drugs can be caught by the gazetteer even if the model hasn't seen them. This hybrid approach is the production standard.",
+        rationale: "B-PER followed by another B-PER signals the start of a new entity. For subword continuations, the model should not be penalized or trained at all — hence -100 as the ignore index in PyTorch's CrossEntropyLoss.",
+      },
+      nlp_ner_fix_choice: {
+        id: "nlp_ner_fix_choice",
+        type: "scenario_choice",
+        badge: "Stage 1 choice",
+        title: "Stage 1 · Choose the correct label alignment",
+        prompt: "Which subword label alignment strategy is correct for training a BERT NER model?",
+        code_snippet: `for word, label in zip(words, word_labels):
+    word_tokens = tokenizer.tokenize(word)
+    # How should expanded_labels be extended?`,
+        choices: [
+          { id: "a", label: "First subword gets the BIO label; continuation subwords get -100", description: "Only the first subword represents the true token boundary. Continuations are ignored in loss." },
+          { id: "b", label: "All subwords get the BIO label for consistent supervision", description: "This creates contradictory B-TAG sequences and inflates the loss contribution of multi-subword words." },
+          { id: "c", label: "All subwords get I-TAG except the first which gets B-TAG", description: "Transforming B-TAG to I-TAG for continuations still trains the model to predict I-TAG on ##ama, which is meaningless." },
+          { id: "d", label: "Use a separate tokenizer that does not split words", description: "BERT requires its own tokenizer; using a different tokenizer misaligns with the model's embedding lookup." },
+        ],
+        branches: {
+          a: "nlp_ner_bio_choice",
+          b: "bio_recovery",
+          c: "bio_recovery",
+          d: "bio_recovery",
         },
-        sp_n4_end: {
-          id: "sp_n4_end",
-          type: "scenario_choice",
-          badge: "Complete",
-          title: "NER Mastered",
-          prompt: "You want to build an NER system for a new language (Swahili) with no labeled data. What is the most practical starting point?",
-          choices: [
-            { id: "a", label: "Use multilingual BERT (mBERT) or XLM-R with cross-lingual transfer from English NER data", description: "mBERT/XLM-R transfers NER patterns across languages; zero-shot cross-lingual NER works surprisingly well" },
-            { id: "b", label: "Collect 10,000 labeled Swahili NER examples before starting", description: "Valid but slow; cross-lingual transfer can bootstrap before data collection" },
-            { id: "c", label: "Translate Swahili text to English, apply English NER, back-translate entities", description: "Translation errors compound; 'Nairobi' might get lost in translation" },
-            { id: "d", label: "Rule-based NER using capitalization (proper nouns are capitalized)", description: "Swahili capitalization rules differ from English; many entities won't be capitalized" },
-          ],
-          branches: { a: "sp_n4_end", b: "sp_n4_end", c: "sp_n4_end", d: "sp_n4_end" },
-          terminal: true,
-          rationale: "XLM-RoBERTa (trained on 100 languages) enables zero-shot cross-lingual NER transfer: train on English CoNLL-2003, evaluate on Swahili WikiAnn. It works because XLM-R learns language-agnostic representations. Fine-tuning on even 100-200 Swahili labeled examples dramatically improves performance over zero-shot.",
+        rationale: "-100 is the standard ignore index: PyTorch's CrossEntropyLoss skips positions where target == -100. This lets the model focus learning on real word boundaries without penalizing it for subword continuations.",
+      },
+      nlp_ner_bio_choice: {
+        id: "nlp_ner_bio_choice",
+        type: "scenario_choice",
+        badge: "Stage 2 tagging",
+        title: "Stage 2 · BIO tag sequence for adjacent entities",
+        prompt: "The sentence is: 'Tim Cook runs Apple'. Write the correct BIO tag sequence for ['Tim', 'Cook', 'runs', 'Apple'].",
+        code_snippet: `# Entities: Tim Cook → PERSON, Apple → ORG
+# Tokens: ['Tim', 'Cook', 'runs', 'Apple']`,
+        choices: [
+          { id: "a", label: "B-PER, I-PER, O, B-ORG", description: "Tim starts a PERSON entity, Cook continues it, runs is outside, Apple starts an ORG entity." },
+          { id: "b", label: "B-PER, B-PER, O, B-ORG", description: "B-B would imply Tim and Cook are two separate single-token entities, not one span." },
+          { id: "c", label: "B-PER, I-PER, O, I-ORG", description: "Apple is the start of the ORG entity, not a continuation — it must use B-ORG." },
+          { id: "d", label: "I-PER, I-PER, O, B-ORG", description: "An entity span must begin with B-TAG, not I-TAG." },
+        ],
+        branches: {
+          a: "nlp_ner_eval_choice",
+          b: "bio_recovery",
+          c: "bio_recovery",
+          d: "bio_recovery",
         },
+        rationale: "BIO rule: every entity span starts with B-TAG. The B vs I distinction is essential for correct span reconstruction — I-TAG means 'this token is the continuation of an entity started by the previous B-TAG'.",
+      },
+      nlp_ner_eval_choice: {
+        id: "nlp_ner_eval_choice",
+        type: "scenario_choice",
+        badge: "Stage 3 evaluation",
+        title: "Stage 3 · Why not token accuracy for NER?",
+        prompt: "A model predicts all tokens as O on a test set where 85% of tokens are O. It achieves 85% token accuracy. What is its entity-level F1?",
+        code_snippet: `# Test set: 85% tokens are O (outside any entity)
+# Model prediction: all tokens → O
+# Token accuracy: 85%
+# Entity-level F1: ???`,
+        choices: [
+          { id: "a", label: "0.0 — the model detected zero entities so precision, recall, and F1 are all zero", description: "With no predicted entities, precision is undefined/0 and recall is 0, giving F1=0." },
+          { id: "b", label: "85% — entity F1 equals token accuracy when most tokens are O", description: "Entity F1 measures exact span matches; a model detecting no entities scores 0." },
+          { id: "c", label: "42.5% — entity F1 averages token accuracy and zero recall", description: "seqeval entity F1 is not an average of token metrics." },
+          { id: "d", label: "Cannot compute entity F1 without knowing entity types", description: "seqeval can compute entity F1 from BIO sequences alone." },
+        ],
+        branches: {
+          a: "nlp_ner_terminal",
+          b: "ner_recovery",
+          c: "ner_recovery",
+          d: "ner_recovery",
+        },
+        rationale: "This is the core argument for entity-level evaluation. Token accuracy is gameable by always predicting O. seqeval's entity-level F1 requires exact span-type match — predicting O for every token gives 0 recall and 0 F1.",
+      },
+      ner_recovery: {
+        id: "ner_recovery",
+        type: "scenario_choice",
+        badge: "Recovery 3",
+        title: "Recovery · Entity F1 vs token accuracy",
+        prompt: "Which statement correctly explains why seqeval entity-level F1 is preferred over token accuracy for NER?",
+        code_snippet: `# seqeval: a prediction is correct only if
+# - the span start matches exactly
+# - the span end matches exactly
+# - the entity type matches exactly`,
+        choices: [
+          { id: "a", label: "Token accuracy rewards predicting O for most tokens; entity F1 requires exact span and type matches", description: "The O-class dominance makes token accuracy trivially gameable." },
+          { id: "b", label: "Entity F1 is always higher than token accuracy", description: "Entity F1 is typically lower because it is a stricter criterion." },
+          { id: "c", label: "Token accuracy and entity F1 are equivalent when BIO tagging is used", description: "They measure fundamentally different things — token agreement vs entity span correctness." },
+          { id: "d", label: "seqeval entity F1 gives partial credit for correct entity type with wrong span", description: "seqeval is all-or-nothing — wrong span is a false positive and a false negative." },
+        ],
+        branches: {
+          a: "nlp_ner_terminal",
+          b: "ner_recovery",
+          c: "ner_recovery",
+          d: "ner_recovery",
+        },
+        rationale: "The evaluation argument is: token accuracy is dominated by O-tag frequency and masks complete failure at entity detection. seqeval's strict span-type matching is the canonical NER evaluation metric.",
+      },
+      nlp_ner_terminal: {
+        id: "nlp_ner_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Simulation complete · NER pipeline locked",
+        prompt: "You fixed the subword alignment bug, applied correct BIO tagging, and defended entity-level F1 as the right evaluation metric.",
+        code_snippet: `# NER checklist:
+# - BIO: B-TAG starts entity, I-TAG continues, O is outside
+# - Subwords: first subword gets BIO label, rest get -100
+# - Inference: take first-subword prediction per word; use aggregation_strategy='simple' in HF pipeline
+# - Evaluation: seqeval entity F1, NOT token accuracy`,
+        choices: [],
+        branches: {},
+        terminal: true,
+        rationale: "Interview-ready answer: BIO tagging encodes span boundaries; subword alignment uses -100 to mask continuation tokens from the loss; entity-level F1 via seqeval is the correct metric because it requires exact span + type match, preventing the O-class dominance that inflates token accuracy.",
       },
     },
-
-    knowledgeCheck: [
-      {
-        question: "What is the seqeval library commonly used for in NLP?",
-        options: [
-          "Tokenizing sequences for transformer models",
-          "Computing entity-level precision, recall, and F1 for sequence labeling tasks like NER",
-          "Evaluating language model perplexity on text sequences",
-          "Sequentially splitting datasets for time series cross-validation",
-        ],
-        correctIndex: 1,
-        explanation: "seqeval is the standard Python library for evaluating sequence labeling tasks (NER, POS tagging, chunking). It computes entity-level precision, recall, and F1 from lists of BIO-tagged predictions and gold labels. It correctly handles multi-token entities and enforces exact span matching.",
-      },
-      {
-        question: "In NER for legal documents, 'Bank of America' appears as an organization. The same text contains 'bank' as a common noun ('visit your local bank'). What challenge does this illustrate?",
-        options: [
-          "Ambiguity: the same surface form can be an entity or a common noun depending on context",
-          "Nested entities: 'Bank' is nested inside 'Bank of America'",
-          "Class imbalance: ORG entities are rarer than common nouns",
-          "Tokenization: 'Bank of America' tokenizes differently from 'bank'",
-        ],
-        correctIndex: 0,
-        explanation: "NER must resolve named entity ambiguity: 'Apple' (company) vs 'apple' (fruit), 'Bank of America' (ORG) vs 'local bank' (common noun). This is why capitalization alone isn't sufficient and why contextual models (BERT) outperform rule-based systems — the surrounding context disambiguates the entity status.",
-      },
-    ],
   },
+  knowledgeCheck: [
+    {
+      question: "In BIO tagging, what is the difference between B-PER and I-PER?",
+      options: [
+        "B-PER marks the beginning of a PERSON entity; I-PER marks continuation tokens within the same entity span",
+        "B-PER is for single-token names; I-PER is for names longer than one word",
+        "B-PER is used by BERT; I-PER is used by spaCy",
+      ],
+      correctIndex: 0,
+      explanation: "B marks the start of a new entity span. I marks continuation tokens within the same span. This distinction is essential for reconstructing multi-token entities and separating adjacent entities of the same type.",
+    },
+    {
+      question: "When BERT tokenizes 'Obama' into ['Ob', '##ama'], what label should '##ama' receive during NER training?",
+      options: [
+        "-100, which tells PyTorch's CrossEntropyLoss to ignore this position",
+        "I-PER, to signal that it is inside a person entity",
+        "B-PER, to match the label of the first subword",
+      ],
+      correctIndex: 0,
+      explanation: "Subword continuations (##ama) do not represent real word boundaries in the original text. Labeling them -100 excludes them from the loss computation, so the model is only supervised on the first subword of each original word.",
+    },
+    {
+      question: "Why is token accuracy a misleading metric for NER evaluation?",
+      options: [
+        "When most tokens are O-tagged, a model predicting all-O achieves high token accuracy while detecting zero entities",
+        "Token accuracy cannot be computed for sequences longer than 128 tokens",
+        "Token accuracy requires the BIOES scheme rather than BIO",
+      ],
+      correctIndex: 0,
+      explanation: "In typical NER datasets, 70-90% of tokens are O (outside entities). A trivial all-O baseline scores high on token accuracy. Entity-level F1 via seqeval requires exact span + type matches, giving 0 F1 to a model that detects no entities.",
+    },
+  ],
+},
 
 
 };
