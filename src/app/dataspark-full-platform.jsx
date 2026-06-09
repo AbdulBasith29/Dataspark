@@ -107,6 +107,7 @@ import ContentBasedRecViz from "../visualizations/ContentBasedRecViz.jsx";
 import LSTMSequenceViz from "../visualizations/LSTMSequenceViz.jsx";
 import NERViz from "../visualizations/NERViz.jsx";
 import VenvCondaViz from "../visualizations/VenvCondaViz.jsx";
+import SentimentAnalysisViz from "../visualizations/SentimentAnalysisViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import LessonModule from "../components/platform/LessonModule.jsx";
 import PracticeQuestion from "../components/platform/PracticeQuestion.jsx";
@@ -632,7 +633,7 @@ const CURRICULUM = [
         lessons: [
           { id: "sp-n1", title: "Text Preprocessing & Tokenization", duration: "15 min", hasViz: true },
           { id: "sp-n2", title: "Word Embeddings: Word2Vec to BERT", duration: "25 min", hasViz: true },
-          { id: "sp-n3", title: "Sentiment Analysis & Text Classification", duration: "18 min", hasViz: false },
+          { id: "sp-n3", title: "Sentiment Analysis & Text Classification", duration: "18 min", hasViz: true },
           { id: "sp-n4", title: "Named Entity Recognition", duration: "15 min", hasViz: true },
         ]
       }
@@ -1098,6 +1099,7 @@ const VISUALIZATIONS = {
   "mo-v3": DashboardDesignViz,
   "sp-r2": ContentBasedRecViz,
   "sp-t4": LSTMSequenceViz,
+  "sp-n3": SentimentAnalysisViz,
   "sp-n4": NERViz,
 };
 
