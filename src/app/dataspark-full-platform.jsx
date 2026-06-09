@@ -87,6 +87,16 @@ import DLTransferLearningViz from "../visualizations/DLTransferLearningViz.jsx";
 import ChunkingStrategyViz from "../visualizations/ChunkingStrategyViz.jsx";
 import RAGPipelineViz from "../visualizations/RAGPipelineViz.jsx";
 import AdvancedRAGViz from "../visualizations/AdvancedRAGViz.jsx";
+import MLDriftMonitorViz from "../visualizations/MLDriftMonitorViz.jsx";
+import AirflowDAGViz from "../visualizations/AirflowDAGViz.jsx";
+import CanaryDeploymentViz from "../visualizations/CanaryDeploymentViz.jsx";
+import ARIMACFViz from "../visualizations/ARIMACFViz.jsx";
+import ProphetDecompositionViz from "../visualizations/ProphetDecompositionViz.jsx";
+import MatrixFactorizationViz from "../visualizations/MatrixFactorizationViz.jsx";
+import MatplotlibAnatomyViz from "../visualizations/MatplotlibAnatomyViz.jsx";
+import RecEvalMetricsViz from "../visualizations/RecEvalMetricsViz.jsx";
+import TextPreprocessingPipelineViz from "../visualizations/TextPreprocessingPipelineViz.jsx";
+import MLCICDPipelineViz from "../visualizations/MLCICDPipelineViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import LessonModule from "../components/platform/LessonModule.jsx";
 import PracticeQuestion from "../components/platform/PracticeQuestion.jsx";
@@ -546,7 +556,7 @@ const CURRICULUM = [
         title: "MLOps Fundamentals",
         lessons: [
           { id: "mo-c1", title: "CI/CD for Machine Learning", duration: "20 min", hasViz: true },
-          { id: "mo-c2", title: "Model Versioning & Experiment Tracking", duration: "15 min", hasViz: false },
+          { id: "mo-c2", title: "Model Versioning & Experiment Tracking", duration: "15 min", hasViz: true },
           { id: "mo-c3", title: "Monitoring & Drift Detection", duration: "18 min", hasViz: true },
           { id: "mo-c4", title: "Automated Retraining Pipelines", duration: "15 min", hasViz: true },
         ]
@@ -557,7 +567,7 @@ const CURRICULUM = [
         lessons: [
           { id: "mo-t1", title: "Git Workflows for Data Teams", duration: "18 min", hasViz: true },
           { id: "mo-t2", title: "Virtual Environments: venv, conda, poetry", duration: "12 min", hasViz: false },
-          { id: "mo-t3", title: "Building APIs with FastAPI", duration: "22 min", hasViz: false },
+          { id: "mo-t3", title: "Building APIs with FastAPI", duration: "22 min", hasViz: true },
           { id: "mo-t4", title: "Docker for Data Scientists", duration: "20 min", hasViz: true },
           { id: "mo-t5", title: "Cloud Basics: AWS for DS", duration: "25 min", hasViz: true },
         ]
@@ -1033,6 +1043,16 @@ const VISUALIZATIONS = {
   "sd-m2": FeatureStoreViz,
   "sd-m3": BatchVsStreaming,
   "sd-m4": RecSysCollaborativeFiltering,
+  "mo-c1": MLCICDPipelineViz,
+  "mo-c2": MLDriftMonitorViz,
+  "mo-t3": AirflowDAGViz,
+  "mo-t4": CanaryDeploymentViz,
+  "mo-v1": MatplotlibAnatomyViz,
+  "sp-r3": MatrixFactorizationViz,
+  "sp-r4": RecEvalMetricsViz,
+  "sp-t2": ARIMACFViz,
+  "sp-t3": ProphetDecompositionViz,
+  "sp-n1": TextPreprocessingPipelineViz,
   "sql-found-01": SQLOrderOfExecution,
   "sql-found-02": SQLNullLogic,
   "sql-found-03": SQLGroupByViz,
