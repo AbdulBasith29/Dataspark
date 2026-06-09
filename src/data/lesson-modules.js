@@ -42186,717 +42186,2021 @@ plt.show()`,
 },
 
 "sp-r1": {
-    durationLabel: "18 min",
-    outcomes: [
-      "Explain user-based vs item-based collaborative filtering",
-      "Identify the cold-start problem and its mitigations",
-      "Interpret similarity metrics (cosine, Pearson) for recommendations",
-    ],
-    learnMarkdown: `## Collaborative Filtering
+  durationLabel: "18 min",
+  outcomes: [
+    "Explain user-based and item-based collaborative filtering and when to choose each.",
+    "Construct and reason about a sparse user-item matrix with explicit vs implicit feedback.",
+    "Apply cosine similarity correctly and identify where it breaks down for cold-start users.",
+    "Diagnose scalability and cold-start failure modes that appear in production and in interviews.",
+  ],
+  learnMarkdown: `## What collaborative filtering is — and what it refuses to know
 
-Collaborative filtering recommends items based on the behavior of similar users or items — no item metadata needed.
+Collaborative filtering (CF) makes recommendations by learning from **collective behavior**: "users who liked X also liked Y." It does not look at item descriptions, genres, or metadata. The only input is the history of who interacted with what, and how strongly.
 
-### User-Based CF
-Find users similar to the target user, then recommend what those similar users liked:
+That is both the power and the weakness. CF can surface unexpected but genuinely liked items because it finds latent patterns across thousands of users. But it is blind to any item it has never seen rated, and helpless with a brand-new user who has no history.
 
-\`\`\`
-similarity(u, v) = cosine(ratings_u, ratings_v)
-predicted(u, i) = mean(u) + Σ sim(u,v)*(r_vi - mean(v)) / Σ|sim(u,v)|
-\`\`\`
+## The user-item matrix
 
-### Item-Based CF
-Find items similar to what the target user rated, recommend similar items:
-- More stable than user-based (items change less than user taste)
-- Amazon pioneered this approach at scale
+Everything in CF starts with a matrix **R** of shape (n_users × n_items). Each cell R[u, i] is a signal of how much user u engages with item i.
 
-### Similarity Metrics
-| Metric | Formula | Best For |
-|--------|---------|---------|
-| Cosine | cos(θ) between rating vectors | Sparse vectors |
-| Pearson | correlation of centered ratings | Rating bias correction |
-| Jaccard | intersection/union of rated items | Implicit feedback |
+**Explicit feedback**: star ratings (1–5), thumbs up/down. Direct and interpretable, but sparse — users rate a tiny fraction of items.
 
-### The Cold-Start Problem
-- **New user**: No history → can't find similar users
-- **New item**: No ratings → can't compute similarity
-- **Mitigations**: Popularity-based fallback, content features, onboarding questions
+**Implicit feedback**: clicks, purchases, play counts, dwell time. Far more abundant, but noisy — a click does not mean enjoyment, and a missing value means "not rated" not "disliked." Implicit-feedback CF requires special treatment (Hu et al. 2008).
 
-### Scalability Challenges
-- Computing all user pairs: O(U²) — infeasible for millions of users
-- Solution: Approximate nearest neighbors (FAISS, ScaNN), matrix factorization`,
+In practice, R is extremely sparse — often 99% or more of entries are missing. Algorithms must handle this efficiently; materializing R as a dense matrix is infeasible for large catalogs.
 
-    video: null,
-    videoFallbackMarkdown: `## Matrix Factorization as Collaborative Filtering
+## User-based CF: find your taste-twins
 
-Latent factor models (SVD, ALS) decompose the rating matrix R ≈ U × Vᵀ:
-- U: user latent factor matrix (U × K)
-- V: item latent factor matrix (I × K)
-- K: number of latent dimensions (e.g., 50–200)
-
-**Alternating Least Squares (ALS)**: Fix V, solve for U; fix U, solve for V. Repeat until convergence. Parallelizable — used in Spark MLlib.
-
-**Implicit Feedback**: When you only have clicks/views (not explicit ratings), weight the confidence: c_ui = 1 + α * r_ui where r_ui is interaction count.`,
-
-    tryGuidance: "Explore how user similarity drives recommendations. Adjust the rating matrix and watch predicted scores update.",
-
-    interviewGraph: {
-      initialStageId: "sp_r1_stage1",
-      artifactDimensions: [
-        { label: "CF Mechanics", recoveryStageId: "sp_r1_rec1" },
-        { label: "Cold-Start", recoveryStageId: "sp_r1_rec2" },
-        { label: "Scalability", recoveryStageId: "sp_r1_rec3", passLabel: "RecSys Ready" },
-      ],
-      stages: {
-        sp_r1_stage1: {
-          id: "sp_r1_stage1",
-          type: "scenario_choice",
-          badge: "Stage 1",
-          title: "Stage 1 · User vs Item CF",
-          prompt: "A streaming platform uses user-based CF. As the user base grows to 50M, recommendations become slow. An engineer suggests switching to item-based CF. Why might this help?",
-          choices: [
-            { id: "a", label: "Items are fewer and more stable than users", description: "Item similarity matrix is smaller and changes less frequently" },
-            { id: "b", label: "Item-based CF is always more accurate", description: "Accuracy depends on the domain, not the approach" },
-            { id: "c", label: "Users don't like being compared to other users", description: "Privacy concern, but not the performance reason" },
-            { id: "d", label: "Item-based CF avoids the cold-start problem", description: "Both approaches have cold-start issues" },
-          ],
-          branches: { a: "sp_r1_stage2", b: "sp_r1_rec1", c: "sp_r1_rec1", d: "sp_r1_rec1" },
-          rationale: "Item-based CF wins at scale because the number of items (movies, products) is typically much smaller and more stable than the number of users. Pre-computing item-item similarities offline is feasible; recomputing user-user similarities for 50M users is not.",
-        },
-        sp_r1_rec1: {
-          id: "sp_r1_rec1",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · CF Mechanics",
-          prompt: "In user-based CF, user A rated movies [5, 3, 0, 4] and user B rated [4, 0, 2, 5]. Which similarity metric handles the missing ratings (0s) best for sparse data?",
-          choices: [
-            { id: "a", label: "Cosine similarity on non-zero entries only", description: "Ignores missing ratings — appropriate for sparse data" },
-            { id: "b", label: "Euclidean distance on the full vectors", description: "0s for unrated items would distort the distance" },
-            { id: "c", label: "Pearson correlation on all entries", description: "Treating 0 as a rating of 0 is incorrect for missing data" },
-            { id: "d", label: "Jaccard on the full rating vectors", description: "Jaccard is for binary data — not raw ratings" },
-          ],
-          branches: { a: "sp_r1_stage2", b: "sp_r1_stage2", c: "sp_r1_stage2", d: "sp_r1_stage2" },
-          rationale: "For sparse rating matrices, cosine similarity computed only over co-rated items avoids the distortion of treating unrated items as 0. Pearson is better when you want to correct for rating bias (some users always rate high/low).",
-        },
-        sp_r1_stage2: {
-          id: "sp_r1_stage2",
-          type: "scenario_choice",
-          badge: "Stage 2",
-          title: "Stage 2 · Cold-Start",
-          prompt: "A new user signs up and watches one movie. Your CF system has almost no data about this user. What is the BEST immediate strategy?",
-          choices: [
-            { id: "a", label: "Serve popularity-based recommendations then shift to CF", description: "Fallback to popular items while collecting data" },
-            { id: "b", label: "Ask the user to rate 50 items before showing anything", description: "High friction — most users will leave" },
-            { id: "c", label: "Use the ratings of randomly selected users", description: "Random neighbors add noise, not signal" },
-            { id: "d", label: "Wait 30 days until enough data is collected", description: "Users won't return if the experience is bad from day one" },
-          ],
-          branches: { a: "sp_r1_stage3", b: "sp_r1_rec2", c: "sp_r1_rec2", d: "sp_r1_rec2" },
-          rationale: "Popularity-based fallback (trending, top-rated) is the standard cold-start strategy. You surface content likely to be enjoyed while collecting implicit signals (watch time, clicks) to bootstrap the user's profile. A short onboarding quiz (3–5 questions) is also acceptable friction.",
-        },
-        sp_r1_rec2: {
-          id: "sp_r1_rec2",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Cold-Start",
-          prompt: "Which of these is NOT a valid cold-start mitigation strategy?",
-          choices: [
-            { id: "a", label: "Content-based filtering using item metadata", description: "Doesn't require user history — valid mitigation" },
-            { id: "b", label: "Asking onboarding preference questions", description: "Collects initial preferences — valid mitigation" },
-            { id: "c", label: "Computing CF on the full matrix excluding new users", description: "Correct — this is what you do anyway, it doesn't help the new user" },
-            { id: "d", label: "Using demographic similarity to find proxy users", description: "Age/location can proxy for taste — valid mitigation" },
-          ],
-          branches: { a: "sp_r1_stage3", b: "sp_r1_stage3", c: "sp_r1_stage3", d: "sp_r1_stage3" },
-          rationale: "Option C doesn't help — you're already excluding new users from CF because they have no history. The real mitigations are: content-based fallback, onboarding questions, demographic proxies, or popularity-based recommendations.",
-        },
-        sp_r1_stage3: {
-          id: "sp_r1_stage3",
-          type: "scenario_choice",
-          badge: "Stage 3",
-          title: "Stage 3 · Scale & Matrix Factorization",
-          prompt: "Your team wants to replace item-based CF with matrix factorization (ALS). A stakeholder asks: 'What do the latent factors actually represent?' Best answer?",
-          choices: [
-            { id: "a", label: "They are learned abstract features that capture taste patterns", description: "Correct — latent factors are not interpretable genre labels" },
-            { id: "b", label: "They are explicit genre tags like action, comedy, drama", description: "Those are content features, not latent factors" },
-            { id: "c", label: "They represent user demographics like age and gender", description: "Demographics are not learned from ratings alone" },
-            { id: "d", label: "They are the top principal components of the rating matrix", description: "SVD is related but ALS/implicit factorization is not pure PCA" },
-          ],
-          branches: { a: "sp_r1_end", b: "sp_r1_rec3", c: "sp_r1_rec3", d: "sp_r1_rec3" },
-          rationale: "Latent factors are abstract learned representations — they might correlate with genres or demographics, but they're not interpretable labels. A factor might capture 'cerebral sci-fi enjoyed by night-owl viewers' — a pattern the model discovered without being told.",
-        },
-        sp_r1_rec3: {
-          id: "sp_r1_rec3",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Matrix Factorization",
-          prompt: "ALS (Alternating Least Squares) factorization is used for implicit feedback (clicks, views) rather than explicit ratings. What adjustment is made?",
-          choices: [
-            { id: "a", label: "Confidence weighting: c_ui = 1 + α * interaction_count", description: "More interactions → higher confidence, not just a binary signal" },
-            { id: "b", label: "Treating all unobserved items as negative ratings of -1", description: "Unobserved means unknown, not disliked — too harsh" },
-            { id: "c", label: "Ignoring unobserved items entirely in the loss function", description: "You must model unobserved items or the model has no signal to push against" },
-            { id: "d", label: "Converting clicks to a 1-5 star rating scale", description: "Clicks are ordinal at best — this loses information" },
-          ],
-          branches: { a: "sp_r1_end", b: "sp_r1_end", c: "sp_r1_end", d: "sp_r1_end" },
-          rationale: "For implicit feedback, ALS uses confidence weighting: c_ui = 1 + α * r_ui where r_ui is the raw interaction count. This treats frequently accessed items as higher-confidence positives, while unobserved items become low-confidence negatives (contributing to the loss with weight 1).",
-        },
-        sp_r1_end: {
-          id: "sp_r1_end",
-          type: "scenario_choice",
-          badge: "Complete",
-          title: "Collaborative Filtering Mastered",
-          prompt: "You've completed collaborative filtering. Which scenario best fits item-based CF over user-based CF in production?",
-          choices: [
-            { id: "a", label: "Item catalog is small and stable, user base is massive", description: "Item similarity precomputation scales better" },
-            { id: "b", label: "New items launch daily, user base is small", description: "User-based CF would handle frequent new items better" },
-            { id: "c", label: "Pure cold-start scenario with no historical data", description: "Neither CF variant helps without data" },
-            { id: "d", label: "When you need human-interpretable explanations", description: "Neither produces interpretable explanations easily" },
-          ],
-          branches: { a: "sp_r1_end", b: "sp_r1_end", c: "sp_r1_end", d: "sp_r1_end" },
-          terminal: true,
-          rationale: "Item-based CF shines when items are relatively stable (movies, products) and users are plentiful. The item similarity matrix can be computed offline once and served at low latency. User-based CF struggles at scale because the user-user similarity matrix grows as O(U²).",
-        },
-      },
-    },
-
-    knowledgeCheck: [
-      {
-        question: "A user has rated 5 items. Another user has rated 200 items but only 2 overlap with the first user. Cosine similarity returns 0.92. Should you trust this similarity score?",
-        options: [
-          "Yes — 0.92 is very high, strong signal",
-          "No — high similarity from only 2 co-rated items is unreliable",
-          "Yes — more items rated means better data quality",
-          "No — cosine similarity is always unreliable for CF",
-        ],
-        correctIndex: 1,
-        explanation: "High cosine similarity computed from only 2 co-rated items is statistically unreliable. Many CF systems apply shrinkage: sim_shrunk = sim * n_common / (n_common + λ) where λ is a regularization term. With n_common=2, the similarity would be heavily discounted.",
-      },
-      {
-        question: "What is the 'gray sheep' problem in collaborative filtering?",
-        options: [
-          "Users who only watch content on weekends",
-          "Users whose tastes don't correlate well with any other user",
-          "Items that have very few ratings",
-          "The cold-start problem for new items",
-        ],
-        correctIndex: 1,
-        explanation: "Gray sheep are users with unusual or eclectic tastes that don't align with any cluster of other users. CF performs poorly for them because there are no good nearest neighbors. Content-based or hybrid approaches work better for gray sheep.",
-      },
-      {
-        question: "Why does item-based CF typically produce more stable recommendations than user-based CF?",
-        options: [
-          "Items have more metadata than users",
-          "Item similarity changes less frequently than user taste patterns",
-          "Items are rated by more people than users rate items",
-          "Item-based CF uses a more advanced algorithm",
-        ],
-        correctIndex: 1,
-        explanation: "Item similarities are relatively stable — 'Inception' and 'Interstellar' will remain similar over time. User tastes shift more frequently. This means item-item similarity matrices can be precomputed offline and refreshed less often, making the system more stable and efficient.",
-      },
-    ],
-  },
-
-  "sp-r2": {
-    durationLabel: "15 min",
-    outcomes: [
-      "Build content-based recommendations using item features",
-      "Compare TF-IDF and embedding-based item representations",
-      "Explain why content-based avoids cold-start for new items",
-    ],
-    learnMarkdown: `## Content-Based Filtering
-
-Content-based filtering recommends items similar to what the user liked, based on item attributes — no other users needed.
-
-### How It Works
-1. Represent each item as a feature vector (genre, director, keywords, embeddings)
-2. Build a user profile from items they rated positively
-3. Score unrated items by similarity to the user profile
+The core idea: find users similar to the target user, then recommend items those users liked that the target has not seen.
 
 \`\`\`python
-# TF-IDF representation of movie descriptions
+# Step 1: represent each user as a vector of their ratings
+# Step 2: compute cosine similarity between target user and all others
+# Step 3: take top-K similar users
+# Step 4: aggregate their ratings, weighted by similarity, for unseen items
+\`\`\`
+
+**Cosine similarity** between two users u and v:
+
+\`\`\`
+sim(u, v) = (R_u · R_v) / (‖R_u‖ · ‖R_v‖)
+\`\`\`
+
+It measures the angle between rating vectors, ignoring magnitude — so a user who consistently rates 4–5 is treated as similar to one who rates the same items 3–4, rather than penalized for rating differently. Only co-rated items contribute; missing values are treated as zero (which biases results — a known limitation).
+
+**User-based CF weaknesses**:
+- Scales as **O(n²)** in users: computing pairwise similarities across millions of users is expensive.
+- User taste is unstable — today's pop fan may be tomorrow's jazz listener, so pre-computed neighborhoods go stale.
+- Cold start: a new user with zero ratings has no neighbors; similarity is undefined.
+
+## Item-based CF: stable co-rating patterns
+
+Instead of finding similar users, find items similar to items the user already likes, then recommend the most similar unseen items.
+
+\`\`\`python
+# Item similarity: computed from co-rating patterns across users
+# sim(i, j) = cosine similarity of columns i and j in R
+# Recommendation: for target user u, score each unseen item j as
+#   sum over u's rated items i of: sim(i, j) * R[u, i]
+\`\`\`
+
+**Why item-based is more stable**: items do not change their content over time. A thriller remains a thriller; the co-rating pattern between two thrillers is stable across years. Item similarities can be precomputed offline and cached, making real-time serving cheap.
+
+Item-based CF is what Amazon famously scaled to production in the early 2000s. The key insight was that item-item similarity matrices are much smaller and more stable than user-user ones for large-catalog, many-user systems.
+
+**Item-based CF weaknesses**:
+- New item cold start: a newly added item has no co-rating history, so it has no neighbors.
+- Popularity bias: popular items dominate neighborhoods because they appear in many users' histories.
+- Still fails for new users with no rated items.
+
+## Explicit vs implicit feedback: different loss functions
+
+With explicit ratings, the goal is to predict the numeric rating R[u, i]. Mean squared error is a natural loss.
+
+With implicit feedback, you do not know whether a missing entry is a dislike or simply unseen. Hu et al. (2008) introduced a confidence-weighted formulation: \`c_{ui} = 1 + α * f_{ui}\` where f is interaction count. Higher confidence for more interactions, but all missing entries still contribute as "not preferred" — the model is trained on the full dense matrix with low-confidence zeros.
+
+## Cold start: the Achilles heel of CF
+
+Cold start is the most common interview and production challenge:
+- **New user cold start**: no ratings → no similarities → cannot generate CF recommendations.
+- **New item cold start**: no co-ratings → cannot appear in any CF neighborhood.
+
+Production remedies for new users: onboarding surveys, popular-item recommendations, fallback to content-based, demographic-based priors, or simply showing trending items until enough signal accumulates (typically 5–20 ratings).
+
+## Scalability: why O(n²) matters at scale
+
+For n = 10 million users, computing all pairwise user similarities requires 10¹⁴ operations — infeasible. Practical solutions:
+
+- **Locality-sensitive hashing (LSH)** to find approximate nearest neighbors in O(n log n).
+- **Matrix factorization** (see sp-r3) sidesteps explicit pairwise computation.
+- **Pre-computed item similarity tables** for item-based CF, cached and updated nightly.
+
+## Interview-Ready Summary
+
+- CF needs only interaction history — no item features. The signal is "users who did X also did Y."
+- User-based CF: cosine similarity on rating vectors; O(n²) cost; taste drift makes neighborhoods stale.
+- Item-based CF: more stable, precomputable offline; still fails for new items.
+- Cosine similarity measures angle, not magnitude; it handles differing rating scales well but requires at least one overlapping item.
+- Cold start (new user or new item) is the fundamental CF failure mode — always have a fallback strategy.
+- Implicit feedback is abundant but noisy; handle it with confidence-weighted models, not plain MSE.`,
+  video: null,
+  videoFallbackMarkdown: `## Deep dive without video
+
+1. Sketch a 5-user × 6-item rating matrix on paper with mostly blanks. Compute cosine similarity between two users by hand — which items contribute?
+2. Identify which user is a cold-start case. What would you show them?
+3. Write two sentences: "Item-based CF is more production-friendly than user-based because ___. Its blind spot is ___."
+4. Review the interviewGraph — identify the stage where cold start appears and rehearse the answer out loud before clicking.`,
+  tryGuidance: "Use the interactive to explore how adding or removing ratings changes user neighborhoods and which items get surfaced. Pay special attention to what happens when a user has only 1–2 ratings — that is the cold-start boundary.",
+  interviewGraph: {
+    initialStageId: "spr1_click",
+    artifactDimensions: [
+      {
+        label: "CF Algorithm Choice",
+        recoveryStageId: "cf_recovery",
+      },
+      {
+        label: "Cold Start Handling",
+        recoveryStageId: "coldstart_recovery",
+        passLabel: "CF Mastery",
+      },
+    ],
+    stages: {
+      spr1_click: {
+        id: "spr1_click",
+        type: "click_target",
+        badge: "Stage 1",
+        title: "Stage 1 · Cold Start Bug",
+        prompt: "A new user just signed up and has not rated anything. Your teammate's recommendation function calls compute_cosine_similarities immediately. Click the line that will silently fail or return nonsense for this new user.",
+        code_snippet: `def get_recs_for_new_user(user_id, user_item_matrix):
+    # New user with 0 ratings
+    similarities = compute_cosine_similarities(user_id, user_item_matrix)  # -- ds-target:cold_start_bug
+    top_users = sorted(similarities.items(), key=lambda x: x[1])[:10]
+    return recommend_from_similar_users(top_users, user_item_matrix)`,
+        validationCopy: {
+          cold_start_bug: "Correct. A new user has an all-zero rating vector, so cosine similarity is undefined (division by zero) or returns 0 for every neighbor. CF cannot work here — you need a fallback strategy such as popularity-based recommendations or a short onboarding survey before invoking CF.",
+        },
+        branches: {
+          cold_start_bug: "spr1_ubcf_vs_ibcf",
+        },
+      },
+      spr1_ubcf_vs_ibcf: {
+        id: "spr1_ubcf_vs_ibcf",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · User-Based vs Item-Based CF",
+        prompt: "Your team is building a recommender for a catalog of 500,000 products and 10 million users. Product descriptions rarely change, but user preferences shift seasonally. Which CF variant is more appropriate for production serving?",
+        code_snippet: `# Option A: user-based CF
+# Compute pairwise user similarities at query time
+# n_users = 10_000_000
+
+# Option B: item-based CF
+# Precompute item-item similarity matrix nightly
+# n_items = 500_000`,
+        choices: [
+          {
+            id: "a",
+            label: "User-based CF — users are the ultimate signal of taste",
+            description: "User-based CF is O(n²) in users. With 10 million users, real-time pairwise similarity is infeasible, and user neighborhoods go stale as preferences shift.",
+          },
+          {
+            id: "b",
+            label: "Item-based CF — item similarities are stable and can be precomputed",
+            description: "Item content is stable; co-rating patterns change slowly. Precomputing item similarities offline and serving at query time with a simple dot-product is the scalable choice pioneered by Amazon.",
+          },
+          {
+            id: "c",
+            label: "Both perform identically at scale — choose based on team preference",
+            description: "They have very different scalability and freshness tradeoffs. For large user counts, item-based CF dominates in production systems.",
+          },
+          {
+            id: "d",
+            label: "Neither — CF cannot handle 10 million users",
+            description: "CF absolutely scales to this size — item-based CF does so via offline precomputation, and matrix factorization (sp-r3) scales even further.",
+          },
+        ],
+        branches: {
+          a: "cf_recovery",
+          b: "spr1_cosine_choice",
+          c: "cf_recovery",
+          d: "cf_recovery",
+        },
+        rationale: "Item-based CF wins on production scalability because item similarities are stable and precomputable. User-based CF's O(n²) cost and taste-drift instability make it impractical at scale. Amazon's foundational paper specifically argues this tradeoff.",
+      },
+      spr1_cosine_choice: {
+        id: "spr1_cosine_choice",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Cosine Similarity Interpretation",
+        prompt: "User A rates five movies: all 5 stars. User B rates the same five movies: all 1 star. What is the cosine similarity between users A and B?",
+        code_snippet: `import numpy as np
+
+user_a = np.array([5, 5, 5, 5, 5])
+user_b = np.array([1, 1, 1, 1, 1])
+
+cosine_sim = np.dot(user_a, user_b) / (np.linalg.norm(user_a) * np.linalg.norm(user_b))
+print(cosine_sim)`,
+        choices: [
+          {
+            id: "a",
+            label: "0.0 — they have opposite taste, so similarity is zero",
+            description: "Cosine similarity measures angle, not direction of preference. These two vectors point in the exact same direction.",
+          },
+          {
+            id: "b",
+            label: "1.0 — cosine similarity measures angle, and both vectors point in the same direction",
+            description: "Both users rate all items identically in relative terms. Cosine similarity = 1.0. This is a known limitation — it treats a consistent 5-star rater and a consistent 1-star rater as identical, ignoring their differing baseline bias.",
+          },
+          {
+            id: "c",
+            label: "-1.0 — they rate very differently, so similarity is negative",
+            description: "Negative cosine similarity requires components pointing in opposite directions. Both users have all-positive values here.",
+          },
+          {
+            id: "d",
+            label: "0.5 — partial overlap because rating scales differ",
+            description: "Cosine similarity depends only on the angle between vectors, not their scale. The result is 1.0 regardless of magnitude.",
+          },
+        ],
+        branches: {
+          a: "cf_recovery",
+          b: "spr1_implicit_choice",
+          c: "cf_recovery",
+          d: "cf_recovery",
+        },
+        rationale: "Cosine similarity = 1.0 for any two vectors that are scalar multiples of each other. [5,5,5,5,5] and [1,1,1,1,1] point in the same direction. This is the rating-bias problem — mean-centering ratings before computing similarity is a common fix (Pearson correlation instead of raw cosine).",
+      },
+      spr1_implicit_choice: {
+        id: "spr1_implicit_choice",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Implicit Feedback Modeling",
+        prompt: "You are building a CF system on streaming play counts. A user has 500 plays of Song A and 2 plays of Song B. How should you interpret the missing entries (songs never played)?",
+        code_snippet: `# Play counts matrix (implicit feedback)
+# user_1: {song_A: 500, song_B: 2, song_C: 0, song_D: 0, ...}
+# Missing = never played (0 in the matrix)`,
+        choices: [
+          {
+            id: "a",
+            label: "Missing = strong dislike; weight them heavily as negative signal",
+            description: "Missing entries could mean the user never discovered the song, not that they dislike it. Treating all unknowns as strong negatives destroys recall.",
+          },
+          {
+            id: "b",
+            label: "Ignore missing entries entirely and only train on observed interactions",
+            description: "This ignores the vast majority of the matrix and produces a biased model that only knows how to recommend popular items.",
+          },
+          {
+            id: "c",
+            label: "Treat missing as low-confidence 'not preferred', and scale confidence by interaction count",
+            description: "Hu et al. (2008) ALS: confidence c_ui = 1 + α * f_ui. High play count = high confidence positive; missing = low-confidence negative. This handles the full sparse matrix correctly.",
+          },
+          {
+            id: "d",
+            label: "Fill missing entries with the user's average play count before training",
+            description: "Mean-filling distorts the sparsity structure and conflates 'not discovered' with average preference.",
+          },
+        ],
+        branches: {
+          a: "coldstart_recovery",
+          b: "coldstart_recovery",
+          c: "spr1_scalability_choice",
+          d: "coldstart_recovery",
+        },
+        rationale: "Implicit feedback CF (Hu et al. 2008) uses confidence-weighted ALS. c_ui = 1 + α*f_ui makes high-count interactions high-confidence positives while treating unobserved entries as low-confidence negatives — not strong negatives. This is the standard approach for play counts, purchases, and click data.",
+      },
+      spr1_scalability_choice: {
+        id: "spr1_scalability_choice",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Scalability Bottleneck",
+        prompt: "Your user-based CF system has 5 million users. Each recommendation request requires computing cosine similarities against all other users. What is the time complexity and the correct production fix?",
+        code_snippet: `def get_recommendations_user_based(target_user, all_users, k=10):
+    similarities = []
+    for user in all_users:          # O(n) users
+        sim = cosine_sim(target_user, user)   # O(m) items
+        similarities.append((user, sim))
+    top_k = sorted(similarities)[-k:]
+    return aggregate_recs(top_k)`,
+        choices: [
+          {
+            id: "a",
+            label: "O(n·m) per request; fix by caching the entire similarity matrix",
+            description: "Caching the full n×n similarity matrix for 5M users requires 200TB of memory — completely infeasible.",
+          },
+          {
+            id: "b",
+            label: "O(n·m) per request; fix with approximate nearest neighbor search (e.g., FAISS, LSH) or switch to item-based CF",
+            description: "ANN methods like FAISS reduce lookup to O(log n) with acceptable approximation. Item-based CF precomputes a much smaller item×item matrix. Both are standard production solutions.",
+          },
+          {
+            id: "c",
+            label: "O(m) per request — only the target user's vector matters",
+            description: "You still need to compare against all n other users, so the cost is O(n·m) in the naive implementation.",
+          },
+          {
+            id: "d",
+            label: "O(n²) total but O(1) per request after precomputation",
+            description: "Precomputing all user-user similarities is O(n²) — for 5M users that is 2.5×10¹³ operations, and storing the result is infeasible.",
+          },
+        ],
+        branches: {
+          a: "coldstart_recovery",
+          b: "spr1_coldstart_strategy",
+          c: "coldstart_recovery",
+          d: "coldstart_recovery",
+        },
+        rationale: "Naive user-based CF is O(n·m) per query. Standard production approaches: (1) approximate nearest neighbor search with FAISS or LSH reduces lookup complexity dramatically, (2) item-based CF avoids user-user comparison entirely, (3) matrix factorization (sp-r3) compresses users to dense vectors that support fast ANN lookup.",
+      },
+      spr1_coldstart_strategy: {
+        id: "spr1_coldstart_strategy",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · Cold Start Strategy Design",
+        prompt: "A new user signs up on your platform. What is the most principled cold-start strategy before they accumulate enough interactions for CF to work?",
+        code_snippet: `def recommend_for_new_user(user_id, n_interactions):
+    if n_interactions == 0:
+        # What goes here?
+        pass
+    elif n_interactions < 5:
+        # What goes here?
+        pass
+    else:
+        return collaborative_filter(user_id)`,
+        choices: [
+          {
+            id: "a",
+            label: "Return empty recommendations — do not guess",
+            description: "Empty results destroy the new-user experience and guarantee low retention. Always have a fallback.",
+          },
+          {
+            id: "b",
+            label: "Show global popularity rankings; after 3-5 interactions use those to seed a content-based filter; switch to CF after 10-20",
+            description: "A tiered cold-start strategy is standard: popularity first (no user data needed), then content-based on early signal, then full CF once enough history exists.",
+          },
+          {
+            id: "c",
+            label: "Ask users to rate 20 items during onboarding — then full CF immediately",
+            description: "Long onboarding surveys hurt conversion. 3-5 implicit interactions are more realistic as a bootstrap; explicit surveys should be brief.",
+          },
+          {
+            id: "d",
+            label: "Use the same CF model but replace missing ratings with zeros",
+            description: "Zero-filled new users will appear most similar to users who also rated everything zero — not meaningful neighbors.",
+          },
+        ],
+        branches: {
+          a: "coldstart_recovery",
+          b: "spr1_terminal",
+          c: "coldstart_recovery",
+          d: "coldstart_recovery",
+        },
+        rationale: "The best cold-start designs are tiered: global popularity requires nothing, content-based filtering requires only item features (not user history), and CF becomes viable after 10–20 interactions. Hybrid transitions between tiers are industry standard at Netflix, Spotify, and Amazon.",
+      },
+      cf_recovery: {
+        id: "cf_recovery",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · CF Algorithm Choice",
+        prompt: "A startup has 200,000 users and 10,000 products. They want to precompute recommendations overnight and serve them instantly at query time. Which CF approach is most appropriate?",
+        code_snippet: `# Nightly batch job — 8 hours available
+# Serving: must return in < 50ms
+# n_users = 200_000, n_items = 10_000`,
+        choices: [
+          {
+            id: "a",
+            label: "User-based CF computed at query time",
+            description: "At query time, comparing against 200,000 users per request will exceed 50ms. And results cannot be precomputed since they depend on the query user's current ratings.",
+          },
+          {
+            id: "b",
+            label: "Item-based CF with offline precomputed item-item similarities",
+            description: "Precompute the 10,000×10,000 item similarity matrix overnight (100M pairs, feasible). At query time, look up the user's rated items and aggregate scores — O(items_rated × k) which is very fast.",
+          },
+          {
+            id: "c",
+            label: "Content-based filtering — no matrix needed",
+            description: "Content-based filtering is a valid fallback but is not CF. CF means using collective behavior, not item features.",
+          },
+          {
+            id: "d",
+            label: "Real-time user-based CF with a pre-sorted neighbor cache",
+            description: "Neighbor caches go stale as users rate new items, and maintaining them at this scale adds significant complexity over item-based CF.",
+          },
+        ],
+        branches: {
+          a: "cf_recovery",
+          b: "spr1_scalability_choice",
+          c: "cf_recovery",
+          d: "cf_recovery",
+        },
+        rationale: "Item-based CF is the canonical batch-precompute solution. The item-item matrix is computed overnight and is stable (items do not change behavior frequently). Serving is a simple vector dot product against precomputed similarities — well under 50ms.",
+      },
+      coldstart_recovery: {
+        id: "coldstart_recovery",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · Cold Start Handling",
+        prompt: "A new item is added to the catalog at 9am. By 9:05am, three users have purchased it. How quickly can item-based CF incorporate this new item into recommendations?",
+        code_snippet: `# Item-item similarity matrix recomputed nightly at 2am
+# New item: 'item_new_123', added at 09:00
+# 3 purchases by 09:05
+# Next batch recomputation: tomorrow 02:00`,
+        choices: [
+          {
+            id: "a",
+            label: "Immediately — CF updates in real time",
+            description: "Batch item-based CF does not update in real time. The similarity matrix reflects yesterday's data.",
+          },
+          {
+            id: "b",
+            label: "After the next nightly batch — approximately 17 hours with only 3 co-ratings",
+            description: "3 co-ratings are insufficient to compute stable item similarities. The item will appear in the matrix tomorrow but its neighbors will be noisy until it accumulates hundreds of co-ratings.",
+          },
+          {
+            id: "c",
+            label: "Never — CF cannot incorporate new items without retraining from scratch",
+            description: "CF can incorporate new items; it just needs co-rating data and a recomputation cycle.",
+          },
+          {
+            id: "d",
+            label: "After a streaming update using the 3 purchases — within minutes",
+            description: "Streaming CF updates are architecturally possible but require significant infrastructure (e.g., online ALS). The question describes a batch system.",
+          },
+        ],
+        branches: {
+          a: "coldstart_recovery",
+          b: "spr1_terminal",
+          c: "coldstart_recovery",
+          d: "coldstart_recovery",
+        },
+        rationale: "New item cold start is item-based CF's fundamental limitation. With a nightly batch, a new item waits up to 24 hours for its first neighbors, and those neighbors are unreliable until it has hundreds of co-ratings. Production fixes: content-based bootstrap for new items (use features to assign approximate neighbors before co-ratings accumulate), or a popularity fallback.",
+      },
+      spr1_terminal: {
+        id: "spr1_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "CF Mastery · Collaborative Filtering Complete",
+        terminal: true,
+        prompt: "An interviewer asks: 'Walk me through the cold start problem in collaborative filtering and how you would handle it end-to-end in production.' Identify the strongest answer.",
+        code_snippet: `# Production recommender at scale
+# Users: 10M  Items: 500K  Avg ratings/user: 8
+# New users: 50K/day  New items: 2K/day`,
+        choices: [
+          {
+            id: "a",
+            label: "Cold start means new users/items lack interaction history, making CF unreliable. Fix: tier recommendations — popularity for new users, content-based for new items, transition to CF after 10-20 interactions. Monitor engagement at each tier.",
+            description: "This covers both dimensions (user and item cold start), names concrete strategies, and includes a transition criterion — the complete production answer.",
+          },
+          {
+            id: "b",
+            label: "Cold start only affects new users. Solve it with onboarding surveys.",
+            description: "Cold start also affects new items. Onboarding surveys alone are incomplete and hurt conversion.",
+          },
+          {
+            id: "c",
+            label: "Use a deeper neural CF model — it is more robust to cold start",
+            description: "Neural CF still requires interaction history. The cold start problem is not solved by model depth.",
+          },
+        ],
+        branches: {
+          a: "spr1_terminal",
+          b: "spr1_terminal",
+          c: "spr1_terminal",
+        },
+        rationale: "A complete production answer covers: (1) both user and item cold start as distinct problems, (2) tiered strategies (popularity → content-based → CF), (3) a clear transition threshold (interaction count), (4) monitoring at each tier. Mentioning that implicit-feedback CF also needs careful handling of missing entries (Hu et al. 2008) earns extra credit.",
+      },
+    },
+  },
+  knowledgeCheck: [
+    {
+      question: "Why is item-based CF generally more stable than user-based CF in production?",
+      options: [
+        "Item co-rating patterns are more stable over time than user preferences, making precomputed item similarities reliable",
+        "Item-based CF does not use a user-item matrix",
+        "Item-based CF requires less memory than user-based CF",
+      ],
+      correctIndex: 0,
+      explanation: "Items do not change their content or co-occurrence patterns frequently. User preferences shift with seasons, moods, and life events. Stable item similarities can be precomputed nightly and served at millisecond latency.",
+    },
+    {
+      question: "User A rates movies [5, 5, 5, 5] and User B rates the same movies [1, 1, 1, 1]. What is their cosine similarity?",
+      options: [
+        "1.0 — both vectors point in the same direction regardless of magnitude",
+        "0.2 — proportional to the ratio of their rating scales",
+        "-1.0 — they have opposite rating levels",
+      ],
+      correctIndex: 0,
+      explanation: "Cosine similarity measures the angle between vectors. [5,5,5,5] and [1,1,1,1] are scalar multiples — same direction, cosine = 1.0. This rating-bias issue is commonly fixed by mean-centering ratings (Pearson correlation) before computing similarity.",
+    },
+    {
+      question: "What is the correct approach to missing entries in an implicit-feedback CF system?",
+      options: [
+        "Treat missing as strong dislike with high confidence",
+        "Ignore missing entries and train only on observed interactions",
+        "Treat missing as low-confidence 'not preferred', scale confidence by interaction frequency (Hu et al. 2008)",
+      ],
+      correctIndex: 2,
+      explanation: "Missing implicit feedback means 'not observed,' not 'disliked.' The confidence-weighted ALS formulation (c_ui = 1 + α*f_ui) treats unobserved entries as low-confidence negatives while giving high-count interactions high-confidence positive weight.",
+    },
+    {
+      question: "Which cold-start scenario does item-based CF handle WORST?",
+      options: [
+        "A user who has rated 5 items",
+        "A brand-new item added to the catalog today with zero interactions",
+        "A user who has rated 100 items but only in niche categories",
+      ],
+      correctIndex: 1,
+      explanation: "Item-based CF computes item similarities from co-rating history. A new item with zero interactions has no co-ratings, so it cannot appear in any similarity neighborhood until interactions accumulate and the batch job reruns.",
+    },
+  ],
+},
+
+  "sp-r2": {
+  durationLabel: "15 min",
+  outcomes: [
+    "Build a content-based recommendation pipeline using TF-IDF and cosine similarity.",
+    "Explain why TF-IDF outperforms raw term counts for item representation.",
+    "Construct a user profile as a feature aggregate and generate ranked recommendations.",
+    "Articulate the filter bubble problem and when to prefer CF over content-based filtering.",
+  ],
+  learnMarkdown: `## What content-based filtering is
+
+Content-based (CB) filtering recommends items similar to ones a user has already liked, based on **item features** rather than other users' behavior. No collective wisdom, no matrix of interactions — just "you liked this thriller, here are other thrillers with similar plot descriptions."
+
+CB solves one major CF weakness: the **new item cold start**. As long as you have features (a description, tags, metadata), you can recommend a brand-new item immediately, even before any user has seen it. You cannot do that with CF.
+
+## Building item representations: TF-IDF
+
+The most common text feature for CB is **TF-IDF** (Term Frequency × Inverse Document Frequency). It transforms a text description into a vector where terms that are distinctive to a document score high, and common terms score low.
+
+**Term Frequency (TF)**: how often a term appears in this document, normalized by document length.
+
+\`\`\`
+TF(t, d) = count(t in d) / total_terms(d)
+\`\`\`
+
+**Inverse Document Frequency (IDF)**: penalizes terms that appear in many documents (they are not discriminative).
+
+\`\`\`
+IDF(t) = log(N / df(t))    # N = total docs, df = docs containing term t
+\`\`\`
+
+**TF-IDF score**:
+
+\`\`\`
+TF-IDF(t, d) = TF(t, d) × IDF(t)
+\`\`\`
+
+Words like "the," "and," "movie" get near-zero IDF because they appear everywhere. Words like "heist," "cyberpunk," "biopharma" get high IDF because they are rare and specific.
+
+### TF-IDF vs CountVectorizer
+
+CountVectorizer simply counts term occurrences. It inflates the scores of common words that appear frequently in many documents — exactly the words you do not want to drive similarity.
+
+\`\`\`python
+# Wrong: raw counts inflate common terms
+from sklearn.feature_extraction.text import CountVectorizer
+vec = CountVectorizer()
+
+# Correct: TF-IDF weights distinctive terms
 from sklearn.feature_extraction.text import TfidfVectorizer
+vec = TfidfVectorizer(stop_words='english', max_features=10000)
+item_matrix = vec.fit_transform(item_descriptions)  # shape: (n_items, vocab_size)
+\`\`\`
+
+## Computing item-item similarity
+
+Once items are represented as TF-IDF vectors, compute pairwise cosine similarity:
+
+\`\`\`python
 from sklearn.metrics.pairwise import cosine_similarity
 
-tfidf = TfidfVectorizer(stop_words='english')
-item_matrix = tfidf.fit_transform(movie_descriptions)  # (n_items, n_features)
-user_profile = item_matrix[liked_movies].mean(axis=0)   # average liked-item vector
-scores = cosine_similarity(user_profile, item_matrix)   # score all items
+# item_matrix shape: (n_items, vocab_size) — sparse
+# similarity_matrix shape: (n_items, n_items)
+similarity_matrix = cosine_similarity(item_matrix)
 \`\`\`
 
-### Feature Representations
-| Type | Examples | Pros | Cons |
-|------|---------|------|------|
-| Categorical | Genre, Director | Interpretable | Sparse, brittle |
-| TF-IDF | Description text | Captures nuance | High-dimensional |
-| Embeddings | BERT, CLIP | Semantic understanding | Black box |
+For a catalog of 50,000 items, the full similarity matrix is 50K × 50K = 2.5 billion entries. In practice: compute on demand, use approximate nearest neighbor search, or store only top-K neighbors per item.
 
-### Advantages over CF
-- **No cold-start for new items**: New items can be recommended the moment their metadata is available
-- **Explainable**: "Because you liked X (action, Nolan), here's Y"
-- **No popularity bias**: Niche items can still be recommended
+## Building a user profile
 
-### Disadvantages
-- **Filter bubble**: Only recommends items similar to past history — no discovery
-- **Requires rich metadata**: Quality depends on item feature quality
-- **No cross-domain signals**: Misses the "users like you also liked" signal`,
+A user is not represented as a row in a rating matrix but as an **aggregate of liked item features**:
 
-    video: null,
-    videoFallbackMarkdown: `## Embedding-Based Content Filtering
+\`\`\`python
+def build_user_profile(liked_item_ids, item_matrix, ratings=None):
+    liked_vectors = item_matrix[liked_item_ids]
+    if ratings is not None:
+        # Weight by ratings — higher-rated items contribute more
+        weights = np.array(ratings).reshape(-1, 1)
+        user_profile = (liked_vectors.multiply(weights)).mean(axis=0)
+    else:
+        user_profile = liked_vectors.mean(axis=0)
+    return user_profile  # shape: (1, vocab_size)
 
-Modern content-based systems use pretrained embeddings:
-- **Text items (articles, products)**: Sentence-BERT embeddings → cosine similarity
-- **Images**: CLIP embeddings enable text-to-image and image-to-image retrieval
-- **Multi-modal**: Combine text + image embeddings with learned weights
+# Recommend items most similar to user profile
+scores = cosine_similarity(user_profile, item_matrix).flatten()
+top_items = np.argsort(scores)[::-1][:20]
+\`\`\`
 
-**Approximate Nearest Neighbor Search**: With millions of items, brute-force cosine similarity is too slow. Use FAISS (Facebook AI Similarity Search) or ScaNN (Google) to find top-K similar items in sub-linear time.`,
+This user profile captures the average vocabulary of items the user has engaged with. It is interpretable — you can look at the top TF-IDF terms in the profile and understand why a recommendation was made.
 
-    tryGuidance: "No interactive visualization for this lesson. Review the TF-IDF code examples and try the knowledge check.",
+## Strengths of content-based filtering
 
-    interviewGraph: {
-      initialStageId: "sp_r2_stage1",
-      artifactDimensions: [
-        { label: "Content Representation", recoveryStageId: "sp_r2_rec1" },
-        { label: "CB vs CF Tradeoffs", recoveryStageId: "sp_r2_rec2", passLabel: "Content-Based Expert" },
-      ],
-      stages: {
-        sp_r2_stage1: {
-          id: "sp_r2_stage1",
-          type: "scenario_choice",
-          badge: "Stage 1",
-          title: "Stage 1 · Item Representation",
-          prompt: "You're building a news article recommender. Articles have: title, full text, publication date, author, and category tags. Which representation would best capture semantic similarity between articles?",
-          choices: [
-            { id: "a", label: "Sentence-BERT embeddings of the article text", description: "Dense semantic vectors capture meaning, not just keywords" },
-            { id: "b", label: "One-hot encoding of category tags only", description: "Ignores the rich text content" },
-            { id: "c", label: "Author name as the only feature", description: "Author alone misses topic-level similarity" },
-            { id: "d", label: "Publication date as a numeric feature", description: "Recency is a filter, not a similarity metric" },
-          ],
-          branches: { a: "sp_r2_stage2", b: "sp_r2_rec1", c: "sp_r2_rec1", d: "sp_r2_rec1" },
-          rationale: "Sentence-BERT embeddings capture semantic meaning — two articles about 'Fed rate hikes' and 'central bank interest decisions' would be close in embedding space even if they share few exact words. TF-IDF is a strong second choice for keyword-heavy domains.",
-        },
-        sp_r2_rec1: {
-          id: "sp_r2_rec1",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Item Representation",
-          prompt: "TF-IDF scores a term highly when it appears frequently in one document but rarely across all documents. This makes it useful for recommendations because:",
-          choices: [
-            { id: "a", label: "It identifies terms that make a document distinctive", description: "Rare-but-frequent terms characterize the document's unique topic" },
-            { id: "b", label: "It weights common words like 'the' and 'and' highly", description: "Those are filtered by IDF — they appear in every document" },
-            { id: "c", label: "It guarantees documents in the same category score similarly", description: "TF-IDF ignores category metadata" },
-            { id: "d", label: "It normalizes all documents to the same length", description: "TF-IDF doesn't inherently normalize by length" },
-          ],
-          branches: { a: "sp_r2_stage2", b: "sp_r2_stage2", c: "sp_r2_stage2", d: "sp_r2_stage2" },
-          rationale: "IDF (Inverse Document Frequency) penalizes common words and boosts rare ones. A term like 'quantitative easing' appearing frequently in one article but rarely elsewhere gets a high TF-IDF score — correctly flagging this article as being about monetary policy.",
-        },
-        sp_r2_stage2: {
-          id: "sp_r2_stage2",
-          type: "scenario_choice",
-          badge: "Stage 2",
-          title: "Stage 2 · Filter Bubble & Diversity",
-          prompt: "Your content-based music recommender is working, but users complain that recommendations feel repetitive — always the same artist and genre. What is happening and how do you fix it?",
-          choices: [
-            { id: "a", label: "Filter bubble — inject diversity via MMR or random exploration", description: "Maximum Marginal Relevance penalizes items too similar to already-recommended items" },
-            { id: "b", label: "Switch entirely to collaborative filtering", description: "CF has its own issues and you'd lose content-based advantages" },
-            { id: "c", label: "Lower the similarity threshold to recommend more items", description: "Lower threshold means less relevant, not more diverse" },
-            { id: "d", label: "Add more features to the item representation", description: "More features don't fix the echo chamber — the algorithm still maximizes similarity" },
-          ],
-          branches: { a: "sp_r2_end", b: "sp_r2_rec2", c: "sp_r2_rec2", d: "sp_r2_rec2" },
-          rationale: "The filter bubble is the core weakness of pure content-based filtering. Maximum Marginal Relevance (MMR) selects items that are relevant to the user profile BUT also different from already-selected items. You can also blend in popularity-based or CF-based items to inject discovery.",
-        },
-        sp_r2_rec2: {
-          id: "sp_r2_rec2",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · CB vs CF Tradeoffs",
-          prompt: "A new product is added to your e-commerce catalog. It has detailed metadata (category, description, images) but zero purchases or reviews. Which recommender system can immediately serve it?",
-          choices: [
-            { id: "a", label: "Content-based filtering", description: "Uses item metadata — no purchase history needed" },
-            { id: "b", label: "User-based collaborative filtering", description: "Needs interaction data for the new item" },
-            { id: "c", label: "Item-based collaborative filtering", description: "Can't compute item similarity without ratings" },
-            { id: "d", label: "Matrix factorization (ALS)", description: "Factorizes the existing rating matrix — new item not in it" },
-          ],
-          branches: { a: "sp_r2_end", b: "sp_r2_end", c: "sp_r2_end", d: "sp_r2_end" },
-          rationale: "Content-based filtering is the only approach that can handle new items immediately, because it relies on item features (description, category) rather than interaction history. This is its key advantage over all collaborative filtering variants.",
-        },
-        sp_r2_end: {
-          id: "sp_r2_end",
-          type: "scenario_choice",
-          badge: "Complete",
-          title: "Content-Based Mastered",
-          prompt: "When would you choose content-based filtering as your PRIMARY recommendation strategy?",
-          choices: [
-            { id: "a", label: "Small user base, rich item metadata, frequent new items", description: "All three conditions favor content-based" },
-            { id: "b", label: "Large user base, sparse item metadata, stable catalog", description: "CF would win here" },
-            { id: "c", label: "When you want serendipitous cross-category discovery", description: "CF enables discovery; CB stays within the user's taste bubble" },
-            { id: "d", label: "When item popularity signals are your strongest feature", description: "Popularity is a CF/hybrid strength" },
-          ],
-          branches: { a: "sp_r2_end", b: "sp_r2_end", c: "sp_r2_end", d: "sp_r2_end" },
-          terminal: true,
-          rationale: "Content-based is ideal when: users are too sparse for CF to work, item metadata is rich and reliable, and the catalog updates frequently with new items (news, e-commerce). Its weakness is the filter bubble — in mature systems, it's usually one component of a hybrid.",
-        },
-      },
-    },
+- **New item cold start solved**: any item with features can be recommended immediately.
+- **Interpretable**: you can explain "recommended because you liked X, and both feature Y prominently."
+- **User independence**: no need to find similar users. Works for users with niche tastes that have no close neighbors in a user-user CF model.
+- **Privacy-friendly**: does not require access to other users' behavior.
 
-    knowledgeCheck: [
+## Weaknesses: filter bubble and feature dependence
+
+**Filter bubble**: CB only recommends items similar to what the user has already seen. If a user only watches action movies, CB will only ever recommend more action movies. It cannot discover that the user might enjoy a documentary. CF, by using collective wisdom, can surface genuinely unexpected but liked content.
+
+**Feature quality dependence**: CB is only as good as the item features. If descriptions are thin, wrong, or unavailable (e.g., videos with no transcripts, private business documents), CB degrades badly.
+
+**Over-specialization**: users with very narrow interaction histories get very narrow recommendations — CB amplifies their current tastes rather than broadening them.
+
+**Cannot model evolving preferences well**: the user profile is an average of all past interactions, giving equal or rating-weighted influence to items seen years ago.
+
+## When to choose CB vs CF
+
+| Situation | Prefer |
+|---|---|
+| New item just launched | CB (no co-ratings needed) |
+| Large catalog, many active users | CF (item-based) |
+| Niche user with few neighbors | CB |
+| Serendipity / discovery is the goal | CF or hybrid |
+| Features are rich and high-quality | CB |
+| Features are sparse or unreliable | CF |
+
+## Interview-Ready Summary
+
+- CB recommends by item-feature similarity, not collective behavior — no user history from others is needed.
+- TF-IDF weights terms by local frequency × global rarity; use TfidfVectorizer, not CountVectorizer.
+- User profile = weighted average of liked item TF-IDF vectors; recommendations = cosine similarity to that profile.
+- CB solves new item cold start but creates a filter bubble — it cannot surprise users with content outside their history.
+- Feature quality is the bottleneck: bad or missing item descriptions make CB degrade gracefully to popularity ranking.
+- In interviews: know when CB is better (new items, niche users, interpretability) and when CF beats it (serendipity, scale, rich interaction data).`,
+  video: null,
+  videoFallbackMarkdown: `## Deep dive without video
+
+1. On paper, compute TF-IDF by hand for a 3-document toy corpus. Which term gets the highest TF-IDF? Which gets near-zero?
+2. Sketch a user profile vector after a user likes 3 items. What does each dimension represent?
+3. Write two sentences: "I would choose content-based filtering over CF when ___ because ___. Its main risk is ___."
+4. Open sklearn docs and verify: what is the difference between TfidfVectorizer's default norm parameter and what would happen if you removed it?`,
+  tryGuidance: "Use the interactive to build item TF-IDF vectors from toy descriptions, then construct a user profile by selecting liked items. Observe how the top-recommended items change as you add or remove items from the liked set — and watch for the filter bubble narrowing.",
+  interviewGraph: {
+    initialStageId: "spr2_click",
+    artifactDimensions: [
       {
-        question: "A content-based recommender recommends sci-fi movies because the user rated 'Interstellar' highly. The user actually loves Nolan's directing style, not sci-fi specifically. What does this reveal?",
-        options: [
-          "A bug in the similarity metric",
-          "Content features may not capture the user's true preference signal",
-          "The TF-IDF weights need recalibration",
-          "Collaborative filtering would have the same problem",
-        ],
-        correctIndex: 1,
-        explanation: "Content-based filtering is only as good as the features used. If 'director' is a weak or missing feature but 'genre' is strong, the model will over-index on genre. This is why feature engineering for content-based systems is crucial — and why hybrid models that incorporate CF signals are more robust.",
+        label: "Feature Engineering",
+        recoveryStageId: "feature_recovery",
       },
       {
-        question: "What is Maximum Marginal Relevance (MMR) used for in content-based recommendations?",
-        options: [
-          "Maximizing click-through rate on recommended items",
-          "Balancing relevance and diversity to reduce filter bubble effects",
-          "Merging content features from multiple data sources",
-          "Ranking items by their marginal revenue contribution",
-        ],
-        correctIndex: 1,
-        explanation: "MMR selects the next recommended item to maximize relevance to the user profile MINUS a penalty for similarity to already-selected items. This explicitly trades off relevance vs. diversity, reducing the echo chamber effect of pure similarity-based ranking.",
+        label: "CB vs CF Trade-offs",
+        recoveryStageId: "tradeoff_recovery",
+        passLabel: "CB Mastery",
       },
     ],
+    stages: {
+      spr2_click: {
+        id: "spr2_click",
+        type: "click_target",
+        badge: "Stage 1",
+        title: "Stage 1 · Wrong Vectorizer",
+        prompt: "Your teammate builds a content-based recommender for movie descriptions. They use CountVectorizer to transform the text. Click the line that introduces a feature engineering bug — common words will dominate item similarity.",
+        code_snippet: `from sklearn.feature_extraction.text import CountVectorizer  # -- ds-target:wrong_vectorizer
+
+vectorizer = CountVectorizer(stop_words='english')
+item_matrix = vectorizer.fit_transform(item_descriptions)`,
+        validationCopy: {
+          wrong_vectorizer: "Correct. CountVectorizer counts raw term occurrences, which inflates the weight of frequently-occurring but non-discriminative words. Even with stop_words='english', domain-common words (like 'film', 'story', 'character') will dominate similarity scores. Replace with TfidfVectorizer, which weights terms by global rarity (IDF), making distinctive terms drive similarity.",
+        },
+        branches: {
+          wrong_vectorizer: "spr2_profile_choice",
+        },
+      },
+      spr2_profile_choice: {
+        id: "spr2_profile_choice",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · User Profile Construction",
+        prompt: "A user has rated 10 movies: 8 at 5 stars and 2 at 1 star. How should you construct the user's TF-IDF profile for content-based recommendations?",
+        code_snippet: `liked_ids = [m1, m2, m3, m4, m5, m6, m7, m8]   # 5-star
+disliked_ids = [m9, m10]                          # 1-star
+item_matrix  # shape: (n_movies, vocab_size), TF-IDF`,
+        choices: [
+          {
+            id: "a",
+            label: "Average TF-IDF vectors of all 10 movies equally",
+            description: "Equal averaging ignores the rating signal. The 2 disliked movies would pull the profile toward content the user dislikes.",
+          },
+          {
+            id: "b",
+            label: "Use only the 5-star movies; ignore disliked ones",
+            description: "This is simple and often effective, but it ignores the useful negative signal. A more nuanced profile subtracts disliked content.",
+          },
+          {
+            id: "c",
+            label: "Weight each movie by its rating (positive for liked, negative or zero for disliked), then aggregate",
+            description: "Rating-weighted aggregation is the standard approach: high-rated items contribute positively, low-rated items contribute negatively or are down-weighted. This produces a profile that captures both taste and aversion.",
+          },
+          {
+            id: "d",
+            label: "Use the single highest-rated movie as the profile",
+            description: "A single-item profile is brittle and ignores most of the available signal.",
+          },
+        ],
+        branches: {
+          a: "feature_recovery",
+          b: "feature_recovery",
+          c: "spr2_tfidf_choice",
+          d: "feature_recovery",
+        },
+        rationale: "Rating-weighted user profiles are the standard: weight = rating - mean_rating so 5-stars pull the profile toward liked content and 1-stars push it away. Many production systems simplify to using only positively-interacted items with implicit weights (dwell time, repeat plays), but understanding the principled version is interview-essential.",
+      },
+      spr2_tfidf_choice: {
+        id: "spr2_tfidf_choice",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · TF-IDF Mechanics",
+        prompt: "The word 'movie' appears in 95% of all 10,000 item descriptions in your catalog. What will TF-IDF do to its weight, and why is that the right behavior for a recommender?",
+        code_snippet: `# Corpus: 10,000 movie descriptions
+# 'movie' appears in 9,500 of them
+# IDF('movie') = log(10000 / 9500) ≈ 0.051
+
+# 'cyberpunk' appears in 42 descriptions
+# IDF('cyberpunk') = log(10000 / 42) ≈ 5.47`,
+        choices: [
+          {
+            id: "a",
+            label: "'movie' gets a high TF-IDF weight because it is very common",
+            description: "IDF specifically penalizes common terms. A term appearing in 95% of documents has near-zero IDF regardless of its TF.",
+          },
+          {
+            id: "b",
+            label: "'movie' gets a near-zero TF-IDF weight; 'cyberpunk' gets a high weight — common terms do not discriminate between items",
+            description: "IDF = log(N/df). For 'movie', IDF ≈ 0.05; for 'cyberpunk', IDF ≈ 5.47. High-IDF terms drive item similarity because they are the terms that make items distinctive from each other.",
+          },
+          {
+            id: "c",
+            label: "TF-IDF removes 'movie' entirely from the vocabulary",
+            description: "TF-IDF does not remove terms — it down-weights them. You can also use max_df=0.95 to exclude very common terms, but that is a separate step.",
+          },
+          {
+            id: "d",
+            label: "'movie' and 'cyberpunk' get equal weights because TF-IDF only uses local frequency",
+            description: "TF-IDF combines local frequency (TF) with global rarity (IDF). The IDF component explicitly differentiates common from rare terms.",
+          },
+        ],
+        branches: {
+          a: "feature_recovery",
+          b: "spr2_newitem_choice",
+          c: "feature_recovery",
+          d: "feature_recovery",
+        },
+        rationale: "IDF = log(N / df(t)). When a term appears in nearly all documents, df ≈ N, so IDF ≈ log(1) ≈ 0. The term contributes nothing to similarity — which is exactly right, because it cannot discriminate between items. Distinctive terms (rare words like 'cyberpunk') have high IDF and drive meaningful item-item similarity.",
+      },
+      spr2_newitem_choice: {
+        id: "spr2_newitem_choice",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · New Item Cold Start",
+        prompt: "Your streaming platform adds 500 new movies per week. A new movie is uploaded at midnight with a full plot description but zero user interactions. How does content-based filtering handle this differently from item-based CF?",
+        code_snippet: `# New movie: 'Neon Heist 2077'
+# Description: 'A cyberpunk thriller set in Neo-Tokyo...'
+# Ratings: 0   Co-views: 0   Added: today`,
+        choices: [
+          {
+            id: "a",
+            label: "Both CB and CF can recommend the new movie immediately using its features",
+            description: "CF cannot recommend a new item with zero co-ratings — it has no place in the item-item similarity matrix.",
+          },
+          {
+            id: "b",
+            label: "CB can recommend it immediately using its TF-IDF vector; CF cannot until co-ratings accumulate",
+            description: "CB only needs item features. As soon as the description is available, the TF-IDF vector exists and the movie can appear in similarity searches. CF requires co-occurrence history.",
+          },
+          {
+            id: "c",
+            label: "Neither can recommend it until at least 10 users have seen it",
+            description: "CB needs only item features, not interaction history. It can recommend the new movie immediately.",
+          },
+          {
+            id: "d",
+            label: "CF can recommend it immediately; CB cannot because it needs the user's preferences first",
+            description: "CF needs co-ratings; CB needs item features and a user profile. The new item is in the CB pool instantly; it takes days/weeks to enter CF neighborhoods.",
+          },
+        ],
+        branches: {
+          a: "tradeoff_recovery",
+          b: "spr2_filterbubble_choice",
+          c: "tradeoff_recovery",
+          d: "tradeoff_recovery",
+        },
+        rationale: "New item cold start is the clearest case where CB beats CF. CB requires only item features (description, tags, metadata) — no interaction history. CF requires co-occurrence data accumulated over time. For any catalog with frequent new item additions (news articles, fresh product listings), CB is essential for coverage.",
+      },
+      spr2_filterbubble_choice: {
+        id: "spr2_filterbubble_choice",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Filter Bubble Diagnosis",
+        prompt: "A user has watched 50 action movies and nothing else. Your CB recommender generates their next 20 recommendations — all action movies. A PM asks why the system never recommends documentaries. What is the root cause?",
+        code_snippet: `user_profile = build_profile(user_liked_movies)
+# user_profile: high weights on 'action', 'fight', 'explosion', 'hero'
+# very low weights on 'documentary', 'nature', 'interview'
+
+recs = top_k_similar(user_profile, all_movies, k=20)
+# All recs: action movies`,
+        choices: [
+          {
+            id: "a",
+            label: "A bug in TF-IDF — documentary terms are being removed incorrectly",
+            description: "TF-IDF is working correctly. The issue is the profile construction logic, not the vectorizer.",
+          },
+          {
+            id: "b",
+            label: "The filter bubble: CB can only recommend items similar to what the user has already seen, amplifying existing preferences without broadening them",
+            description: "This is the fundamental CB limitation. The user profile is built from action movies, so it is tuned to action features. CB cannot discover cross-genre preferences that exist but have never been signaled.",
+          },
+          {
+            id: "c",
+            label: "Documentaries have different vocabulary — CB cannot handle multi-genre catalogs",
+            description: "CB handles multi-genre catalogs fine. The problem is not vocabulary mismatch but that the user profile has no documentary signal.",
+          },
+          {
+            id: "d",
+            label: "The user simply dislikes documentaries — the recommendations are correct",
+            description: "This is possible but is not something CB can distinguish from 'never discovered.' CB cannot separate 'dislike' from 'never tried.'",
+          },
+        ],
+        branches: {
+          a: "tradeoff_recovery",
+          b: "spr2_terminal",
+          c: "tradeoff_recovery",
+          d: "tradeoff_recovery",
+        },
+        rationale: "The filter bubble is the defining CB weakness. The user profile is a function of past interactions only — it cannot represent latent interests that have never been expressed. CF and hybrid systems (sp-r3) help by incorporating collective wisdom: if many action fans also watch a specific documentary, that signal propagates through CF even if the individual user has never explored docs.",
+      },
+      feature_recovery: {
+        id: "feature_recovery",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Feature Engineering",
+        prompt: "You are building a CB recommender for a B2B software product catalog. Products have short, jargon-heavy descriptions with lots of acronyms (SaaS, ETL, CRM). Which feature engineering approach works best?",
+        code_snippet: `# Product descriptions: avg 50 words, jargon-heavy
+# 'DataSync Pro: ETL pipeline with CRM integration, real-time SaaS delivery'
+# 'CloudMerge: SaaS ETL solution for CRM data consolidation'`,
+        choices: [
+          {
+            id: "a",
+            label: "CountVectorizer with default settings",
+            description: "CountVectorizer without IDF weighting will give equal weight to common domain terms like 'SaaS', 'ETL', 'CRM' and specific terms. These shared terms dominate similarity.",
+          },
+          {
+            id: "b",
+            label: "TfidfVectorizer with low min_df to keep rare but meaningful domain terms, and sublinear_tf=True to reduce term-count dominance",
+            description: "sublinear_tf=True applies log(1+TF) which reduces the advantage of high-frequency terms within a document. Low min_df keeps rare-but-meaningful product-specific terms. This is the right combination for jargon-heavy short texts.",
+          },
+          {
+            id: "c",
+            label: "Remove all acronyms as noise before vectorizing",
+            description: "Acronyms like 'ETL' and 'CRM' are high-signal terms for product similarity in B2B. Removing them destroys the most useful features.",
+          },
+          {
+            id: "d",
+            label: "Use character n-grams to handle misspellings in product names",
+            description: "Character n-grams help with typos, but the main problem here is term weighting, not spelling variation.",
+          },
+        ],
+        branches: {
+          a: "feature_recovery",
+          b: "spr2_newitem_choice",
+          c: "feature_recovery",
+          d: "feature_recovery",
+        },
+        rationale: "For jargon-heavy B2B text: (1) TfidfVectorizer over CountVectorizer — IDF down-weights ubiquitous domain terms, (2) sublinear_tf=True handles repetitive mentions (a product mentioning 'SaaS' 5 times vs 1 time should not score 5x higher), (3) low min_df keeps product-specific rare terms that define niche categories.",
+      },
+      tradeoff_recovery: {
+        id: "tradeoff_recovery",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · CB vs CF Trade-offs",
+        prompt: "A news recommendation platform publishes 2,000 new articles per day. Articles older than 48 hours have almost no engagement. Which recommendation approach is most appropriate for serving fresh content?",
+        code_snippet: `# Article lifecycle: published → peak engagement in 2-6 hours → stale after 48h
+# New articles per day: 2,000
+# Avg article age at first recommendation: needs to be < 1 hour`,
+        choices: [
+          {
+            id: "a",
+            label: "Item-based CF — precomputed nightly similarities ensure fast serving",
+            description: "Nightly precomputation means new articles are invisible in CF recommendations for up to 24 hours — far too slow for a news platform where articles peak in 2-6 hours.",
+          },
+          {
+            id: "b",
+            label: "Content-based filtering using article TF-IDF — new articles are recommendable immediately after publication",
+            description: "As soon as an article is published, its TF-IDF vector is computable. CB can recommend it within seconds to users whose profiles match the article's content. This is the correct choice for fresh content.",
+          },
+          {
+            id: "c",
+            label: "Matrix factorization — latent factors update automatically with new content",
+            description: "Matrix factorization models require interaction data and periodic retraining. A new article with zero interactions has no latent factor representation.",
+          },
+          {
+            id: "d",
+            label: "Popularity ranking — most-read articles in the past hour",
+            description: "Popularity ranking helps with discovery but provides zero personalization. It is a useful fallback but not a personalized recommender.",
+          },
+        ],
+        branches: {
+          a: "tradeoff_recovery",
+          b: "spr2_terminal",
+          c: "tradeoff_recovery",
+          d: "tradeoff_recovery",
+        },
+        rationale: "News is the canonical CB use case: extremely high item turnover, rich text features (title, body, tags), and an article's value window of hours means CF's dependency on accumulated co-ratings is fatal. Every major news personalization system (Google News, Apple News) uses CB as its primary engine for fresh article ranking.",
+      },
+      spr2_terminal: {
+        id: "spr2_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "CB Mastery · Content-Based Filtering Complete",
+        terminal: true,
+        prompt: "An interviewer asks: 'When would you choose content-based filtering over collaborative filtering, and what is its biggest production risk?' Identify the strongest answer.",
+        code_snippet: `# Production scenario
+# E-commerce: 100,000 new products/month, 5M active users
+# Product catalog: images + descriptions + categories
+# User interaction data: clicks and purchases`,
+        choices: [
+          {
+            id: "a",
+            label: "CB when: new items need immediate coverage (no cold start), user is niche with few neighbors, interpretability is required. Biggest risk: filter bubble — CB cannot surface items outside user history; monitor recommendation diversity as a health metric.",
+            description: "This answer covers the key CB strengths (cold start, niche users, interpretability) and names the filter bubble as the production risk with a concrete monitoring strategy.",
+          },
+          {
+            id: "b",
+            label: "CB is always better — it does not need other users' data",
+            description: "CB has significant weaknesses (filter bubble, feature dependence) that make it inferior to CF in many contexts, especially with rich interaction data.",
+          },
+          {
+            id: "c",
+            label: "CB only works for text data — use CF for structured product features",
+            description: "CB works on any feature representation: TF-IDF for text, embeddings for images, one-hot for categories. It is not limited to text.",
+          },
+        ],
+        branches: {
+          a: "spr2_terminal",
+          b: "spr2_terminal",
+          c: "spr2_terminal",
+        },
+        rationale: "The complete CB answer: choose it for new item coverage, niche users, and interpretability; monitor for filter bubble (track intra-list diversity, cross-category exploration rate). Production-mature systems combine CB and CF in a hybrid (sp-r3) to get cold-start coverage without sacrificing serendipity.",
+      },
+    },
   },
+  knowledgeCheck: [
+    {
+      question: "Why should you use TfidfVectorizer instead of CountVectorizer for content-based filtering?",
+      options: [
+        "TF-IDF weights terms by local frequency × global rarity, so common uninformative terms get near-zero weight and distinctive terms drive similarity",
+        "CountVectorizer is slower for large catalogs",
+        "TfidfVectorizer automatically removes stop words that CountVectorizer cannot remove",
+      ],
+      correctIndex: 0,
+      explanation: "CountVectorizer's raw term counts inflate the weight of frequent but non-discriminative terms. TF-IDF's IDF component (log(N/df)) assigns near-zero weight to terms appearing in most documents and high weight to rare, distinctive terms that actually differentiate items.",
+    },
+    {
+      question: "What is the 'filter bubble' problem in content-based filtering?",
+      options: [
+        "CB cannot handle catalogs with more than 10,000 items",
+        "CB can only recommend items similar to what the user has already interacted with, preventing discovery of genuinely new content categories",
+        "CB ignores user ratings and only uses item metadata",
+      ],
+      correctIndex: 1,
+      explanation: "The filter bubble is the fundamental CB limitation: the user profile is derived from past interactions, so CB can only recommend within the content space the user has already explored. CF avoids this by leveraging the collective wisdom of similar users who may have ventured into different content areas.",
+    },
+    {
+      question: "A new product is added to your catalog with a full description but zero user interactions. Which system can recommend it immediately?",
+      options: [
+        "Item-based collaborative filtering",
+        "Content-based filtering",
+        "Both CF and CB simultaneously",
+      ],
+      correctIndex: 1,
+      explanation: "CB only needs item features — the TF-IDF vector is computable as soon as the description exists. Item-based CF requires co-occurrence data: the new item must appear in other users' interaction histories before it can be placed in the similarity matrix.",
+    },
+    {
+      question: "How is a user profile typically constructed in content-based filtering?",
+      options: [
+        "As the cosine similarity between the user and all items",
+        "As a weighted average of TF-IDF vectors of items the user has interacted with, weighted by rating or interaction strength",
+        "As the TF-IDF vector of the single item the user last viewed",
+      ],
+      correctIndex: 1,
+      explanation: "A CB user profile aggregates the feature vectors of liked items. Rating-weighted averaging (positive weights for high ratings, negative for low) captures both positive taste and aversion. This profile vector is then compared against all item vectors to generate ranked recommendations.",
+    },
+  ],
+},
 
   "sp-r3": {
-    durationLabel: "16 min",
-    outcomes: [
-      "Explain how hybrid systems combine CF and content-based filtering",
-      "Describe matrix factorization and its role in modern recsys",
-      "Identify when each hybrid strategy is appropriate",
+  durationLabel: "16 min",
+  outcomes: [
+    "Explain matrix factorization as decomposing R into user and item latent factor matrices.",
+    "Compare SVD, ALS, and SGD-based MF and choose the right variant for explicit vs implicit feedback.",
+    "Design a hybrid recommender that combines CF and CB to address cold start and filter bubble simultaneously.",
+    "Identify when MF predictions are unreliable and specify the correct fallback strategy.",
+  ],
+  learnMarkdown: `## Why hybrid: neither CF nor CB alone is sufficient
+
+Collaborative filtering has a cold start problem — it cannot recommend new users or new items. Content-based filtering has a filter bubble — it traps users in their existing taste. In production, you almost always end up building a **hybrid recommender** that combines the strengths of both.
+
+A second motivation: CF with explicit user-user or item-item similarity does not scale well to very large catalogs. **Matrix factorization** (MF) solves this by compressing the interaction matrix into dense low-dimensional representations, enabling fast similarity search and better generalization.
+
+## Matrix Factorization: decomposing the interaction matrix
+
+The core idea: approximate the user-item rating matrix **R** (shape: n_users × n_items) as the product of two low-rank matrices:
+
+\`\`\`
+R ≈ U × Vᵀ
+\`\`\`
+
+- **U** (n_users × k): each row is a user's **latent factor vector** in k-dimensional space
+- **V** (n_items × k): each row is an item's latent factor vector
+- **k** (typically 20–200) is the number of latent dimensions — much smaller than n_users or n_items
+
+The predicted rating for user u, item i is the dot product: **r̂(u,i) = U[u] · V[i]**
+
+The latent factors are not interpretable labels — they emerge from the factorization to minimize prediction error. They might capture concepts like "genre preference" or "complexity tolerance," but you cannot directly read them.
+
+## Three factorization approaches
+
+### 1. Truncated SVD
+
+Singular Value Decomposition decomposes any matrix exactly as **R = U Σ Vᵀ**. Truncated SVD keeps only the top-k singular values:
+
+\`\`\`python
+from sklearn.decomposition import TruncatedSVD
+
+svd = TruncatedSVD(n_components=50)
+user_factors = svd.fit_transform(user_item_matrix)  # U × Σ^(1/2)
+item_factors = svd.components_.T                    # V × Σ^(1/2)
+\`\`\`
+
+SVD minimizes reconstruction error globally. But it is designed for **dense matrices** — missing values in R must be filled (usually with zeros or mean ratings) before applying SVD, which introduces systematic bias. It also has no built-in regularization, making it prone to overfitting on sparse data.
+
+### 2. ALS (Alternating Least Squares)
+
+ALS alternates between fixing item factors and solving for user factors, then fixing user factors and solving for item factors. Each step is a closed-form least-squares solve.
+
+\`\`\`
+Fix V → solve U: min ‖R_observed − U Vᵀ‖² + λ‖U‖²
+Fix U → solve V: min ‖R_observed − U Vᵀ‖² + λ‖V‖²
+\`\`\`
+
+**Key advantages of ALS**:
+- Naturally handles missing values — only optimize over observed entries
+- Regularization (λ) is built in — prevents overfitting on sparse data
+- Parallelizable across users and items — scales to hundreds of millions
+- Hu et al. (2008) extended ALS for **implicit feedback** with confidence weighting
+
+ALS is the workhorse of production MF (Spark MLlib, LightFM). If someone asks "how does Netflix/Spotify do MF?", the answer is usually ALS-based.
+
+### 3. SGD-based MF
+
+Stochastic Gradient Descent updates U and V one observed interaction at a time:
+
+\`\`\`
+error = R[u,i] - U[u] · V[i]
+U[u] += η * (error * V[i] - λ * U[u])
+V[i] += η * (error * U[u] - λ * V[i])
+\`\`\`
+
+SGD-based MF (as in the original Simon Funk SVD, popularized by the Netflix Prize) naturally handles sparsity (only updates on observed pairs), is memory efficient, and can incorporate additional features. The downside: learning rate sensitivity and slow convergence compared to ALS.
+
+## Neural Collaborative Filtering (NCF)
+
+Replace the dot product U[u] · V[i] with a neural network. The user and item latent vectors are learned embeddings fed into multiple dense layers:
+
+\`\`\`python
+# Simplified NCF
+user_emb = Embedding(n_users, k)(user_input)
+item_emb = Embedding(n_items, k)(item_input)
+concat = Concatenate()([user_emb, item_emb])
+hidden = Dense(64, activation='relu')(concat)
+output = Dense(1, activation='sigmoid')(hidden)
+\`\`\`
+
+NCF can capture non-linear interactions that dot-product MF misses. The cost: much more data and compute needed, harder to explain, and more prone to overfitting on sparse catalogs.
+
+## Hybrid approaches: combining CF and CB
+
+### 1. Weighted blending
+
+Generate scores from CF and CB independently, then blend:
+
+\`\`\`python
+cf_score = matrix_factorization_predict(user_id, item_id)
+cb_score = content_similarity(user_profile, item_id)
+final_score = 0.7 * cf_score + 0.3 * cb_score
+\`\`\`
+
+Simple and interpretable. The weights (0.7, 0.3) are tuned on validation engagement metrics. CB compensates for CF's cold start; CF compensates for CB's filter bubble.
+
+### 2. Cascade hybrid
+
+Use CB to generate a candidate set, then use CF to rerank within that set. Efficient because CF (the more expensive model) only scores a small candidate pool.
+
+### 3. Feature augmentation
+
+Use CB item features as additional inputs to the MF model. The item latent factor is initialized or regularized using its feature representation. This is the basis for **content-boosted CF** and systems like YouTube's Two-Tower model.
+
+## Cold start in MF: the sparse user problem
+
+\`\`\`python
+# Predict for a user with only 2 ratings
+preds = [predict(new_user_id, i) for i in range(n_items)]  # -- ds-target:sparse_user
+\`\`\`
+
+A user with 2 ratings has a latent factor vector that was barely trained — most of its dimensions converged to the regularization prior (near zero). Predictions for this user are essentially "items that are globally popular" with a tiny signal from those 2 ratings. They are not reliable individual recommendations.
+
+**Production rule**: gate MF predictions behind a minimum interaction threshold (typically 5–20 interactions). Below the threshold, use CB or popularity as a fallback.
+
+## Interview-Ready Summary
+
+- Matrix factorization decomposes R ≈ U × Vᵀ into user and item latent vectors; prediction = dot product.
+- SVD handles dense matrices but biases missing values; ALS handles sparsity natively with regularization; SGD-based MF updates incrementally.
+- ALS is the production standard for large-scale explicit and implicit feedback MF.
+- Neural CF replaces the dot product with a neural network for non-linear interactions — more expressive but requires more data.
+- Hybrid = weighted blend or cascade: CF for users with history, CB for new items, blend weights tuned on engagement metrics.
+- MF predictions for users with fewer than ~5–10 interactions are unreliable — always have a cold-start fallback path.`,
+  video: null,
+  videoFallbackMarkdown: `## Deep dive without video
+
+1. On paper, draw R ≈ U × Vᵀ for a 4-user × 5-item toy matrix with k=2. What does each column of U represent conceptually?
+2. Write the ALS update rule in plain English: what is being held fixed and what is being solved?
+3. Sketch the hybrid blending formula. What happens to the output as CF weight → 1.0? As CB weight → 1.0?
+4. Describe the sparse user problem to a peer — why does a 2-rating user get unreliable MF predictions?`,
+  tryGuidance: "Use the interactive to visualize the latent factor space. Drag user and item vectors to explore how dot product scores change. Notice how sparse users (few interactions) cluster near the origin — that is the sparse user problem made visual.",
+  interviewGraph: {
+    initialStageId: "spr3_click",
+    artifactDimensions: [
+      {
+        label: "Matrix Factorization",
+        recoveryStageId: "mf_recovery",
+      },
+      {
+        label: "Hybrid Design",
+        recoveryStageId: "hybrid_recovery",
+        passLabel: "MF & Hybrid Mastery",
+      },
     ],
-    learnMarkdown: `## Hybrid Systems & Matrix Factorization
-
-Most production recommendation systems are hybrid — combining collaborative filtering, content-based, and often deep learning signals.
-
-### Hybrid Strategies
-| Strategy | How | Example |
-|---------|-----|---------|
-| **Weighted** | score = α*CF + (1-α)*CB | Netflix early system |
-| **Switching** | Use CB for cold users, CF when enough data | Amazon |
-| **Feature augmentation** | CF adds features to CB model | Content + user embeddings |
-| **Cascade** | CB filters candidates → CF re-ranks | Most search + recsys pipelines |
-
-### Matrix Factorization Deep Dive
-Decompose the rating matrix R (n_users × n_items) into:
-- **U** (n_users × k): user latent factors
-- **V** (n_items × k): item latent factors
-- Predicted rating: r̂_ui = uᵢ · vⱼ + bias_u + bias_i + global_bias
-
-\`\`\`
-Objective: min Σ (r_ui - û_i · v̂_j)² + λ(||U||² + ||V||²)
-           (u,i) observed
-\`\`\`
-
-**SVD++**: Extends SVD with implicit feedback (which items a user has interacted with, regardless of rating).
-
-### Two-Tower Models (Modern Approach)
-\`\`\`
-User features → [MLP] → user embedding (256-dim)
-                                                → dot product → relevance score
-Item features → [MLP] → item embedding (256-dim)
-\`\`\`
-- Used at YouTube, Pinterest, Twitter
-- Item embeddings precomputed → fast retrieval via ANN search
-- Naturally handles both user and item features → solves cold-start
-
-### Practical Pipeline
-1. **Candidate generation**: Fast retrieval of top-K (~100-1000) candidates
-2. **Ranking**: Expensive model scores and re-ranks candidates
-3. **Post-processing**: Business rules, diversity, freshness`,
-
-    video: null,
-    videoFallbackMarkdown: `## Netflix Prize and the Rise of Hybrid Systems
-
-The Netflix Prize (2006-2009) showed that ensembling many models outperformed any single algorithm. The winning solution blended 800+ models. Key insight: diverse models that fail in different ways combine to cover each other's weaknesses.
-
-**Modern production recsys** (YouTube, TikTok) use learned embeddings + two-tower retrieval + neural ranking layers. The hybrid nature is baked into the architecture — item features and user-item interaction history are jointly encoded.`,
-
-    tryGuidance: "No interactive visualization for this lesson. Review the hybrid strategies and try the knowledge check.",
-
-    interviewGraph: {
-      initialStageId: "sp_r3_stage1",
-      artifactDimensions: [
-        { label: "Hybrid Strategy", recoveryStageId: "sp_r3_rec1" },
-        { label: "Matrix Factorization", recoveryStageId: "sp_r3_rec2", passLabel: "Recsys Architect" },
-      ],
-      stages: {
-        sp_r3_stage1: {
-          id: "sp_r3_stage1",
-          type: "scenario_choice",
-          badge: "Stage 1",
-          title: "Stage 1 · Choosing a Hybrid Strategy",
-          prompt: "You're designing a recipe recommendation system. New users get poor recommendations (cold-start). Existing users occasionally receive irrelevant suggestions because CF over-indexes on popularity. Which hybrid strategy addresses BOTH issues?",
-          choices: [
-            { id: "a", label: "Switching hybrid: content-based for new users, CF for established users", description: "Directly addresses cold-start; CF improves as history grows" },
-            { id: "b", label: "Weighted hybrid with equal weights for all users", description: "Equal weights don't adapt to the user's data richness" },
-            { id: "c", label: "Pure content-based for all users", description: "Won't leverage user-user similarity signals for established users" },
-            { id: "d", label: "Pure collaborative filtering for all users", description: "Doesn't solve the cold-start problem" },
-          ],
-          branches: { a: "sp_r3_stage2", b: "sp_r3_rec1", c: "sp_r3_rec1", d: "sp_r3_rec1" },
-          rationale: "A switching hybrid is the clean solution: start with content-based (using recipe attributes: cuisine, ingredients, dietary tags) and transition to CF once the user has enough interaction history. The switching threshold might be 10-20 rated recipes.",
+    stages: {
+      spr3_click: {
+        id: "spr3_click",
+        type: "click_target",
+        badge: "Stage 1",
+        title: "Stage 1 · Sparse User Prediction",
+        prompt: "Your teammate builds an MF recommender and generates predictions for all users, including one who has only rated 2 items. Click the line that will produce unreliable recommendations for this sparse user without any safeguard.",
+        code_snippet: `from sklearn.decomposition import TruncatedSVD
+svd = TruncatedSVD(n_components=50)
+user_factors = svd.fit_transform(user_item_matrix)  # -- ds-target:no_regularization
+# Predict for user with only 2 ratings
+preds = [predict(new_user_id, i) for i in range(n_items)]  # -- ds-target:sparse_user`,
+        validationCopy: {
+          no_regularization: "Partially right — TruncatedSVD on raw sparse data introduces bias from missing-value treatment, but the bigger problem is the next line. Click the line that directly generates unreliable predictions for an under-trained user.",
+          sparse_user: "Correct. A user with only 2 interactions has an insufficiently trained latent factor vector — most dimensions converged to the regularization prior rather than learning meaningful preferences. Predictions for this user are essentially global popularity with tiny noise from 2 data points. You must gate MF predictions behind a minimum interaction threshold (typically 5-20 interactions) and serve a cold-start fallback below that threshold.",
         },
-        sp_r3_rec1: {
-          id: "sp_r3_rec1",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Hybrid Strategy",
-          prompt: "In a cascade hybrid system, the first stage generates 500 candidates using a fast retrieval model, and the second stage re-ranks them. Why not just run the expensive ranking model on all items?",
-          choices: [
-            { id: "a", label: "The expensive model would take too long for millions of items", description: "Latency: a 10ms model on 10M items = 27 hours per request" },
-            { id: "b", label: "The ranking model is less accurate than the retrieval model", description: "The opposite — ranking models are typically more sophisticated" },
-            { id: "c", label: "Regulatory constraints prevent scoring all items", description: "Not a typical constraint" },
-            { id: "d", label: "The retrieval model produces better final rankings", description: "Retrieval is optimized for speed/recall, not precision ranking" },
-          ],
-          branches: { a: "sp_r3_stage2", b: "sp_r3_stage2", c: "sp_r3_stage2", d: "sp_r3_stage2" },
-          rationale: "The cascade architecture exists purely for efficiency. Retrieval (ANN search on embeddings) fetches top-K in milliseconds. The expensive ranking model (with many features, cross-interactions) then scores only those K candidates — achieving high quality at acceptable latency.",
+        branches: {
+          no_regularization: "spr3_click",
+          sparse_user: "spr3_als_choice",
         },
-        sp_r3_stage2: {
-          id: "sp_r3_stage2",
-          type: "scenario_choice",
-          badge: "Stage 2",
-          title: "Stage 2 · Matrix Factorization",
-          prompt: "In matrix factorization, you have a user vector u = [0.8, 0.1, 0.5] and two item vectors: item A = [0.9, 0.2, 0.4] and item B = [0.1, 0.9, 0.2]. Which item gets the higher predicted rating, and why?",
-          choices: [
-            { id: "a", label: "Item A — its latent factors align better with the user's factors", description: "Dot product: A = 0.72+0.02+0.20=0.94 vs B = 0.08+0.09+0.10=0.27" },
-            { id: "b", label: "Item B — it has a larger factor in dimension 2", description: "The user has a low weight (0.1) in dimension 2, so B's strength there doesn't matter" },
-            { id: "c", label: "Both are equal — all factor dimensions contribute equally", description: "Dimensions are weighted by the user's factor values" },
-            { id: "d", label: "Cannot determine without knowing the global bias", description: "Bias shifts the prediction uniformly — doesn't change the relative ranking" },
-          ],
-          branches: { a: "sp_r3_end", b: "sp_r3_rec2", c: "sp_r3_rec2", d: "sp_r3_rec2" },
-          rationale: "Predicted rating = dot product of user and item vectors. Item A: 0.8×0.9 + 0.1×0.2 + 0.5×0.4 = 0.72 + 0.02 + 0.20 = 0.94. Item B: 0.8×0.1 + 0.1×0.9 + 0.5×0.2 = 0.08 + 0.09 + 0.10 = 0.27. Item A wins because its strong dimension-1 factor aligns with the user's strong dimension-1 preference.",
+      },
+      spr3_als_choice: {
+        id: "spr3_als_choice",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · ALS vs SGD for Implicit Feedback",
+        prompt: "You are building a MF model on 500 million implicit feedback events (stream plays) with 20 million users and 2 million tracks. Which MF variant is most appropriate?",
+        code_snippet: `# Dataset: 500M play events, implicit feedback
+# n_users = 20_000_000
+# n_items = 2_000_000
+# Matrix density: ~0.001% (extremely sparse)`,
+        choices: [
+          {
+            id: "a",
+            label: "TruncatedSVD from sklearn — fast and well-tested",
+            description: "TruncatedSVD is designed for dense or moderately sparse matrices and fills missing values with zeros, which biases the implicit feedback model. It does not scale to 500M events without distributed infrastructure.",
+          },
+          {
+            id: "b",
+            label: "SGD-based MF — updates incrementally, memory efficient",
+            description: "SGD works but is slower to converge on this scale, and hyperparameter tuning (learning rate, schedule) is more complex than ALS in a distributed setting.",
+          },
+          {
+            id: "c",
+            label: "ALS with confidence weighting (Hu et al. 2008) — designed for implicit feedback at scale, parallelizable across users and items",
+            description: "ALS alternates closed-form solves, handles sparsity natively, and the confidence-weighted formulation specifically targets implicit feedback. Spark MLlib's ALS implementation handles this exact scale.",
+          },
+          {
+            id: "d",
+            label: "Neural CF — deeper models always outperform linear MF",
+            description: "NCF requires dense interaction data to train well and is harder to scale to 500M events without careful engineering. ALS is more reliable at this scale with sparse implicit data.",
+          },
+        ],
+        branches: {
+          a: "mf_recovery",
+          b: "mf_recovery",
+          c: "spr3_latent_choice",
+          d: "mf_recovery",
         },
-        sp_r3_rec2: {
-          id: "sp_r3_rec2",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Matrix Factorization",
-          prompt: "Regularization (λ||U||² + λ||V||²) is added to the matrix factorization objective. What does this prevent?",
-          choices: [
-            { id: "a", label: "Overfitting — large factor values that perfectly fit training ratings but generalize poorly", description: "L2 regularization penalizes large weights" },
-            { id: "b", label: "The cold-start problem for new users", description: "Regularization doesn't create ratings where none exist" },
-            { id: "c", label: "Negative predicted ratings", description: "Nothing in standard MF prevents negative predictions" },
-            { id: "d", label: "Items with many ratings from dominating the loss", description: "That's addressed with per-item loss weighting, not regularization" },
-          ],
-          branches: { a: "sp_r3_end", b: "sp_r3_end", c: "sp_r3_end", d: "sp_r3_end" },
-          rationale: "L2 regularization prevents overfitting by penalizing large factor values. Without it, the model would set factors to arbitrarily large values to perfectly fit the training ratings, but would generalize poorly to unseen user-item pairs.",
+        rationale: "ALS with confidence weighting (Hu et al. 2008) is the industry standard for implicit feedback MF at scale. The confidence c_ui = 1 + α*f_ui handles the 'missing = low-confidence negative' problem. ALS is parallelizable across the user dimension and item dimension independently — the basis for Spark MLlib's distributed implementation.",
+      },
+      spr3_latent_choice: {
+        id: "spr3_latent_choice",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Choosing Latent Dimension k",
+        prompt: "You are training an ALS MF model. You try k=5, k=50, and k=500 latent factors. What is the correct way to choose k and what is the risk of setting it too high?",
+        code_snippet: `from implicit import als
+
+# Experiment with k (factors)
+for k in [5, 50, 500]:
+    model = als.AlternatingLeastSquares(factors=k, regularization=0.1)
+    model.fit(interaction_matrix)
+    # Evaluate on held-out interactions`,
+        choices: [
+          {
+            id: "a",
+            label: "Higher k always better — more latent factors capture more nuance",
+            description: "More factors increase model capacity but also increase compute, memory, and overfitting risk on sparse data. Beyond a point, validation metrics plateau or decline.",
+          },
+          {
+            id: "b",
+            label: "Choose k by cross-validation on held-out interactions; too-high k overfits and too-low k underfits",
+            description: "k is a hyperparameter like any other. Tune it on a validation set (e.g., held-out user-item pairs). On sparse data, k=50-200 often outperforms k=500 because there is not enough data to constrain very high-dimensional factor vectors.",
+          },
+          {
+            id: "c",
+            label: "k should equal the number of item categories in your catalog",
+            description: "There is no principled reason k should match catalog taxonomy. k is a continuous hyperparameter tuned by validation performance.",
+          },
+          {
+            id: "d",
+            label: "Always use k=100 — it is the standard for MF",
+            description: "k=100 is a common starting point but is not universally optimal. It depends on dataset size, sparsity, and evaluation metric.",
+          },
+        ],
+        branches: {
+          a: "mf_recovery",
+          b: "spr3_hybrid_choice",
+          c: "mf_recovery",
+          d: "mf_recovery",
         },
-        sp_r3_end: {
-          id: "sp_r3_end",
-          type: "scenario_choice",
-          badge: "Complete",
-          title: "Hybrid Systems Mastered",
-          prompt: "A two-tower model encodes users and items into the same embedding space. After training, how are item recommendations served at low latency for millions of items?",
-          choices: [
-            { id: "a", label: "Precompute item embeddings; use ANN search at query time", description: "Items don't change per-request; user embedding + ANN retrieval is fast" },
-            { id: "b", label: "Re-encode all items on every user request", description: "Would take seconds to minutes per request" },
-            { id: "c", label: "Store the full dot-product matrix between all users and items", description: "Memory: 100M users × 10M items × 4 bytes = 4 petabytes" },
-            { id: "d", label: "Use only the top-100 most popular items for all users", description: "Defeats the purpose of personalization" },
-          ],
-          branches: { a: "sp_r3_end", b: "sp_r3_end", c: "sp_r3_end", d: "sp_r3_end" },
-          terminal: true,
-          rationale: "Two-tower deployment pattern: (1) precompute all item embeddings and index them in an ANN store (FAISS, ScaNN); (2) at query time, compute the user embedding from their real-time features; (3) run ANN search to retrieve top-K items in <10ms. Only the user tower runs online; the item tower runs offline.",
+        rationale: "k is tuned by held-out validation. Too low: underfits (misses latent structure). Too high: overfits on sparse data (factor vectors have not enough data constraints). The sweet spot depends on the ratio of observed interactions to k: roughly need O(k) interactions per user for reliable factors. Typical production values: k=50-200 for tens of millions of users.",
+      },
+      spr3_hybrid_choice: {
+        id: "spr3_hybrid_choice",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Designing a Hybrid System",
+        prompt: "Your platform has: (A) 30% of users with <5 interactions, (B) 500 new items added per day, (C) users complaining recs are 'too predictable'. Design the hybrid recommender.",
+        code_snippet: `# Requirements:
+# - Handle new users (< 5 interactions)
+# - Handle new items (added today)
+# - Improve diversity / serendipity
+# - Fast serving (< 100ms)`,
+        choices: [
+          {
+            id: "a",
+            label: "Full CF (item-based) for all users — simplest to maintain",
+            description: "Item-based CF cannot handle new users with <5 interactions or new items added today. Fails requirements A and B.",
+          },
+          {
+            id: "b",
+            label: "Full CB for all users — handles cold start and new items",
+            description: "CB handles A and B but worsens C (filter bubble makes recs even more predictable). Fails requirement C.",
+          },
+          {
+            id: "c",
+            label: "Tiered hybrid: CB for users < 5 interactions and new items; ALS-MF + CB blend (0.7/0.3) for active users; inject diversity with exploration items",
+            description: "This addresses all three: CB covers cold start (A and B), MF+CB blend handles filter bubble (C), and explicit diversity injection further improves serendipity. Serving uses precomputed scores for speed.",
+          },
+          {
+            id: "d",
+            label: "NCF for all users — neural models handle all edge cases",
+            description: "NCF still requires interaction history for cold-start users and newly added items have no embeddings. NCF does not solve cold start without additional feature engineering.",
+          },
+        ],
+        branches: {
+          a: "hybrid_recovery",
+          b: "hybrid_recovery",
+          c: "spr3_ncf_choice",
+          d: "hybrid_recovery",
         },
+        rationale: "The tiered hybrid is the standard production pattern: (1) Popularity/CB for users below the interaction threshold, (2) MF+CB weighted blend for active users (MF for personalization, CB for new item coverage), (3) explicit diversity budget (e.g., reserve 10% of the rec list for exploration) to prevent filter bubble. This architecture is used at Netflix, Spotify, and YouTube in various forms.",
+      },
+      spr3_ncf_choice: {
+        id: "spr3_ncf_choice",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Neural CF vs Dot-Product MF",
+        prompt: "When would you choose Neural CF (NCF) over standard dot-product matrix factorization? What is the main cost?",
+        code_snippet: `# Option A: ALS dot-product MF
+# score(u, i) = U[u] · V[i]
+
+# Option B: NCF
+# score(u, i) = MLP([emb_user(u), emb_item(i)])`,
+        choices: [
+          {
+            id: "a",
+            label: "Always NCF — neural models are strictly better than dot product",
+            description: "NCF outperforms dot-product MF only when there is enough data to train the MLP. On sparse catalogs it often underperforms well-regularized ALS.",
+          },
+          {
+            id: "b",
+            label: "NCF when interaction data is dense and non-linear user-item interactions need to be captured; dot-product MF when data is sparse, interpretability matters, or serving latency is critical",
+            description: "NCF's MLP can capture complex non-linear patterns that a simple dot product misses, but requires dense data to avoid overfitting and is slower to serve (no pre-computed dot products). Dot-product MF with ALS is preferable for sparse, large-scale implicit feedback.",
+          },
+          {
+            id: "c",
+            label: "NCF only for small catalogs (< 10,000 items)",
+            description: "Catalog size is not the primary criterion. NCF scales to large catalogs with proper infrastructure; the key trade-off is data density vs model capacity.",
+          },
+          {
+            id: "d",
+            label: "Dot-product MF is always better because it is interpretable",
+            description: "Neither approach is fully interpretable at the latent factor level. NCF is genuinely better when data is abundant and non-linear interactions are present.",
+          },
+        ],
+        branches: {
+          a: "hybrid_recovery",
+          b: "spr3_terminal",
+          c: "hybrid_recovery",
+          d: "hybrid_recovery",
+        },
+        rationale: "NCF vs ALS-MF trade-off: NCF captures non-linear interactions and can incorporate side features easily, but requires more training data to avoid overfitting and is computationally heavier for both training and serving. Dot-product MF with ALS is the production standard for sparse implicit feedback at scale. Many teams use both: dot-product for candidate generation, a small MLP for final reranking.",
+      },
+      mf_recovery: {
+        id: "mf_recovery",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Matrix Factorization",
+        prompt: "You decompose R ≈ U × Vᵀ with k=50 latent factors. What does the vector U[u] represent, and how do you make a prediction for user u, item i?",
+        code_snippet: `# After ALS training:
+# U shape: (n_users, 50)
+# V shape: (n_items, 50)
+# U[u] = ?
+# Predict R[u, i] = ?`,
+        choices: [
+          {
+            id: "a",
+            label: "U[u] is the user's raw rating history; predict by averaging V[i] over rated items",
+            description: "U[u] is a learned latent embedding, not the raw ratings. The raw ratings are in R, which we are trying to approximate.",
+          },
+          {
+            id: "b",
+            label: "U[u] is a 50-dimensional learned representation of user u's latent preferences; predict R[u,i] = U[u] · V[i] (dot product)",
+            description: "The dot product U[u] · V[i] captures how well user u's preferences (U[u]) align with item i's characteristics (V[i]) in the 50-dimensional latent space.",
+          },
+          {
+            id: "c",
+            label: "U[u] is the user's cluster assignment; predict by the cluster's average rating for item i",
+            description: "Cluster-based methods are distinct from MF. U[u] is a dense continuous vector, not a cluster label.",
+          },
+          {
+            id: "d",
+            label: "U[u] is the top-50 items the user has rated; predict by checking if item i is in that list",
+            description: "U[u] is a 50-dimensional latent embedding vector, not a list of items.",
+          },
+        ],
+        branches: {
+          a: "mf_recovery",
+          b: "spr3_latent_choice",
+          c: "mf_recovery",
+          d: "mf_recovery",
+        },
+        rationale: "In MF: U[u] is the user's position in a k-dimensional latent space learned to reconstruct R. Each dimension loosely captures a latent concept (not interpretable labels). Prediction = U[u] · V[i] — the dot product measures alignment between user preference direction and item feature direction in that space. High dot product = predicted high rating.",
+      },
+      hybrid_recovery: {
+        id: "hybrid_recovery",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · Hybrid Design",
+        prompt: "Your CF+CB hybrid uses weights (0.7 CF, 0.3 CB). CF scores range 1-5 and CB scores range 0-1. What is the problem and how do you fix it?",
+        code_snippet: `cf_score = cf_model.predict(user_id, item_id)  # range: [1, 5]
+cb_score = cosine_similarity(user_profile, item_vec)  # range: [0, 1]
+blended = 0.7 * cf_score + 0.3 * cb_score`,
+        choices: [
+          {
+            id: "a",
+            label: "No problem — different ranges are fine in a weighted blend",
+            description: "Different ranges mean 0.7 * [1-5] dominates the blend range (0.7-3.5) while 0.3 * [0-1] contributes maximally 0.3. The 70/30 weight does not reflect actual contribution in practice.",
+          },
+          {
+            id: "b",
+            label: "Normalize both scores to [0, 1] (or z-score) before blending so weights reflect actual contribution",
+            description: "Score normalization is required before blending. Min-max normalization to [0,1] or z-score standardization ensures the weights (0.7, 0.3) actually correspond to the intended contribution ratio.",
+          },
+          {
+            id: "c",
+            label: "Multiply weights by range ratio: use 0.7/5 for CF and 0.3/1 for CB",
+            description: "Dividing by range is not the standard normalization approach and does not account for the actual distribution of scores within each range.",
+          },
+          {
+            id: "d",
+            label: "Use rank-based blending instead — rank each list independently and combine ranks",
+            description: "Rank-based blending (Reciprocal Rank Fusion) is valid but avoids the problem rather than fixing the score-scale issue. For score-based blending, normalization is the correct fix.",
+          },
+        ],
+        branches: {
+          a: "hybrid_recovery",
+          b: "spr3_hybrid_choice",
+          c: "hybrid_recovery",
+          d: "hybrid_recovery",
+        },
+        rationale: "Before weighted blending, scores must be on comparable scales. Options: (1) min-max normalize to [0,1], (2) z-score standardize (mean=0, std=1), (3) use rank-based fusion (Reciprocal Rank Fusion) which sidesteps score scale entirely. In production, score distributions shift over time — dynamic normalization (using recent score statistics) is more robust than static normalization.",
+      },
+      spr3_terminal: {
+        id: "spr3_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "MF & Hybrid Mastery · Complete",
+        terminal: true,
+        prompt: "An interviewer asks: 'Walk me through how you would design a production recommender for a music streaming service with 50M users and 5M tracks.' Identify the strongest answer structure.",
+        code_snippet: `# Music streaming
+# Users: 50M   Tracks: 5M   New tracks: 10K/day
+# Data: play counts, skips, saves (implicit)
+# Goal: personalized home feed, < 100ms p99 latency`,
+        choices: [
+          {
+            id: "a",
+            label: "Two-stage: (1) ALS-MF on play counts for candidate generation (top-500 per user, nightly), (2) CB using audio features + metadata for new track coverage + reranking. Cold start: popularity for <5 plays. Diversity: inject 10% exploration budget. Evaluate offline with NDCG + online with session length.",
+            description: "This covers all dimensions: candidate generation scale, cold start handling, diversity, and both offline and online evaluation. It names specific algorithms and thresholds — the level of detail that signals production experience.",
+          },
+          {
+            id: "b",
+            label: "Train a deep neural CF model on all 50M users end-to-end",
+            description: "A monolithic deep model without a candidate generation stage will be too slow for 50M users × 5M tracks at < 100ms. Production systems always use two stages.",
+          },
+          {
+            id: "c",
+            label: "Item-based CF precomputed nightly — proven to work at Spotify and Amazon",
+            description: "Item-based CF alone cannot handle 10K new tracks per day (they have no co-ratings for up to 24 hours) and will not satisfy the diversity requirement without additional engineering.",
+          },
+        ],
+        branches: {
+          a: "spr3_terminal",
+          b: "spr3_terminal",
+          c: "spr3_terminal",
+        },
+        rationale: "The canonical production architecture is two-stage: (1) fast candidate generation (ALS-MF, embedding ANN search) narrows 5M tracks to ~500 candidates per user, (2) a slower but richer ranking model rescores candidates using MF + CB + contextual features. This two-stage pattern is used at Spotify, YouTube, Netflix, and TikTok. Always include: cold start strategy, diversity mechanism, and both offline (NDCG) and online (session length, CTR) evaluation.",
       },
     },
-
-    knowledgeCheck: [
-      {
-        question: "What is the main advantage of SVD++ over standard SVD for matrix factorization?",
-        options: [
-          "SVD++ runs faster because it uses fewer parameters",
-          "SVD++ incorporates implicit feedback (which items were interacted with) alongside explicit ratings",
-          "SVD++ is more interpretable because it uses sparse factors",
-          "SVD++ solves the cold-start problem completely",
-        ],
-        correctIndex: 1,
-        explanation: "SVD++ extends standard SVD by adding a term for implicit feedback — the set of items a user has interacted with (viewed, clicked, purchased), regardless of whether they rated them. This provides additional signal about user preferences beyond explicit ratings alone.",
-      },
-      {
-        question: "In a production two-stage recommendation system, what is the primary optimization objective of the RETRIEVAL stage?",
-        options: [
-          "Precision — return only highly relevant items",
-          "Recall — don't miss relevant items, even at the cost of including some irrelevant ones",
-          "Diversity — return items from varied categories",
-          "Revenue — return the highest-margin items first",
-        ],
-        correctIndex: 1,
-        explanation: "The retrieval stage optimizes for recall — its job is to filter millions of items down to a few hundred candidates without missing the truly relevant ones. The ranking stage then handles precision. Missing a relevant item at retrieval means it can never be recommended, no matter how good the ranker is.",
-      },
-    ],
   },
+  knowledgeCheck: [
+    {
+      question: "In matrix factorization R ≈ U × Vᵀ, how is the predicted rating for user u and item i computed?",
+      options: [
+        "The dot product of U[u] and V[i]",
+        "The Euclidean distance between U[u] and V[i]",
+        "The average of U[u] and V[i]",
+      ],
+      correctIndex: 0,
+      explanation: "MF prediction = U[u] · V[i], the dot product of the user's and item's latent factor vectors. A high dot product means the user's preference direction and the item's feature direction are well-aligned in the k-dimensional latent space.",
+    },
+    {
+      question: "Why is ALS preferred over TruncatedSVD for implicit feedback recommendation at scale?",
+      options: [
+        "ALS is always faster than SVD for any matrix size",
+        "ALS handles missing values natively (trains on observed entries only), includes regularization, and supports confidence-weighted implicit feedback",
+        "ALS produces more interpretable latent factors than SVD",
+      ],
+      correctIndex: 1,
+      explanation: "TruncatedSVD requires filling in missing values (introducing bias) and has no native regularization. ALS alternates closed-form solves over observed entries only, includes L2 regularization, and the Hu et al. (2008) confidence-weighted extension directly models the 'missing ≠ dislike' nature of implicit feedback.",
+    },
+    {
+      question: "What is the 'sparse user problem' in matrix factorization?",
+      options: [
+        "Users who rate many items make the training matrix too dense for MF",
+        "Users with very few interactions have insufficiently trained latent vectors, making MF predictions unreliable for them",
+        "MF cannot handle users who rate items below 3 stars",
+      ],
+      correctIndex: 1,
+      explanation: "A user with only 2-3 interactions does not provide enough signal to constrain their k-dimensional latent factor vector. Most dimensions default to the regularization prior. Predictions for sparse users are essentially global popularity. The production fix is to gate MF predictions behind a minimum interaction threshold and use cold-start fallbacks below it.",
+    },
+    {
+      question: "What must you do before computing a weighted blend of CF scores (range 1-5) and CB similarity scores (range 0-1)?",
+      options: [
+        "Nothing — the weights automatically adjust for different scales",
+        "Normalize both score distributions to a comparable scale before applying the blend weights",
+        "Multiply CF scores by 0.2 to match the CB range",
+      ],
+      correctIndex: 1,
+      explanation: "Without normalization, the blend weights (e.g., 0.7 CF + 0.3 CB) do not correspond to the actual contribution ratio because the score ranges differ dramatically. Normalize each signal (min-max or z-score) before blending so the weights reflect true contribution.",
+    },
+  ],
+},
 
   "sp-r4": {
-    durationLabel: "14 min",
-    outcomes: [
-      "Explain why accuracy metrics alone are insufficient for recommender evaluation",
-      "Calculate and interpret NDCG, Precision@K, and Recall@K",
-      "Describe coverage, diversity, and novelty as beyond-accuracy metrics",
+  durationLabel: "14 min",
+  outcomes: [
+    "Compute NDCG and explain why ranking order matters for recommender evaluation.",
+    "Distinguish offline evaluation metrics (NDCG, Precision@K, MAP) from online metrics (CTR, session length).",
+    "Explain coverage, diversity, novelty, and serendipity as dimensions beyond accuracy.",
+    "Diagnose the offline-to-online gap and design an A/B test that addresses it.",
+  ],
+  learnMarkdown: `## Why accuracy alone fails
+
+A recommender that always suggests the 10 most popular items will have high Precision@10 — those items are genuinely liked by most users. But it is also a terrible personalized recommender: everyone gets the same list, users see nothing new, and engagement drops over time as the novelty wears off.
+
+Optimizing only for accuracy metrics produces systems that are **accurate but boring, redundant, and potentially harmful** — amplifying popularity bias, creating filter bubbles, and eroding catalog diversity. Senior recommendation engineers think about a portfolio of metrics, not just NDCG.
+
+## Offline accuracy metrics
+
+### RMSE and MAE (explicit feedback)
+
+Root Mean Square Error and Mean Absolute Error measure how accurately the model predicts held-out ratings.
+
+\`\`\`
+RMSE = sqrt( (1/n) Σ (R[u,i] - R̂[u,i])² )
+MAE  = (1/n) Σ |R[u,i] - R̂[u,i]|
+\`\`\`
+
+The Netflix Prize famously optimized RMSE. But a 10% RMSE improvement did not translate to a meaningful online improvement in engagement — foreshadowing the offline-online gap.
+
+### Precision@K and Recall@K
+
+\`\`\`
+Precision@K = (relevant items in top K) / K
+Recall@K    = (relevant items in top K) / (total relevant items)
+\`\`\`
+
+Simple and interpretable. Weakness: treats all positions within the top K equally — position 1 and position K are weighted the same.
+
+### NDCG (Normalized Discounted Cumulative Gain)
+
+NDCG rewards relevant items at the **top of the ranking list** more than the same items lower down. It is the standard metric for ranking-quality in production recommenders.
+
+\`\`\`
+DCG@K = Σ (rel_i / log₂(i+1))    for i = 1 to K
+
+NDCG@K = DCG@K / IDCG@K
+\`\`\`
+
+Where **IDCG@K** is the DCG of the ideal ordering (best items first). NDCG ranges from 0 (all wrong) to 1 (perfect ranking).
+
+Example — three recommendations, relevances [1, 1, 0]:
+\`\`\`
+DCG = 1/log₂(2) + 1/log₂(3) + 0/log₂(4) = 1.0 + 0.63 + 0 = 1.63
+IDCG = 1/log₂(2) + 1/log₂(3) = 1.63   (ideal = same, both relevant items first)
+NDCG = 1.63 / 1.63 = 1.0
+\`\`\`
+
+### MAP (Mean Average Precision)
+
+Average of Precision@K computed at each relevant item's position, averaged over users. Combines ranking quality with recall.
+
+### Hit Rate@K
+
+Did at least one relevant item appear in the top K? A coarser metric but useful for sparse interaction data where few users have more than 1 held-out item.
+
+## Beyond accuracy: the four diversity metrics
+
+### Coverage
+
+\`\`\`
+Coverage = (unique items recommended across all users) / (total catalog size)
+\`\`\`
+
+A recommender with 99% NDCG that only ever recommends the same 500 popular items from a 500,000-item catalog has 0.1% coverage. For platforms monetizing the long tail (Spotify, Netflix, Amazon), low catalog coverage is a business problem.
+
+### Diversity (intra-list diversity)
+
+How different are the items within a single recommendation list? Measured as average pairwise distance between recommended items:
+
+\`\`\`
+diversity(L) = (2 / (K*(K-1))) Σ_{i≠j} dist(item_i, item_j)
+\`\`\`
+
+Where dist is computed from item features (genre distance, content dissimilarity, embedding distance). A diverse list prevents the "you liked one sci-fi thriller, here are 9 more exactly like it" failure mode.
+
+### Novelty
+
+Do recommended items tend to be less-popular, less-seen content? Novelty rewards recommendations of long-tail items:
+
+\`\`\`
+novelty(i) = -log₂(P(i))    where P(i) = popularity of item i
+\`\`\`
+
+Low-novelty systems over-recommend blockbusters. High-novelty systems risk recommending obscure items nobody wants. The right balance depends on platform goals.
+
+### Serendipity
+
+The hardest to measure: did the user encounter something genuinely surprising yet satisfying? A serendipitous recommendation is both **unexpected** (low similarity to past history) and **relevant** (user ended up liking it). Serendipity is often measured post-hoc via user surveys or implicit signals (save rate for items outside typical genre).
+
+## Online metrics: the real ground truth
+
+Offline metrics are computed on historical data. Online metrics measure what actually happens when users see the recommendations.
+
+| Online metric | What it captures |
+|---|---|
+| **CTR (Click-Through Rate)** | Do users engage with the recs? Noisy — easily gamed by clickbait thumbnails |
+| **Watch time / dwell time** | Did users actually consume the recommended content? Better quality signal |
+| **Session length** | Did users stay on platform longer? Measures broader satisfaction |
+| **Return rate** | Did users come back the next day/week? Loyalty signal |
+| **Explicit feedback** | Likes, shares, saves — high signal, low volume |
+
+## The offline-online gap
+
+A model that improves NDCG by 5% in offline evaluation may show zero improvement (or even regression) in online A/B testing. Why?
+
+- Offline test sets contain only **historically observed** interactions — they cannot capture what users would have liked but never saw.
+- **Popularity bias** in historical data inflates offline metrics for models that recommend popular items.
+- **Novelty and diversity** improvements may lower offline NDCG (recommending less popular items) while improving online engagement (users discover things they love).
+- **Temporal effects**: offline evaluation ignores seasonality, recency, and context that drive online behavior.
+
+**Implication**: never deploy purely on offline metric improvement. Always A/B test. Monitor both accuracy metrics and engagement metrics. NDCG is a proxy, not the goal.
+
+## Evaluating and monitoring in production
+
+\`\`\`python
+# Offline gate: require NDCG improvement before A/B test
+avg_ndcg = compute_ndcg(model, test_users)
+if avg_ndcg > baseline_ndcg:
+    # Do NOT auto-deploy — run A/B test and check diversity
+    launch_ab_test(model, traffic_fraction=0.05)
+
+# Production health monitoring
+monitor_metrics([
+    'ndcg@10',          # accuracy
+    'catalog_coverage', # coverage
+    'intra_list_diversity',  # diversity
+    'long_tail_fraction',    # novelty
+    'session_length',        # online engagement
+    'return_rate_7d',        # retention
+])
+\`\`\`
+
+## Interview-Ready Summary
+
+- NDCG rewards relevant items at the top of the list by discounting by log₂(rank+1); ranges 0-1; the industry standard for ranking quality.
+- Precision@K and Recall@K ignore position; MAP rewards rank order across users; Hit Rate@K is a coarser but useful sparse-data metric.
+- Coverage = what fraction of the catalog gets recommended; low coverage = popularity bias.
+- Diversity = intra-list pairwise distance; novelty = inverse popularity; serendipity = unexpected yet liked.
+- Online metrics (CTR, watch time, session length) are the real ground truth — offline improvements do not guarantee online gains.
+- Offline-to-online gap: historical data is biased toward observed interactions; novelty/diversity improvements may lower offline NDCG while boosting engagement.
+- Never deploy on NDCG alone: always A/B test, always monitor the beyond-accuracy metrics as health signals.`,
+  video: null,
+  videoFallbackMarkdown: `## Deep dive without video
+
+1. Compute NDCG@3 by hand for a result list with relevances [0, 1, 1]. Then compute it for [1, 1, 0]. Why does the order matter?
+2. Sketch the offline-online gap in your own words: name one scenario where an offline NDCG improvement fails to translate to an online win.
+3. Pick a real platform (Netflix, Spotify, TikTok). What does low catalog coverage cost them in business terms?
+4. Write a two-sentence definition of serendipity that distinguishes it from diversity and novelty.`,
+  tryGuidance: "Use the interactive to rank two recommendation lists with the same items but different orderings and observe how NDCG changes. Then use the metric dashboard to see how improving NDCG conflicts with catalog coverage when you optimize aggressively for accuracy.",
+  interviewGraph: {
+    initialStageId: "spr4_click",
+    artifactDimensions: [
+      {
+        label: "Metric Selection",
+        recoveryStageId: "metric_recovery",
+      },
+      {
+        label: "Beyond Accuracy",
+        recoveryStageId: "beyond_recovery",
+        passLabel: "Evaluation Mastery",
+      },
     ],
-    learnMarkdown: `## Evaluation: Beyond Accuracy
-
-Recommender systems are not just about predicting ratings correctly — they're about producing recommendations that users actually value.
-
-### Ranking Metrics (More Important Than RMSE)
-
-**Precision@K**: Of the K items recommended, what fraction did the user like?
-\`\`\`
-Precision@K = |relevant ∩ recommended_top_K| / K
-\`\`\`
-
-**Recall@K**: Of all items the user liked, what fraction appeared in the top K?
-\`\`\`
-Recall@K = |relevant ∩ recommended_top_K| / |relevant|
-\`\`\`
-
-**NDCG@K** (Normalized Discounted Cumulative Gain): Rewards putting relevant items higher in the list.
-\`\`\`
-DCG@K = Σ (2^rel_i - 1) / log2(i + 1)   for i = 1..K
-NDCG@K = DCG@K / IDCG@K                   (normalized by ideal DCG)
-\`\`\`
-
-### Beyond-Accuracy Metrics
-| Metric | Definition | Why It Matters |
-|--------|-----------|---------------|
-| **Coverage** | % of catalog ever recommended | Ensures niche items get exposure |
-| **Diversity** | Avg dissimilarity within a recommendation list | Avoids filter bubble |
-| **Novelty** | How unexpected/surprising are the recommendations | Encourages discovery |
-| **Serendipity** | Relevant AND surprising | The "wow" factor |
-
-### Why RMSE Fails
-Netflix Prize winner improved RMSE by 10% but when deployed, barely moved engagement metrics. Users prefer surprising, timely, diverse recommendations over slightly more accurate rating predictions.
-
-### A/B Testing is Ground Truth
-Offline metrics (NDCG, Precision@K) are proxies. True evaluation requires live A/B tests measuring:
-- Click-through rate (CTR)
-- Session length / return visits
-- Conversion (purchase, subscription)`,
-
-    video: null,
-    videoFallbackMarkdown: `## Counterfactual Evaluation
-
-A fundamental challenge: offline evaluation uses held-out ratings, but the ratings were collected under a previous recommendation policy — biased toward items that were shown. Items never shown have no ratings.
-
-**Inverse Propensity Scoring (IPS)**: Weight each observation by 1/P(item was shown) to correct for exposure bias. Gives unbiased offline estimates of online performance.
-
-**Replay**: Log actions with random exploration, replay new policies against the logged data. Expensive but unbiased.`,
-
-    tryGuidance: "No interactive visualization for this lesson. Work through the NDCG calculation example and try the knowledge check.",
-
-    interviewGraph: {
-      initialStageId: "sp_r4_stage1",
-      artifactDimensions: [
-        { label: "Ranking Metrics", recoveryStageId: "sp_r4_rec1" },
-        { label: "Beyond Accuracy", recoveryStageId: "sp_r4_rec2", passLabel: "RecSys Evaluator" },
-      ],
-      stages: {
-        sp_r4_stage1: {
-          id: "sp_r4_stage1",
-          type: "scenario_choice",
-          badge: "Stage 1",
-          title: "Stage 1 · NDCG vs Precision@K",
-          prompt: "System A returns [relevant, irrelevant, relevant, irrelevant, relevant] as its top-5. System B returns [irrelevant, irrelevant, relevant, relevant, relevant]. Precision@5 is 0.6 for both. Which system is better and why?",
-          choices: [
-            { id: "a", label: "System A — NDCG rewards relevant items appearing higher in the list", description: "Position matters: relevant items at ranks 1,3,5 beat 3,4,5" },
-            { id: "b", label: "System B — it has more relevant items at the bottom", description: "Relevant items lower in the list are worth less" },
-            { id: "c", label: "They are equal — Precision@5 is the same", description: "Precision@K ignores position; NDCG reveals the difference" },
-            { id: "d", label: "Cannot determine without the full catalog", description: "NDCG can be computed from these 5 positions alone" },
-          ],
-          branches: { a: "sp_r4_stage2", b: "sp_r4_rec1", c: "sp_r4_rec1", d: "sp_r4_rec1" },
-          rationale: "System A is better. NDCG discounts by log(rank), so a relevant item at rank 1 contributes ~3x more than one at rank 3. Precision@K treats all positions equally — it's a weaker metric when users scan results top-to-bottom. For recommendation carousels and search results, NDCG is preferred.",
+    stages: {
+      spr4_click: {
+        id: "spr4_click",
+        type: "click_target",
+        badge: "Stage 1",
+        title: "Stage 1 · Deploying on NDCG Alone",
+        prompt: "Your teammate writes a deployment gate: if NDCG beats baseline, auto-deploy. Click the line that represents the most dangerous evaluation shortcut — deploying without checking diversity or running an A/B test.",
+        code_snippet: `avg_ndcg = compute_ndcg(model, test_users)
+if avg_ndcg > baseline_ndcg:   # -- ds-target:ndcg_only
+    deploy_model(model)         # -- ds-target:auto_deploy
+# No diversity or coverage check  # -- ds-target:missing_diversity`,
+        validationCopy: {
+          ndcg_only: "Correct. NDCG is a valuable offline metric, but deploying on NDCG improvement alone misses critical failure modes: the model may have boosted accuracy by over-recommending popular items, reducing catalog coverage and diversity. Online engagement (CTR, watch time, session length) may not improve — or may regress. Always pair NDCG with diversity/coverage checks and an A/B test.",
+          auto_deploy: "You identified the auto-deploy as risky — that is partially right. But the root cause is the NDCG-only condition in the line above. Click that line to identify the metric selection failure.",
+          missing_diversity: "You identified the missing diversity check — that is a valid observation, but the primary problem is the condition that triggers the deployment. Click the NDCG comparison line to identify where the evaluation logic fails.",
         },
-        sp_r4_rec1: {
-          id: "sp_r4_rec1",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Ranking Metrics",
-          prompt: "You have 10 relevant items in the user's history. Your system recommends 5 items, 3 of which are relevant. What is Recall@5?",
-          choices: [
-            { id: "a", label: "0.3 (3 out of 10 relevant items retrieved)", description: "Recall@5 = |relevant ∩ top-5| / |all relevant| = 3/10" },
-            { id: "b", label: "0.6 (3 out of 5 recommendations are relevant)", description: "That's Precision@5, not Recall@5" },
-            { id: "c", label: "0.5 (average of precision and recall)", description: "That would be F1, and the calculation is different" },
-            { id: "d", label: "1.0 (perfect recall because all recommendations are relevant)", description: "Recall measures coverage of all relevant items, not just recommended ones" },
-          ],
-          branches: { a: "sp_r4_stage2", b: "sp_r4_stage2", c: "sp_r4_stage2", d: "sp_r4_stage2" },
-          rationale: "Recall@K = relevant items in top-K / total relevant items. Here: 3/10 = 0.3. Precision@K = 3/5 = 0.6. Both matter: Precision shows how many recommendations are useful; Recall shows what fraction of all useful items you're surfacing.",
+        branches: {
+          ndcg_only: "spr4_ndcg_choice",
+          auto_deploy: "spr4_click",
+          missing_diversity: "spr4_click",
         },
-        sp_r4_stage2: {
-          id: "sp_r4_stage2",
-          type: "scenario_choice",
-          badge: "Stage 2",
-          title: "Stage 2 · Coverage & Diversity",
-          prompt: "Your music recommender has 10 million songs. After a week of recommendations across all users, only 50,000 songs have ever been recommended. What problem does this indicate?",
-          choices: [
-            { id: "a", label: "Low catalog coverage — popularity bias toward well-known songs", description: "The system recommends the same popular items to everyone" },
-            { id: "b", label: "Poor precision — too many irrelevant songs recommended", description: "Low coverage means too FEW items recommended, not poor quality" },
-            { id: "c", label: "High novelty — users are getting surprising recommendations", description: "Popularity bias means the opposite — familiar, not novel items" },
-            { id: "d", label: "The catalog is too large for the algorithm", description: "Catalog size is not the problem — the algorithm is biased" },
-          ],
-          branches: { a: "sp_r4_end", b: "sp_r4_rec2", c: "sp_r4_rec2", d: "sp_r4_rec2" },
-          rationale: "0.5% catalog coverage after a week means 99.5% of the catalog is never surfaced. This popularity bias creates a winner-takes-all dynamic that's bad for long-tail artists and for user discovery. Fixes include: diversity-aware ranking (MMR), coverage-constrained optimization, or exploration policies.",
+      },
+      spr4_ndcg_choice: {
+        id: "spr4_ndcg_choice",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · NDCG Mechanics",
+        prompt: "Two recommendation lists for the same user. List A: [relevant, irrelevant, relevant]. List B: [irrelevant, relevant, relevant]. Both have Precision@3 = 2/3. Which list has higher NDCG@3, and why?",
+        code_snippet: `# List A relevances: [1, 0, 1]
+# DCG_A = 1/log2(2) + 0/log2(3) + 1/log2(4)
+#       = 1.0 + 0 + 0.5 = 1.5
+
+# List B relevances: [0, 1, 1]
+# DCG_B = 0/log2(2) + 1/log2(3) + 1/log2(4)
+#       = 0 + 0.63 + 0.5 = 1.13`,
+        choices: [
+          {
+            id: "a",
+            label: "They are equal — Precision@3 is the same so quality is the same",
+            description: "Precision@K ignores rank position within the top K. NDCG explicitly rewards relevant items appearing earlier.",
+          },
+          {
+            id: "b",
+            label: "List A has higher NDCG@3 because its first relevant item is at position 1, earning the maximum log₂(2)=1.0 discount factor",
+            description: "DCG_A = 1.5 > DCG_B = 1.13. The same two relevant items yield higher NDCG when placed earlier in the list. This is why NDCG is preferred over Precision@K for ranked recommendations.",
+          },
+          {
+            id: "c",
+            label: "List B has higher NDCG@3 because it has relevant items at positions 2 and 3",
+            description: "Having relevant items at lower positions yields lower NDCG, not higher. Position 1 is the highest-value slot.",
+          },
+          {
+            id: "d",
+            label: "NDCG cannot distinguish between the two lists",
+            description: "NDCG explicitly measures rank position via the log₂(rank+1) discount. It is specifically designed to distinguish these cases.",
+          },
+        ],
+        branches: {
+          a: "metric_recovery",
+          b: "spr4_coverage_choice",
+          c: "metric_recovery",
+          d: "metric_recovery",
         },
-        sp_r4_rec2: {
-          id: "sp_r4_rec2",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Beyond Accuracy",
-          prompt: "A recommender system achieves very high NDCG offline but users report the recommendations feel stale and predictable. Which metric would have caught this problem?",
-          choices: [
-            { id: "a", label: "Novelty — measures how unexpected/unfamiliar recommended items are", description: "Low novelty means recommendations are too predictable" },
-            { id: "b", label: "Recall@K — measures how many relevant items are surfaced", description: "Recall doesn't capture predictability" },
-            { id: "c", label: "Coverage — measures how much of the catalog is recommended", description: "Coverage measures breadth, not individual-level novelty" },
-            { id: "d", label: "RMSE — measures prediction accuracy", description: "RMSE measures rating accuracy, not novelty" },
-          ],
-          branches: { a: "sp_r4_end", b: "sp_r4_end", c: "sp_r4_end", d: "sp_r4_end" },
-          rationale: "Novelty measures how unexpected recommendations are — often operationalized as the negative log of item popularity (1/popularity). A system that always recommends the most popular items will have high NDCG (popular items are often relevant) but low novelty. Serendipity goes further: relevant AND surprising.",
+        rationale: "NDCG discounts relevance by log₂(rank+1): position 1 gets weight 1/log₂(2)=1.0, position 2 gets 1/log₂(3)≈0.63, position 3 gets 1/log₂(4)=0.5. Relevant items at the top earn more credit. This is what makes NDCG the standard for ranking-quality evaluation — it models the user behavior of preferring recommendations that appear at the top.",
+      },
+      spr4_coverage_choice: {
+        id: "spr4_coverage_choice",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Catalog Coverage",
+        prompt: "Your recommender has NDCG@10 = 0.82 (excellent). But analysis shows that 92% of all recommendations are drawn from the same 1,000 items in a 200,000-item catalog. What metric captures this problem and what is the likely cause?",
+        code_snippet: `total_catalog = 200_000
+unique_recommended = 1_850  # across all users in a week
+
+coverage = unique_recommended / total_catalog
+# coverage = 0.00925 = 0.9%`,
+        choices: [
+          {
+            id: "a",
+            label: "This is fine — NDCG of 0.82 means users are satisfied",
+            description: "NDCG measures per-user ranking quality on items that users historically interacted with. It cannot measure whether the model over-concentrates on popular items or ignores the long tail.",
+          },
+          {
+            id: "b",
+            label: "Low catalog coverage (0.9%) indicates popularity bias — the model over-recommends a small pool of popular items, ignoring 99%+ of the catalog",
+            description: "Catalog coverage directly measures this failure mode. The 1,000-item pool is likely the most interacted-with items, which dominated training signal. The 199,000 long-tail items are never surfaced.",
+          },
+          {
+            id: "c",
+            label: "Low coverage is a data pipeline issue — items are not being indexed correctly",
+            description: "Coverage is a model behavior metric, not a data pipeline metric. The items exist in the catalog; the model simply never recommends them.",
+          },
+          {
+            id: "d",
+            label: "Use Recall@K to measure this — it captures missed items",
+            description: "Recall@K measures whether relevant held-out items appear in the top K, not catalog coverage. Coverage measures what fraction of all catalog items are ever recommended.",
+          },
+        ],
+        branches: {
+          a: "beyond_recovery",
+          b: "spr4_diversity_choice",
+          c: "beyond_recovery",
+          d: "beyond_recovery",
         },
-        sp_r4_end: {
-          id: "sp_r4_end",
-          type: "scenario_choice",
-          badge: "Complete",
-          title: "Evaluation Mastered",
-          prompt: "A PM asks: 'Our offline NDCG improved 5% — should we ship?' Best response?",
-          choices: [
-            { id: "a", label: "Run an A/B test — offline metrics don't guarantee online improvement", description: "NDCG is a proxy; true ground truth is live user behavior" },
-            { id: "b", label: "Yes — 5% NDCG improvement is statistically significant", description: "Statistical significance doesn't imply practical or online significance" },
-            { id: "c", label: "Only if the RMSE also improved", description: "RMSE is a weaker proxy than NDCG for ranking quality" },
-            { id: "d", label: "No — offline improvements never translate to online gains", description: "Too strong — offline metrics are imperfect but not useless" },
-          ],
-          branches: { a: "sp_r4_end", b: "sp_r4_end", c: "sp_r4_end", d: "sp_r4_end" },
-          terminal: true,
-          rationale: "Offline metrics are necessary but not sufficient. The Netflix Prize winner improved offline RMSE by 10% but showed minimal online engagement lift when deployed. Always validate with an A/B test before shipping. Offline improvements are a signal worth investigating, not a guarantee.",
+        rationale: "Catalog coverage = unique recommended items / catalog size. Low coverage indicates popularity bias: the model learned that historically popular items get high engagement (because they were shown frequently), so it over-indexes on them. This starves long-tail items of traffic, creating a feedback loop. For platforms monetizing the long tail, low coverage is a serious business problem, not just an academic metric failure.",
+      },
+      spr4_diversity_choice: {
+        id: "spr4_diversity_choice",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Diversity vs Accuracy Trade-off",
+        prompt: "You improve catalog diversity by adding a maximum-marginal-relevance (MMR) reranking step that penalizes recommendations similar to already-selected items. Your NDCG@10 drops from 0.82 to 0.78. How do you evaluate whether this trade-off is worth deploying?",
+        code_snippet: `# Before MMR: NDCG@10 = 0.82, catalog_coverage = 0.9%
+# After MMR:  NDCG@10 = 0.78, catalog_coverage = 8.4%
+
+# Question: is the 4% NDCG drop worth the 10x coverage gain?`,
+        choices: [
+          {
+            id: "a",
+            label: "No — any NDCG drop means the model is worse; revert the change",
+            description: "NDCG is one metric, not the only metric. A trade-off between accuracy and diversity often improves long-term engagement even when it reduces offline NDCG.",
+          },
+          {
+            id: "b",
+            label: "Yes — NDCG is the only metric that matters; higher coverage is irrelevant",
+            description: "Catalog coverage is a business-critical metric for long-tail monetization. Treating NDCG as the only metric is exactly the problem the question is diagnosing.",
+          },
+          {
+            id: "c",
+            label: "Run an A/B test — measure session length, return rate, and long-tail item engagement online to determine if the NDCG trade-off improves actual user experience",
+            description: "The correct decision process: offline metrics disagree, so let online behavior decide. A/B test measures session length, return rate, and long-tail click rate to determine whether diversity improvement is worth the NDCG cost.",
+          },
+          {
+            id: "d",
+            label: "Use the Pareto criterion — keep the change only if no metric worsens",
+            description: "Pareto optimality is useful in theory but in practice almost any meaningful change involves a trade-off. You need to decide whether the trade-off is worth it, which requires online experimentation.",
+          },
+        ],
+        branches: {
+          a: "beyond_recovery",
+          b: "beyond_recovery",
+          c: "spr4_offlinegap_choice",
+          d: "beyond_recovery",
         },
+        rationale: "When offline metrics conflict, online A/B testing is the tie-breaker. NDCG measures short-term relevance on historical data; session length and return rate measure long-term engagement and loyalty, which are the true business metrics. Diversity improvements often lower offline NDCG while increasing online engagement — this is well-documented in industry (Netflix, Spotify have both published on this trade-off).",
+      },
+      spr4_offlinegap_choice: {
+        id: "spr4_offlinegap_choice",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Offline-Online Gap",
+        prompt: "Your team trains a new MF model that improves offline NDCG by 8% on the historical test set. In the A/B test, CTR is flat and session length drops by 2%. What is the most likely explanation?",
+        code_snippet: `# Offline evaluation
+# NDCG improvement: +8%   ✓
+
+# Online A/B test (5% traffic, 2 weeks)
+# CTR: +0.1%  (not significant)
+# Session length: -2%   ✗
+# Return rate: -1%      ✗`,
+        choices: [
+          {
+            id: "a",
+            label: "The A/B test duration was too short — run for another 2 weeks",
+            description: "A 2-week test is generally sufficient for session and return metrics. The results are consistent (CTR flat, engagement metrics down) — more data is unlikely to flip the direction.",
+          },
+          {
+            id: "b",
+            label: "The model optimized for historically observed interactions (popularity bias) — NDCG improved because it better predicts what users clicked before, but not what would increase future engagement",
+            description: "The offline-online gap: historical data over-represents popular items (shown more often, so more clicks observed). A model optimized on this data learns to predict historical patterns, not to generate better future experiences. Online metrics reveal the true effect.",
+          },
+          {
+            id: "c",
+            label: "The recommender infrastructure is slow — optimize serving latency",
+            description: "Latency regression would show up as uniform CTR drop across all sessions, not a 2-week consistent session length decline while CTR stays flat.",
+          },
+          {
+            id: "d",
+            label: "The 8% NDCG improvement was a mistake — recompute offline metrics",
+            description: "The offline computation may be correct; the gap between offline improvement and online regression is the documented offline-online gap in recommender systems research.",
+          },
+        ],
+        branches: {
+          a: "beyond_recovery",
+          b: "spr4_terminal",
+          c: "beyond_recovery",
+          d: "beyond_recovery",
+        },
+        rationale: "The offline-online gap is a well-documented phenomenon. Historical data is biased: (1) position bias (users click items shown first), (2) popularity bias (popular items observed more frequently), (3) selection bias (users only see items the previous recommender showed them). A model that better fits this biased history may perform worse on future users who encounter a different distribution. Counterfactual evaluation methods (IPS, DRO) partially address this, but A/B testing remains the gold standard.",
+      },
+      metric_recovery: {
+        id: "metric_recovery",
+        type: "scenario_choice",
+        badge: "Recovery 1",
+        title: "Recovery · Metric Selection",
+        prompt: "For a sparse dataset where most users have only 1 held-out interaction, which offline metric is most appropriate?",
+        code_snippet: `# Test set statistics:
+# Users with 1 held-out item: 78%
+# Users with 2+ held-out items: 22%
+# Average held-out items per user: 1.3`,
+        choices: [
+          {
+            id: "a",
+            label: "MAP (Mean Average Precision) — best for ranking quality",
+            description: "MAP averages Precision at each relevant item's rank. With only 1 held-out item per user, MAP reduces to Precision@K at that one item's position, losing most of its averaging benefit.",
+          },
+          {
+            id: "b",
+            label: "RMSE — most interpretable metric",
+            description: "RMSE requires predicted and actual ratings for all held-out items. With implicit feedback and only 1 held-out interaction per user, RMSE is not applicable.",
+          },
+          {
+            id: "c",
+            label: "Hit Rate@K — did the single held-out item appear in the top K? Simple and appropriate for sparse test sets",
+            description: "Hit Rate@K = 1 if the held-out item appears in top K, 0 otherwise. With only 1 held-out item per user, this is the cleanest and most statistically reliable metric — no ambiguity about multiple relevant items.",
+          },
+          {
+            id: "d",
+            label: "Precision@K — measures the fraction of relevant items in top K",
+            description: "With 1 held-out item, Precision@K = Hit Rate@K / K. It adds a K denominator that makes comparison across K values harder. Hit Rate@K is simpler and more interpretable for this use case.",
+          },
+        ],
+        branches: {
+          a: "metric_recovery",
+          b: "metric_recovery",
+          c: "spr4_coverage_choice",
+          d: "metric_recovery",
+        },
+        rationale: "With very sparse test sets (mostly 1 held-out item per user), MAP and NDCG lose statistical power because most users have only one relevant item. Hit Rate@K (= 1 if the held-out item appears in the top K) is maximally interpretable and statistically clean. NDCG@K is still valid but becomes equivalent to a binary relevance metric. Hit Rate@K is widely used in production CF evaluation (collaborative filtering benchmarks consistently use HR@10 and NDCG@10).",
+      },
+      beyond_recovery: {
+        id: "beyond_recovery",
+        type: "scenario_choice",
+        badge: "Recovery 2",
+        title: "Recovery · Beyond Accuracy",
+        prompt: "An interviewer asks: 'Your NDCG-optimized model is 3 months old. Users are complaining that recommendations feel stale. Which metric should you add to your monitoring dashboard first?'",
+        code_snippet: `# Current monitoring dashboard
+metrics = [
+    'ndcg_at_10',
+    'precision_at_10',
+    'map',
+]
+# User complaints: 'I keep seeing the same items'
+# Business impact: session length down 4% over 3 months`,
+        choices: [
+          {
+            id: "a",
+            label: "Add RMSE — better rating prediction accuracy will fix staleness",
+            description: "RMSE measures prediction accuracy, not recommendation freshness or diversity. Better RMSE does not address 'same items repeatedly.'",
+          },
+          {
+            id: "b",
+            label: "Add intra-list diversity and novelty (inverse popularity) metrics; monitor trending item injection rate and catalog coverage week-over-week",
+            description: "'Same items' complaints map directly to low diversity and low novelty. Intra-list diversity measures within-list variety; novelty measures whether long-tail items are surfacing; coverage shows whether the model is over-concentrating. These are the right dashboard additions.",
+          },
+          {
+            id: "c",
+            label: "Add Recall@K — the model is missing relevant items",
+            description: "Recall@K measures how many relevant items are in the top K, not whether recommendations feel fresh or repetitive.",
+          },
+          {
+            id: "d",
+            label: "Add Hit Rate@K — coarser but simpler metric",
+            description: "Hit Rate@K measures whether the held-out item is in the top K. It does not capture staleness or repetition.",
+          },
+        ],
+        branches: {
+          a: "beyond_recovery",
+          b: "spr4_terminal",
+          c: "beyond_recovery",
+          d: "beyond_recovery",
+        },
+        rationale: "Staleness ('same items') maps to low diversity and low novelty. Intra-list diversity (pairwise distance between recommended items) and novelty (inverse popularity, long-tail fraction) are the direct metrics. Catalog coverage (week-over-week) detects increasing concentration. In production, these are tracked alongside session length as health signals — when session length drops, check diversity and novelty first before retraining the core model.",
+      },
+      spr4_terminal: {
+        id: "spr4_terminal",
+        type: "scenario_choice",
+        badge: "Terminal",
+        title: "Evaluation Mastery · Recommender Evaluation Complete",
+        terminal: true,
+        prompt: "An interviewer asks: 'How would you evaluate whether a new recommender model is ready to ship?' Identify the strongest end-to-end answer.",
+        code_snippet: `# Model candidate: new ALS-MF + diversity reranking
+# Baseline: current production model
+# Timeline: 2-week A/B test window`,
+        choices: [
+          {
+            id: "a",
+            label: "Run offline eval first: NDCG@10, Precision@10, catalog coverage, intra-list diversity. If NDCG neutral-to-positive and diversity improves, launch A/B test at 5% traffic. Monitor CTR, session length, 7-day return rate for 2 weeks. Ship if session length and return rate positive, even if CTR is flat.",
+            description: "This covers offline gating (not just NDCG but also diversity), A/B testing structure, the right online metrics (engagement over clicks), and the correct decision criterion (long-term engagement).",
+          },
+          {
+            id: "b",
+            label: "If offline NDCG improves, ship immediately — offline validation is sufficient",
+            description: "Offline NDCG improvement alone is insufficient. The offline-online gap means NDCG improvements frequently do not translate to online engagement gains.",
+          },
+          {
+            id: "c",
+            label: "If CTR improves in A/B test, ship — CTR is the most important metric",
+            description: "CTR is easily gamed (clickbait thumbnails, sensational titles) and does not measure whether users actually consumed or valued the content. Session length and return rate are higher-quality signals.",
+          },
+        ],
+        branches: {
+          a: "spr4_terminal",
+          b: "spr4_terminal",
+          c: "spr4_terminal",
+        },
+        rationale: "Production-grade evaluation requires: (1) offline gating — NDCG + diversity/coverage checks (not NDCG alone), (2) A/B test at low traffic fraction with statistical power analysis, (3) online metrics prioritized by quality: return rate > session length > explicit feedback > CTR. The decision criterion should be long-term engagement (return rate, session length), not just clicks. Document all metric trade-offs before shipping.",
       },
     },
-
-    knowledgeCheck: [
-      {
-        question: "Why is RMSE (root mean squared error) considered a poor metric for recommendation system evaluation?",
-        options: [
-          "It is computationally expensive to calculate",
-          "It optimizes rating prediction accuracy but not the quality of the ranked recommendation list",
-          "It requires explicit ratings which are rarely available",
-          "It cannot handle sparse rating matrices",
-        ],
-        correctIndex: 1,
-        explanation: "RMSE optimizes prediction accuracy for ALL items equally — including items rated 2/5 that users will never care about. What matters in recommendations is ranking: did the user's most-loved items appear near the top? NDCG and Precision/Recall@K directly measure ranking quality, making them more aligned with the actual user experience.",
-      },
-      {
-        question: "What is 'serendipity' in the context of recommender evaluation?",
-        options: [
-          "The ability to handle completely new users with no history",
-          "Recommendations that are both relevant and surprising to the user",
-          "The speed at which recommendations are generated",
-          "The percentage of the catalog covered by recommendations",
-        ],
-        correctIndex: 1,
-        explanation: "Serendipity = relevant + unexpected. A recommendation of 'Thriller' to someone who listens to pop music is expected (not serendipitous). A recommendation of a niche jazz album that the user ends up loving — and would never have found themselves — is serendipitous. It's the 'wow' dimension of recommendation quality.",
-      },
-    ],
   },
+  knowledgeCheck: [
+    {
+      question: "Why does NDCG reward items at the top of the ranking list more than items lower down?",
+      options: [
+        "NDCG uses a log₂(rank+1) discount factor so position 1 earns the maximum weight and lower positions earn exponentially less",
+        "NDCG only considers the first item in the list",
+        "NDCG weights items by their popularity score",
+      ],
+      correctIndex: 0,
+      explanation: "DCG = Σ rel_i / log₂(i+1). At position 1: discount = 1/log₂(2)=1.0. At position 5: discount = 1/log₂(6)≈0.39. The logarithmic discount models the realistic user behavior of paying more attention to the top of the list.",
+    },
+    {
+      question: "What does catalog coverage measure, and why is it important for platforms with long-tail content?",
+      options: [
+        "Coverage = fraction of held-out items correctly predicted; high coverage means high recall",
+        "Coverage = unique items recommended across all users / total catalog size; low coverage indicates popularity bias and under-exposure of the long tail",
+        "Coverage = fraction of users who received at least one recommendation",
+      ],
+      correctIndex: 1,
+      explanation: "Catalog coverage measures whether the recommender surfaces the full catalog or over-concentrates on a small popular subset. For platforms monetizing the long tail (Spotify tracks, Netflix catalog, Amazon products), low coverage starves most content of traffic, creating a self-reinforcing popularity bias loop.",
+    },
+    {
+      question: "A new model improves offline NDCG by 7% but in the A/B test, session length drops by 3%. What is the most likely explanation?",
+      options: [
+        "The A/B test had insufficient sample size — the session length drop is noise",
+        "The model optimized for historical popularity patterns (offline-online gap) — offline NDCG improved by better predicting past clicks, not by improving future user experience",
+        "The serving infrastructure introduced latency that caused the session length drop",
+      ],
+      correctIndex: 1,
+      explanation: "The offline-online gap: historical data is biased toward popular items (shown more, therefore clicked more). A model that fits this distribution better improves offline NDCG while potentially worsening user experience by recommending more of the same popular items. Online metrics (session length, return rate) capture the true user experience that offline metrics cannot.",
+    },
+    {
+      question: "What is the difference between diversity and novelty in recommender evaluation?",
+      options: [
+        "They are the same concept measured at different scales",
+        "Diversity measures variation within a recommendation list (intra-list pairwise distance); novelty measures how unpopular/long-tail the recommended items are",
+        "Diversity measures catalog coverage; novelty measures whether the user has seen items before",
+      ],
+      correctIndex: 1,
+      explanation: "Diversity (intra-list diversity) = average pairwise distance between recommended items in one list — prevents 10 nearly-identical items. Novelty = inverse popularity of recommended items — rewards recommending lesser-known, long-tail content. Both are distinct from serendipity, which also requires the surprising item to be liked after exposure.",
+    },
+  ],
+},
 
 "sp-t1": {
   durationLabel: "18 min",
