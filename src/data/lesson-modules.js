@@ -37859,6 +37859,375 @@ stages:
 },
 
 "mo-c2": {
+  durationLabel: "16 min",
+  outcomes: [
+    "Explain what MLflow tracks and why experiment tracking matters for reproducibility",
+    "Use the MLflow Tracking API to log params, metrics, and artifacts",
+    "Describe the Model Registry lifecycle: Staging → Production → Archived",
+    "Compare MLflow with Weights & Biases and articulate when to use each",
+    "Answer 'how do you ensure reproducibility?' confidently in a system design interview",
+  ],
+  learnMarkdown: `## The Reproducibility Problem
+
+Picture this: you train a model on a Tuesday, it hits 91% accuracy, and you excitedly move on. Three weeks later your manager asks you to reproduce it — or worse, a colleague asks why the production model behaves differently from last month. You stare at a folder of \`model_v2_final_FINAL.pkl\` files and a notebook with no record of which hyperparameters you used.
+
+This is the **reproducibility crisis** of ML. Unlike traditional software, where the same code always produces the same output, ML experiments are shaped by dozens of choices: learning rate, random seeds, data preprocessing steps, library versions, and git state. Without systematic tracking, you are flying blind.
+
+**MLflow** is the open-source answer. It turns your ad-hoc experiment scripts into a searchable, comparable, auditable record of every run you have ever executed.
+
+---
+
+## MLflow Components
+
+MLflow is four loosely coupled subsystems:
+
+**Tracking** — The core. Every time you call \`mlflow.start_run()\`, MLflow creates a *run* record inside an *experiment*. A run stores parameters, scalar metrics (optionally per-step for learning curves), arbitrary artifacts (model files, plots, CSVs), and environment metadata. The UI lets you sort and filter across hundreds of runs.
+
+**Models** — A packaging convention. MLflow wraps your model in a standard format with a \`MLmodel\` manifest that declares *flavors* (sklearn, pytorch, pyfunc, etc.). This lets a downstream service load the model without knowing which framework trained it.
+
+**Model Registry** — Version control for models. After logging a model, you register it under a named entry (e.g., \`fraud-detector\`). Each registered version flows through lifecycle stages: **None → Staging → Production → Archived**. Teams can gate production promotion with approval workflows.
+
+**Projects** — Packaging for reproducibility at the code level. A \`MLproject\` file declares entry points and Conda/Docker environments so anyone can run your experiment with \`mlflow run .\`.
+
+---
+
+## What to Log
+
+Logging everything may seem like overkill — until you need it.
+
+- **Hyperparameters**: every tunable value (\`n_estimators\`, \`learning_rate\`, \`batch_size\`). Log these with \`mlflow.log_param()\` before training starts.
+- **Metrics per epoch/step**: call \`mlflow.log_metric("val_loss", loss, step=epoch)\` to capture the learning curve, not just the final number.
+- **Artifacts**: model weights, feature importance plots, confusion matrices, SHAP plots. Log them with \`mlflow.log_artifact()\` or \`mlflow.log_figure()\`.
+- **Environment**: requirements.txt, conda.yaml, Python version. MLflow auto-captures these when you use \`mlflow.autolog()\`.
+- **Git commit**: MLflow records the active git hash automatically. This pins the exact code version to every run.
+
+A good rule of thumb: if a parameter affects the model's behavior or the metric's validity, log it.
+
+---
+
+## MLflow Tracking API
+
+\`\`\`python
+import mlflow
+import mlflow.sklearn
+from sklearn.ensemble import RandomForestClassifier
+
+mlflow.set_experiment("churn-prediction")
+
+with mlflow.start_run(run_name="rf-baseline"):
+    # Log every hyperparameter
+    mlflow.log_param("n_estimators", 100)
+    mlflow.log_param("max_depth", 5)
+    mlflow.log_param("random_state", 42)
+
+    model = RandomForestClassifier(n_estimators=100, max_depth=5, random_state=42)
+    model.fit(X_train, y_train)
+
+    # Log scalar metrics
+    mlflow.log_metric("accuracy", model.score(X_test, y_test))
+    mlflow.log_metric("f1", f1_score(y_test, model.predict(X_test)))
+
+    # Log the model as a tracked artifact with schema
+    mlflow.sklearn.log_model(model, artifact_path="model")
+
+    # Log a confusion matrix image
+    mlflow.log_artifact("confusion_matrix.png")
+\`\`\`
+
+The \`with mlflow.start_run()\` context manager ensures the run is closed even if an exception occurs. Using \`mlflow.sklearn.log_model()\` instead of \`joblib.dump()\` stores the model inside the run's artifact store with its flavor manifest — making it loadable by the registry.
+
+---
+
+## Model Registry Workflow
+
+1. **Log**: train a run and call \`mlflow.sklearn.log_model()\`.
+2. **Register**: in the UI or via \`mlflow.register_model(run_uri, "model-name")\` — creates version 1.
+3. **Transition to Staging**: evaluate on a holdout set, run integration tests.
+4. **Transition to Production**: once validated, move the version to Production. The serving layer loads whichever version holds the Production stage.
+5. **Archive**: when a newer version supersedes it, archive the old one — it stays queryable but is no longer served.
+
+This workflow decouples the training team from the serving team and gives you an auditable history of every model version that ever reached production.
+
+---
+
+## Alternatives
+
+**Weights & Biases (W&B)** — richer visualizations, better support for deep learning (gradient histograms, system metrics, media logging). More popular in research and computer vision teams. Hosted SaaS with a generous free tier.
+
+**Neptune** — strong collaboration features, good for larger teams.
+
+**Comet ML** — similar to W&B, good UI, offers a self-hosted option.
+
+For interviews: know that W&B is dominant in the DL/research space, while MLflow is dominant in enterprise/batch ML workflows where Databricks or a self-hosted setup is preferred.
+
+---
+
+## Why This Matters in Interviews
+
+The question "how do you ensure reproducibility in your ML pipeline?" is a litmus test for ML engineering maturity. The strong answer describes: (1) version-controlling data and code, (2) logging all params and metrics per run, (3) storing artifacts in a tracked registry, (4) gating stage transitions with validation criteria. Candidates who answer "I just save the pickle file" signal they have not operated ML in production.
+
+---
+
+## Interview-Ready Summary
+
+- MLflow Tracking records params, metrics, artifacts, and git state for every training run inside named experiments.
+- A *run* is a single execution of training code; an *experiment* groups related runs for comparison.
+- Always log hyperparameters with \`mlflow.log_param()\`, not just final metrics — params are what make a run reproducible.
+- Use \`mlflow.sklearn.log_model()\` (not \`joblib.dump()\`) to store models with their flavor manifest for registry compatibility.
+- The Model Registry separates training from serving via lifecycle stages: Staging → Production → Archived.
+- W&B is preferred for deep learning / research; MLflow for enterprise batch ML and Databricks environments.
+`,
+
+  video: null,
+
+  videoFallbackMarkdown: `## Deep Dive: Registry Stage Transitions and Tool Trade-offs
+
+### Navigating Model Registry Stages
+
+The Model Registry is not just a file store — it is an organizational contract between the team that trains models and the team that serves them. Understanding how stage transitions work at the operational level signals genuine production ML experience.
+
+**None → Staging**: triggered by the data scientist after a run looks promising. The model is registered (creating a versioned entry) and moved to Staging. At this point the inference service does *not* serve it. The team runs offline evaluation on a held-out test set, checks latency benchmarks, and often runs shadow-mode predictions alongside the current Production model.
+
+**Staging → Production**: a deliberate promotion that should require sign-off — either a human approval or an automated gate (e.g., accuracy must exceed a threshold, latency p99 must be under 200 ms). MLflow lets you add a description and transition comment to each stage change, creating an audit trail. In Databricks, this can be wired to a CI/CD approval step.
+
+**Production → Archived**: when a new version is promoted to Production, the old version is archived rather than deleted. This preserves the artifact for rollback or post-incident analysis. A common mistake is to skip archiving and leave multiple versions in Production simultaneously — this creates ambiguity about which version the serving layer will load.
+
+### MLflow vs Weights & Biases: When to Choose
+
+The choice between MLflow and W&B is often a cultural and infrastructure question rather than a purely technical one.
+
+**Choose MLflow when**: your organization uses Databricks or Apache Spark; you need a fully self-hosted, air-gapped deployment; you work primarily with tabular data and batch inference; your team values interoperability with the broader Python ML ecosystem without vendor lock-in.
+
+**Choose W&B when**: you are training deep learning models and want gradient histograms, system GPU metrics, and rich media logging out of the box; your team is research-oriented and values fast iteration with slick collaboration features; you need to share experiment dashboards with stakeholders outside the engineering team.
+
+**The maturity signal**: candidates who can articulate *why* they chose one over the other — not just that they used it — demonstrate genuine engineering judgment. In a system design interview, saying "we chose MLflow because we were already on Databricks and needed an air-gapped deployment for compliance reasons" is far stronger than "we used MLflow because it was popular."
+
+### Demonstrating ML Engineering Maturity
+
+In system design interviews, the experiment tracking and model registry question is really about whether you understand the *lifecycle* of a model, not just training. A complete answer covers: how experiments are logged and compared (tracking), how the best model is promoted through validated stages (registry), how the serving layer queries the registry (model loading by stage), and how rollbacks are handled (archive + re-promote). Tying each layer to a concrete tool and explaining the organizational contract it enforces distinguishes senior ML engineers from practitioners who have only trained models in notebooks.
+`,
+
+  tryGuidance: "Step through the interactive stages. For the code review, click the line that contains the most critical missing tracking practice. For scenario questions, choose the answer you would give in a real interview — the rationale reveals what interviewers are probing for.",
+
+  interviewGraph: {
+    initialStageId: "intro_tracking",
+    artifactDimensions: [
+      { label: "Experiment Tracking", recoveryStageId: "tracking_recovery" },
+      { label: "Model Registry", recoveryStageId: "registry_recovery" },
+    ],
+    stages: {
+      intro_tracking: {
+        id: "intro_tracking",
+        type: "scenario_choice",
+        badge: "Stage 1",
+        title: "Stage 1 · Why track experiments?",
+        prompt: "Your team ran 40 experiments last month. Now you need to reproduce the model that performed best. Which MLflow feature is most directly useful?",
+        choices: [
+          { id: "a", label: "Model Registry", description: "Browse registered model versions and their stage history" },
+          { id: "b", label: "MLflow Tracking", description: "Search runs by metric, inspect logged params and artifacts for each run" },
+          { id: "c", label: "MLflow Projects", description: "Re-run the project entry point with the same environment" },
+          { id: "d", label: "MLflow Models", description: "Load the model artifact using its flavor interface" },
+        ],
+        branches: { a: "tracking_recovery", b: "code_review", c: "tracking_recovery", d: "tracking_recovery" },
+        rationale: "MLflow Tracking is where params, metrics, and artifacts are stored per run. To reproduce the best model you need to find its run, read the logged params, and reload the artifact — that is all Tracking. The Registry stores *promoted* versions, not every experimental run.",
+      },
+
+      tracking_recovery: {
+        id: "tracking_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Tracking vs Registry",
+        prompt: "An MLflow *experiment* is to a *run* as a Git repository is to:",
+        choices: [
+          { id: "a", label: "A commit", description: "Each run is a single recorded snapshot, like a commit" },
+          { id: "b", label: "A branch", description: "Runs diverge from each other like branches" },
+          { id: "c", label: "A tag", description: "Runs mark notable points like tags" },
+        ],
+        branches: { a: "code_review", b: "code_review", c: "code_review" },
+        rationale: "A run is the atomic unit in MLflow Tracking — one execution of training code producing one set of params, metrics, and artifacts. An experiment groups many runs, just as a repo groups many commits.",
+      },
+
+      code_review: {
+        id: "code_review",
+        type: "click_target",
+        badge: "Stage 2",
+        title: "Stage 2 · Spot the tracking bug",
+        prompt: "This MLflow training script has two problems. Click the line that represents the *most critical* missing tracking practice — the one that makes this run irreproducible.",
+        code_snippet: `import mlflow
+
+with mlflow.start_run():
+    model = RandomForestClassifier(n_estimators=100, max_depth=5)
+    model.fit(X_train, y_train)
+
+    accuracy = model.score(X_test, y_test)
+    mlflow.log_metric("accuracy", accuracy)    # -- ds-target:single_metric
+
+    # Save model locally
+    joblib.dump(model, "model.pkl")            # -- ds-target:local_save
+
+    # No hyperparameters logged                # -- ds-target:missing_params`,
+        validationCopy: {
+          single_metric: "Logging only final accuracy is a partial problem — you also need per-step metrics for training curves. But the *most critical* gap is the missing hyperparameters. Without them you cannot reconstruct this exact model. Try the comment line.",
+          local_save: "Saving the model locally instead of using mlflow.sklearn.log_model() means the model is not stored inside the run's artifact store and cannot be registered. This is a real bug — but the even more fundamental issue is that the hyperparameters are not logged at all. Try the comment line.",
+          missing_params: "Correct. Without logging n_estimators=100 and max_depth=5 via mlflow.log_param(), you cannot reproduce this exact model even if you re-run the same script with different defaults. Hyperparameters are the most critical thing to log.",
+        },
+        branches: {
+          single_metric: "param_recovery",
+          local_save: "param_recovery",
+          missing_params: "registry_intro",
+        },
+      },
+
+      param_recovery: {
+        id: "param_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · What must be logged",
+        prompt: "Which of the following makes a training run *reproducible* when logged in MLflow?",
+        choices: [
+          { id: "a", label: "Log hyperparameters with mlflow.log_param()", description: "Records every tunable setting so the exact model config can be reconstructed" },
+          { id: "b", label: "Log only the final accuracy metric", description: "Final accuracy summarizes performance but does not describe how the model was built" },
+          { id: "c", label: "Save model.pkl locally with joblib", description: "Local files are not stored in the run artifact store and disappear if the file system changes" },
+        ],
+        branches: { a: "registry_intro", b: "registry_intro", c: "registry_intro" },
+        rationale: "Hyperparameters define the model configuration. Logging them with mlflow.log_param() is the single most important step for reproducibility — without them, even having the trained artifact does not tell you how to retrain if needed.",
+      },
+
+      registry_intro: {
+        id: "registry_intro",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Staging → Production promotion",
+        prompt: "What should be true before you transition a model version from Staging to Production in the MLflow Registry?",
+        choices: [
+          { id: "a", label: "The model achieved the highest training accuracy in its experiment", description: "Training accuracy measures fit, not generalization or production readiness" },
+          { id: "b", label: "The model passed offline evaluation on a held-out test set and latency benchmarks", description: "Validates both predictive quality and serving performance before live traffic" },
+          { id: "c", label: "The previous Production version has been deleted", description: "Old versions should be archived, not deleted — you need them for rollback" },
+          { id: "d", label: "The model was registered at least 24 hours ago", description: "Time elapsed is not a meaningful validation criterion" },
+        ],
+        branches: { a: "registry_recovery", b: "reproduce_stage", c: "registry_recovery", d: "registry_recovery" },
+        rationale: "Staging exists as a validation gate. Best practice is to run the Staging model on a held-out evaluation set (separate from any data used during training or hyperparameter search) and confirm latency/throughput meets SLOs before promoting to Production.",
+      },
+
+      registry_recovery: {
+        id: "registry_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Model Registry stages",
+        prompt: "When a new model version is promoted to Production, what should happen to the previous Production version?",
+        choices: [
+          { id: "a", label: "Delete it to save storage", description: "Deletion removes the rollback option and violates audit trail requirements" },
+          { id: "b", label: "Leave it in Production alongside the new version", description: "Multiple Production versions creates ambiguity about which version is served" },
+          { id: "c", label: "Transition it to Archived", description: "Archiving retains the artifact and audit trail while marking it inactive" },
+        ],
+        branches: { a: "reproduce_stage", b: "reproduce_stage", c: "reproduce_stage" },
+        rationale: "Archive is the correct state for superseded models. It keeps the artifact accessible for rollback or forensic analysis without confusing the serving layer about which version is active.",
+      },
+
+      reproduce_stage: {
+        id: "reproduce_stage",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Reproducing a run from last month",
+        prompt: "A colleague needs to reproduce your best model from six weeks ago exactly. What combination of MLflow artifacts makes this possible?",
+        choices: [
+          { id: "a", label: "The logged params, the logged artifact, and the git commit hash", description: "Together these pin the hyperparameters, the trained weights, and the exact code version" },
+          { id: "b", label: "The final validation metric and the model artifact", description: "Metrics describe performance but do not tell you what hyperparameters produced it" },
+          { id: "c", label: "The conda.yaml environment file only", description: "Environment captures dependencies but not hyperparameters or model weights" },
+          { id: "d", label: "The experiment name and the run timestamp", description: "These identify the run but are not sufficient to reproduce it without the actual logged data" },
+        ],
+        branches: { a: "mlflow_vs_wandb", b: "tracking_recovery", c: "tracking_recovery", d: "tracking_recovery" },
+        rationale: "Full reproducibility requires three things: the hyperparameters (params), the trained model weights (artifact), and the code that trained it (git commit). MLflow logs all three inside a single run record.",
+      },
+
+      mlflow_vs_wandb: {
+        id: "mlflow_vs_wandb",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · MLflow vs Weights & Biases",
+        prompt: "Your team is building a computer vision model with a transformer backbone. Training runs for 3 days on 8 GPUs. Which tracking tool is likely the better fit and why?",
+        choices: [
+          { id: "a", label: "MLflow, because it is open source and self-hostable", description: "True, but self-hosting is an operational cost, not a feature advantage for this use case" },
+          { id: "b", label: "Weights & Biases, because it has richer DL-specific logging: gradient histograms, GPU metrics, and media logging", description: "W&B was designed for exactly this scenario — long-running DL training with rich per-step diagnostics" },
+          { id: "c", label: "Neither — just log to TensorBoard and read the files manually", description: "TensorBoard has no model registry, no run comparison UI, and no artifact storage" },
+          { id: "d", label: "MLflow, because Databricks integrates with it natively", description: "Databricks integration is a strong reason to use MLflow, but this team is not described as using Databricks" },
+        ],
+        branches: { a: "run_definition", b: "run_definition", c: "run_definition", d: "run_definition" },
+        rationale: "W&B was built with deep learning in mind. Its gradient histogram logging, system-level GPU and memory metrics, and first-class support for logging images and video make it substantially more useful for multi-day transformer training than MLflow's more tabular-oriented feature set.",
+      },
+
+      run_definition: {
+        id: "run_definition",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · What is a 'run'?",
+        prompt: "An interviewer asks: 'In MLflow, what exactly is a run and what does it contain?' Select the most complete and accurate answer.",
+        choices: [
+          { id: "a", label: "A run is a single execution of training code that records params, metrics, artifacts, tags, and environment metadata under a unique run ID", description: "Complete — covers all the key contents and the unique identifier" },
+          { id: "b", label: "A run is a trained model file stored in the artifact store", description: "Artifacts are one component of a run, but a run contains much more than the model file" },
+          { id: "c", label: "A run is equivalent to an experiment — they are interchangeable terms", description: "An experiment groups many runs; they are distinct hierarchical concepts" },
+        ],
+        branches: { a: "terminal_stage", b: "tracking_recovery", c: "tracking_recovery" },
+        rationale: "A run is the atomic unit of MLflow Tracking. It is identified by a UUID, belongs to one experiment, and contains: logged parameters (key-value), metrics (with optional step index), artifacts (files), tags (freeform metadata), and automatically captured environment info (git hash, Python version, start/end time).",
+      },
+
+      terminal_stage: {
+        id: "terminal_stage",
+        type: "scenario_choice",
+        badge: "Stage 7",
+        title: "Stage 7 · Answering in a system design interview",
+        prompt: "An interviewer asks: 'How do you ensure reproducibility in your ML pipeline?' What structure makes for the strongest answer?",
+        choices: [
+          { id: "a", label: "Mention only that you use MLflow to track experiments", description: "Naming the tool is necessary but insufficient — you need to describe what you log and why" },
+          { id: "b", label: "Describe: version-controlled data + all params logged per run + artifacts in registry + git commit captured + stage-gated promotion", description: "This covers the full lifecycle and shows you understand reproducibility as a system property, not a single tool" },
+          { id: "c", label: "Explain that you save model files with version numbers in S3", description: "Ad-hoc file naming is not a reproducibility system — it lacks param logging, run comparison, and governance" },
+          { id: "d", label: "Say you use random seeds to make training deterministic", description: "Deterministic training is one small part of reproducibility — it does not address tracking or governance" },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage", d: "terminal_stage" },
+        rationale: "The strongest reproducibility answer frames it as a pipeline property: data versioning ensures the same input, param logging ensures the same configuration, artifact storage with git hash ensures the same code and weights, and registry stage gates ensure the same governance. MLflow is the mechanism, but the principle is what impresses.",
+        terminal: true,
+      },
+    },
+  },
+
+  knowledgeCheck: [
+    {
+      question: "Which of the following should you log in MLflow to make a training run fully reproducible?",
+      options: [
+        "Only the final validation metric",
+        "Hyperparameters, per-step metrics, model artifact, and git commit",
+        "The model pickle file and the experiment name",
+        "The conda environment file only",
+      ],
+      correctIndex: 1,
+      explanation: "Full reproducibility requires logging every hyperparameter (so you can reconstruct the config), metrics (to compare runs), the model artifact via mlflow.sklearn.log_model() (so the trained weights are in the artifact store), and the git commit (so the exact code is pinned). MLflow captures the git hash automatically.",
+    },
+    {
+      question: "In the MLflow Model Registry, what is the correct sequence of lifecycle stages for a newly trained model?",
+      options: [
+        "Production → Staging → Archived",
+        "None → Staging → Production → Archived",
+        "Staging → None → Production",
+        "Draft → Review → Published",
+      ],
+      correctIndex: 1,
+      explanation: "Models start in None (registered but undeployed), move to Staging for evaluation, are promoted to Production when they pass validation, and are finally Archived when superseded. Skipping Staging and going directly to Production bypasses the validation gate.",
+    },
+    {
+      question: "Why should you use mlflow.sklearn.log_model() instead of joblib.dump() to save a scikit-learn model?",
+      options: [
+        "mlflow.sklearn.log_model() is faster than joblib.dump()",
+        "joblib.dump() produces larger files",
+        "mlflow.sklearn.log_model() stores the model inside the run's artifact store with a flavor manifest, enabling Model Registry integration and framework-agnostic loading",
+        "joblib.dump() does not support scikit-learn models",
+      ],
+      correctIndex: 2,
+      explanation: "mlflow.sklearn.log_model() does three things joblib.dump() does not: it stores the artifact inside the tracked run (so it appears in the MLflow UI), it writes an MLmodel manifest declaring the sklearn flavor (enabling mlflow.pyfunc.load_model() to load it without knowing the framework), and it makes the model registerable via mlflow.register_model().",
+    },
+  ],
+},
+
+"mo-c3": {
   durationLabel: "18 min",
   outcomes: [
     "Distinguish **data drift**, **concept drift**, and **label drift** and explain why each degrades a production model differently.",
@@ -38327,375 +38696,6 @@ Track metrics on **rolling windows** (7-day and 30-day) rather than cumulative s
       ],
       correctIndex: 0,
       explanation: "Stable input features (low PSI) combined with degrading model performance is the hallmark of concept drift: P(y | X) has changed. The model's learned decision boundary is no longer aligned with actual outcomes. Lowering the threshold would trade precision for recall but would not fix the underlying misalignment. Expanding PSI monitoring won't help if the drift is in the label relationship, not the input distributions. The correct fix is to retrain using recently labeled data that reflects the new patterns — in fraud, this means including recent fraud cases that capture the evolved fraud tactics the model doesn't yet recognize.",
-    },
-  ],
-},
-
-"mo-c3": {
-  durationLabel: "16 min",
-  outcomes: [
-    "Explain what MLflow tracks and why experiment tracking matters for reproducibility",
-    "Use the MLflow Tracking API to log params, metrics, and artifacts",
-    "Describe the Model Registry lifecycle: Staging → Production → Archived",
-    "Compare MLflow with Weights & Biases and articulate when to use each",
-    "Answer 'how do you ensure reproducibility?' confidently in a system design interview",
-  ],
-  learnMarkdown: `## The Reproducibility Problem
-
-Picture this: you train a model on a Tuesday, it hits 91% accuracy, and you excitedly move on. Three weeks later your manager asks you to reproduce it — or worse, a colleague asks why the production model behaves differently from last month. You stare at a folder of \`model_v2_final_FINAL.pkl\` files and a notebook with no record of which hyperparameters you used.
-
-This is the **reproducibility crisis** of ML. Unlike traditional software, where the same code always produces the same output, ML experiments are shaped by dozens of choices: learning rate, random seeds, data preprocessing steps, library versions, and git state. Without systematic tracking, you are flying blind.
-
-**MLflow** is the open-source answer. It turns your ad-hoc experiment scripts into a searchable, comparable, auditable record of every run you have ever executed.
-
----
-
-## MLflow Components
-
-MLflow is four loosely coupled subsystems:
-
-**Tracking** — The core. Every time you call \`mlflow.start_run()\`, MLflow creates a *run* record inside an *experiment*. A run stores parameters, scalar metrics (optionally per-step for learning curves), arbitrary artifacts (model files, plots, CSVs), and environment metadata. The UI lets you sort and filter across hundreds of runs.
-
-**Models** — A packaging convention. MLflow wraps your model in a standard format with a \`MLmodel\` manifest that declares *flavors* (sklearn, pytorch, pyfunc, etc.). This lets a downstream service load the model without knowing which framework trained it.
-
-**Model Registry** — Version control for models. After logging a model, you register it under a named entry (e.g., \`fraud-detector\`). Each registered version flows through lifecycle stages: **None → Staging → Production → Archived**. Teams can gate production promotion with approval workflows.
-
-**Projects** — Packaging for reproducibility at the code level. A \`MLproject\` file declares entry points and Conda/Docker environments so anyone can run your experiment with \`mlflow run .\`.
-
----
-
-## What to Log
-
-Logging everything may seem like overkill — until you need it.
-
-- **Hyperparameters**: every tunable value (\`n_estimators\`, \`learning_rate\`, \`batch_size\`). Log these with \`mlflow.log_param()\` before training starts.
-- **Metrics per epoch/step**: call \`mlflow.log_metric("val_loss", loss, step=epoch)\` to capture the learning curve, not just the final number.
-- **Artifacts**: model weights, feature importance plots, confusion matrices, SHAP plots. Log them with \`mlflow.log_artifact()\` or \`mlflow.log_figure()\`.
-- **Environment**: requirements.txt, conda.yaml, Python version. MLflow auto-captures these when you use \`mlflow.autolog()\`.
-- **Git commit**: MLflow records the active git hash automatically. This pins the exact code version to every run.
-
-A good rule of thumb: if a parameter affects the model's behavior or the metric's validity, log it.
-
----
-
-## MLflow Tracking API
-
-\`\`\`python
-import mlflow
-import mlflow.sklearn
-from sklearn.ensemble import RandomForestClassifier
-
-mlflow.set_experiment("churn-prediction")
-
-with mlflow.start_run(run_name="rf-baseline"):
-    # Log every hyperparameter
-    mlflow.log_param("n_estimators", 100)
-    mlflow.log_param("max_depth", 5)
-    mlflow.log_param("random_state", 42)
-
-    model = RandomForestClassifier(n_estimators=100, max_depth=5, random_state=42)
-    model.fit(X_train, y_train)
-
-    # Log scalar metrics
-    mlflow.log_metric("accuracy", model.score(X_test, y_test))
-    mlflow.log_metric("f1", f1_score(y_test, model.predict(X_test)))
-
-    # Log the model as a tracked artifact with schema
-    mlflow.sklearn.log_model(model, artifact_path="model")
-
-    # Log a confusion matrix image
-    mlflow.log_artifact("confusion_matrix.png")
-\`\`\`
-
-The \`with mlflow.start_run()\` context manager ensures the run is closed even if an exception occurs. Using \`mlflow.sklearn.log_model()\` instead of \`joblib.dump()\` stores the model inside the run's artifact store with its flavor manifest — making it loadable by the registry.
-
----
-
-## Model Registry Workflow
-
-1. **Log**: train a run and call \`mlflow.sklearn.log_model()\`.
-2. **Register**: in the UI or via \`mlflow.register_model(run_uri, "model-name")\` — creates version 1.
-3. **Transition to Staging**: evaluate on a holdout set, run integration tests.
-4. **Transition to Production**: once validated, move the version to Production. The serving layer loads whichever version holds the Production stage.
-5. **Archive**: when a newer version supersedes it, archive the old one — it stays queryable but is no longer served.
-
-This workflow decouples the training team from the serving team and gives you an auditable history of every model version that ever reached production.
-
----
-
-## Alternatives
-
-**Weights & Biases (W&B)** — richer visualizations, better support for deep learning (gradient histograms, system metrics, media logging). More popular in research and computer vision teams. Hosted SaaS with a generous free tier.
-
-**Neptune** — strong collaboration features, good for larger teams.
-
-**Comet ML** — similar to W&B, good UI, offers a self-hosted option.
-
-For interviews: know that W&B is dominant in the DL/research space, while MLflow is dominant in enterprise/batch ML workflows where Databricks or a self-hosted setup is preferred.
-
----
-
-## Why This Matters in Interviews
-
-The question "how do you ensure reproducibility in your ML pipeline?" is a litmus test for ML engineering maturity. The strong answer describes: (1) version-controlling data and code, (2) logging all params and metrics per run, (3) storing artifacts in a tracked registry, (4) gating stage transitions with validation criteria. Candidates who answer "I just save the pickle file" signal they have not operated ML in production.
-
----
-
-## Interview-Ready Summary
-
-- MLflow Tracking records params, metrics, artifacts, and git state for every training run inside named experiments.
-- A *run* is a single execution of training code; an *experiment* groups related runs for comparison.
-- Always log hyperparameters with \`mlflow.log_param()\`, not just final metrics — params are what make a run reproducible.
-- Use \`mlflow.sklearn.log_model()\` (not \`joblib.dump()\`) to store models with their flavor manifest for registry compatibility.
-- The Model Registry separates training from serving via lifecycle stages: Staging → Production → Archived.
-- W&B is preferred for deep learning / research; MLflow for enterprise batch ML and Databricks environments.
-`,
-
-  video: null,
-
-  videoFallbackMarkdown: `## Deep Dive: Registry Stage Transitions and Tool Trade-offs
-
-### Navigating Model Registry Stages
-
-The Model Registry is not just a file store — it is an organizational contract between the team that trains models and the team that serves them. Understanding how stage transitions work at the operational level signals genuine production ML experience.
-
-**None → Staging**: triggered by the data scientist after a run looks promising. The model is registered (creating a versioned entry) and moved to Staging. At this point the inference service does *not* serve it. The team runs offline evaluation on a held-out test set, checks latency benchmarks, and often runs shadow-mode predictions alongside the current Production model.
-
-**Staging → Production**: a deliberate promotion that should require sign-off — either a human approval or an automated gate (e.g., accuracy must exceed a threshold, latency p99 must be under 200 ms). MLflow lets you add a description and transition comment to each stage change, creating an audit trail. In Databricks, this can be wired to a CI/CD approval step.
-
-**Production → Archived**: when a new version is promoted to Production, the old version is archived rather than deleted. This preserves the artifact for rollback or post-incident analysis. A common mistake is to skip archiving and leave multiple versions in Production simultaneously — this creates ambiguity about which version the serving layer will load.
-
-### MLflow vs Weights & Biases: When to Choose
-
-The choice between MLflow and W&B is often a cultural and infrastructure question rather than a purely technical one.
-
-**Choose MLflow when**: your organization uses Databricks or Apache Spark; you need a fully self-hosted, air-gapped deployment; you work primarily with tabular data and batch inference; your team values interoperability with the broader Python ML ecosystem without vendor lock-in.
-
-**Choose W&B when**: you are training deep learning models and want gradient histograms, system GPU metrics, and rich media logging out of the box; your team is research-oriented and values fast iteration with slick collaboration features; you need to share experiment dashboards with stakeholders outside the engineering team.
-
-**The maturity signal**: candidates who can articulate *why* they chose one over the other — not just that they used it — demonstrate genuine engineering judgment. In a system design interview, saying "we chose MLflow because we were already on Databricks and needed an air-gapped deployment for compliance reasons" is far stronger than "we used MLflow because it was popular."
-
-### Demonstrating ML Engineering Maturity
-
-In system design interviews, the experiment tracking and model registry question is really about whether you understand the *lifecycle* of a model, not just training. A complete answer covers: how experiments are logged and compared (tracking), how the best model is promoted through validated stages (registry), how the serving layer queries the registry (model loading by stage), and how rollbacks are handled (archive + re-promote). Tying each layer to a concrete tool and explaining the organizational contract it enforces distinguishes senior ML engineers from practitioners who have only trained models in notebooks.
-`,
-
-  tryGuidance: "Step through the interactive stages. For the code review, click the line that contains the most critical missing tracking practice. For scenario questions, choose the answer you would give in a real interview — the rationale reveals what interviewers are probing for.",
-
-  interviewGraph: {
-    initialStageId: "intro_tracking",
-    artifactDimensions: [
-      { label: "Experiment Tracking", recoveryStageId: "tracking_recovery" },
-      { label: "Model Registry", recoveryStageId: "registry_recovery" },
-    ],
-    stages: {
-      intro_tracking: {
-        id: "intro_tracking",
-        type: "scenario_choice",
-        badge: "Stage 1",
-        title: "Stage 1 · Why track experiments?",
-        prompt: "Your team ran 40 experiments last month. Now you need to reproduce the model that performed best. Which MLflow feature is most directly useful?",
-        choices: [
-          { id: "a", label: "Model Registry", description: "Browse registered model versions and their stage history" },
-          { id: "b", label: "MLflow Tracking", description: "Search runs by metric, inspect logged params and artifacts for each run" },
-          { id: "c", label: "MLflow Projects", description: "Re-run the project entry point with the same environment" },
-          { id: "d", label: "MLflow Models", description: "Load the model artifact using its flavor interface" },
-        ],
-        branches: { a: "tracking_recovery", b: "code_review", c: "tracking_recovery", d: "tracking_recovery" },
-        rationale: "MLflow Tracking is where params, metrics, and artifacts are stored per run. To reproduce the best model you need to find its run, read the logged params, and reload the artifact — that is all Tracking. The Registry stores *promoted* versions, not every experimental run.",
-      },
-
-      tracking_recovery: {
-        id: "tracking_recovery",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · Tracking vs Registry",
-        prompt: "An MLflow *experiment* is to a *run* as a Git repository is to:",
-        choices: [
-          { id: "a", label: "A commit", description: "Each run is a single recorded snapshot, like a commit" },
-          { id: "b", label: "A branch", description: "Runs diverge from each other like branches" },
-          { id: "c", label: "A tag", description: "Runs mark notable points like tags" },
-        ],
-        branches: { a: "code_review", b: "code_review", c: "code_review" },
-        rationale: "A run is the atomic unit in MLflow Tracking — one execution of training code producing one set of params, metrics, and artifacts. An experiment groups many runs, just as a repo groups many commits.",
-      },
-
-      code_review: {
-        id: "code_review",
-        type: "click_target",
-        badge: "Stage 2",
-        title: "Stage 2 · Spot the tracking bug",
-        prompt: "This MLflow training script has two problems. Click the line that represents the *most critical* missing tracking practice — the one that makes this run irreproducible.",
-        code_snippet: `import mlflow
-
-with mlflow.start_run():
-    model = RandomForestClassifier(n_estimators=100, max_depth=5)
-    model.fit(X_train, y_train)
-
-    accuracy = model.score(X_test, y_test)
-    mlflow.log_metric("accuracy", accuracy)    # -- ds-target:single_metric
-
-    # Save model locally
-    joblib.dump(model, "model.pkl")            # -- ds-target:local_save
-
-    # No hyperparameters logged                # -- ds-target:missing_params`,
-        validationCopy: {
-          single_metric: "Logging only final accuracy is a partial problem — you also need per-step metrics for training curves. But the *most critical* gap is the missing hyperparameters. Without them you cannot reconstruct this exact model. Try the comment line.",
-          local_save: "Saving the model locally instead of using mlflow.sklearn.log_model() means the model is not stored inside the run's artifact store and cannot be registered. This is a real bug — but the even more fundamental issue is that the hyperparameters are not logged at all. Try the comment line.",
-          missing_params: "Correct. Without logging n_estimators=100 and max_depth=5 via mlflow.log_param(), you cannot reproduce this exact model even if you re-run the same script with different defaults. Hyperparameters are the most critical thing to log.",
-        },
-        branches: {
-          single_metric: "param_recovery",
-          local_save: "param_recovery",
-          missing_params: "registry_intro",
-        },
-      },
-
-      param_recovery: {
-        id: "param_recovery",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · What must be logged",
-        prompt: "Which of the following makes a training run *reproducible* when logged in MLflow?",
-        choices: [
-          { id: "a", label: "Log hyperparameters with mlflow.log_param()", description: "Records every tunable setting so the exact model config can be reconstructed" },
-          { id: "b", label: "Log only the final accuracy metric", description: "Final accuracy summarizes performance but does not describe how the model was built" },
-          { id: "c", label: "Save model.pkl locally with joblib", description: "Local files are not stored in the run artifact store and disappear if the file system changes" },
-        ],
-        branches: { a: "registry_intro", b: "registry_intro", c: "registry_intro" },
-        rationale: "Hyperparameters define the model configuration. Logging them with mlflow.log_param() is the single most important step for reproducibility — without them, even having the trained artifact does not tell you how to retrain if needed.",
-      },
-
-      registry_intro: {
-        id: "registry_intro",
-        type: "scenario_choice",
-        badge: "Stage 3",
-        title: "Stage 3 · Staging → Production promotion",
-        prompt: "What should be true before you transition a model version from Staging to Production in the MLflow Registry?",
-        choices: [
-          { id: "a", label: "The model achieved the highest training accuracy in its experiment", description: "Training accuracy measures fit, not generalization or production readiness" },
-          { id: "b", label: "The model passed offline evaluation on a held-out test set and latency benchmarks", description: "Validates both predictive quality and serving performance before live traffic" },
-          { id: "c", label: "The previous Production version has been deleted", description: "Old versions should be archived, not deleted — you need them for rollback" },
-          { id: "d", label: "The model was registered at least 24 hours ago", description: "Time elapsed is not a meaningful validation criterion" },
-        ],
-        branches: { a: "registry_recovery", b: "reproduce_stage", c: "registry_recovery", d: "registry_recovery" },
-        rationale: "Staging exists as a validation gate. Best practice is to run the Staging model on a held-out evaluation set (separate from any data used during training or hyperparameter search) and confirm latency/throughput meets SLOs before promoting to Production.",
-      },
-
-      registry_recovery: {
-        id: "registry_recovery",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · Model Registry stages",
-        prompt: "When a new model version is promoted to Production, what should happen to the previous Production version?",
-        choices: [
-          { id: "a", label: "Delete it to save storage", description: "Deletion removes the rollback option and violates audit trail requirements" },
-          { id: "b", label: "Leave it in Production alongside the new version", description: "Multiple Production versions creates ambiguity about which version is served" },
-          { id: "c", label: "Transition it to Archived", description: "Archiving retains the artifact and audit trail while marking it inactive" },
-        ],
-        branches: { a: "reproduce_stage", b: "reproduce_stage", c: "reproduce_stage" },
-        rationale: "Archive is the correct state for superseded models. It keeps the artifact accessible for rollback or forensic analysis without confusing the serving layer about which version is active.",
-      },
-
-      reproduce_stage: {
-        id: "reproduce_stage",
-        type: "scenario_choice",
-        badge: "Stage 4",
-        title: "Stage 4 · Reproducing a run from last month",
-        prompt: "A colleague needs to reproduce your best model from six weeks ago exactly. What combination of MLflow artifacts makes this possible?",
-        choices: [
-          { id: "a", label: "The logged params, the logged artifact, and the git commit hash", description: "Together these pin the hyperparameters, the trained weights, and the exact code version" },
-          { id: "b", label: "The final validation metric and the model artifact", description: "Metrics describe performance but do not tell you what hyperparameters produced it" },
-          { id: "c", label: "The conda.yaml environment file only", description: "Environment captures dependencies but not hyperparameters or model weights" },
-          { id: "d", label: "The experiment name and the run timestamp", description: "These identify the run but are not sufficient to reproduce it without the actual logged data" },
-        ],
-        branches: { a: "mlflow_vs_wandb", b: "tracking_recovery", c: "tracking_recovery", d: "tracking_recovery" },
-        rationale: "Full reproducibility requires three things: the hyperparameters (params), the trained model weights (artifact), and the code that trained it (git commit). MLflow logs all three inside a single run record.",
-      },
-
-      mlflow_vs_wandb: {
-        id: "mlflow_vs_wandb",
-        type: "scenario_choice",
-        badge: "Stage 5",
-        title: "Stage 5 · MLflow vs Weights & Biases",
-        prompt: "Your team is building a computer vision model with a transformer backbone. Training runs for 3 days on 8 GPUs. Which tracking tool is likely the better fit and why?",
-        choices: [
-          { id: "a", label: "MLflow, because it is open source and self-hostable", description: "True, but self-hosting is an operational cost, not a feature advantage for this use case" },
-          { id: "b", label: "Weights & Biases, because it has richer DL-specific logging: gradient histograms, GPU metrics, and media logging", description: "W&B was designed for exactly this scenario — long-running DL training with rich per-step diagnostics" },
-          { id: "c", label: "Neither — just log to TensorBoard and read the files manually", description: "TensorBoard has no model registry, no run comparison UI, and no artifact storage" },
-          { id: "d", label: "MLflow, because Databricks integrates with it natively", description: "Databricks integration is a strong reason to use MLflow, but this team is not described as using Databricks" },
-        ],
-        branches: { a: "run_definition", b: "run_definition", c: "run_definition", d: "run_definition" },
-        rationale: "W&B was built with deep learning in mind. Its gradient histogram logging, system-level GPU and memory metrics, and first-class support for logging images and video make it substantially more useful for multi-day transformer training than MLflow's more tabular-oriented feature set.",
-      },
-
-      run_definition: {
-        id: "run_definition",
-        type: "scenario_choice",
-        badge: "Stage 6",
-        title: "Stage 6 · What is a 'run'?",
-        prompt: "An interviewer asks: 'In MLflow, what exactly is a run and what does it contain?' Select the most complete and accurate answer.",
-        choices: [
-          { id: "a", label: "A run is a single execution of training code that records params, metrics, artifacts, tags, and environment metadata under a unique run ID", description: "Complete — covers all the key contents and the unique identifier" },
-          { id: "b", label: "A run is a trained model file stored in the artifact store", description: "Artifacts are one component of a run, but a run contains much more than the model file" },
-          { id: "c", label: "A run is equivalent to an experiment — they are interchangeable terms", description: "An experiment groups many runs; they are distinct hierarchical concepts" },
-        ],
-        branches: { a: "terminal_stage", b: "tracking_recovery", c: "tracking_recovery" },
-        rationale: "A run is the atomic unit of MLflow Tracking. It is identified by a UUID, belongs to one experiment, and contains: logged parameters (key-value), metrics (with optional step index), artifacts (files), tags (freeform metadata), and automatically captured environment info (git hash, Python version, start/end time).",
-      },
-
-      terminal_stage: {
-        id: "terminal_stage",
-        type: "scenario_choice",
-        badge: "Stage 7",
-        title: "Stage 7 · Answering in a system design interview",
-        prompt: "An interviewer asks: 'How do you ensure reproducibility in your ML pipeline?' What structure makes for the strongest answer?",
-        choices: [
-          { id: "a", label: "Mention only that you use MLflow to track experiments", description: "Naming the tool is necessary but insufficient — you need to describe what you log and why" },
-          { id: "b", label: "Describe: version-controlled data + all params logged per run + artifacts in registry + git commit captured + stage-gated promotion", description: "This covers the full lifecycle and shows you understand reproducibility as a system property, not a single tool" },
-          { id: "c", label: "Explain that you save model files with version numbers in S3", description: "Ad-hoc file naming is not a reproducibility system — it lacks param logging, run comparison, and governance" },
-          { id: "d", label: "Say you use random seeds to make training deterministic", description: "Deterministic training is one small part of reproducibility — it does not address tracking or governance" },
-        ],
-        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage", d: "terminal_stage" },
-        rationale: "The strongest reproducibility answer frames it as a pipeline property: data versioning ensures the same input, param logging ensures the same configuration, artifact storage with git hash ensures the same code and weights, and registry stage gates ensure the same governance. MLflow is the mechanism, but the principle is what impresses.",
-        terminal: true,
-      },
-    },
-  },
-
-  knowledgeCheck: [
-    {
-      question: "Which of the following should you log in MLflow to make a training run fully reproducible?",
-      options: [
-        "Only the final validation metric",
-        "Hyperparameters, per-step metrics, model artifact, and git commit",
-        "The model pickle file and the experiment name",
-        "The conda environment file only",
-      ],
-      correctIndex: 1,
-      explanation: "Full reproducibility requires logging every hyperparameter (so you can reconstruct the config), metrics (to compare runs), the model artifact via mlflow.sklearn.log_model() (so the trained weights are in the artifact store), and the git commit (so the exact code is pinned). MLflow captures the git hash automatically.",
-    },
-    {
-      question: "In the MLflow Model Registry, what is the correct sequence of lifecycle stages for a newly trained model?",
-      options: [
-        "Production → Staging → Archived",
-        "None → Staging → Production → Archived",
-        "Staging → None → Production",
-        "Draft → Review → Published",
-      ],
-      correctIndex: 1,
-      explanation: "Models start in None (registered but undeployed), move to Staging for evaluation, are promoted to Production when they pass validation, and are finally Archived when superseded. Skipping Staging and going directly to Production bypasses the validation gate.",
-    },
-    {
-      question: "Why should you use mlflow.sklearn.log_model() instead of joblib.dump() to save a scikit-learn model?",
-      options: [
-        "mlflow.sklearn.log_model() is faster than joblib.dump()",
-        "joblib.dump() produces larger files",
-        "mlflow.sklearn.log_model() stores the model inside the run's artifact store with a flavor manifest, enabling Model Registry integration and framework-agnostic loading",
-        "joblib.dump() does not support scikit-learn models",
-      ],
-      correctIndex: 2,
-      explanation: "mlflow.sklearn.log_model() does three things joblib.dump() does not: it stores the artifact inside the tracked run (so it appears in the MLflow UI), it writes an MLmodel manifest declaring the sklearn flavor (enabling mlflow.pyfunc.load_model() to load it without knowing the framework), and it makes the model registerable via mlflow.register_model().",
     },
   ],
 },

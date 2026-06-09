@@ -567,7 +567,7 @@ const CURRICULUM = [
         title: "MLOps Fundamentals",
         lessons: [
           { id: "mo-c1", title: "CI/CD for Machine Learning", duration: "20 min", hasViz: true },
-          { id: "mo-c2", title: "Model Versioning & Experiment Tracking", duration: "15 min", hasViz: true },
+          { id: "mo-c2", title: "Model Versioning & Experiment Tracking", duration: "15 min", hasViz: false },
           { id: "mo-c3", title: "Monitoring & Drift Detection", duration: "18 min", hasViz: true },
           { id: "mo-c4", title: "Automated Retraining Pipelines", duration: "15 min", hasViz: true },
         ]
@@ -578,8 +578,8 @@ const CURRICULUM = [
         lessons: [
           { id: "mo-t1", title: "Git Workflows for Data Teams", duration: "18 min", hasViz: true },
           { id: "mo-t2", title: "Virtual Environments: venv, conda, poetry", duration: "12 min", hasViz: true },
-          { id: "mo-t3", title: "Building APIs with FastAPI", duration: "22 min", hasViz: true },
-          { id: "mo-t4", title: "Docker for Data Scientists", duration: "20 min", hasViz: true },
+          { id: "mo-t3", title: "ML Pipeline Orchestration with Airflow", duration: "22 min", hasViz: true },
+          { id: "mo-t4", title: "Deployment Strategies: Canary & Blue/Green", duration: "20 min", hasViz: true },
           { id: "mo-t5", title: "Cloud Basics: AWS for DS", duration: "25 min", hasViz: true },
         ]
       },
@@ -1055,7 +1055,6 @@ const VISUALIZATIONS = {
   "sd-m3": BatchVsStreaming,
   "sd-m4": RecSysCollaborativeFiltering,
   "mo-c1": MLCICDPipelineViz,
-  "mo-c2": MLDriftMonitorViz,
   "mo-t3": AirflowDAGViz,
   "mo-t4": CanaryDeploymentViz,
   "mo-v1": MatplotlibAnatomyViz,
