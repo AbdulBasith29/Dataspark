@@ -42899,370 +42899,621 @@ A fundamental challenge: offline evaluation uses held-out ratings, but the ratin
   },
 
 "sp-t1": {
-    durationLabel: "18 min",
-    outcomes: [
-      "Test a time series for stationarity using ADF and KPSS tests",
-      "Decompose a series into trend, seasonality, and residual components",
-      "Apply differencing and transformations to achieve stationarity",
-    ],
-    learnMarkdown: `## Stationarity & Decomposition
+  durationLabel: "18 min",
+  outcomes: [
+    "Explain stationarity and why it matters for time series models",
+    "Interpret ADF and KPSS test results correctly, including their opposing null hypotheses",
+    "Apply differencing, log transforms, and seasonal differencing to achieve stationarity",
+    "Identify the order of integration I(0), I(1), I(2) for a series",
+  ],
+  learnMarkdown: `## What Is Stationarity?
 
-A time series is **stationary** if its statistical properties (mean, variance, autocorrelation) do not change over time. Most forecasting models assume stationarity.
+A time series is **stationary** when its statistical properties do not change over time. Formally, three conditions must hold:
 
-### Why Stationarity Matters
-- ARIMA, VAR, and classical models require stationary inputs
-- Non-stationary series have time-dependent structure that invalidates standard inference
-- A series trending upward has a non-constant mean → not stationary
+1. **Constant mean** — the average value does not trend upward or downward
+2. **Constant variance** — the spread of values stays the same (no increasing "fan" shape)
+3. **Constant autocorrelation structure** — the relationship between a value and its lagged values depends only on the lag distance, not on when in the series you are
 
-### Testing for Stationarity
+Most classical time series models — particularly **ARIMA** — are built on the assumption of stationarity. When the assumption is violated, parameter estimates become unreliable, forecasts drift, and statistical tests lose validity.
+
+## Diagnosing Non-Stationarity Visually
+
+Before running any test, plot the series:
+
+- A **rising or falling trend** is the most common signal of a non-stationary mean
+- **Increasing variance over time** (e.g., stock price volatility growing with price level) indicates non-constant variance — a log transform often fixes this
+- **Repeating seasonal spikes** can look stationary if the seasonal pattern is stable, but require seasonal differencing to fully remove
+
+Visual inspection is quick but subjective. Formal statistical tests remove the ambiguity.
+
+## The ADF Test (Augmented Dickey-Fuller)
+
+The ADF test checks for a **unit root** — the mathematical signature of a random walk, which is non-stationary.
+
+- **H₀ (null hypothesis)**: The series has a unit root → it is **non-stationary**
+- **H₁ (alternative)**: No unit root → the series **is stationary**
+
+Decision rule: if the **p-value < 0.05**, reject H₀ and conclude the series is stationary.
+
 \`\`\`python
-from statsmodels.tsa.stattools import adfuller, kpss
-
-# ADF test: H0 = unit root (non-stationary)
+from statsmodels.tsa.stattools import adfuller
 result = adfuller(series)
-print(f"ADF Statistic: {result[0]:.4f}, p-value: {result[1]:.4f}")
-# p < 0.05 → reject H0 → stationary
-
-# KPSS test: H0 = stationary
-stat, p, lags, crit = kpss(series, regression='ct')
-# p < 0.05 → reject H0 → non-stationary
+print(f"ADF p-value: {result[1]:.4f}")
+# p < 0.05 → stationary (reject unit root)
 \`\`\`
 
-| Test | H₀ | Reject H₀ means |
-|------|-----|----------------|
-| ADF | Non-stationary (unit root) | Stationary |
-| KPSS | Stationary | Non-stationary |
+A key subtlety: a low p-value means you can *reject* non-stationarity — it does not mean the series is perfectly well-behaved.
 
-Use both together — they have different power characteristics.
+## The KPSS Test — The Opposite Null
 
-### Classical Decomposition
-\`\`\`
-y(t) = Trend(t) + Seasonal(t) + Residual(t)     [additive]
-y(t) = Trend(t) × Seasonal(t) × Residual(t)     [multiplicative]
-\`\`\`
+The KPSS (Kwiatkowski–Phillips–Schmidt–Shin) test has the **opposite null hypothesis** from ADF. This trips up many candidates.
+
+- **H₀**: The series **is stationary** (around a level or trend)
+- **H₁**: The series is **non-stationary**
+
+Decision rule: if the **p-value < 0.05**, reject H₀ and conclude the series is **non-stationary**.
 
 \`\`\`python
-from statsmodels.tsa.seasonal import seasonal_decompose
-result = seasonal_decompose(series, model='additive', period=12)
-result.plot()
+from statsmodels.tsa.stattools import kpss
+stat, p_value, lags, crit = kpss(series, regression='c')
+print(f"KPSS p-value: {p_value:.4f}")
+# p < 0.05 → non-stationary (reject stationarity)
 \`\`\`
 
-### Achieving Stationarity
-| Transformation | Removes |
-|----------------|---------|
-| First differencing: Δy_t = y_t - y_{t-1} | Linear trend |
-| Second differencing | Quadratic trend |
-| Log transform | Heteroscedasticity (growing variance) |
-| Seasonal differencing: y_t - y_{t-m} | Seasonality of period m |
+## Using ADF and KPSS Together
 
-### Autocorrelation Functions
-- **ACF** (Autocorrelation Function): correlation of series with itself at lag k
-- **PACF** (Partial ACF): correlation after removing intermediate lag effects
-- Used to identify the order of ARIMA models`,
+Running both tests gives four possible outcomes:
 
-    video: null,
-    videoFallbackMarkdown: `## STL Decomposition
+| ADF p-value | KPSS p-value | Conclusion |
+|-------------|--------------|-----------|
+| < 0.05 | ≥ 0.05 | Stationary ✓ |
+| ≥ 0.05 | < 0.05 | Non-stationary — difference the series |
+| ≥ 0.05 | ≥ 0.05 | Trend-stationary — remove deterministic trend |
+| < 0.05 | < 0.05 | Conflicting — consider structural breaks |
 
-STL (Seasonal-Trend decomposition using LOESS) is more robust than classical decomposition:
-- Handles any seasonal period (not just integer multiples)
-- Robust to outliers
-- Can model changing seasonal patterns over time
+Relying on ADF alone is risky: ADF has low power against near-unit-root processes. KPSS is a useful cross-check.
+
+## Making a Series Stationary
+
+**First differencing** subtracts consecutive values: Δyₜ = yₜ − yₜ₋₁. This removes linear trends.
 
 \`\`\`python
-from statsmodels.tsa.seasonal import STL
-stl = STL(series, period=12, robust=True)
-result = stl.fit()
-# result.trend, result.seasonal, result.resid
-\`\`\``,
+series_diff = series.diff().dropna()
+\`\`\`
 
-    tryGuidance: "Explore the time series decomposition visualization. Toggle between additive and multiplicative models and observe the residual pattern.",
+**Log transform** stabilizes variance when it grows with the level (common in financial and economic data):
 
-    interviewGraph: {
-      initialStageId: "sp_t1_stage1",
-      artifactDimensions: [
-        { label: "Stationarity Tests", recoveryStageId: "sp_t1_rec1" },
-        { label: "Differencing", recoveryStageId: "sp_t1_rec2", passLabel: "Time Series Foundation" },
-      ],
-      stages: {
-        sp_t1_stage1: {
-          id: "sp_t1_stage1",
-          type: "scenario_choice",
-          badge: "Stage 1",
-          title: "Stage 1 · Diagnosing Stationarity",
-          prompt: "You run an ADF test on monthly sales data and get p = 0.42. You run a KPSS test and get p = 0.03. What does this tell you?",
-          choices: [
-            { id: "a", label: "Both tests agree: the series is non-stationary", description: "ADF fails to reject non-stationary; KPSS rejects stationary" },
-            { id: "b", label: "ADF says stationary; KPSS says stationary — you're fine", description: "ADF p=0.42 means FAIL to reject non-stationarity" },
-            { id: "c", label: "Both tests disagree — run more tests to break the tie", description: "The tests actually agree here — read the hypotheses carefully" },
-            { id: "d", label: "Only ADF matters; ignore KPSS", description: "KPSS catches different types of non-stationarity" },
-          ],
-          branches: { a: "sp_t1_stage2", b: "sp_t1_rec1", c: "sp_t1_rec1", d: "sp_t1_rec1" },
-          rationale: "ADF H₀ = non-stationary. p=0.42 means fail to reject → series is likely non-stationary. KPSS H₀ = stationary. p=0.03 means reject → non-stationary. Both tests agree: the series is non-stationary. Apply differencing before modeling.",
+\`\`\`python
+import numpy as np
+log_series = np.log(series)
+\`\`\`
+
+Often both are applied: log first (variance stabilization), then difference (mean stabilization).
+
+**Seasonal differencing** removes repeating annual or monthly patterns:
+
+\`\`\`python
+series_seasonal_diff = series.diff(12).dropna()  # monthly data with annual seasonality
+\`\`\`
+
+## Order of Integration
+
+The **order of integration** I(d) tells you how many differences are needed to reach stationarity:
+
+- **I(0)** — already stationary, no differencing needed (d=0 in ARIMA)
+- **I(1)** — one difference needed (most economic series: prices, GDP)
+- **I(2)** — two differences needed (acceleration terms, rare in practice)
+
+Always re-test with ADF + KPSS after differencing to confirm you've achieved stationarity. Over-differencing (applying too many differences) introduces unnecessary MA terms and hurts model performance.
+
+## Interview-Ready Summary
+
+- A stationary series has constant mean, variance, and autocorrelation structure over time; ARIMA and most classical models require it
+- **ADF**: H₀ = non-stationary (unit root); p < 0.05 → reject → series is stationary
+- **KPSS**: H₀ = stationary; p < 0.05 → reject → series is non-stationary — opposite null from ADF!
+- Run both tests: agreement gives confidence; conflict suggests structural breaks or trend-stationarity
+- Fix non-stationarity with first differencing (trend), log transform (variance), or seasonal differencing (seasonality)
+- Order of integration I(d) = number of differences required; most real-world series are I(1)
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Unit Roots and Cointegration
+
+**Why unit roots are special**: A pure random walk yₜ = yₜ₋₁ + εₜ has a variance that grows unboundedly with time — the series can drift anywhere. Shocks never die out; they accumulate permanently. Standard OLS regression on two independent random walks often shows spurious correlation (R² close to 1, t-stats huge) purely by chance — the classic spurious regression problem.
+
+**Structural breaks**: The ADF test can fail (wrongly concluding non-stationarity) when a series has a structural break — a sudden permanent level shift. The Zivot-Andrews test extends ADF to allow for one unknown break point.
+
+**Cointegration**: Two I(1) series can be cointegrated — their linear combination is I(0). This is economically meaningful (e.g., price and cost moving together). The Engle-Granger or Johansen test detects cointegration; VECM (Vector Error Correction Model) exploits it for better long-run forecasts.
+
+**Practical workflow**:
+1. Plot the series — visual check
+2. Run ADF + KPSS on the raw series
+3. If non-stationary, apply appropriate transformation
+4. Re-run tests on the transformed series
+5. Repeat until both tests agree on stationarity
+`,
+  tryGuidance: "Use the interactive visualization to apply ADF and KPSS tests to different synthetic time series. Toggle between trending, random-walk, and stationary series to see how p-values respond. Apply differencing and observe how the test statistics change.",
+  interviewGraph: {
+    initialStageId: "click_bug",
+    artifactDimensions: [
+      { label: "Stationarity Testing", recoveryStageId: "adf_recovery" },
+      { label: "Transformation Strategy", recoveryStageId: "transform_recovery" },
+    ],
+    stages: {
+      click_bug: {
+        id: "click_bug",
+        type: "click_target",
+        badge: "Stage 1",
+        title: "Stage 1 · Spot the Testing Bug",
+        prompt: "A data scientist is preparing a sales series for ARIMA modeling. Click the line that contains the most critical bug in the stationarity testing workflow.",
+        code_snippet: `adf_result = adfuller(sales)
+if adf_result[1] < 0.05:      # -- ds-target:adf_only
+    fit_arima(sales)           # -- ds-target:fit_without_check`,
+        validationCopy: {
+          adf_only: "Correct! Using only ADF is risky — ADF has low power against near-unit-root processes. The best practice is to run both ADF and KPSS: if ADF p < 0.05 AND KPSS p ≥ 0.05, you can confidently conclude stationarity.",
+          fit_without_check: "This line calls ARIMA, but the deeper issue is upstream: the stationarity check itself is incomplete. If the check passes incorrectly, fitting ARIMA on non-stationary data is the downstream consequence. Look at the condition that controls whether we reach this line.",
         },
-        sp_t1_rec1: {
-          id: "sp_t1_rec1",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Stationarity Tests",
-          prompt: "ADF test result: statistic = -4.2, p-value = 0.001. What does this mean?",
-          choices: [
-            { id: "a", label: "Reject H₀ → series is stationary (no unit root)", description: "p < 0.05 → reject the null hypothesis of a unit root" },
-            { id: "b", label: "Fail to reject H₀ → series is non-stationary", description: "p = 0.001 is very small — that means rejecting H₀" },
-            { id: "c", label: "The series has strong seasonality", description: "ADF tests for unit root, not seasonality" },
-            { id: "d", label: "The statistic must be positive to indicate stationarity", description: "ADF statistics are typically negative; more negative = more evidence of stationarity" },
-          ],
-          branches: { a: "sp_t1_stage2", b: "sp_t1_stage2", c: "sp_t1_stage2", d: "sp_t1_stage2" },
-          rationale: "ADF H₀ = unit root (non-stationary). p=0.001 << 0.05 means strong evidence against H₀ → reject it → the series IS stationary. A very negative ADF statistic (like -4.2) also suggests stationarity — the critical value is typically around -2.9 at 5% significance.",
+        branches: {
+          adf_only: "scenario_kpss_null",
+          fit_without_check: "adf_recovery",
         },
-        sp_t1_stage2: {
-          id: "sp_t1_stage2",
-          type: "scenario_choice",
-          badge: "Stage 2",
-          title: "Stage 2 · Choosing a Transformation",
-          prompt: "Weekly revenue data shows: (1) an upward linear trend, (2) annual seasonality, (3) variance that grows proportionally with the level. Which transformations address all three?",
-          choices: [
-            { id: "a", label: "Log transform + seasonal differencing (lag 52)", description: "Log stabilizes growing variance; seasonal diff removes seasonality" },
-            { id: "b", label: "First differencing only", description: "Removes linear trend but not seasonality or heteroscedasticity" },
-            { id: "c", label: "Standardize (subtract mean, divide by std)", description: "Standardization doesn't remove trend or seasonality" },
-            { id: "d", label: "Moving average smoothing", description: "Smoothing removes noise but doesn't make the series stationary" },
-          ],
-          branches: { a: "sp_t1_end", b: "sp_t1_rec2", c: "sp_t1_rec2", d: "sp_t1_rec2" },
-          rationale: "Three problems → three fixes: log transform stabilizes multiplicative variance, seasonal differencing (y_t - y_{t-52}) removes annual seasonality, and first differencing (if still needed after log) removes linear trend. In practice: log → seasonal diff → check ADF → first diff if still needed.",
-        },
-        sp_t1_rec2: {
-          id: "sp_t1_rec2",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Differencing",
-          prompt: "After first differencing a series, the ADF test still shows non-stationarity. What should you try next?",
-          choices: [
-            { id: "a", label: "Second differencing (difference the already-differenced series)", description: "Handles quadratic trend; most series need d ≤ 2" },
-            { id: "b", label: "Apply the same first difference again without checking", description: "Over-differencing introduces unnecessary noise" },
-            { id: "c", label: "Conclude the series can never be stationary", description: "Most economic time series are I(1) or I(2) — first or second order integration" },
-            { id: "d", label: "Switch immediately to a neural network model", description: "Don't abandon classical methods without understanding the data" },
-          ],
-          branches: { a: "sp_t1_end", b: "sp_t1_end", c: "sp_t1_end", d: "sp_t1_end" },
-          rationale: "If first differencing doesn't achieve stationarity, try second differencing. In ARIMA notation, this means d=2. Beyond d=2 is rare and may indicate you need a different transformation (log, Box-Cox) first. Also check: did you account for seasonality? Seasonal differencing may be needed separately.",
-        },
-        sp_t1_end: {
-          id: "sp_t1_end",
-          type: "scenario_choice",
-          badge: "Complete",
-          title: "Stationarity Mastered",
-          prompt: "In additive vs multiplicative decomposition: y(t) = T + S + R vs y(t) = T × S × R. When do you choose multiplicative?",
-          choices: [
-            { id: "a", label: "When seasonal swings grow proportionally with the trend level", description: "Multiplicative seasonality: amplitude scales with the trend" },
-            { id: "b", label: "When the series has negative values", description: "Multiplicative decomp with negative values is undefined (log transform fails)" },
-            { id: "c", label: "Always — multiplicative is more general", description: "Log-transforming for multiplicative = additive on log scale; both are valid" },
-            { id: "d", label: "When the trend is decreasing", description: "Trend direction doesn't determine the composition type" },
-          ],
-          branches: { a: "sp_t1_end", b: "sp_t1_end", c: "sp_t1_end", d: "sp_t1_end" },
-          terminal: true,
-          rationale: "Multiplicative decomposition: use when seasonal amplitude grows/shrinks with the level (e.g., a 10% seasonal effect on $100 revenue = $10, but on $1000 = $100). Additive: use when seasonal amplitude is constant regardless of level. Log-transforming and then using additive decomposition is equivalent to multiplicative.",
-        },
+      },
+      adf_recovery: {
+        id: "adf_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · ADF Null Hypothesis",
+        prompt: "Let's reinforce the ADF test fundamentals. What is the null hypothesis of the Augmented Dickey-Fuller test?",
+        choices: [
+          { id: "a", label: "The series is stationary", description: "H₀ states the series has no trend or unit root." },
+          { id: "b", label: "The series has a unit root (non-stationary)", description: "H₀ states a unit root is present — the series is non-stationary." },
+          { id: "c", label: "The series follows a normal distribution", description: "H₀ concerns the distribution of values." },
+        ],
+        branches: { a: "adf_recovery", b: "scenario_kpss_null", c: "adf_recovery" },
+        rationale: "The ADF null hypothesis is that the series **has a unit root** — i.e., it is non-stationary. A p-value below 0.05 means you reject that null and conclude stationarity. This is opposite to KPSS, which assumes stationarity under H₀.",
+      },
+      scenario_kpss_null: {
+        id: "scenario_kpss_null",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · KPSS Null Direction",
+        prompt: "You run KPSS on a sales series and get p = 0.03. What does this tell you?",
+        choices: [
+          { id: "a", label: "The series is stationary (p < 0.05 confirms H₀)", description: "Low p-value supports the KPSS null hypothesis." },
+          { id: "b", label: "The series is non-stationary (p < 0.05 rejects H₀ = stationary)", description: "KPSS H₀ is stationarity; rejecting it means non-stationary." },
+          { id: "c", label: "Cannot conclude anything without the ADF result", description: "KPSS alone provides no information." },
+          { id: "d", label: "The series needs a log transform specifically", description: "The p-value directs you to differencing, not necessarily log transform." },
+        ],
+        branches: { a: "transform_recovery", b: "scenario_both_tests", c: "transform_recovery", d: "transform_recovery" },
+        rationale: "KPSS H₀ is that the series **is stationary**. A p-value of 0.03 is below 0.05, so you reject H₀ and conclude the series is **non-stationary**. This is the opposite direction from ADF — a critical distinction.",
+      },
+      transform_recovery: {
+        id: "transform_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · KPSS Direction",
+        prompt: "The KPSS test has p = 0.01. Which statement correctly interprets this result?",
+        choices: [
+          { id: "a", label: "Reject H₀ → series is non-stationary", description: "Low p-value rejects KPSS null (stationarity)." },
+          { id: "b", label: "Fail to reject H₀ → series is stationary", description: "Low p-value means we fail to reject." },
+          { id: "c", label: "The null hypothesis of KPSS is a unit root", description: "KPSS null is about unit roots, same as ADF." },
+        ],
+        branches: { a: "scenario_both_tests", b: "transform_recovery", c: "transform_recovery" },
+        rationale: "KPSS H₀ = series is stationary. p = 0.01 < 0.05 → reject H₀ → the series is non-stationary. Remember: KPSS and ADF have opposite nulls, which is why running both together is the robust approach.",
+      },
+      scenario_both_tests: {
+        id: "scenario_both_tests",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Interpreting Conflicting Results",
+        prompt: "You run ADF (p = 0.04) and KPSS (p = 0.03) on the same series. Both p-values are below 0.05. How do you interpret this?",
+        choices: [
+          { id: "a", label: "The series is definitely stationary — ADF p < 0.05", description: "ADF alone is sufficient to conclude stationarity." },
+          { id: "b", label: "Conflicting results — possible structural break or trend-stationarity", description: "Both tests reject their null simultaneously, suggesting something unusual." },
+          { id: "c", label: "The series is definitely non-stationary — KPSS p < 0.05", description: "KPSS alone overrides ADF." },
+          { id: "d", label: "Apply double differencing immediately", description: "Conflicting results call for more investigation, not immediate differencing." },
+        ],
+        branches: { a: "scenario_differencing", b: "scenario_differencing", c: "scenario_differencing", d: "scenario_differencing" },
+        rationale: "When ADF rejects non-stationarity (p < 0.05) AND KPSS rejects stationarity (p < 0.05), the results conflict. This often signals a structural break, a deterministic trend, or regime change. The right response is further investigation — Zivot-Andrews test for breaks — not immediate differencing.",
+      },
+      scenario_differencing: {
+        id: "scenario_differencing",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Choosing the Right Transformation",
+        prompt: "A monthly retail sales series shows an upward trend AND increasing variance (larger swings as values grow). What transformation sequence should you apply first?",
+        choices: [
+          { id: "a", label: "First difference only", description: "Difference directly to remove the trend." },
+          { id: "b", label: "Log transform, then first difference", description: "Log stabilizes growing variance; differencing then removes the trend." },
+          { id: "c", label: "Seasonal difference (lag 12) only", description: "Seasonal differencing removes the annual cycle." },
+          { id: "d", label: "Second difference immediately", description: "Apply two rounds of differencing." },
+        ],
+        branches: { a: "scenario_order_integration", b: "scenario_order_integration", c: "scenario_order_integration", d: "scenario_order_integration" },
+        rationale: "When variance grows proportionally with the level (a multiplicative effect), apply a **log transform first** to stabilize variance. Then apply first differencing to remove the trend. This two-step sequence is the standard approach for financial and economic series. Seasonal differencing (lag 12) is additionally needed if seasonality remains after log + first difference.",
+      },
+      scenario_order_integration: {
+        id: "scenario_order_integration",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Order of Integration",
+        prompt: "After one round of differencing, ADF still shows p = 0.18 (non-stationary). After a second differencing, ADF gives p = 0.01. What is the order of integration?",
+        choices: [
+          { id: "a", label: "I(0) — already stationary", description: "No differencing was needed." },
+          { id: "b", label: "I(1) — one difference needed", description: "One differencing achieved stationarity." },
+          { id: "c", label: "I(2) — two differences needed", description: "Two rounds of differencing were required." },
+          { id: "d", label: "I(3) — three differences were applied", description: "Three rounds of differencing were applied." },
+        ],
+        branches: { a: "scenario_over_differencing", b: "scenario_over_differencing", c: "scenario_over_differencing", d: "scenario_over_differencing" },
+        rationale: "The order of integration I(d) equals the number of differences required to achieve stationarity. Here, two rounds were needed → I(2). In practice, I(2) is rare; most economic series are I(1). If you find I(2), reconsider whether a log transform or structural break analysis might be more appropriate than double differencing.",
+      },
+      scenario_over_differencing: {
+        id: "scenario_over_differencing",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · The Cost of Over-Differencing",
+        prompt: "A series is I(1) but a colleague applies two differences to be safe. What is the most likely consequence?",
+        choices: [
+          { id: "a", label: "No consequence — more differencing is always safer", description: "Extra differencing has no downside." },
+          { id: "b", label: "Introduces unnecessary moving-average structure, inflating the MA order needed", description: "Over-differencing creates artificial MA patterns." },
+          { id: "c", label: "Violates the assumption of stationarity", description: "Over-differencing makes a series non-stationary." },
+          { id: "d", label: "Makes the series I(0) instead of I(1), which is ideal", description: "Applying extra differences changes the integration order beneficially." },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage", d: "terminal_stage" },
+        rationale: "Over-differencing an I(1) series with a second difference introduces an unnecessary MA(1) component into the ARIMA residuals. The resulting model will need a higher q parameter, reducing parsimony and potentially hurting forecast accuracy. Always re-test with ADF + KPSS after each differencing step and stop as soon as stationarity is confirmed.",
+      },
+      terminal_stage: {
+        id: "terminal_stage",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · Stationarity Testing Mastered",
+        prompt: "Final check: Which combination of test results gives you the strongest evidence that a series is stationary and ready for ARIMA modeling?",
+        choices: [
+          { id: "a", label: "ADF p = 0.02 AND KPSS p = 0.30", description: "Both tests agree: ADF rejects unit root, KPSS fails to reject stationarity." },
+          { id: "b", label: "ADF p = 0.02 only (KPSS not run)", description: "ADF alone is sufficient." },
+          { id: "c", label: "KPSS p = 0.30 only (ADF not run)", description: "KPSS alone confirms stationarity." },
+          { id: "d", label: "ADF p = 0.02 AND KPSS p = 0.02", description: "Both tests have low p-values, confirming stationarity from both directions." },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage", d: "terminal_stage" },
+        terminal: true,
+        rationale: "The strongest evidence comes when **both tests agree**: ADF p < 0.05 (reject unit root → stationary) AND KPSS p ≥ 0.05 (fail to reject stationarity → stationary). This combination means neither test found evidence against stationarity. Option D is a trap — both low p-values means conflicting results, not confirmation.",
       },
     },
-
-    knowledgeCheck: [
-      {
-        question: "A time series has ACF that decays slowly (still significant at lag 20) and PACF that cuts off sharply after lag 1. What model does this suggest?",
-        options: [
-          "AR(1) — autoregressive model with one lag",
-          "MA(1) — moving average model with one lag",
-          "ARIMA(0,1,1) — first difference with one MA term",
-          "Seasonal ARIMA with period 20",
-        ],
-        correctIndex: 0,
-        explanation: "ACF decaying slowly + PACF cutting off at lag 1 is the signature of an AR(1) process. The rule: if PACF cuts off at lag p → AR(p); if ACF cuts off at lag q → MA(q). Slowly decaying ACF alone indicates an AR component.",
-      },
-      {
-        question: "You difference a stationary time series that doesn't need differencing. What problem does this cause?",
-        options: [
-          "The series becomes non-stationary",
-          "Over-differencing: introduces a moving average unit root, making the series harder to model",
-          "The ADF test statistic becomes more negative",
-          "No problem — extra differencing is always harmless",
-        ],
-        correctIndex: 1,
-        explanation: "Over-differencing a stationary series introduces a non-invertible MA unit root — the differenced series has an ACF that looks like an MA(1) with coefficient -1. This makes estimation unstable. Always check whether the series actually needs differencing with ADF/KPSS before applying it.",
-      },
-    ],
   },
+  knowledgeCheck: [
+    {
+      question: "The ADF test returns p = 0.08. What do you conclude?",
+      options: [
+        "The series is stationary (p is close to 0.05)",
+        "Fail to reject the null hypothesis — the series is likely non-stationary",
+        "The series is definitely non-stationary",
+        "Run only KPSS to get a definitive answer",
+      ],
+      correctIndex: 1,
+      explanation: "ADF H₀ is that the series has a unit root (non-stationary). p = 0.08 > 0.05, so you fail to reject H₀ — you cannot conclude stationarity. You should apply a transformation and re-test.",
+    },
+    {
+      question: "A log transform is most useful when a time series has:",
+      options: [
+        "A deterministic linear trend",
+        "Variance that grows proportionally with the level",
+        "Missing values at regular intervals",
+        "Strong seasonality with stable amplitude",
+      ],
+      correctIndex: 1,
+      explanation: "Log transforms stabilize variance when it scales with the level (multiplicative structure). For a simple linear trend with constant variance, first differencing alone is sufficient.",
+    },
+    {
+      question: "What does I(2) mean for a time series?",
+      options: [
+        "The series has 2 seasonal cycles per year",
+        "Two rounds of differencing are needed to achieve stationarity",
+        "The series has 2 autoregressive lags",
+        "The KPSS test was run twice",
+      ],
+      correctIndex: 1,
+      explanation: "I(d) denotes the order of integration — the number of differences required for stationarity. I(2) means two differences are needed. Most real-world series are I(1).",
+    },
+  ],
+},
 
   "sp-t2": {
-    durationLabel: "17 min",
-    outcomes: [
-      "Interpret AR, MA, and ARIMA parameters (p, d, q)",
-      "Use ACF/PACF plots to identify ARIMA order",
-      "Extend ARIMA to seasonal data with SARIMA",
-    ],
-    learnMarkdown: `## ARIMA Family Models
+  durationLabel: "17 min",
+  outcomes: [
+    "Determine ARIMA(p,d,q) parameters using ACF and PACF plots",
+    "Distinguish AR, MA, and ARMA signatures in correlogram plots",
+    "Validate a fitted ARIMA model using residual diagnostics and the Ljung-Box test",
+    "Extend ARIMA to SARIMA for seasonal data",
+  ],
+  learnMarkdown: `## ARIMA: The Building Blocks
 
-ARIMA (AutoRegressive Integrated Moving Average) is the workhorse of classical time series forecasting.
+**ARIMA(p, d, q)** combines three mechanisms into one forecasting model:
 
-### ARIMA(p, d, q) Components
-- **AR(p)**: current value depends on p past values: y_t = Σᵢ φᵢ y_{t-i} + ε_t
-- **I(d)**: integrated of order d → apply d-th differencing to achieve stationarity
-- **MA(q)**: current value depends on q past errors: y_t = ε_t + Σⱼ θⱼ ε_{t-j}
+- **AR(p) — Autoregressive**: the current value is a linear combination of the previous *p* values
+- **I(d) — Integrated**: the series is differenced *d* times to achieve stationarity (covered in sp-t1)
+- **MA(q) — Moving Average**: the current value depends on the previous *q* forecast errors (residuals)
 
-\`\`\`python
-from statsmodels.tsa.arima.model import ARIMA
+The model formula: yₜ = c + φ₁yₜ₋₁ + ... + φₚyₜ₋ₚ + θ₁εₜ₋₁ + ... + θqεₜ₋q + εₜ
 
-model = ARIMA(series, order=(2, 1, 1))  # AR(2), 1 difference, MA(1)
-fit = model.fit()
-forecast = fit.forecast(steps=12)
-print(fit.summary())
-\`\`\`
+Each component captures a different pattern. AR captures momentum or mean-reversion; MA captures shock propagation.
 
-### Identifying Order with ACF/PACF
-| Pattern | Model |
-|---------|-------|
+## Reading ACF Plots
+
+The **Autocorrelation Function (ACF)** measures the correlation between yₜ and yₜ₋ₖ for each lag k. It includes both direct and indirect correlations.
+
+- **MA(q) process**: ACF cuts off sharply to zero after lag *q*, then stays within the confidence band
+- **AR(p) process**: ACF decays gradually (exponential decay or damped oscillation) — never cuts off cleanly
+- Spikes beyond the blue confidence band (±1.96/√n) are statistically significant
+
+## Reading PACF Plots
+
+The **Partial Autocorrelation Function (PACF)** measures the direct correlation between yₜ and yₜ₋ₖ after removing the effect of all intermediate lags.
+
+- **AR(p) process**: PACF cuts off sharply to zero after lag *p*
+- **MA(q) process**: PACF decays gradually
+- The PACF spike at lag k answers: "how much does yₜ₋ₖ explain yₜ, above and beyond yₜ₋₁ through yₜ₋ₖ₊₁?"
+
+## The ACF/PACF Decision Table
+
+| Observation | Model type |
+|-------------|-----------|
 | PACF cuts off at lag p, ACF decays | AR(p) |
 | ACF cuts off at lag q, PACF decays | MA(q) |
-| Both decay gradually | ARMA(p,q) — try information criteria |
-| After differencing: both cut off | ARMA after differencing = ARIMA |
+| Both ACF and PACF decay gradually | ARMA(p, q) |
+| Both cut off (or near zero throughout) | White noise — already stationary, no model needed |
 
-### Model Selection
 \`\`\`python
-import pmdarima as pm
-auto_model = pm.auto_arima(series, seasonal=True, m=12,
-                            information_criterion='aic',
-                            stepwise=True)
+import matplotlib.pyplot as plt
+from statsmodels.graphics.tsaplots import plot_acf, plot_pacf
+
+fig, axes = plt.subplots(2, 1, figsize=(10, 6))
+plot_acf(series_diff, lags=30, ax=axes[0])
+plot_pacf(series_diff, lags=30, ax=axes[1])
+plt.show()
 \`\`\`
 
-**AIC** (Akaike): -2×log-likelihood + 2k → prefer lower AIC
-**BIC** (Bayesian): -2×log-likelihood + k×log(n) → penalizes complexity more
+## Selecting p, d, q in Practice
 
-### SARIMA(p,d,q)(P,D,Q)[m]
-Extends ARIMA with seasonal AR, differencing, and MA terms at lag m:
-\`\`\`
-SARIMA(1,1,1)(1,1,1)[12] for monthly data with annual seasonality
-\`\`\``,
+1. **d**: Run ADF + KPSS on the raw series. Apply first differences until stationary. Count the differences — that is d.
+2. **p**: Look at the PACF of the differenced series. Count significant spikes before cutoff.
+3. **q**: Look at the ACF of the differenced series. Count significant spikes before cutoff.
 
-    video: null,
-    videoFallbackMarkdown: `## ARIMAX and Transfer Functions
+For complex series where ACF and PACF both show gradual decay, use **auto_arima** from pmdarima for a grid search over (p, d, q) combinations minimizing AIC or BIC:
 
-ARIMAX adds exogenous variables (X) to ARIMA:
 \`\`\`python
-model = ARIMA(y, exog=X, order=(1,1,1))
+from pmdarima import auto_arima
+model = auto_arima(series, seasonal=False, information_criterion='aic', stepwise=True)
+print(model.summary())
 \`\`\`
-Use cases: forecasting sales with known promotions, demand with weather data.
 
-**VAR (Vector AR)**: multivariate ARIMA for multiple related time series simultaneously. Models Granger causality between series.`,
+AIC penalizes complexity lightly (favors fit); BIC penalizes more strongly (favors parsimony). For forecasting, BIC often generalizes better.
 
-    tryGuidance: "No interactive visualization for this lesson. Study the ACF/PACF interpretation table and work through the knowledge check.",
+## Model Diagnostics: The Ljung-Box Test
 
-    interviewGraph: {
-      initialStageId: "sp_t2_stage1",
-      artifactDimensions: [
-        { label: "ARIMA Parameters", recoveryStageId: "sp_t2_rec1" },
-        { label: "Model Selection", recoveryStageId: "sp_t2_rec2", passLabel: "ARIMA Expert" },
-      ],
-      stages: {
-        sp_t2_stage1: {
-          id: "sp_t2_stage1",
-          type: "scenario_choice",
-          badge: "Stage 1",
-          title: "Stage 1 · ARIMA Order Identification",
-          prompt: "ACF plot: significant spikes at lags 1 and 2, then cuts off. PACF: decays slowly with alternating signs. What ARIMA order is suggested?",
-          choices: [
-            { id: "a", label: "MA(2) — ACF cuts off at lag 2, PACF decays", description: "MA(q) signature: ACF cuts off at q, PACF tails off" },
-            { id: "b", label: "AR(2) — PACF cuts off at lag 2", description: "PACF decays (not cuts off) → this isn't AR" },
-            { id: "c", label: "ARMA(2,2) — both have spikes at lag 2", description: "ARMA when both taper off gradually — not when ACF cuts sharply" },
-            { id: "d", label: "I(2) — needs second differencing", description: "I(d) refers to differencing order, not autocorrelation pattern" },
-          ],
-          branches: { a: "sp_t2_stage2", b: "sp_t2_rec1", c: "sp_t2_rec1", d: "sp_t2_rec1" },
-          rationale: "MA(q) signature: ACF cuts off sharply after lag q, PACF tails off with decaying pattern. Here ACF cuts off after lag 2 and PACF decays → ARIMA(0, d, 2). AR(p) is the opposite: PACF cuts off at p, ACF tails off.",
+After fitting ARIMA, the residuals should look like **white noise** — uncorrelated, mean zero, constant variance. If structure remains in the residuals, the model has not captured all information.
+
+**Ljung-Box test** checks whether residual autocorrelations are jointly zero:
+- H₀: residuals are white noise (no autocorrelation up to lag h)
+- p > 0.05: fail to reject → residuals look like white noise → good model fit
+
+\`\`\`python
+from statsmodels.stats.diagnostic import acorr_ljungbox
+lb_test = acorr_ljungbox(results.resid, lags=[10], return_df=True)
+print(lb_test)  # p > 0.05 is what we want
+\`\`\`
+
+Also inspect:
+- **Residual time plot**: should show no pattern, trend, or heteroskedasticity
+- **Histogram / QQ plot**: residuals should be approximately normal
+- **ACF of residuals**: all lags should fall within the confidence band
+
+## SARIMA for Seasonal Data
+
+**SARIMA(p,d,q)(P,D,Q)[m]** adds seasonal AR, differencing, and MA terms:
+
+- *m* = seasonal period (12 for monthly, 4 for quarterly, 7 for daily-with-weekly pattern)
+- Seasonal differencing D: \`series.diff(m)\` removes repeating seasonal pattern
+- P and Q: identified from ACF/PACF at seasonal lags (12, 24, 36 for monthly data)
+
+\`\`\`python
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+model = SARIMAX(series, order=(1,1,1), seasonal_order=(1,1,1,12))
+results = model.fit()
+\`\`\`
+
+## Forecast Uncertainty
+
+ARIMA forecasts carry uncertainty that **widens over the forecast horizon**. The 95% confidence interval grows because errors compound. For h-step-ahead forecasts, uncertainty scales roughly as √h for MA processes. This means long-horizon ARIMA forecasts are often less reliable than short-horizon ones — be cautious when forecasting more than one seasonal cycle ahead.
+
+## Interview-Ready Summary
+
+- **ARIMA(p,d,q)**: AR lags (p), differences for stationarity (d), MA residual lags (q)
+- **PACF cuts off at lag p** → AR(p); **ACF cuts off at lag q** → MA(q); both decay → ARMA
+- Determine d first (ADF/KPSS), then read PACF for p, ACF for q; use auto_arima for complex cases
+- **Ljung-Box test** on residuals: p > 0.05 means white-noise residuals → model captures the structure
+- SARIMA adds seasonal parameters (P,D,Q)[m] for periodic patterns
+- Forecast confidence intervals widen with horizon; long-range ARIMA forecasts have high uncertainty
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Information Criteria and Model Selection
+
+**AIC vs BIC**: AIC = 2k − 2ln(L), BIC = k·ln(n) − 2ln(L), where k = number of parameters, n = sample size, L = likelihood. BIC penalizes complexity more heavily and tends to select simpler models. For large n, BIC and AIC can diverge substantially. In time series forecasting benchmarks, simpler models selected by BIC often outperform AIC selections out of sample.
+
+**Invertibility and stationarity conditions**: An AR(p) model is stationary if all roots of the characteristic polynomial lie outside the unit circle. An MA(q) model is invertible under similar conditions. statsmodels enforces these constraints during fitting — parameters are projected back into the valid region if the optimizer strays outside.
+
+**Seasonal aliasing**: When identifying SARIMA parameters, focus on lags at multiples of m (12, 24, … for monthly). A spike at lag 12 in the ACF suggests a seasonal MA term; a spike in the PACF at lag 12 suggests a seasonal AR term.
+
+**ARIMA vs ETS**: Exponential Smoothing (ETS) models are often competitive with ARIMA on monthly business data and are faster to fit. ETS has a cleaner decomposition into error, trend, and seasonality components. For intermittent demand (many zeros), Croston's method or Poisson models outperform both.
+`,
+  tryGuidance: "Use the ACF/PACF explorer to examine different synthetic time series. Toggle between AR, MA, and ARMA processes and observe how the correlograms change. Try identifying the correct p and q values before checking the answer.",
+  interviewGraph: {
+    initialStageId: "click_bug",
+    artifactDimensions: [
+      { label: "ARIMA Parameter Selection", recoveryStageId: "arima_recovery" },
+      { label: "Model Diagnostics", recoveryStageId: "diag_recovery" },
+    ],
+    stages: {
+      click_bug: {
+        id: "click_bug",
+        type: "click_target",
+        badge: "Stage 1",
+        title: "Stage 1 · Spot the ARIMA Bug",
+        prompt: "A colleague shares this ARIMA modeling code. Click the line that contains the most critical modeling error.",
+        code_snippet: `model = ARIMA(monthly_sales, order=(1, 0, 1))  # -- ds-target:no_differencing
+results = model.fit()
+forecast = results.forecast(steps=12)           # -- ds-target:long_forecast
+# No residual diagnostics                       # -- ds-target:no_diagnostics`,
+        validationCopy: {
+          no_differencing: "Correct! d=0 assumes the series is already stationary, but that assumption has never been tested. Monthly sales data typically has a trend, making it I(1). The first step should always be checking stationarity with ADF + KPSS and setting d accordingly.",
+          long_forecast: "Forecasting 12 steps ahead is a legitimate concern — ARIMA uncertainty widens with horizon — but it is not the most critical bug. The root issue is that the model itself may be misspecified because stationarity was assumed without testing.",
+          no_diagnostics: "Skipping residual diagnostics is a real problem, but it is a downstream consequence of the upstream bug. If d is wrong, the residuals will certainly not be white noise — but you would not catch that without diagnostics anyway.",
         },
-        sp_t2_rec1: {
-          id: "sp_t2_rec1",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · ARIMA Parameters",
-          prompt: "What does the 'd' in ARIMA(p,d,q) control?",
-          choices: [
-            { id: "a", label: "The number of times the series is differenced to achieve stationarity", description: "d=1: first difference; d=2: second difference" },
-            { id: "b", label: "The number of MA lag terms", description: "That's 'q'" },
-            { id: "c", label: "The seasonal period", description: "Seasonal period is 'm' in SARIMA notation" },
-            { id: "d", label: "The depth of the neural network layers", description: "ARIMA is a classical statistical model, not neural" },
-          ],
-          branches: { a: "sp_t2_stage2", b: "sp_t2_stage2", c: "sp_t2_stage2", d: "sp_t2_stage2" },
-          rationale: "d = integration order. ARIMA(1,1,1): take first differences of the series (d=1), then fit an ARMA(1,1) to the differenced series. d=0 means the original series is already stationary. Most economic series need d=1.",
+        branches: {
+          no_differencing: "scenario_acf_pacf",
+          long_forecast: "arima_recovery",
+          no_diagnostics: "arima_recovery",
         },
-        sp_t2_stage2: {
-          id: "sp_t2_stage2",
-          type: "scenario_choice",
-          badge: "Stage 2",
-          title: "Stage 2 · AIC vs BIC for Model Selection",
-          prompt: "You fit three ARIMA models. AIC scores: AR(1)=450, AR(2)=445, AR(3)=444. BIC scores: AR(1)=455, AR(2)=457, AR(3)=462. Which model do you choose?",
-          choices: [
-            { id: "a", label: "AR(1) — minimizes BIC, which penalizes complexity more strongly", description: "BIC penalizes extra parameters more — AR(1) wins on BIC" },
-            { id: "b", label: "AR(3) — minimizes AIC regardless of BIC", description: "A 1-point AIC improvement at the cost of 7 BIC points is usually not worth it" },
-            { id: "c", label: "AR(2) — middle ground between AIC and BIC optima", description: "AR(2) isn't optimal on either metric" },
-            { id: "d", label: "Run them all in production and average predictions", description: "Ensembling is valid but the question asks about model selection" },
-          ],
-          branches: { a: "sp_t2_end", b: "sp_t2_rec2", c: "sp_t2_rec2", d: "sp_t2_rec2" },
-          rationale: "When AIC and BIC disagree, BIC is preferred for parsimony — it penalizes extra parameters by log(n) vs 2. Here AR(1) wins on BIC; AIC would choose AR(3) but the improvement is tiny (1 point). For forecasting, simpler models often generalize better. Choose AR(1) or validate both on a holdout set.",
-        },
-        sp_t2_rec2: {
-          id: "sp_t2_rec2",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Model Selection",
-          prompt: "Monthly airline passenger data has a clear 12-month seasonal cycle and an upward trend. Standard ARIMA struggles. What extension handles this?",
-          choices: [
-            { id: "a", label: "SARIMA(p,d,q)(P,D,Q)[12] with seasonal terms at lag 12", description: "SARIMA explicitly models seasonal AR and MA at the seasonal period" },
-            { id: "b", label: "ARIMA with p=12 to capture 12-month autocorrelation", description: "High AR order overfits; seasonal differencing is more parsimonious" },
-            { id: "c", label: "Remove the trend first, then apply standard ARIMA", description: "Trend removal alone doesn't handle seasonal patterns" },
-            { id: "d", label: "ARMA(12,12) on the raw series", description: "12 AR + 12 MA = 24 parameters for a simpler seasonal structure" },
-          ],
-          branches: { a: "sp_t2_end", b: "sp_t2_end", c: "sp_t2_end", d: "sp_t2_end" },
-          rationale: "SARIMA extends ARIMA with seasonal components: (P,D,Q)[m] where P=seasonal AR, D=seasonal differencing, Q=seasonal MA, m=seasonal period. For monthly data with annual seasonality: SARIMA(1,1,1)(1,1,1)[12] is a common starting point — the Box-Jenkins airline model.",
-        },
-        sp_t2_end: {
-          id: "sp_t2_end",
-          type: "scenario_choice",
-          badge: "Complete",
-          title: "ARIMA Mastered",
-          prompt: "Residuals from a fitted ARIMA model show significant autocorrelation at lag 7. What does this indicate?",
-          choices: [
-            { id: "a", label: "The model is misspecified — residuals should be white noise", description: "Autocorrelated residuals mean the model left predictable structure in the data" },
-            { id: "b", label: "The model has too many parameters — overfitting", description: "Overfitting causes small residuals, not autocorrelated ones" },
-            { id: "c", label: "This is expected — some autocorrelation in residuals is normal", description: "Ideally residuals are white noise (no autocorrelation)" },
-            { id: "d", label: "The forecast horizon should be extended to 7 days", description: "Residual autocorrelation is about model fit, not forecast horizon" },
-          ],
-          branches: { a: "sp_t2_end", b: "sp_t2_end", c: "sp_t2_end", d: "sp_t2_end" },
-          terminal: true,
-          rationale: "ARIMA residuals should be white noise — no autocorrelation, no pattern. Significant ACF at lag 7 means predictable weekly structure wasn't captured. Fix: add a weekly seasonal component (SARIMA with m=7), add MA(7), or use a different model. Use Ljung-Box test for formal residual diagnostics.",
-        },
+      },
+      arima_recovery: {
+        id: "arima_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · The Role of d",
+        prompt: "In ARIMA(p, d, q), what does the d parameter control?",
+        choices: [
+          { id: "a", label: "The number of autoregressive lags", description: "Controls how many past values are included." },
+          { id: "b", label: "The number of times the series is differenced for stationarity", description: "d is the integration order." },
+          { id: "c", label: "The number of moving-average residual lags", description: "Controls dependence on past forecast errors." },
+        ],
+        branches: { a: "arima_recovery", b: "scenario_acf_pacf", c: "arima_recovery" },
+        rationale: "In ARIMA(p, **d**, q), d is the **integration order** — the number of differencing operations applied to make the series stationary. Setting d=0 assumes the raw series is already stationary; d=1 applies one difference. Determining d correctly, via ADF and KPSS testing, is the critical first step before selecting p and q.",
+      },
+      scenario_acf_pacf: {
+        id: "scenario_acf_pacf",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Reading ACF and PACF",
+        prompt: "After differencing, you plot ACF and PACF on the stationary series. The PACF has a single significant spike at lag 1 and then cuts off cleanly. The ACF decays gradually. What model does this suggest?",
+        choices: [
+          { id: "a", label: "MA(1) — ACF should cut off for MA models", description: "Moving average identified by ACF cutoff." },
+          { id: "b", label: "AR(1) — PACF cuts off at lag 1 signals an AR model", description: "Autoregressive identified by PACF cutoff." },
+          { id: "c", label: "ARMA(1,1) — both plots show some structure", description: "Mixed model because both ACF and PACF are non-zero." },
+          { id: "d", label: "White noise — no model needed", description: "Both plots fall within the confidence band." },
+        ],
+        branches: { a: "diag_recovery", b: "scenario_ljungbox", c: "diag_recovery", d: "diag_recovery" },
+        rationale: "A PACF that cuts off sharply after lag p (here, lag 1) while the ACF decays gradually is the signature of an **AR(p)** model. For MA(q), the roles are reversed: ACF cuts off, PACF decays. When both decay gradually, you have an ARMA process and should use auto_arima.",
+      },
+      diag_recovery: {
+        id: "diag_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · ACF/PACF Patterns",
+        prompt: "Which pattern in the correlograms indicates a pure MA(2) process?",
+        choices: [
+          { id: "a", label: "PACF cuts off at lag 2, ACF decays gradually", description: "PACF cutoff is the AR signature." },
+          { id: "b", label: "ACF cuts off at lag 2, PACF decays gradually", description: "ACF cutoff is the MA signature." },
+          { id: "c", label: "Both ACF and PACF cut off at lag 2", description: "Both cut off simultaneously." },
+        ],
+        branches: { a: "diag_recovery", b: "scenario_ljungbox", c: "diag_recovery" },
+        rationale: "For a pure MA(q) process: the **ACF cuts off sharply to zero after lag q** (here, lag 2), while the PACF decays gradually. This is because MA processes have finite memory — they only directly depend on the last q error terms. The PACF, measuring partial correlations, picks up the infinite AR representation of the MA process.",
+      },
+      scenario_ljungbox: {
+        id: "scenario_ljungbox",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Ljung-Box Test",
+        prompt: "After fitting ARIMA(1,1,0), the Ljung-Box test on residuals returns p = 0.02 at lag 10. What should you do?",
+        choices: [
+          { id: "a", label: "The model is validated — p < 0.05 confirms good fit", description: "Low p-value is what we want from Ljung-Box." },
+          { id: "b", label: "The residuals have significant autocorrelation — the model is misspecified", description: "Ljung-Box H₀ is white noise; p < 0.05 rejects it." },
+          { id: "c", label: "Increase the forecast horizon to compensate", description: "Longer forecasts address residual autocorrelation." },
+          { id: "d", label: "Switch to OLS regression instead", description: "OLS is a better choice when ARIMA residuals fail." },
+        ],
+        branches: { a: "scenario_sarima", b: "scenario_sarima", c: "scenario_sarima", d: "scenario_sarima" },
+        rationale: "Ljung-Box H₀ is that **residuals are white noise** (no autocorrelation). p = 0.02 < 0.05 → reject H₀ → residuals have significant autocorrelation → the model has not captured all temporal structure. The response is to re-examine p and q (perhaps increase one), check for seasonality, or consider adding an MA term.",
+      },
+      scenario_sarima: {
+        id: "scenario_sarima",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Identifying Seasonal Structure",
+        prompt: "You examine ACF of monthly data (after first differencing) and see significant spikes at lags 12, 24, and 36, with a gradual decay at those seasonal lags. What does this suggest?",
+        choices: [
+          { id: "a", label: "No seasonal pattern — spikes at lag 12 are coincidental", description: "Spikes at regular multiples of 12 are random." },
+          { id: "b", label: "Seasonal AR structure — use SARIMA with seasonal P parameter", description: "Slow decay at seasonal lags points to seasonal AR." },
+          { id: "c", label: "Seasonal MA structure — use SARIMA with seasonal Q parameter", description: "Slow decay at seasonal lags points to seasonal MA." },
+          { id: "d", label: "The data needs a Box-Cox transform before modeling", description: "Box-Cox addresses variance, not seasonal autocorrelation." },
+        ],
+        branches: { a: "scenario_forecast_uncertainty", b: "scenario_forecast_uncertainty", c: "scenario_forecast_uncertainty", d: "scenario_forecast_uncertainty" },
+        rationale: "Spikes at lags 12, 24, 36 that **decay gradually** in the seasonal ACF indicate a **seasonal AR** process — the effect persists across many seasonal periods. If the spike cut off sharply after lag 12, it would suggest seasonal MA. Here, the decay pattern means you need a seasonal AR term: SARIMA(p,d,q)(P,D,Q)[12] with P ≥ 1.",
+      },
+      scenario_forecast_uncertainty: {
+        id: "scenario_forecast_uncertainty",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Forecast Horizon and Uncertainty",
+        prompt: "A business stakeholder asks for an ARIMA point forecast for the next 24 months with a 95% confidence interval. What is the most important caveat to communicate?",
+        choices: [
+          { id: "a", label: "ARIMA cannot forecast more than 12 steps ahead", description: "There is a hard limit on ARIMA forecast horizon." },
+          { id: "b", label: "Confidence intervals widen substantially with horizon — 24-month intervals may be too wide to be actionable", description: "Uncertainty compounds over each additional forecast step." },
+          { id: "c", label: "ARIMA always forecasts the mean, so confidence intervals are unnecessary", description: "ARIMA provides both a point forecast and uncertainty bounds." },
+          { id: "d", label: "The model must be re-fitted every month to produce multi-step forecasts", description: "Re-fitting is required for multi-step ARIMA forecasts." },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage", d: "terminal_stage" },
+        rationale: "ARIMA forecast uncertainty widens with horizon. For MA and ARMA models, the variance of h-step-ahead errors grows, resulting in confidence intervals that can span an impractically wide range by month 24. The right message to stakeholders: short-horizon forecasts (1–3 months) are reliable; long-horizon ones should be treated as scenario planning, not precise estimates.",
+      },
+      terminal_stage: {
+        id: "terminal_stage",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · ARIMA Mastery Check",
+        prompt: "You fit ARIMA(2,1,1) to a monthly sales series. Ljung-Box p = 0.45, QQ plot looks normal, residual ACF is clean. What is your conclusion?",
+        choices: [
+          { id: "a", label: "The model is well-specified — residuals are white noise and the diagnostics pass", description: "All diagnostic checks are satisfied." },
+          { id: "b", label: "Ljung-Box p = 0.45 means the model is borderline — barely acceptable", description: "High p-value is a concern for Ljung-Box." },
+          { id: "c", label: "The model needs more AR lags — p = 2 is insufficient", description: "More lags would improve the model." },
+          { id: "d", label: "Must use auto_arima to confirm this is the optimal model", description: "Manual identification is unreliable without grid search." },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage", d: "terminal_stage" },
+        terminal: true,
+        rationale: "Ljung-Box p = 0.45 >> 0.05: fail to reject H₀ — residuals are white noise. Normal QQ plot means residuals are approximately Gaussian. Clean residual ACF confirms no remaining autocorrelation. All three diagnostic checks pass → the model is well-specified. High p-values on Ljung-Box are **good**, not borderline.",
       },
     },
-
-    knowledgeCheck: [
-      {
-        question: "An ARIMA(2,1,0) model is fit to daily temperature data. What does this mean in plain language?",
-        options: [
-          "Predict today's temperature using yesterday's and the day-before's temperatures, after removing trend via differencing",
-          "Predict temperature using 2 MA terms and no AR terms",
-          "The model uses 2 seasonal periods and 1 outlier correction",
-          "Temperature is integrated twice and has no AR structure",
-        ],
-        correctIndex: 0,
-        explanation: "ARIMA(2,1,0): AR(2) — uses 2 past values; I(1) — first differencing applied; MA(0) — no moving average terms. The model predicts the differenced series (today minus yesterday) as a linear function of the two previous differences. In plain terms: change in temperature today depends on changes over the past two days.",
-      },
-      {
-        question: "Why is the Ljung-Box test applied to ARIMA residuals?",
-        options: [
-          "To check if the original series is stationary before fitting",
-          "To test whether residual autocorrelations are jointly zero (white noise test)",
-          "To select the optimal ARIMA order using information criteria",
-          "To detect outliers in the training data",
-        ],
-        correctIndex: 1,
-        explanation: "The Ljung-Box test jointly tests whether autocorrelations at multiple lags are all zero. A significant p-value (p < 0.05) means residuals have structure — the model is missing something. A non-significant p-value supports the white noise assumption, indicating a well-specified model.",
-      },
-    ],
   },
+  knowledgeCheck: [
+    {
+      question: "The PACF of a differenced series cuts off sharply after lag 2, while the ACF decays slowly. What ARIMA order does this suggest?",
+      options: [
+        "ARIMA(0, d, 2) — MA(2) because ACF is involved",
+        "ARIMA(2, d, 0) — AR(2) because PACF cuts off at lag 2",
+        "ARIMA(2, d, 2) — both p and q are 2",
+        "ARIMA(0, d, 0) — white noise",
+      ],
+      correctIndex: 1,
+      explanation: "PACF cutting off at lag p is the signature of AR(p). When the PACF cuts off at lag 2 and the ACF decays gradually, the model is AR(2), giving ARIMA(2, d, 0).",
+    },
+    {
+      question: "After fitting ARIMA, the Ljung-Box test returns p = 0.001. What does this mean?",
+      options: [
+        "The model fits very well — low p-value confirms good residuals",
+        "Significant autocorrelation remains in residuals — model is misspecified",
+        "The series was over-differenced",
+        "The forecast horizon is too long",
+      ],
+      correctIndex: 1,
+      explanation: "Ljung-Box H₀ is that residuals are white noise. p = 0.001 << 0.05 → reject H₀ → significant autocorrelation in residuals → model has not captured all temporal structure and needs revision.",
+    },
+    {
+      question: "What does the 'm' parameter represent in SARIMA(p,d,q)(P,D,Q)[m]?",
+      options: [
+        "The number of months in the training data",
+        "The model order selection metric (AIC or BIC)",
+        "The seasonal period (e.g., 12 for monthly data with annual seasonality)",
+        "The maximum lag considered in the ACF plot",
+      ],
+      correctIndex: 2,
+      explanation: "In SARIMA notation, m is the seasonal period — how many observations constitute one seasonal cycle. For monthly data with annual patterns, m = 12; for quarterly data, m = 4.",
+    },
+  ],
+},
 
   "sp-t3": {
   durationLabel: "15 min",
@@ -43613,192 +43864,309 @@ forecast = model.predict(future)`,
 },
 
   "sp-t4": {
-    durationLabel: "16 min",
-    outcomes: [
-      "Explain how LSTMs handle sequence memory via gates",
-      "Frame a time series problem as a supervised learning problem for LSTM",
-      "Compare LSTM to classical methods for time series forecasting",
-    ],
-    learnMarkdown: `## LSTM for Sequence Prediction
+  durationLabel: "16 min",
+  outcomes: [
+    "Explain LSTM gate mechanics and how they solve the vanishing gradient problem",
+    "Convert a raw time series into windowed (batch, sequence, features) training tensors",
+    "Identify and prevent target leakage from fitting a scaler on the full dataset",
+    "Choose between LSTM and ARIMA/Prophet based on data characteristics",
+  ],
+  learnMarkdown: `## Why LSTM for Time Series?
 
-LSTMs (Long Short-Term Memory) are recurrent neural networks designed to learn long-range dependencies in sequential data.
+Traditional statistical models like ARIMA excel at linear, stationary patterns with limited history. Real-world time series often violate these assumptions:
 
-### Why Vanilla RNNs Fail
-Simple RNNs suffer from **vanishing gradients**: gradients decay exponentially through time during backpropagation, making it impossible to learn long-range patterns (>10-20 steps back).
+- **Long-range dependencies**: today's value might depend on events 50 timesteps ago
+- **Nonlinear patterns**: demand spikes driven by promotions, weather interactions
+- **Multivariate inputs**: using weather, price, and day-of-week together to forecast sales
 
-### LSTM Gates
-\`\`\`
-Forget gate: f_t = σ(W_f · [h_{t-1}, x_t] + b_f)    # what to discard
-Input gate:  i_t = σ(W_i · [h_{t-1}, x_t] + b_i)    # what to write
-Cell update: C̃_t = tanh(W_C · [h_{t-1}, x_t] + b_C) # candidate values
-Cell state:  C_t = f_t * C_{t-1} + i_t * C̃_t        # updated memory
-Output gate: o_t = σ(W_o · [h_{t-1}, x_t] + b_o)    # what to output
-Hidden:      h_t = o_t * tanh(C_t)
-\`\`\`
+LSTMs (Long Short-Term Memory networks) were designed to handle all three. They are a special type of Recurrent Neural Network (RNN) with a gating mechanism that controls how information flows through time.
 
-### Framing as Supervised Learning
+## The Vanishing Gradient Problem in Plain RNNs
+
+Plain RNNs pass a hidden state forward through time and use backpropagation through time (BPTT) for training. When sequences are long, gradients are multiplied through many timesteps. Multiplying small numbers repeatedly causes gradients to shrink toward zero — weights far back in the sequence receive almost no update signal. This is the **vanishing gradient problem**.
+
+LSTM solves it by introducing a **cell state** — a highway that carries information across long distances with minimal transformation, regulated by gates.
+
+## LSTM Gates: The Core Mechanism
+
+Each LSTM unit maintains two states: a **cell state** (Cₜ, long-term memory) and a **hidden state** (hₜ, short-term working memory passed to the next layer).
+
+**Forget gate**: Decides what to erase from cell state.
+fₜ = σ(Wf · [hₜ₋₁, xₜ] + bf)
+Output near 0 → forget; near 1 → keep.
+
+**Input gate**: Decides what new information to write to cell state.
+iₜ = σ(Wi · [hₜ₋₁, xₜ] + bi)
+C̃ₜ = tanh(Wc · [hₜ₋₁, xₜ] + bc)  ← candidate values
+Cell state update: Cₜ = fₜ ⊙ Cₜ₋₁ + iₜ ⊙ C̃ₜ
+
+**Output gate**: Decides what part of cell state to expose as hidden state.
+oₜ = σ(Wo · [hₜ₋₁, xₜ] + bo)
+hₜ = oₜ ⊙ tanh(Cₜ)
+
+The sigmoid activations produce values in [0,1], acting as soft switches. The cell state update is additive (not multiplicative), which allows gradients to flow without vanishing.
+
+## Sequence Windowing: Creating Supervised Inputs
+
+A raw time series [y₁, y₂, ..., yₙ] must be converted into (input, target) pairs. With a **lookback window** of L:
+
+- Input: [yₜ₋ₗ, ..., yₜ₋₁] → shape (L, 1) for univariate
+- Target: yₜ
+
 \`\`\`python
-import numpy as np
-
-def create_sequences(data, seq_len=30, horizon=1):
+def create_sequences(data, lookback=30):
     X, y = [], []
-    for i in range(len(data) - seq_len - horizon + 1):
-        X.append(data[i:i+seq_len])
-        y.append(data[i+seq_len:i+seq_len+horizon])
+    for i in range(lookback, len(data)):
+        X.append(data[i - lookback:i])
+        y.append(data[i])
     return np.array(X), np.array(y)
 
-X, y = create_sequences(scaled_series, seq_len=60, horizon=7)
-# X shape: (n_samples, 60, n_features)
-# y shape: (n_samples, 7)
+X, y = create_sequences(scaled_train, lookback=30)
+# X shape: (n_samples, 30, 1)  — (batch, sequence, features)
 \`\`\`
 
-### PyTorch LSTM Example
+The Keras LSTM input shape is **(batch_size, sequence_length, n_features)**. For multivariate inputs (price + temperature + day-of-week), n_features = 3.
+
+## Scaling: Fit on Train, Transform Both
+
+LSTMs are sensitive to input scale. Standardization or min-max scaling is essential. The critical rule: **fit the scaler only on training data**, then use that same fitted scaler to transform test data.
+
 \`\`\`python
-import torch.nn as nn
+from sklearn.preprocessing import MinMaxScaler
 
-class LSTMForecaster(nn.Module):
-    def __init__(self, input_size, hidden_size, horizon):
-        super().__init__()
-        self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)
-        self.linear = nn.Linear(hidden_size, horizon)
-
-    def forward(self, x):
-        out, _ = self.lstm(x)
-        return self.linear(out[:, -1, :])  # last timestep
+scaler = MinMaxScaler()
+train_scaled = scaler.fit_transform(train.reshape(-1, 1))  # fit on train only
+test_scaled = scaler.transform(test.reshape(-1, 1))        # transform only, no fit
 \`\`\`
 
-### LSTM vs Classical for Time Series
-| Aspect | LSTM | ARIMA/Prophet |
-|--------|------|---------------|
-| Long-range dependencies | Excellent | Limited |
-| Small datasets (<1000 pts) | Often overfits | Better |
-| External features | Easy multivariate input | Requires ARIMAX/regressors |
-| Interpretability | Low | High |
-| Training cost | High | Low |
-| Uncertainty quantification | Difficult | Confidence intervals native |`,
+Fitting the scaler on all data (train + test combined) introduces **data leakage**: the scaler's min/max are influenced by future test values, meaning the model implicitly sees future information during training.
 
-    video: null,
-    videoFallbackMarkdown: `## Seq2Seq and Attention for Time Series
+## Stacked and Bidirectional LSTMs
 
-Beyond basic LSTMs, sequence-to-sequence (Seq2Seq) models use encoder-decoder architectures for multi-step forecasting:
-- **Encoder**: processes the history → context vector
-- **Decoder**: generates forecast one step at a time, attending to encoder states
+**Stacked LSTM**: multiple LSTM layers for deeper representations. Intermediate layers must return sequences (\`return_sequences=True\`):
 
-**Temporal Fusion Transformer (TFT)**: the state of the art for interpretable multi-horizon forecasting. Uses multi-head attention across time + gating layers. Provides variable importance scores.`,
+\`\`\`python
+model = Sequential([
+    LSTM(64, return_sequences=True, input_shape=(lookback, n_features)),
+    Dropout(0.2),
+    LSTM(32),
+    Dense(1)
+])
+\`\`\`
 
-    tryGuidance: "No interactive visualization for this lesson. Focus on the sequence windowing pattern and the LSTM architecture.",
+**Bidirectional LSTM**: processes sequences in both directions, useful when future context is available (e.g., sequence classification, imputation) — not for real-time forecasting where future values are unknown.
 
-    interviewGraph: {
-      initialStageId: "sp_t4_stage1",
-      artifactDimensions: [
-        { label: "LSTM Mechanics", recoveryStageId: "sp_t4_rec1" },
-        { label: "Practical Tradeoffs", recoveryStageId: "sp_t4_rec2", passLabel: "Deep TS Expert" },
-      ],
-      stages: {
-        sp_t4_stage1: {
-          id: "sp_t4_stage1",
-          type: "scenario_choice",
-          badge: "Stage 1",
-          title: "Stage 1 · LSTM Gate Intuition",
-          prompt: "An LSTM is reading a long patient health record sequence. Early in the sequence, a 'diabetes diagnosis' event occurs. The LSTM must remember this when predicting outcomes 200 timesteps later. Which gate makes this possible?",
-          choices: [
-            { id: "a", label: "The cell state with a near-1 forget gate (retain the diabetes flag)", description: "Cell state carries information long-term; forget gate ≈1 means don't discard" },
-            { id: "b", label: "The output gate alone decides long-range memory", description: "Output gate selects what to expose from the cell, but doesn't retain information" },
-            { id: "c", label: "The input gate replaces old memory with new at each step", description: "Input gate writes new info but forget gate decides what to keep" },
-            { id: "d", label: "Vanilla RNN hidden state — LSTMs don't improve on this", description: "This is exactly the vanishing gradient problem LSTMs solve" },
-          ],
-          branches: { a: "sp_t4_stage2", b: "sp_t4_rec1", c: "sp_t4_rec1", d: "sp_t4_rec1" },
-          rationale: "The cell state C_t is the LSTM's long-term memory highway. When the forget gate f_t ≈ 1, the cell state is passed through unchanged across timesteps. The LSTM learns to write the diabetes flag into the cell state with a high input gate, then keep it alive by learning forget gate ≈ 1 for those subsequent timesteps.",
+**Dropout** after LSTM layers reduces overfitting. Typical rates: 0.1–0.3.
+
+## Walk-Forward Validation
+
+A simple train/test split on time series is insufficient because it tests only one fixed hold-out window. **Walk-forward validation** (expanding or sliding window) evaluates the model as it would be used in production:
+
+1. Train on observations 1 to t
+2. Forecast observation t+1
+3. Advance by one step, retrain (or update), repeat
+
+This gives a realistic estimate of out-of-sample performance across different points in the series. It is more expensive than a single split but substantially more reliable.
+
+## LSTM vs ARIMA vs Prophet
+
+| Scenario | Best choice |
+|----------|------------|
+| Small dataset (< 200 observations) | ARIMA or ETS |
+| Large dataset, nonlinear patterns | LSTM |
+| Multiple exogenous variables | LSTM or SARIMAX |
+| Interpretability required | ARIMA |
+| Multiple seasonality (daily + weekly + annual) | Prophet |
+| Low latency production inference | ARIMA (lighter) |
+
+LSTMs require substantially more data and computational resources and are harder to interpret. For many business forecasting problems, ARIMA or Prophet outperforms LSTM due to data size constraints.
+
+## Interview-Ready Summary
+
+- **LSTM gates** (forget, input, output) regulate cell state; the additive cell state update prevents vanishing gradients that afflict plain RNNs
+- **Input shape** for Keras LSTM: (batch_size, sequence_length, n_features) — windowing converts the raw series into this format
+- **Scaling leakage**: fitting the scaler on train + test combined lets the model see future statistics during training — always fit only on training data
+- **Walk-forward validation** is the correct evaluation strategy for time series; simple random splits violate temporal ordering
+- LSTM wins for large, multivariate, nonlinear series; ARIMA wins for small datasets, interpretability, and low-data scenarios
+- Stacked LSTMs need \`return_sequences=True\` on intermediate layers; Bidirectional LSTMs are not suitable for real-time forecasting
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: GRU vs LSTM and Attention Mechanisms
+
+**GRU (Gated Recurrent Unit)** is a simplified LSTM with only two gates (update gate, reset gate) and no separate cell state. GRUs use fewer parameters and train faster; on many time series benchmarks they match LSTM performance. When in doubt on a new dataset, benchmark both.
+
+**Attention mechanisms**: the Transformer architecture replaces recurrence entirely with self-attention, computing direct relationships between all pairs of timesteps. Temporal Fusion Transformer (TFT) and PatchTST are Transformer-based models that outperform LSTMs on many long-horizon forecasting benchmarks (see the DARTS library for easy experimentation).
+
+**Teacher forcing**: during LSTM training, you feed the true previous value as input even when the model's prediction was wrong. This speeds training but can cause exposure bias — at inference time, the model receives its own (potentially wrong) predictions. Scheduled sampling gradually replaces teacher forcing with model predictions during training to bridge this gap.
+
+**Sequence-to-sequence (Seq2Seq)**: for multi-step forecasts, an encoder LSTM reads the input sequence, an decoder LSTM generates multiple future steps. The decoder can be teacher-forced during training and auto-regressive at inference. This is superior to forecasting each horizon independently.
+`,
+  tryGuidance: "Use the LSTM architecture visualizer to trace how information flows through the forget, input, and output gates. Experiment with different lookback window sizes and observe how the windowed dataset shape changes. Toggle the scaler leakage toggle to see why fitting on all data is problematic.",
+  interviewGraph: {
+    initialStageId: "click_bug",
+    artifactDimensions: [
+      { label: "LSTM Architecture", recoveryStageId: "lstm_recovery" },
+      { label: "Data Preparation", recoveryStageId: "prep_recovery" },
+    ],
+    stages: {
+      click_bug: {
+        id: "click_bug",
+        type: "click_target",
+        badge: "Stage 1",
+        title: "Stage 1 · Spot the Leakage Bug",
+        prompt: "A data scientist builds an LSTM for time series forecasting. Click the line that introduces data leakage into the pipeline.",
+        code_snippet: `scaler = MinMaxScaler()
+scaled_data = scaler.fit_transform(full_series.reshape(-1, 1))  # -- ds-target:fit_on_all
+X_train, X_test = X[:800], X[800:]`,
+        validationCopy: {
+          fit_on_all: "Correct! Calling fit_transform on the full series (including the test portion) leaks future statistics into the scaler. The scaler's min and max are computed from all data, including future test values, so the model implicitly sees information from the future during training. Always call fit_transform only on training data, then transform the test set separately.",
         },
-        sp_t4_rec1: {
-          id: "sp_t4_rec1",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · LSTM Mechanics",
-          prompt: "Why do vanilla RNNs suffer from the vanishing gradient problem when learning from long sequences?",
-          choices: [
-            { id: "a", label: "Gradients are multiplied by weights at each timestep; repeated multiplication of values <1 → exponential decay", description: "Backpropagation through time multiplies gradients across all timesteps" },
-            { id: "b", label: "RNNs use sigmoid activations which always output zero", description: "Sigmoid outputs (0,1), not zero — though saturation contributes to the problem" },
-            { id: "c", label: "The hidden state has too many parameters to train", description: "Parameter count is not the issue — gradient flow is" },
-            { id: "d", label: "Long sequences cause memory errors during forward pass", description: "Memory usage is a practical concern but not the gradient problem" },
-          ],
-          branches: { a: "sp_t4_stage2", b: "sp_t4_stage2", c: "sp_t4_stage2", d: "sp_t4_stage2" },
-          rationale: "BPTT (Backpropagation Through Time) multiplies the recurrent weight matrix at each timestep. If the largest eigenvalue of W < 1, gradients shrink exponentially with sequence length. LSTM's additive cell state update (C_t = f_t*C_{t-1} + i_t*C̃_t) allows gradients to flow unchanged when the forget gate ≈ 1.",
+        branches: {
+          fit_on_all: "scenario_gate_mechanism",
         },
-        sp_t4_stage2: {
-          id: "sp_t4_stage2",
-          type: "scenario_choice",
-          badge: "Stage 2",
-          title: "Stage 2 · Sequence Windowing",
-          prompt: "You have 5 years of hourly electricity consumption (43,800 points). You want to predict the next 24 hours. What sequence length (lookback window) is most appropriate?",
-          choices: [
-            { id: "a", label: "168 hours (1 week) — captures daily and weekly seasonality", description: "A week covers daily patterns (24h) and weekly periodicity" },
-            { id: "b", label: "1 hour — use only the immediately previous value", description: "Loses all seasonal context" },
-            { id: "c", label: "43,776 hours — use all history as the context window", description: "Impractical; LSTM memory saturates and training is extremely slow" },
-            { id: "d", label: "24 hours — exactly the forecast horizon", description: "Lookback of 24h misses weekly patterns that repeat every 168 hours" },
-          ],
-          branches: { a: "sp_t4_end", b: "sp_t4_rec2", c: "sp_t4_rec2", d: "sp_t4_rec2" },
-          rationale: "For electricity forecasting, 168-hour (1 week) lookback captures both daily cycles (24h) and the Monday-vs-Saturday pattern (weekly). Common practice: lookback = at least one full seasonal cycle, often 2-4 cycles. For daily data with annual seasonality, a 365-day lookback or Fourier features work better than a 365-step LSTM.",
-        },
-        sp_t4_rec2: {
-          id: "sp_t4_rec2",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Practical Tradeoffs",
-          prompt: "You compare LSTM (RMSE=45) vs SARIMA (RMSE=48) on 2 years of monthly sales data (24 data points). Which do you deploy?",
-          choices: [
-            { id: "a", label: "SARIMA — LSTM likely overfit with only 24 training points", description: "24 points for an LSTM is extremely small; SARIMA is more appropriate" },
-            { id: "b", label: "LSTM — lower RMSE wins always", description: "Lower RMSE on 24-point training data means little; likely overfitting" },
-            { id: "c", label: "Ensemble both — average their predictions", description: "Ensembling an overfit model dilutes rather than helps" },
-            { id: "d", label: "Deploy neither — only neural ODEs work for monthly data", description: "SARIMA is a well-established choice for monthly data" },
-          ],
-          branches: { a: "sp_t4_end", b: "sp_t4_end", c: "sp_t4_end", d: "sp_t4_end" },
-          rationale: "24 monthly data points is far too few for an LSTM (typically needs 1000+). The LSTM's lower RMSE likely reflects overfitting. SARIMA is the right tool here — classical models with few parameters outperform deep learning on small datasets. Reserve LSTM for cases with thousands of data points or complex multivariate inputs.",
-        },
-        sp_t4_end: {
-          id: "sp_t4_end",
-          type: "scenario_choice",
-          badge: "Complete",
-          title: "LSTM Forecasting Mastered",
-          prompt: "Before feeding raw time series data into an LSTM, what preprocessing step is critical and why?",
-          choices: [
-            { id: "a", label: "Normalize to [0,1] or standardize — LSTMs are sensitive to input scale via tanh/sigmoid activations", description: "Saturated activations cause vanishing gradients during training" },
-            { id: "b", label: "Apply seasonal differencing — LSTMs cannot model seasonality", description: "LSTMs can learn seasonal patterns given enough lookback" },
-            { id: "c", label: "Remove all outliers — a single outlier breaks LSTM training", description: "LSTMs are somewhat robust to outliers; this is overstated" },
-            { id: "d", label: "Convert to stationary — LSTMs require stationarity like ARIMA", description: "LSTMs don't require stationarity; they can model non-stationary series" },
-          ],
-          branches: { a: "sp_t4_end", b: "sp_t4_end", c: "sp_t4_end", d: "sp_t4_end" },
-          terminal: true,
-          rationale: "Normalization is essential for LSTMs: tanh activation outputs (−1, 1) and sigmoid outputs (0, 1). Large raw values push activations into saturation zones where gradients → 0. Always normalize (MinMax or StandardScaler) per feature, fit on training data only, and inverse-transform predictions back to original scale.",
-        },
+      },
+      lstm_recovery: {
+        id: "lstm_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · LSTM Gate Functions",
+        prompt: "Which LSTM gate decides what information to erase from the cell state?",
+        choices: [
+          { id: "a", label: "Forget gate — sigmoid output near 0 erases, near 1 keeps", description: "The forget gate controls cell state erasure." },
+          { id: "b", label: "Input gate — sigmoid output controls new information written", description: "The input gate writes new information to cell state." },
+          { id: "c", label: "Output gate — controls what is exposed as hidden state", description: "The output gate filters what the cell state reveals." },
+        ],
+        branches: { a: "scenario_gate_mechanism", b: "lstm_recovery", c: "lstm_recovery" },
+        rationale: "The **forget gate** fₜ = σ(Wf·[hₜ₋₁, xₜ] + bf) produces values in [0,1]. When the output is near 0, the corresponding cell state dimension is erased (forgotten); near 1 means keep. This is how the LSTM decides to discard outdated information (e.g., forget a previous season's anomaly).",
+      },
+      prep_recovery: {
+        id: "prep_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Scaler Leakage",
+        prompt: "Why does fitting a MinMaxScaler on the combined train+test series cause data leakage?",
+        choices: [
+          { id: "a", label: "It makes the scaler slower to compute", description: "Computation speed is affected by data size." },
+          { id: "b", label: "The scaler's min/max incorporate future test values, so training features implicitly reflect future information", description: "Future statistics contaminate the training transformation." },
+          { id: "c", label: "MinMaxScaler does not support time series data", description: "MinMaxScaler has a limitation with time series." },
+        ],
+        branches: { a: "prep_recovery", b: "scenario_gate_mechanism", c: "prep_recovery" },
+        rationale: "MinMaxScaler computes min and max from the data passed to fit(). If you include test data, the scaler's parameters reflect future values. When training features are then scaled using those parameters, the training data is subtly influenced by future information — a form of **target leakage**. Always fit preprocessing objects on training data only.",
+      },
+      scenario_gate_mechanism: {
+        id: "scenario_gate_mechanism",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Cell State and Vanishing Gradients",
+        prompt: "Why does the LSTM cell state solve the vanishing gradient problem that plagues plain RNNs?",
+        choices: [
+          { id: "a", label: "The cell state uses ReLU activation, which prevents gradient decay", description: "ReLU activation prevents gradient decay in cell state." },
+          { id: "b", label: "The cell state update is additive (Cₜ = fₜ⊙Cₜ₋₁ + iₜ⊙C̃ₜ), allowing gradients to flow without repeated multiplication", description: "Additive update avoids compounding small multiplications." },
+          { id: "c", label: "The cell state skips every other timestep, reducing the gradient path length", description: "Cell state skips timesteps to shorten gradient paths." },
+          { id: "d", label: "LSTMs use batch normalization on the cell state to stabilize gradients", description: "Batch normalization is applied to the cell state." },
+        ],
+        branches: { a: "scenario_windowing", b: "scenario_windowing", c: "scenario_windowing", d: "scenario_windowing" },
+        rationale: "Plain RNNs update hidden state multiplicatively at each step, causing gradients to vanish (or explode) over long sequences. The LSTM cell state uses an **additive update**: Cₜ = fₜ⊙Cₜ₋₁ + iₜ⊙C̃ₜ. Addition doesn't compound small multiplications — gradient signals can flow back through time along the cell state pathway without shrinking to zero.",
+      },
+      scenario_windowing: {
+        id: "scenario_windowing",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Sequence Windowing",
+        prompt: "A univariate daily temperature series has 1000 observations. You apply a lookback window of 14 days. What is the shape of the resulting input tensor X?",
+        choices: [
+          { id: "a", label: "(986, 14, 1) — 986 samples, 14 timesteps, 1 feature", description: "Samples = 1000 minus 14 lookback, 14 timesteps, 1 feature." },
+          { id: "b", label: "(1000, 14, 1) — all observations included", description: "All 1000 observations can form sequences of length 14." },
+          { id: "c", label: "(14, 986, 1) — timesteps come first", description: "Timesteps are the first dimension in LSTM input." },
+          { id: "d", label: "(986, 1, 14) — features come before timesteps", description: "Features are placed before timesteps in the shape." },
+        ],
+        branches: { a: "scenario_stacked_lstm", b: "prep_recovery", c: "prep_recovery", d: "prep_recovery" },
+        rationale: "With 1000 observations and lookback=14, the first valid window ends at index 14 and the last at index 999, giving 1000 − 14 = 986 samples. Each sample is a sequence of 14 timesteps with 1 feature. Keras LSTM expects shape **(batch, sequence_length, n_features)** → (986, 14, 1). Note: batch_size here refers to the total training samples; during training the actual batch dimension is the mini-batch size.",
+      },
+      scenario_stacked_lstm: {
+        id: "scenario_stacked_lstm",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Stacked LSTM Architecture",
+        prompt: "You build a two-layer stacked LSTM in Keras. The first LSTM layer fails to pass sequences to the second LSTM layer. What parameter is missing?",
+        choices: [
+          { id: "a", label: "return_state=True on the first LSTM layer", description: "return_state controls whether final state is returned." },
+          { id: "b", label: "return_sequences=True on the first LSTM layer", description: "return_sequences makes the layer output all timesteps." },
+          { id: "c", label: "stateful=True on both LSTM layers", description: "stateful controls whether state is preserved across batches." },
+          { id: "d", label: "input_shape specified on the second LSTM layer", description: "input_shape must be provided to intermediate layers." },
+        ],
+        branches: { a: "scenario_walk_forward", b: "scenario_walk_forward", c: "scenario_walk_forward", d: "scenario_walk_forward" },
+        rationale: "By default, a Keras LSTM layer outputs only the **final timestep** hidden state — a single vector. To stack LSTM layers, the first layer must output the full sequence (one hidden state per timestep) so the second layer receives a proper sequence input. Setting **return_sequences=True** on all but the last LSTM layer achieves this.",
+      },
+      scenario_walk_forward: {
+        id: "scenario_walk_forward",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Walk-Forward Validation",
+        prompt: "Why is walk-forward validation preferred over a simple 80/20 train-test split for evaluating an LSTM time series model?",
+        choices: [
+          { id: "a", label: "Walk-forward is faster to compute than a fixed split", description: "Walk-forward requires fewer training iterations." },
+          { id: "b", label: "A fixed split tests performance at only one future window; walk-forward evaluates across many time points, reflecting real deployment conditions", description: "Multiple evaluation windows give a more robust estimate." },
+          { id: "c", label: "Walk-forward prevents overfitting by using all data for training simultaneously", description: "Walk-forward uses all data for training at once." },
+          { id: "d", label: "The 80/20 split randomly shuffles data, violating temporal ordering", description: "A fixed chronological 80/20 split preserves ordering." },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage", d: "terminal_stage" },
+        rationale: "A fixed 80/20 chronological split evaluates the model on only **one specific future window** — performance might be unusually good or bad by chance. Walk-forward validation trains on observations 1..t, tests on t+1, then slides or expands the window, giving a realistic estimate across many different forecast origins. This mirrors how the model will actually be used in production.",
+      },
+      terminal_stage: {
+        id: "terminal_stage",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · LSTM vs ARIMA Decision",
+        prompt: "You have 150 monthly observations of a univariate sales series with a clear linear trend and no exogenous variables. Your manager asks for a 3-month forecast with interpretation. Which model is the better choice?",
+        choices: [
+          { id: "a", label: "LSTM — deep learning always outperforms classical models", description: "LSTM is universally superior to statistical models." },
+          { id: "b", label: "ARIMA — small dataset, univariate, interpretable, linear trend favors classical model", description: "ARIMA is well-suited to this scenario's constraints." },
+          { id: "c", label: "Bidirectional LSTM — bidirectional models are best for forecasting", description: "Bidirectional LSTM is optimal for future-unknown forecasting." },
+          { id: "d", label: "Neither — 150 observations is too small for any time series model", description: "150 observations is insufficient for time series modeling." },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage", d: "terminal_stage" },
+        terminal: true,
+        rationale: "150 monthly observations is a **small dataset** — LSTMs are data-hungry and tend to overfit on small samples. The series is univariate (no exogenous variables) and has a linear trend — exactly what ARIMA handles well. Interpretability is required (ARIMA coefficients are explainable; LSTM is a black box). Bidirectional LSTMs are inappropriate for forecasting because they require future inputs. ARIMA is the clear choice here.",
       },
     },
-
-    knowledgeCheck: [
-      {
-        question: "What is 'teacher forcing' in LSTM training for multi-step forecasting?",
-        options: [
-          "Forcing the LSTM to attend to the teacher's annotations at each step",
-          "Using ground truth previous outputs as decoder inputs during training, instead of the model's own predictions",
-          "A regularization technique that forces forget gates to be near 1",
-          "Constraining the loss function to penalize large prediction errors more",
-        ],
-        correctIndex: 1,
-        explanation: "Teacher forcing: during training, the decoder receives the true previous value (ground truth) as input, not its own previous prediction. This stabilizes training by preventing error accumulation. At inference time, the model uses its own predictions — creating a train/test mismatch (exposure bias). Scheduled sampling gradually reduces teacher forcing to mitigate this.",
-      },
-      {
-        question: "How should you handle the 'inverse transform' step when an LSTM is trained on normalized data?",
-        options: [
-          "Apply the scaler's inverse_transform() to the model outputs using the same scaler fitted on training data",
-          "Multiply predictions by the training set standard deviation only",
-          "The LSTM automatically rescales outputs — no inverse transform needed",
-          "Apply inverse_transform to inputs before feeding to the model at test time",
-        ],
-        correctIndex: 0,
-        explanation: "You must inverse-transform LSTM outputs back to the original scale using the same scaler object fitted on training data. Critical mistake to avoid: fitting the scaler on the full dataset (including test) — this leaks test statistics into training. Fit scaler on train only, transform train and test, then inverse-transform predictions.",
-      },
-    ],
   },
+  knowledgeCheck: [
+    {
+      question: "What is the correct input shape for a Keras LSTM processing 32 samples of 20-timestep sequences with 3 features each?",
+      options: [
+        "(32, 3, 20) — batch, features, timesteps",
+        "(32, 20, 3) — batch, timesteps, features",
+        "(20, 32, 3) — timesteps, batch, features",
+        "(3, 20, 32) — features, timesteps, batch",
+      ],
+      correctIndex: 1,
+      explanation: "Keras LSTM expects input shape (batch_size, sequence_length, n_features). For 32 samples of 20-timestep sequences with 3 features: (32, 20, 3).",
+    },
+    {
+      question: "A MinMaxScaler is fit_transform'd on the full dataset before the train/test split. What is the consequence?",
+      options: [
+        "The model trains faster due to better normalized inputs",
+        "Future test values influence the scaling of training features, causing data leakage",
+        "The scaler will produce incorrect results because it requires time-ordered data",
+        "No consequence — scaling parameters do not depend on which observations are included",
+      ],
+      correctIndex: 1,
+      explanation: "When the scaler is fitted on all data, its min and max parameters reflect future test values. Training features are then scaled using statistics derived from the future — a form of data leakage that inflates apparent model performance.",
+    },
+    {
+      question: "When should you use ARIMA instead of LSTM for time series forecasting?",
+      options: [
+        "When the dataset has more than 10,000 observations",
+        "When the series has nonlinear patterns and multiple exogenous variables",
+        "When the dataset is small, the series is univariate and linear, and interpretability matters",
+        "When GPU hardware is not available",
+      ],
+      correctIndex: 2,
+      explanation: "ARIMA is preferred over LSTM for small datasets (where LSTM overfits), univariate linear series (where ARIMA's assumptions hold), and when interpretability is required (ARIMA coefficients have direct statistical meaning). LSTM shines on large, multivariate, nonlinear data.",
+    },
+  ],
+},
 
   "sp-n1": {
     durationLabel: "15 min",
