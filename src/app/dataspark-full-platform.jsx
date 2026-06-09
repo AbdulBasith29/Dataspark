@@ -1662,6 +1662,10 @@ export default function DataSparkPlatform() {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 3px; }
         input[type="range"] { height: 4px; }
+        @media (max-width: 640px) {
+          .ds-nav { flex-wrap: wrap !important; padding: 8px 16px 6px !important; gap: 6px !important; }
+          .ds-nav-right { max-width: 100% !important; width: 100%; padding-bottom: 4px; }
+        }
       `}</style>
 
       <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none" }}>
@@ -1669,7 +1673,7 @@ export default function DataSparkPlatform() {
         <div style={{ position: "absolute", width: 480, height: 480, borderRadius: "50%", background: "radial-gradient(circle, rgba(52,211,153,0.05) 0%, transparent 70%)", bottom: "0%", right: "-8%" }} />
       </div>
 
-      <nav style={{
+      <nav className="ds-nav" style={{
         borderBottom: `1px solid ${DS.border}`,
         padding: "12px clamp(16px, 3vw, 28px)",
         display: "flex",
@@ -1726,7 +1730,7 @@ export default function DataSparkPlatform() {
           </Link>
         </div>
 
-        <div style={{ display: "flex", gap: 4, overflowX: "auto", maxWidth: "min(68vw, 520px)", paddingBottom: 2 }}>
+        <div className="ds-nav-right" style={{ display: "flex", gap: 4, overflowX: "auto", maxWidth: "min(68vw, 520px)", paddingBottom: 2 }}>
           {CURRICULUM.slice(0, 6).map(c => (
             <button
               key={c.id}

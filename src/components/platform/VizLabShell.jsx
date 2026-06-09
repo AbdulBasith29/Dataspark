@@ -36,7 +36,7 @@ export default function VizLabShell({ accent = DS.ind, accentSoft = "rgba(129,14
         <span style={{ flex: 1, height: 1, background: DS.border, opacity: 0.85 }} />
         <span style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono)" }}>Explore · no grades</span>
       </div>
-      <div style={{ padding: "20px 20px 22px" }}>{children}</div>
+      <div style={{ padding: "20px 20px 22px", overflowX: "auto", WebkitOverflowScrolling: "touch" }}>{children}</div>
     </div>
   );
 }
