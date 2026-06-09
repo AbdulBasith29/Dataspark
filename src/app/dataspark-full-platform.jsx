@@ -97,6 +97,16 @@ import MatplotlibAnatomyViz from "../visualizations/MatplotlibAnatomyViz.jsx";
 import RecEvalMetricsViz from "../visualizations/RecEvalMetricsViz.jsx";
 import TextPreprocessingPipelineViz from "../visualizations/TextPreprocessingPipelineViz.jsx";
 import MLCICDPipelineViz from "../visualizations/MLCICDPipelineViz.jsx";
+import GitWorkflowViz from "../visualizations/GitWorkflowViz.jsx";
+import AWSDataScienceViz from "../visualizations/AWSDataScienceViz.jsx";
+import DriftConceptViz from "../visualizations/DriftConceptViz.jsx";
+import AutoRetrainingViz from "../visualizations/AutoRetrainingViz.jsx";
+import PlotlyInteractiveViz from "../visualizations/PlotlyInteractiveViz.jsx";
+import DashboardDesignViz from "../visualizations/DashboardDesignViz.jsx";
+import ContentBasedRecViz from "../visualizations/ContentBasedRecViz.jsx";
+import LSTMSequenceViz from "../visualizations/LSTMSequenceViz.jsx";
+import NERViz from "../visualizations/NERViz.jsx";
+import VenvCondaViz from "../visualizations/VenvCondaViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import LessonModule from "../components/platform/LessonModule.jsx";
 import PracticeQuestion from "../components/platform/PracticeQuestion.jsx";
@@ -566,7 +576,7 @@ const CURRICULUM = [
         title: "Essential Tools",
         lessons: [
           { id: "mo-t1", title: "Git Workflows for Data Teams", duration: "18 min", hasViz: true },
-          { id: "mo-t2", title: "Virtual Environments: venv, conda, poetry", duration: "12 min", hasViz: false },
+          { id: "mo-t2", title: "Virtual Environments: venv, conda, poetry", duration: "12 min", hasViz: true },
           { id: "mo-t3", title: "Building APIs with FastAPI", duration: "22 min", hasViz: true },
           { id: "mo-t4", title: "Docker for Data Scientists", duration: "20 min", hasViz: true },
           { id: "mo-t5", title: "Cloud Basics: AWS for DS", duration: "25 min", hasViz: true },
@@ -578,7 +588,7 @@ const CURRICULUM = [
         lessons: [
           { id: "mo-v1", title: "Matplotlib & Seaborn: Static Viz Done Right", duration: "20 min", hasViz: true },
           { id: "mo-v2", title: "Plotly: Interactive Visualizations", duration: "18 min", hasViz: true },
-          { id: "mo-v3", title: "Dashboard Design Principles", duration: "15 min", hasViz: false },
+          { id: "mo-v3", title: "Dashboard Design Principles", duration: "15 min", hasViz: true },
         ]
       }
     ],
@@ -1079,6 +1089,16 @@ const VISUALIZATIONS = {
   "st-a2": StatMultipleTestingViz,
   "st-a3": StatBootstrapViz,
   "st-a4": StatBayesFrequentistViz,
+  "mo-t1": GitWorkflowViz,
+  "mo-t2": VenvCondaViz,
+  "mo-t5": AWSDataScienceViz,
+  "mo-c3": DriftConceptViz,
+  "mo-c4": AutoRetrainingViz,
+  "mo-v2": PlotlyInteractiveViz,
+  "mo-v3": DashboardDesignViz,
+  "sp-r2": ContentBasedRecViz,
+  "sp-t4": LSTMSequenceViz,
+  "sp-n4": NERViz,
 };
 
 const ML_VIZ_FALLBACK = [
