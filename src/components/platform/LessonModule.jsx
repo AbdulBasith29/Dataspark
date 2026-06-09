@@ -73,13 +73,15 @@ function DecisionArtifactCard({ graph, branchPath, clickedTargets, graphChoices,
   const [certName, setCertName] = useState("");
 
   const handleGetCertificate = () => {
+    const name = certName.trim();
+    if (!name) return;
     const certData = {
       id: btoa(`${lessonId}-${Date.now()}`).slice(0, 16),
-      name: certName.trim() || "Dataspark Learner",
+      name,
       title: "StreamCore Analytics Challenge",
       course: courseId || "sql",
       date: new Date().toISOString(),
-      dimensions: artifact.performanceMatrix,
+      dimensions: artifact.performanceMatrix.map(row => ({ label: row.dimension, result: row.result })),
     };
     const encoded = btoa(JSON.stringify(certData));
     navigate(`/certificate/${encoded}`);
