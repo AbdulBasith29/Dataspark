@@ -40509,175 +40509,387 @@ Never start a canary above 5% of traffic. The entire value of canary deployment 
 },
 
 "mo-t5": {
-  durationLabel: "25 min",
+  durationLabel: "18 min",
   outcomes: [
-    "Match AWS services to ML workload types: S3, EC2, SageMaker, Lambda",
-    "Explain spot instances and when to use them for training vs serving",
-    "Compare SageMaker managed endpoints vs DIY EC2 serving",
-    "Apply IAM least-privilege principles to ML infrastructure",
+    "Explain why Infrastructure as Code is essential for reproducible ML systems",
+    "Write and reason about Terraform configurations for ML infrastructure",
+    "Compare managed ML services (SageMaker, Vertex AI) versus custom Kubernetes deployments",
+    "Apply cost optimization strategies including spot/preemptible instances for ML workloads",
+    "Diagnose and fix common Terraform state and configuration issues",
   ],
-  learnMarkdown: `## Cloud Basics: AWS for Data Scientists
+  learnMarkdown: `## Why IaC for ML?
 
-AWS is the most common cloud environment for DS work. Knowing which service fits which ML task saves time and money.
+Machine learning systems are notoriously hard to reproduce. A model trained on a cluster configured by hand three months ago may be impossible to recreate — missing library versions, different GPU drivers, misconfigured environment variables. **Infrastructure as Code (IaC)** solves this by encoding every infrastructure decision in version-controlled files.
 
----
+Four properties make IaC non-negotiable for production ML:
 
-## Core Services for ML
+- **Reproducible environments** — spin up an identical staging cluster from the same Terraform config used in production, eliminating "it works on my machine" failures
+- **Disaster recovery** — if a cloud account is accidentally deleted or a region goes down, you can rebuild the entire infrastructure in minutes from code rather than weeks from memory
+- **Audit trail** — every infrastructure change passes through a pull request with a diff, reviewer sign-off, and git history — critical for SOC 2 compliance and incident post-mortems
+- **Environment parity** — dev, staging, and production share the same Terraform modules with different variable values, so integration bugs surface early rather than in production
 
-### S3 (Simple Storage Service)
-Object storage for everything large and durable:
-- Raw data, processed features, training datasets
-- Trained model artifacts
-- Experiment outputs, logs
-- Lifecycle policies move infrequently accessed data to cheaper storage tiers (Glacier)
+## Terraform Fundamentals
 
-**Key**: S3 is cheap (~$0.023/GB/month), globally accessible, highly durable (99.999999999%). All other AWS ML services integrate with S3.
+Terraform is the dominant IaC tool for cloud ML infrastructure. Its key concepts:
 
-### EC2 (Elastic Compute Cloud)
-Virtual machines for custom compute:
-- **p3/p4/p5**: GPU instances for deep learning training
-- **m5/c5**: CPU instances for inference or data processing
-- **Spot instances**: up to 70% cheaper than on-demand for fault-tolerant workloads. Good for training jobs (can checkpoint and restart). Bad for real-time serving (can be interrupted).
+- **Providers** — plugins that translate Terraform resources into API calls. \`hashicorp/aws\`, \`hashicorp/google\`, and \`hashicorp/azurerm\` are the core providers for ML work
+- **Resources** — the atomic unit of infrastructure (\`resource "aws_s3_bucket" "training_data" { ... }\`)
+- **Variables** — parameterize configs so the same module deploys to dev and prod (\`var.environment\`, \`var.instance_type\`)
+- **Outputs** — expose values from child modules (e.g., export a cluster endpoint so the training pipeline can consume it)
+- **State (tfstate)** — Terraform's snapshot of what it believes is deployed. Every \`apply\` reads state, computes a diff against your config, and updates state after making changes
+- **Workspaces** — named state environments within one configuration directory; useful for lightweight env separation (dev/staging/prod) without duplicating module code
 
-### SageMaker
-Fully managed ML platform:
-- **Training jobs**: auto-provision training compute, integrate with S3, auto-terminate when done
-- **Managed endpoints**: auto-scale serving infrastructure, A/B testing built-in, model registry integration
-- **Feature store**: online + offline store with consistent feature computation
-- **Pipelines**: workflow orchestration for ML pipelines
+## ML Infrastructure with Terraform
 
-**When to use SageMaker**: teams of 2+ ML engineers, production models requiring auto-scaling, or when you want managed infrastructure.
+Common ML resources managed with Terraform:
 
-### Lambda
-Serverless functions for event-driven prediction:
-- Zero infrastructure management
-- Cold start: 2-5 seconds for large Lambda packages (model loading)
-- Max runtime: 15 minutes
-- **Good for**: infrequent, low-volume predictions; preprocessing webhooks
-- **Bad for**: high-frequency, latency-sensitive predictions; large models
+\`\`\`hcl
+# S3 bucket for training data and model artifacts
+resource "aws_s3_bucket" "ml_artifacts" {
+  bucket = "\${var.project}-artifacts-\${var.environment}"
+  versioning { enabled = true }
+}
 
----
+# IAM role for SageMaker with least-privilege policy
+resource "aws_iam_role" "sagemaker_execution" {
+  name               = "sagemaker-execution-\${var.environment}"
+  assume_role_policy = data.aws_iam_policy_document.sagemaker_assume.json
+}
 
-## IAM Best Practices
+# EKS cluster for custom training workloads
+resource "aws_eks_cluster" "ml_cluster" {
+  name     = "\${var.project}-\${var.environment}"
+  role_arn = aws_iam_role.eks_cluster.arn
+  version  = "1.29"
+}
 
-- Use **roles**, not users, for service-to-service access
-- Apply **least privilege**: grant only the permissions actually needed
-- Never embed access keys in code — use IAM roles + instance profiles
-- Rotate any long-lived credentials regularly
+# SageMaker endpoint configuration
+resource "aws_sagemaker_endpoint_config" "inference" {
+  name = "\${var.model_name}-config"
+  production_variants {
+    instance_type          = var.inference_instance_type
+    initial_instance_count = 1
+    model_name             = aws_sagemaker_model.main.name
+  }
+}
+\`\`\`
 
----
+BigQuery datasets, GCS buckets, Vertex AI workbenches, and VPC peering for private model serving follow the same pattern — resource blocks with variable-driven names and tags.
+
+## Terraform State: Remote vs Local
+
+Local state (\`backend "local"\`) stores \`terraform.tfstate\` on the engineer's laptop. This is catastrophic in teams:
+
+- Two engineers running \`terraform apply\` simultaneously can corrupt state beyond recovery
+- The laptop owner leaves the company — their state file leaves too
+- No locking means race conditions between CI/CD and manual runs
+
+**Remote state** (S3 + DynamoDB on AWS, GCS on GCP) solves all three problems: the state file lives in a shared bucket, DynamoDB provides atomic locking so concurrent applies are serialized, and bucket versioning allows rollback after a bad apply. Always use remote state the moment more than one person touches infrastructure.
+
+## Cloud ML Services
+
+The three major clouds each offer a managed ML platform:
+
+| Platform | Training | HPO | Model Registry | Serving |
+|----------|----------|-----|---------------|---------|
+| **AWS SageMaker** | Training Jobs | Automatic Model Tuning | Model Registry | Realtime/Serverless Endpoints |
+| **GCP Vertex AI** | Custom Jobs | Vizier | Model Registry | Prediction Endpoints |
+| **Azure ML** | Compute Clusters | Sweep Jobs | Model Registry | Online Endpoints |
+
+All three provide managed training (submit a container + data URI, the platform handles the cluster), hyperparameter tuning (Bayesian or grid search over your training script), a model registry (versioned model artifacts with metadata), and autoscaling inference endpoints.
+
+## Managed Services vs Custom Kubernetes
+
+Managed ML services win when:
+- Your team lacks Kubernetes expertise and can't afford weeks of cluster tuning
+- You need built-in autoscaling from zero (serverless endpoints) without writing HPA configs
+- You want native integrations — SageMaker Pipelines, Vertex Pipelines, or Azure ML Pipelines handle DAGs without a separate Airflow deployment
+
+Custom Kubernetes wins when:
+- You need hardware the managed service doesn't expose (e.g., specific GPU topology for large model training)
+- You're running multi-cloud and need portability
+- Vendor lock-in is a hard constraint (regulated industries)
+
+The cost of managed services is real — SageMaker and Vertex AI add a markup over raw EC2/GCE compute — but for most teams the operational savings outweigh it.
 
 ## Cost Optimization
 
-| Workload | Cost-optimal approach |
-|----------|----------------------|
-| Training | Spot instances (save 70%) |
-| Always-on serving | Reserved instances (save 30-40%) |
-| Data storage | S3 + lifecycle to Glacier for old data |
-| Dev/test | Spot or on-demand with auto-termination |
+ML infrastructure costs can balloon fast. Key levers:
+
+- **Spot/preemptible instances for training** — up to 90% cheaper than on-demand; safe for fault-tolerant training jobs that checkpoint regularly
+- **Reserved instances for serving** — inference endpoints run 24/7; 1- or 3-year reservations save 40–60% over on-demand
+- **Right-sizing** — profile GPU memory utilization before committing to instance type; most teams over-provision by 2×
+- **Auto-shutdown** — Terraform-managed schedules (Lambda + EventBridge) to stop dev endpoints and notebooks overnight
+
+## Interview-Ready Summary
+
+- IaC gives ML teams reproducibility, disaster recovery, audit trails, and environment parity
+- Terraform state must be remote (S3 + DynamoDB) in any team setting; local state causes corruption and collaboration failures
+- SageMaker, Vertex AI, and Azure ML provide managed training, HPO, model registry, and autoscaling endpoints
+- Managed services trade higher cost and vendor lock-in for dramatically lower operational overhead
+- Spot/preemptible instances are appropriate for long, checkpointed training jobs — never for latency-sensitive serving
+- Cost optimization levers: spot for training, reserved for serving, right-sizing, auto-shutdown of dev resources
 `,
   video: null,
-  videoFallbackMarkdown: `## Deep Dive: SageMaker vs DIY on EC2
+  videoFallbackMarkdown: `## Terraform State Management In Depth
 
-**DIY EC2**: full control, lower per-instance cost, operational burden (install drivers, manage scaling, handle failures). Appropriate at companies with dedicated MLOps teams and custom requirements.
+Terraform state is the source of truth for what Terraform believes exists in your cloud account. Every resource Terraform creates gets a record in the state file — its cloud ID, current attribute values, and dependency relationships. When you run \`terraform plan\`, Terraform reads state, calls cloud APIs to get actual current values, and diffs the two against your configuration to produce a change plan.
 
-**SageMaker**: higher per-instance cost (managed premium), but: auto-scaling, managed endpoints with health checks, built-in A/B testing, direct model registry integration. Appropriate for smaller ML teams or when speed of deployment matters more than cost optimization.
+### Why Local State Fails Teams
 
-Typical breakeven: if your team spends > 2 hours/week managing EC2 serving infrastructure, SageMaker likely pays for itself in engineering time.
+A local \`terraform.tfstate\` on one engineer's laptop creates three failure modes:
+
+1. **Concurrent apply corruption** — two engineers apply simultaneously, each reading the same old state. Whichever finishes second overwrites the first's state, making Terraform believe resources created in the first apply don't exist. The next plan will try to create duplicates or destroy real infrastructure.
+2. **Bus factor** — the state file only exists on one machine. If that engineer leaves or the laptop is lost, Terraform can no longer manage the infrastructure it created. You're left with "orphaned" cloud resources that must be manually imported.
+3. **CI/CD collision** — your automated pipeline runs apply at the same time a human does a hotfix. No locking means you get a race condition.
+
+### Remote State Best Practices
+
+The standard AWS pattern is an S3 bucket with versioning enabled (for rollback) and a DynamoDB table (for state locking). The lock is held for the duration of a plan or apply and released on completion — or forcibly broken with \`terraform force-unlock\` when a process dies mid-run. On GCP, GCS provides locking natively without a separate database.
+
+Terraform workspaces create isolated state files within the same backend, making them useful for environment separation without code duplication — but be careful: workspaces share the same module code, so a destructive change accidentally applied to prod workspace instead of dev is a real risk. Many teams prefer separate backend buckets per environment for hard isolation.
+
+### Managed ML Service Trade-offs
+
+The appeal of SageMaker and Vertex AI is velocity: submit a Docker image and a data URI, get back a trained model artifact and metrics. The platform handles cluster provisioning, distributed training setup, spot interruption handling, and artifact storage. For a team of five data scientists, this eliminates a full-time ML platform engineer.
+
+The cost premium is real — SageMaker training jobs charge roughly 10–20% over raw EC2 pricing — but this is often worth it. The hidden costs of custom Kubernetes include cluster upgrade cycles, GPU driver management, networking for distributed training, and on-call burden for cluster failures at 3am.
+
+The lock-in risk is architectural: SageMaker Pipelines steps are not portable to Vertex AI. Teams that care about portability should keep the managed service to compute and data storage while keeping pipeline orchestration in a portable tool like Prefect or Airflow.
+
+### Cost Optimization Strategies
+
+**Training workloads** are the best candidates for spot/preemptible instances. A 6-hour ResNet fine-tuning job that checkpoints every 30 minutes loses at most 30 minutes of progress on interruption. With 70–90% cost savings, the math almost always works — unless the job is time-critical.
+
+**Serving endpoints** are the opposite: latency and availability matter more than cost. Reserve compute 1–3 years out for stable, predictable serving workloads. For spiky traffic, serverless endpoints (SageMaker Serverless Inference, Vertex AI Dedicated + scale-to-zero) eliminate idle cost without sacrificing availability.
+
+**Right-sizing** is consistently the highest-ROI lever. Profile actual GPU memory and compute utilization under realistic load before committing to an instance type. Most teams discover they're using 40% of the GPU memory they're paying for.
 `,
-  tryGuidance: "No interactive viz — work through the AWS service selection scenarios in the interview simulation.",
+  tryGuidance: `Review the Terraform config and identify the infrastructure problem that will cause failures in a team environment. Click the problematic line in the code snippet. Then work through scenario questions about Terraform workspaces, managed ML services, and spot instance strategies for real ML workloads.`,
   interviewGraph: {
-    initialStageId: "mo_t5_stage1",
+    initialStageId: "terraform_bug",
     artifactDimensions: [
-      { label: "Service Selection", recoveryStageId: "mo_t5_rec1" },
-      { label: "Cost & Security", recoveryStageId: "mo_t5_terminal", passLabel: "AWS for ML" },
+      { label: "IaC Best Practices", recoveryStageId: "iac_recovery" },
+      { label: "Cloud ML Services", recoveryStageId: "cloud_ml_recovery" },
     ],
     stages: {
-      mo_t5_stage1: {
-        id: "mo_t5_stage1",
-        type: "scenario_choice",
+      terraform_bug: {
+        id: "terraform_bug",
+        type: "click_target",
         badge: "Stage 1",
-        title: "Stage 1 · Training infrastructure",
-        prompt: "You need to train a deep learning model weekly. The training takes 8 hours on a GPU. What's the most cost-effective approach?",
-        choices: [
-          { id: "a", label: "On-demand p3.2xlarge running 24/7", description: "Running 24/7 for weekly 8h training wastes 160h of compute per week." },
-          { id: "b", label: "Spot p3.2xlarge for training (can checkpoint every hour) — provision when needed, terminate when done; 60-70% cheaper than on-demand", description: "Spot for fault-tolerant batch training is the standard cost-optimization." },
-          { id: "c", label: "Lambda function for model training", description: "Lambda max runtime is 15 minutes — insufficient for 8-hour training." },
-        ],
-        branches: { a: "mo_t5_rec1", b: "mo_t5_stage2", c: "mo_t5_rec1" },
-        rationale: "B is correct. Weekly batch training is the ideal spot instance use case: fault-tolerant (checkpoint + resume), doesn't need to be always-on, and can be submitted via SageMaker Training Job which handles spot interruption and restart automatically. 70% cost reduction vs on-demand.",
+        title: "Stage 1 · Spot the Terraform Config Bug",
+        prompt: "A teammate pushed this Terraform config to the production repo. One line will cause serious problems for your team. Click the problematic configuration.",
+        code_snippet: `# main.tf
+terraform {
+  backend "local" {}          # -- ds-target:local_backend
+}
+
+resource "aws_s3_bucket" "ml_data" {
+  bucket = "ml-training-data-prod"
+
+  versioning {
+    enabled = false           # -- ds-target:no_versioning
+  }
+
+  tags = {
+    Environment = "production"
+  }
+}
+
+resource "aws_iam_role" "sagemaker_role" {
+  # ... assume_role_policy ...
+  # No least-privilege policy attached  # -- ds-target:no_least_privilege
+}`,
+        validationCopy: {
+          local_backend: "Correct! A local backend stores terraform.tfstate on the running machine. In a team, two engineers applying simultaneously will corrupt state, and the file is lost if the laptop is lost. Use S3 + DynamoDB locking for production.",
+          no_versioning: "Versioning is a best practice, but the most immediately dangerous issue is the local backend — which causes state corruption and collaboration failures in any team setting. Look at the backend block.",
+          no_least_privilege: "Least-privilege IAM is important, but the most critically broken piece is the local backend — which will cause state corruption the first time two people run Terraform. Look at the backend block.",
+        },
+        branches: {
+          local_backend: "iac_recovery",
+          no_versioning: "iac_recovery",
+          no_least_privilege: "iac_recovery",
+        },
       },
-      mo_t5_rec1: {
-        id: "mo_t5_rec1",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · Spot vs on-demand",
-        prompt: "When are spot instances inappropriate for ML workloads?",
-        choices: [
-          { id: "a", label: "For real-time serving endpoints that must have guaranteed availability — spot instances can be interrupted with 2 minutes notice, causing downtime", description: "Serving requires guaranteed availability; training can handle interruption." },
-        ],
-        branches: { a: "mo_t5_stage2" },
-        rationale: "Spot instances are interrupted when AWS reclaims capacity. This is acceptable for batch training (checkpoint + restart) but not for real-time serving (would cause prediction failures).",
-      },
-      mo_t5_stage2: {
-        id: "mo_t5_stage2",
+
+      iac_recovery: {
+        id: "iac_recovery",
         type: "scenario_choice",
         badge: "Stage 2",
-        title: "Stage 2 · Serving deployment",
-        prompt: "You need to deploy a model that serves 1000 RPS with <100ms p99 latency, and traffic spikes 5× during peak hours. SageMaker or DIY EC2?",
+        title: "Stage 2 · Remote State Options",
+        prompt: "Your team wants to fix the local backend. What does a correct remote state configuration for AWS provide that solves the team collaboration problem?",
         choices: [
-          { id: "a", label: "DIY EC2 — more control over the serving stack", description: "Managing your own auto-scaling, load balancing, and health checks for 1000 RPS peaks is significant operational work." },
-          { id: "b", label: "SageMaker managed endpoint — auto-scaling handles 5× traffic spikes automatically, with built-in health checks and load balancing; the managed premium is worth the operational savings at this scale", description: "SageMaker auto-scaling is battle-tested for traffic spikes." },
+          { id: "a", label: "S3 bucket + DynamoDB locking", description: "State stored in S3 (shared, versioned), DynamoDB provides atomic locking so concurrent applies are serialized — prevents corruption." },
+          { id: "b", label: "Local state is fine with one person", description: "As long as only one engineer runs Terraform at a time, local state is safe for production." },
+          { id: "c", label: "State files are read-only during apply", description: "Terraform state files are append-only and safe for concurrent access by design." },
+          { id: "d", label: "Git-commit the state file after each apply", description: "Committing tfstate to git gives everyone the latest state and prevents divergence." },
         ],
-        branches: { a: "mo_t5_rec1", b: "mo_t5_terminal" },
-        rationale: "B is reasonable for a small-to-medium team. SageMaker's managed endpoints include automatic scaling, load balancing, and health checks. The premium over raw EC2 cost is offset by the engineering time saved on infrastructure management.",
+        branches: { a: "workspace_stage", b: "workspace_stage", c: "workspace_stage", d: "workspace_stage" },
+        rationale: "S3 + DynamoDB is the correct answer. S3 stores the state file with versioning for rollback; DynamoDB holds a lock record for the duration of any plan or apply, making concurrent access safe. Local state with one person still fails when CI/CD runs. State files are NOT read-only during apply — Terraform writes them mid-operation. Git-committing state exposes secrets and creates merge conflicts.",
       },
-      mo_t5_terminal: {
-        id: "mo_t5_terminal",
+
+      workspace_stage: {
+        id: "workspace_stage",
         type: "scenario_choice",
-        badge: "Complete",
-        title: "Complete · IAM security",
-        prompt: "Your ML training job needs to read data from S3 and write model artifacts back. What's the secure way to provide credentials?",
+        badge: "Stage 3",
+        title: "Stage 3 · Terraform Workspaces",
+        prompt: "Your team wants to separate dev, staging, and production infrastructure. When is using Terraform workspaces the right tool, versus separate backend buckets per environment?",
         choices: [
-          { id: "a", label: "Embed AWS access keys as environment variables in the training job config", description: "Embedded keys in config can be logged, committed to Git, or exposed in error messages." },
-          { id: "b", label: "Attach an IAM role to the EC2 instance or SageMaker training job with S3 read/write permissions — no credentials in code or config", description: "IAM roles provide temporary credentials automatically via instance metadata; no secrets to manage." },
+          { id: "a", label: "Workspaces for lightweight isolation, separate backends for hard prod isolation", description: "Use workspaces when environments share the same module code and mistakes in dev won't cascade. Use separate backends when accidental prod apply must be impossible." },
+          { id: "b", label: "Always use workspaces — they are the official Terraform multi-environment pattern", description: "HashiCorp recommends workspaces as the primary way to manage multiple environments." },
+          { id: "c", label: "Workspaces are only for personal developer sandboxes, never for staging/prod", description: "Workspaces don't support secrets or IAM isolation so they can't be used for staging or production." },
         ],
-        branches: { a: "mo_t5_terminal", b: "mo_t5_terminal" },
+        branches: { a: "managed_vs_k8s", b: "managed_vs_k8s", c: "managed_vs_k8s" },
+        rationale: "Option A is correct. Workspaces isolate state but share module code — a typo applying to the 'prod' workspace instead of 'dev' is a real risk. Many production teams prefer separate backend configurations per environment (separate S3 buckets, separate AWS accounts) for hard isolation. Workspaces are great for per-engineer sandboxes or feature branches where shared code is the goal.",
+      },
+
+      managed_vs_k8s: {
+        id: "managed_vs_k8s",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Managed ML Services vs Custom Kubernetes",
+        prompt: "A fintech startup's ML team (4 data scientists, 1 ML engineer) needs to train and serve 10 models. They're evaluating SageMaker vs. a self-managed EKS cluster. Which recommendation is most defensible?",
+        choices: [
+          { id: "a", label: "SageMaker — lower operational overhead outweighs the cost premium for a small team", description: "Managed training, HPO, model registry, and autoscaling endpoints without cluster ops work." },
+          { id: "b", label: "EKS — always cheaper and more portable than managed services", description: "Raw EC2 with Kubernetes is always the cost-optimal choice at any scale." },
+          { id: "c", label: "EKS — needed for GPU workloads because SageMaker doesn't support GPUs", description: "SageMaker doesn't expose GPU instance types for training jobs." },
+          { id: "d", label: "SageMaker only for serving, EKS always for training", description: "Managed training services add no value over raw compute, so training should always use custom clusters." },
+        ],
+        branches: { a: "spot_instances", b: "spot_instances", c: "spot_instances", d: "spot_instances" },
+        rationale: "Option A is correct. For a small team, SageMaker's managed training, automatic HPO, and serverless endpoints eliminate the need for a dedicated ML platform engineer. The 10–20% cost premium is typically worth it. EKS is NOT always cheaper — cluster ops, upgrade cycles, and on-call costs are real. SageMaker fully supports GPU instances (p3, p4, g4 families). The training/serving split in D is a false dichotomy.",
+      },
+
+      cloud_ml_recovery: {
+        id: "cloud_ml_recovery",
+        type: "scenario_choice",
+        badge: "Stage 4 (Recovery)",
+        title: "Stage 4 Recovery · Cloud ML Platform Features",
+        prompt: "A data scientist asks: 'What does Vertex AI's managed training give us that raw GCE VMs don't?' What's the most accurate and complete answer?",
+        choices: [
+          { id: "a", label: "Managed cluster lifecycle, distributed training setup, built-in HPO, artifact tracking, and autoscaling endpoints", description: "The full managed platform value — no cluster management, integrated tooling from training to serving." },
+          { id: "b", label: "Faster GPUs than raw GCE", description: "Vertex AI uses the same GCE GPU hardware — the value is in management, not hardware." },
+          { id: "c", label: "Free compute for training jobs under 1 hour", description: "Vertex AI charges for all compute; there is no free tier for GPU training jobs." },
+          { id: "d", label: "Automatic model deployment to production without review", description: "Vertex AI provides endpoints but deployment gates and approval workflows are the team's responsibility." },
+        ],
+        branches: { a: "spot_instances", b: "spot_instances", c: "spot_instances", d: "spot_instances" },
+        rationale: "Option A is the correct and complete answer. The managed platform value is operational: no cluster provisioning, built-in distributed training strategies, Vizier HPO, Model Registry for versioned artifacts, and Prediction Endpoints with autoscaling. The hardware is identical to raw GCE. There is no free tier for GPU training, and deployment gates are the team's responsibility.",
+      },
+
+      spot_instances: {
+        id: "spot_instances",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Spot Instance Workload Selection",
+        prompt: "You want to cut ML infrastructure costs by 70% using spot/preemptible instances. Which workload is the safest candidate?",
+        choices: [
+          { id: "a", label: "A 6-hour model fine-tuning job that checkpoints to S3 every 30 minutes", description: "Training jobs tolerate interruption if they checkpoint state regularly — worst case is 30 minutes of lost progress." },
+          { id: "b", label: "A real-time inference endpoint serving 10,000 requests per minute", description: "Latency-sensitive serving endpoints need consistent availability — spot reclamation would drop requests." },
+          { id: "c", label: "The Terraform remote state DynamoDB lock table", description: "State locking infrastructure must be highly available — spot reclamation would break all Terraform operations." },
+          { id: "d", label: "A database hosting training metadata with sub-100ms read SLAs", description: "Databases with strict SLAs need reserved, on-demand compute to guarantee availability." },
+        ],
+        branches: { a: "spot_recovery", b: "spot_recovery", c: "spot_recovery", d: "spot_recovery" },
+        rationale: "Option A is correct. Long training jobs with regular checkpointing are the canonical spot workload — on interruption, the job resumes from the last checkpoint, losing at most one checkpoint interval of work. The 70–90% cost savings almost always justify the restart risk for non-time-critical training. Inference endpoints, state locking infrastructure, and SLA-bound databases all require consistent availability that spot cannot guarantee.",
+      },
+
+      spot_recovery: {
+        id: "spot_recovery",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · Spot Reclamation Recovery",
+        prompt: "A SageMaker training job runs for 6 hours on a spot instance and is interrupted by a spot reclamation event 5 hours in. The job has been checkpointing to S3 every hour. What is the correct recovery strategy?",
+        choices: [
+          { id: "a", label: "Restart the job from the last S3 checkpoint — 1 hour of work is lost at most", description: "The job loads the 4-hour checkpoint from S3 and continues training from that state." },
+          { id: "b", label: "The job must restart from scratch — checkpoints are lost when the instance is reclaimed", description: "When a spot instance is reclaimed, all local storage is destroyed." },
+          { id: "c", label: "SageMaker automatically resumes from the checkpoint with no intervention needed", description: "SageMaker Managed Spot Training will automatically restart from S3 checkpoint with MaxWaitTimeInSeconds configured." },
+          { id: "d", label: "Switch to on-demand and rerun from scratch — spot is too unreliable for 6-hour jobs", description: "6-hour jobs with checkpointing are exactly the use case spot is designed for." },
+        ],
+        branches: { a: "cost_optimization", b: "cost_optimization", c: "cost_optimization", d: "cost_optimization" },
+        rationale: "Both A and C have merit — C is the most complete answer for SageMaker specifically. SageMaker Managed Spot Training with a properly configured checkpoint S3 path will automatically restart the job from the last checkpoint when capacity becomes available again, within the MaxWaitTimeInSeconds window. The checkpoint files persist in S3 across instance reclamation (S3 is not instance-local storage). Only 1 hour of work is lost at most. Restarting from scratch and switching to on-demand are both costly overreactions.",
+      },
+
+      cost_optimization: {
+        id: "cost_optimization",
+        type: "scenario_choice",
+        badge: "Stage 7",
+        title: "Stage 7 · Cost Optimization Strategy",
+        prompt: "Your ML platform spends $50k/month: $30k on training (bursty, daytime only) and $20k on inference endpoints (24/7, stable throughput). What is the highest-ROI cost optimization plan?",
+        choices: [
+          { id: "a", label: "Spot instances for training + reserved instances for inference endpoints", description: "Spot cuts bursty training cost 70–90%; reserved cuts stable 24/7 serving cost 40–60%." },
+          { id: "b", label: "Reserved instances for everything — commit to 3 years for maximum discount", description: "Training is bursty, not constant — reserving training capacity means paying for idle compute overnight and on weekends." },
+          { id: "c", label: "Spot instances for both training and inference to maximize savings", description: "Inference endpoints need consistent availability — spot reclamation causes request drops and latency spikes." },
+          { id: "d", label: "Right-size all instances first, then revisit spot/reserved decisions", description: "Right-sizing is valuable but sequential optimization loses months of spot/reserved savings." },
+        ],
+        branches: { a: "terraform_final", b: "terraform_final", c: "terraform_final", d: "terraform_final" },
+        rationale: "Option A is the correct strategy. Spot is ideal for bursty training workloads — the job doesn't run overnight anyway, so interruptions during low-capacity hours are low-impact. Reserved instances for the 24/7 inference endpoint commit to predictable workload in exchange for 40–60% savings. Committing 3 years of reserved capacity to bursty training (B) means paying for idle compute. Spot for inference (C) risks dropped requests. Right-sizing first (D) is sequentially suboptimal — you can do both in parallel.",
+      },
+
+      terraform_final: {
+        id: "terraform_final",
+        type: "scenario_choice",
+        badge: "Stage 8",
+        title: "Stage 8 · IaC for Complete ML Platform",
+        prompt: "A new ML platform project starts from scratch. In what order should you provision infrastructure with Terraform to minimize dependency errors and rework?",
+        choices: [
+          { id: "a", label: "Networking (VPC) → IAM roles → Storage (S3/GCS) → Compute (EKS/SageMaker) → Endpoints", description: "Resources are provisioned in dependency order: networking first, then identity, then data, then compute that references all of the above." },
+          { id: "b", label: "Compute first — get the cluster running so the team can start working immediately", description: "Compute depends on VPC subnets, IAM roles, and security groups — provisioning compute first will fail." },
+          { id: "c", label: "Storage first — data is the foundation of ML, everything else depends on it", description: "Storage buckets are relatively independent, but compute requires networking and IAM that must come first." },
+          { id: "d", label: "Order doesn't matter — Terraform resolves dependencies automatically from the graph", description: "Terraform does resolve dependencies, but missing resources (like a VPC that hasn't been created yet in another workspace) still cause errors." },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage", d: "terminal_stage" },
+        rationale: "Option A is correct. Terraform does compute a dependency graph for resources defined in the same configuration, but foundational resources like VPCs, IAM roles, and S3 buckets must exist before compute resources that reference them. Across Terraform modules or workspaces, dependencies must be explicit. The correct order (networking → IAM → storage → compute → endpoints) mirrors the actual cloud dependency graph and minimizes apply failures.",
+      },
+
+      terminal_stage: {
+        id: "terminal_stage",
+        type: "scenario_choice",
+        badge: "Stage 9",
+        title: "Stage 9 · Final Check: IaC in Practice",
+        prompt: "A senior engineer reviews your ML infrastructure PR and asks: 'What is the one Terraform practice most likely to cause a production incident if skipped?' What do you say?",
+        choices: [
+          { id: "a", label: "Remote state with locking — without it, concurrent applies corrupt infrastructure state and can destroy production resources", description: "State corruption is immediate and catastrophic — Terraform may delete resources it no longer tracks." },
+          { id: "b", label: "Tagging all resources — without tags, cost allocation reports are unreadable", description: "Missing tags create cost visibility problems but don't cause production incidents." },
+          { id: "c", label: "Using variables instead of hard-coded values — without variables, you can't reuse modules", description: "Hard-coded values reduce reusability but don't directly cause incidents." },
+          { id: "d", label: "Running terraform fmt — unformatted code causes syntax errors in CI", description: "terraform fmt is a style formatter; unformatted code is valid Terraform and does not cause syntax errors." },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage", d: "terminal_stage" },
+        rationale: "Option A is the unambiguous answer. State corruption from concurrent local-state applies is the most catastrophic Terraform failure mode: Terraform loses track of what it created, causing the next apply to attempt to create duplicate resources or — worse — delete existing ones that it no longer sees in state. Missing tags (B), hard-coded values (C), and formatting (D) are all legitimate best practices but none cause production incidents on their own.",
         terminal: true,
-        rationale: "IAM roles are the secure approach. The EC2 instance or SageMaker job gets a role attached that grants specific S3 permissions. AWS provides temporary credentials automatically via instance metadata — no access keys to manage, rotate, or accidentally expose.",
       },
     },
   },
   knowledgeCheck: [
     {
-      question: "For a data science team of 3 that needs to deploy a real-time model endpoint with auto-scaling, what AWS service should they use?",
+      question: "Why is local Terraform state dangerous in a team environment?",
       options: [
-        "EC2 with custom auto-scaling groups and Application Load Balancer",
-        "SageMaker managed endpoints — provides auto-scaling, health checks, and A/B testing without managing the underlying infrastructure",
-        "Lambda — serverless is always the simplest option",
+        "It stores state in plaintext JSON, which is a security risk",
+        "Concurrent applies can corrupt state, and the file is lost if the local machine is unavailable",
+        "Local state doesn't support Terraform workspaces",
+        "Terraform requires remote state for any resource creation to succeed",
       ],
       correctIndex: 1,
-      explanation: "For a small team without dedicated infrastructure engineers, SageMaker managed endpoints provide production-grade serving infrastructure (auto-scaling, health checks, rolling deployments) without requiring expertise in EC2 auto-scaling groups, load balancers, and container orchestration. Lambda has cold start latency and 15-minute max runtime that make it unsuitable for high-volume real-time serving.",
+      explanation: "Local state has no locking mechanism. Two engineers (or a CI/CD pipeline and a human) running terraform apply simultaneously will each read the same old state, and whichever finishes second will overwrite the first's changes — corrupting the state file. The file also disappears if the laptop is lost or the engineer leaves. Remote state (S3 + DynamoDB) solves both problems.",
     },
     {
-      question: "Why should you never embed AWS access keys in application code or Docker images?",
+      question: "When does a managed ML service like SageMaker or Vertex AI provide clear value over a self-managed Kubernetes cluster?",
       options: [
-        "AWS access keys are too long to embed efficiently",
-        "Embedded keys can be committed to Git history, exposed in error logs, or extracted from Docker image layers — use IAM roles instead, which provide automatic temporary credentials",
-        "AWS requires keys to be stored only in environment variables",
+        "When you need to run multi-GPU distributed training across hundreds of nodes",
+        "When your team is small and lacks dedicated ML platform engineering capacity",
+        "When you need strict data residency and cannot use shared cloud infrastructure",
+        "When your models are larger than 10GB and require custom GPU drivers",
       ],
       correctIndex: 1,
-      explanation: "Access keys embedded in code are frequently leaked via Git commits (even in private repos — git history persists after deletion), Docker image inspection (docker history), or log files. IAM roles solve this: the EC2 instance or container gets a role, AWS rotates temporary credentials automatically via instance metadata, and no long-lived key is ever stored anywhere.",
+      explanation: "Managed ML services shine for small-to-medium teams that lack dedicated platform engineers. They handle cluster provisioning, distributed training setup, hyperparameter tuning, model versioning, and autoscaling endpoints — eliminating significant operational burden. Large-scale distributed training, strict data residency, and custom hardware requirements are scenarios where custom Kubernetes may be warranted.",
     },
     {
-      question: "When is Lambda a good choice for ML inference, and when is it a poor choice?",
+      question: "Which ML workload is the best fit for spot/preemptible instances?",
       options: [
-        "Lambda is always better than EC2 for cost optimization",
-        "Lambda is good for infrequent, low-volume, low-latency-tolerance predictions; poor for high-frequency, latency-sensitive, or large-model workloads due to cold start latency and 15-minute execution limit",
-        "Lambda is good for training but not for inference",
+        "A real-time inference endpoint with a 99.9% availability SLA",
+        "A PostgreSQL database storing experiment metadata with sub-100ms read latency requirements",
+        "A nightly model retraining job that saves checkpoints to cloud storage every 30 minutes",
+        "The Terraform remote state backend serving all engineers",
       ],
-      correctIndex: 1,
-      explanation: "Lambda is serverless — zero management overhead for infrequent use cases (webhooks, batch triggers, low-traffic endpoints). But: cold starts (2-5s for packages > 50MB), 15-minute max runtime, and memory limits (10GB max) make it unsuitable for large models or high-frequency real-time serving. EC2 or SageMaker endpoints are better for always-warm, low-latency use cases.",
+      correctIndex: 2,
+      explanation: "Spot and preemptible instances are ideal for fault-tolerant, interruptible workloads. A nightly retraining job that checkpoints to durable cloud storage loses at most one checkpoint interval of work on interruption — and can restart from the last checkpoint. Real-time inference, databases with latency SLAs, and infrastructure services all require consistent availability that spot cannot guarantee.",
     },
   ],
 },
@@ -40685,205 +40897,422 @@ Typical breakeven: if your team spends > 2 hours/week managing EC2 serving infra
 "mo-v1": {
   durationLabel: "20 min",
   outcomes: [
-    "Use the figure/axes API for multi-panel visualization control",
-    "Select the correct chart type for each data relationship type",
-    "Apply Tufte's data-ink ratio principle to remove chart clutter",
-    "Save publication-quality figures with appropriate DPI and tight layout",
+    "Distinguish between pyplot stateful API and the Object-Oriented Figure/Axes API",
+    "Build multi-panel layouts using plt.subplots() with grid dimensions",
+    "Apply Axes methods for labels, titles, limits, tick styling, and legends",
+    "Create dual y-axis charts using ax.twinx()",
+    "Save publication-quality figures with correct DPI and bbox settings",
   ],
-  learnMarkdown: `## Matplotlib & Seaborn: Static Viz Done Right
+  learnMarkdown: `## Two Interfaces, One Library
 
-Good visualization communicates insight. Bad visualization hides it. The choice of chart type and the elimination of visual noise are as important as the data itself.
+Matplotlib ships two distinct programming interfaces. Understanding when to use each is one of the most reliable signals of production-ready Python.
 
----
+**pyplot (stateful interface)** — \`import matplotlib.pyplot as plt\` gives you functions like \`plt.plot()\`, \`plt.title()\`, and \`plt.xlabel()\`. Under the hood, pyplot tracks a "current figure" and "current axes" as global state. This is intentionally similar to MATLAB and makes one-liner exploratory plots fast:
 
-## Figure/Axes Architecture
-
-Matplotlib has two interfaces:
-
-**Functional (pyplot)**:
 \`\`\`python
-plt.plot(x, y)
-plt.xlabel("Date")
+import matplotlib.pyplot as plt
+plt.plot([1, 2, 3], [4, 5, 6])
+plt.title("Quick look")
 plt.show()
 \`\`\`
-Simple for single plots, but loses control with multiple subplots.
 
-**Object-oriented (recommended)**:
-\`\`\`python
-fig, axes = plt.subplots(2, 2, figsize=(12, 8))
-axes[0, 0].plot(x, y)
-axes[0, 0].set_xlabel("Date")
-axes[1, 0].bar(categories, values)
-fig.tight_layout()
-fig.savefig("output.png", dpi=300, bbox_inches='tight')
-\`\`\`
+That works great in isolation. The moment you add a second panel, a helper function, or a loop over subplots, the global state becomes a liability — pyplot may silently draw on the wrong axes.
 
-Rule: use \`ax.method()\` for anything beyond a single plot. The axes object gives explicit control over each panel.
-
----
-
-## Chart Type Selection
-
-| Data relationship | Chart type |
-|-------------------|-----------|
-| Correlation between two numeric variables | Scatter plot |
-| Distribution of one variable | Histogram or KDE |
-| Comparison across groups | Bar chart (avoid pie with >4 slices) |
-| Change over time | Line chart |
-| Distribution by group | Box plot or violin plot |
-| Matrix/correlation table | Heatmap |
-| Multi-variable scatter | Pairplot (seaborn) |
-
----
-
-## Removing Chart Junk (Tufte's Data-Ink Ratio)
-
-Every visual element should encode data. Remove elements that don't:
+**Object-Oriented (OO) API** — you hold explicit references to \`Figure\` and \`Axes\` objects and call methods on them directly. This is the production-quality approach:
 
 \`\`\`python
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
-ax.grid(axis='y', alpha=0.3)  # subtle, not dominant
-ax.tick_params(labelsize=10)
+fig, ax = plt.subplots()
+ax.plot([1, 2, 3], [4, 5, 6])
+ax.set_title("Explicit control")
+fig.savefig("chart.png", dpi=300)
 \`\`\`
 
-Eliminate: 3D effects, heavy gridlines, background fills, thick borders, redundant axis labels.
+No hidden state. Any function that receives \`ax\` can draw on exactly that panel.
 
----
+## Why OO API Wins for Data Science
 
-## Seaborn Statistical Plots
+Three concrete reasons push experienced practitioners toward OO:
 
-Seaborn wraps matplotlib with statistical aware defaults:
+1. **Explicit control** — you always know which \`Axes\` object you are modifying. No surprises when looping.
+2. **Multi-panel layouts** — \`fig, axes = plt.subplots(2, 3)\` hands you a 2×3 NumPy array of \`Axes\` objects. Index them as \`axes[0, 1]\` to address any cell precisely.
+3. **Reusable functions** — write \`def add_annotations(ax, data):\` and call it on any axes in any figure. pyplot's stateful API makes this pattern fragile.
+
+## Anatomy of plt.subplots()
+
+\`\`\`python
+import matplotlib.pyplot as plt
+import numpy as np
+
+# Single axes
+fig, ax = plt.subplots(figsize=(8, 5))
+
+# 2-row × 3-column grid
+fig, axes = plt.subplots(2, 3, figsize=(14, 8), sharex=False, sharey=False)
+
+# Shared x-axis — aligns tick marks across rows
+fig, axes = plt.subplots(3, 1, figsize=(10, 9), sharex=True)
+\`\`\`
+
+\`figsize\` is in **inches** at 100 DPI by default. \`sharex=True\` links the x-axis limits and tick positions across all subplots — essential for time-series panels stacked vertically.
+
+## Essential Axes Methods
+
+| Method | Purpose |
+|--------|---------|
+| \`ax.plot(x, y)\` | Line chart |
+| \`ax.scatter(x, y, c=colors, s=sizes)\` | Scatter plot |
+| \`ax.bar(categories, values)\` | Vertical bar chart |
+| \`ax.hist(data, bins=30)\` | Histogram |
+| \`ax.set_xlabel("Label")\` | x-axis label |
+| \`ax.set_ylabel("Label")\` | y-axis label |
+| \`ax.set_title("Title")\` | Panel title |
+| \`ax.legend(loc="upper right")\` | Legend |
+| \`ax.set_xlim(0, 100)\` | x-axis range |
+| \`ax.set_ylim(0, 1)\` | y-axis range |
+| \`ax.tick_params(axis="x", rotation=45)\` | Rotate tick labels |
+
+## Twin Axes for Dual Y-Axis Charts
+
+When two metrics share an x-axis but have incompatible scales — say, temperature (°C) and rainfall (mm) over months — use a twin axis:
+
+\`\`\`python
+fig, ax1 = plt.subplots(figsize=(10, 5))
+ax1.plot(months, temperature, color="#E45C3A", label="Temp (°C)")
+ax1.set_ylabel("Temperature (°C)", color="#E45C3A")
+
+ax2 = ax1.twinx()                          # shares x, independent y
+ax2.bar(months, rainfall, alpha=0.4, color="#4C9BE8", label="Rain (mm)")
+ax2.set_ylabel("Rainfall (mm)", color="#4C9BE8")
+\`\`\`
+
+\`ax.twinx()\` returns a new \`Axes\` that overlays the original and shares its x-axis. Use \`ax.twiny()\` for a shared y-axis with a secondary x-axis.
+
+## Figure Sizing, DPI, and Saving
+
+\`\`\`python
+fig.set_size_inches(12, 6)                 # change after creation
+fig.savefig("output.png", dpi=300, bbox_inches="tight")
+\`\`\`
+
+- **dpi=300** — print-quality; use 150 for web, 300+ for publication.
+- **bbox_inches="tight"** — crops whitespace and prevents clipped labels; nearly always correct.
+- Supported formats: \`.png\`, \`.pdf\`, \`.svg\`, \`.eps\`. SVG and PDF are vector formats preferred for publications.
+
+Always call \`plt.tight_layout()\` (or \`fig.tight_layout()\`) before saving to prevent subplot panels from overlapping their labels.
+
+## Common Pitfalls
+
+- **Mixing APIs** — calling \`plt.title()\` after \`ax.plot()\` in a multi-panel figure sets the title on whichever axes pyplot considers "current," not necessarily \`ax\`. Pick one API per script.
+- **Forgetting tight_layout** — overlapping tick labels and titles are the most common complaint about Matplotlib figures. Add \`fig.tight_layout()\` as a reflex before every \`savefig\`.
+- **Default color cycle** — Matplotlib's default tab10 palette was not designed for accessibility. Prefer ColorBrewer palettes or explicitly set accessible colors: \`ax.plot(x, y, color="#1f77b4")\`.
+- **Overplotting** — large scatter datasets hide density. Use \`alpha=0.3\`, hexbin (\`ax.hexbin()\`), or 2D histogram (\`ax.hist2d()\`).
+
+## Global Styles and Seaborn Integration
+
+Override defaults globally with rcParams:
+
+\`\`\`python
+plt.rcParams.update({"font.size": 13, "axes.spines.top": False, "axes.spines.right": False})
+\`\`\`
+
+Or use seaborn's theme as aesthetic scaffolding while keeping full OO API control:
 
 \`\`\`python
 import seaborn as sns
-
-# Violin: distribution shape by group
-sns.violinplot(data=df, x='group', y='value', ax=ax)
-
-# Pairplot: scatter matrix
-sns.pairplot(df[['feature1', 'feature2', 'target']], hue='segment')
-
-# Heatmap for correlation
-sns.heatmap(df.corr(), annot=True, cmap='coolwarm', ax=ax)
+sns.set_theme(style="whitegrid", palette="muted")
+fig, ax = plt.subplots()
+ax.scatter(x, y)                           # seaborn theme applies
 \`\`\`
 
----
+Seaborn sets rcParams globally; any subsequent Matplotlib OO code inherits those aesthetics.
 
-## Saving Publication-Quality Figures
+## Interview-Ready Summary
 
-\`\`\`python
-fig.savefig("analysis.png", dpi=300, bbox_inches='tight',
-            facecolor='white')
-\`\`\`
-
-- \`dpi=300\`: 300 dots per inch for print quality
-- \`bbox_inches='tight'\`: removes extra whitespace
-- \`facecolor='white'\`: ensures white background (not transparent)
+- The **pyplot API** is stateful (global current-axes); fine for quick EDA, fragile in complex layouts.
+- The **OO API** (\`fig, ax = plt.subplots()\`) is explicit, composable, and mandatory for production code.
+- \`plt.subplots(m, n)\` returns an m×n array of \`Axes\`; use \`sharex=True\`/\`sharey=True\` for aligned panels.
+- \`ax.twinx()\` creates an overlaid axes sharing x — the standard pattern for dual y-axis charts.
+- Always \`fig.tight_layout()\` before saving; always \`bbox_inches="tight"\` in \`savefig()\`.
+- Global styling: \`plt.rcParams.update()\` or \`sns.set_theme()\` before creating figures.
 `,
   video: null,
-  videoFallbackMarkdown: `## Deep Dive: Color Theory for Data Visualization
+  videoFallbackMarkdown: `## Subplot Grid Layouts in Depth
 
-**Sequential palettes** (viridis, plasma, Blues): for ordered numeric data — low to high. Perceptually uniform and colorblind-friendly.
+The \`plt.subplots()\` call is more powerful than it first appears. Mastering its keyword arguments separates exploratory notebooks from publication-ready reports.
 
-**Diverging palettes** (RdBu, coolwarm): for data with a meaningful midpoint (correlation: -1 to 1, temperature relative to average). Neutral color at center, diverging colors at extremes.
+### sharex and sharey
 
-**Qualitative palettes** (tab10, Set2): for categorical data with no inherent order. Distinguishable but not implying magnitude.
+When stacking time-series panels vertically, misaligned x-axis tick marks make comparisons difficult. \`sharex=True\` links every subplot's x-axis:
 
-**Avoid**: pure red-green combinations (8% of men have red-green color blindness). Use blue-orange or viridis instead for maximum accessibility.
+\`\`\`python
+fig, axes = plt.subplots(3, 1, figsize=(12, 9), sharex=True)
+axes[0].plot(dates, revenue)
+axes[1].plot(dates, sessions)
+axes[2].plot(dates, conversion_rate)
+
+# Only the bottom panel needs x-tick labels
+for ax in axes[:-1]:
+    ax.tick_params(labelbottom=False)
+
+fig.tight_layout()
+\`\`\`
+
+Use \`sharey="row"\` in a 2D grid to share y-axis only within each row, or \`sharey="col"\` to share within columns.
+
+### GridSpec for Unequal Panel Sizes
+
+When a main plot and two smaller diagnostic plots need to coexist:
+
+\`\`\`python
+import matplotlib.gridspec as gridspec
+
+fig = plt.figure(figsize=(14, 8))
+gs = gridspec.GridSpec(2, 2, figure=fig, hspace=0.35, wspace=0.3)
+
+ax_main  = fig.add_subplot(gs[:, 0])      # full left column
+ax_top   = fig.add_subplot(gs[0, 1])      # top-right cell
+ax_bot   = fig.add_subplot(gs[1, 1])      # bottom-right cell
+\`\`\`
+
+GridSpec accepts \`height_ratios\` and \`width_ratios\` lists for proportional sizing.
+
+### Publication-Quality Figure Settings
+
+A repeatable pattern for journal or slide-deck figures:
+
+\`\`\`python
+plt.rcParams.update({
+    "figure.dpi": 150,
+    "font.family": "sans-serif",
+    "font.size": 12,
+    "axes.linewidth": 1.2,
+    "axes.spines.top": False,
+    "axes.spines.right": False,
+    "xtick.direction": "out",
+    "ytick.direction": "out",
+})
+
+fig, ax = plt.subplots(figsize=(8, 5))
+# ... plotting code ...
+fig.tight_layout()
+fig.savefig("figure1.pdf", dpi=300, bbox_inches="tight", format="pdf")
+\`\`\`
+
+Disabling top and right spines (the "Tufte style") reduces chart junk without any visual loss.
+
+### Iterating Over Axes Arrays
+
+When all subplots share the same plot type, \`axes.flat\` makes iteration clean:
+
+\`\`\`python
+fig, axes = plt.subplots(2, 3, figsize=(15, 8))
+datasets = [df_a, df_b, df_c, df_d, df_e, df_f]
+titles   = ["Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta"]
+
+for ax, data, title in zip(axes.flat, datasets, titles):
+    ax.hist(data["value"], bins=25, color="#4C9BE8", edgecolor="white")
+    ax.set_title(title)
+    ax.set_xlabel("Value")
+
+fig.suptitle("Distribution Comparison", fontsize=16, y=1.01)
+fig.tight_layout()
+\`\`\`
+
+\`fig.suptitle()\` adds a super-title spanning all panels; the \`y\` parameter nudges it above the top panels when \`tight_layout\` compresses the figure.
 `,
-  tryGuidance: "Use the visualization gallery to compare chart types for different data relationships and practice the figure/axes API on sample datasets.",
+  tryGuidance: `Use the interactive Matplotlib API explorer to practice the Object-Oriented workflow. Toggle between pyplot and OO modes to see how the same chart is built each way. Add a twin axis, adjust DPI, and experiment with tight_layout to observe how each setting changes the final figure.`,
   interviewGraph: {
-    initialStageId: "mo_v1_stage1",
+    initialStageId: "intro_choice",
     artifactDimensions: [
-      { label: "Chart Selection", recoveryStageId: "mo_v1_rec1" },
-      { label: "API Mastery", recoveryStageId: "mo_v1_terminal", passLabel: "Visualization" },
+      { label: "OO vs Pyplot API", recoveryStageId: "api_recovery" },
+      { label: "Multi-Panel Layouts", recoveryStageId: "layout_recovery" },
     ],
     stages: {
-      mo_v1_stage1: {
-        id: "mo_v1_stage1",
+      intro_choice: {
+        id: "intro_choice",
         type: "scenario_choice",
         badge: "Stage 1",
-        title: "Stage 1 · Chart type",
-        prompt: "You want to compare the distribution of model prediction scores across 5 customer segments. Which chart type is most informative?",
+        title: "Stage 1 · Choosing the Right Interface",
+        prompt: `A colleague shows you a data science notebook. It has a function \`def plot_residuals(data):\` that builds a two-panel diagnostic chart. Inside, they use \`plt.subplot(1, 2, 1)\` to create the first panel and \`plt.subplot(1, 2, 2)\` for the second. They call \`plot_residuals()\` three times in the notebook — once per model. What is the primary risk of this approach?`,
         choices: [
-          { id: "a", label: "Bar chart showing average score per segment", description: "Averages hide distribution shape — two segments with the same mean can have very different spreads." },
-          { id: "b", label: "Violin plot or box plot showing distribution shape and spread per segment", description: "Violin shows full distribution; box shows quartiles + outliers. Both reveal distribution, not just mean." },
-          { id: "c", label: "Pie chart showing segment proportions", description: "Pie charts show composition, not distribution." },
+          { id: "a", label: "plt.subplot() is slower than the OO API for large datasets", description: "Performance is not the key concern here." },
+          { id: "b", label: "The stateful current-axes may point to an unexpected panel when the function is called multiple times", description: "Global pyplot state between calls can silently draw on the wrong axes." },
+          { id: "c", label: "plt.subplot() does not support two panels — it only creates a single axes", description: "plt.subplot() can create multiple panels via indexing." },
+          { id: "d", label: "The function cannot accept a data argument while using pyplot calls", description: "Data arguments work regardless of API choice." },
         ],
-        branches: { a: "mo_v1_rec1", b: "mo_v1_stage2", c: "mo_v1_rec1" },
-        rationale: "B is correct. Comparing distributions across groups calls for violin plots (full distribution shape) or box plots (quartiles + outliers). Bar charts showing only means hide bimodality, skewness, and outliers that may be clinically important.",
+        branches: { a: "api_recovery", b: "bug_hunt", c: "api_recovery", d: "api_recovery" },
+        rationale: `The pyplot stateful API maintains a global "current axes" pointer. Calling \`plt.subplot()\` inside a reusable function means the function depends on whatever pyplot considers current at call time. After the first call completes, pyplot's state may have shifted, causing the second or third call to draw on stale or unexpected axes. The OO API — passing an explicit \`ax\` parameter — eliminates this entirely.`,
       },
-      mo_v1_rec1: {
-        id: "mo_v1_rec1",
+      api_recovery: {
+        id: "api_recovery",
         type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · Distributions",
-        prompt: "Why is a bar chart showing means inadequate for comparing distributions?",
+        badge: "Recovery · OO vs Pyplot API",
+        title: "Recovery · When Does Stateful API Break?",
+        prompt: `You need to write a helper function that draws a styled histogram on a given axes object. Which signature correctly follows OO API conventions?`,
         choices: [
-          { id: "a", label: "Two distributions can have identical means but completely different shapes — a bar chart hides bimodality, skewness, and outliers that violin/box plots reveal", description: "The mean is a single number that summarizes without describing." },
+          { id: "a", label: "def plot_hist(data): plt.hist(data, bins=30)", description: "This uses pyplot's stateful API — no axes parameter." },
+          { id: "b", label: "def plot_hist(ax, data, bins=30): ax.hist(data, bins=bins)", description: "Explicit ax parameter — caller controls which panel receives the chart." },
+          { id: "c", label: "def plot_hist(data): return plt.gca().hist(data)", description: "plt.gca() retrieves the current axes implicitly — still stateful." },
         ],
-        branches: { a: "mo_v1_stage2" },
-        rationale: "Always show the distribution shape when comparing groups, not just summary statistics.",
+        branches: { a: "bug_hunt", b: "bug_hunt", c: "bug_hunt" },
+        rationale: `Accepting an \`ax\` parameter is the OO convention. The caller creates axes with \`fig, ax = plt.subplots()\` and passes it in, giving full control over which panel is drawn on. Functions that call \`plt.hist()\` or \`plt.gca()\` internally are tightly coupled to pyplot's global state.`,
       },
-      mo_v1_stage2: {
-        id: "mo_v1_stage2",
-        type: "scenario_choice",
+      bug_hunt: {
+        id: "bug_hunt",
+        type: "click_target",
         badge: "Stage 2",
-        title: "Stage 2 · Axes API",
-        prompt: "You want 4 related plots sharing x-axis labels in a 2×2 grid. Should you use plt.plot() or the fig/axes API?",
-        choices: [
-          { id: "a", label: "plt.plot() — simpler code", description: "pyplot's functional interface loses control of individual subplot panels." },
-          { id: "b", label: "fig, axes = plt.subplots(2, 2) — explicit control over each axes object, shared axis labels, and the overall figure", description: "Object-oriented API is standard for multi-panel figures." },
-        ],
-        branches: { a: "mo_v1_rec1", b: "mo_v1_terminal" },
-        rationale: "B is correct. The object-oriented (axes) API gives explicit control: axes[0,0].plot(...), axes[0,1].bar(...), shared axes (sharex=True), individual titles and labels per panel. The functional pyplot API is sufficient for single plots but gets unwieldy for subplots.",
+        title: "Stage 2 · Spot the Bug",
+        prompt: `The code below creates a two-panel figure. One part of the code introduces a fragile API-mixing pattern that breaks in multi-panel production code. Click on the problematic line.`,
+        code_snippet: `import matplotlib.pyplot as plt
+import numpy as np
+
+data = np.random.randn(1000)
+plt.figure()
+
+plt.subplot(1, 2, 1)                        # -- ds-target:stateful_mix
+ax = plt.gca()
+ax.hist(data, bins=30, color='steelblue')
+
+plt.subplot(1, 2, 2)                        # -- ds-target:subplot_switch
+plt.plot(data[:100])                        # -- ds-target:pyplot_call
+plt.title('Time Series')
+plt.savefig('output.png')`,
+        validationCopy: {
+          stateful_mix: "Correct. Using plt.subplot() to activate a panel and then plt.gca() to retrieve it mixes the stateful and OO approaches. When this pattern is repeated in loops or helper functions, pyplot's current-axes pointer can point to an unexpected panel. Refactor to: fig, (ax1, ax2) = plt.subplots(1, 2) and use ax1, ax2 directly throughout.",
+          subplot_switch: "Close — but the root problem starts one step earlier. plt.subplot(1, 2, 1) is where the stateful-OO mixing begins. Both subplot calls are part of the fragile pattern, but the first is where the decision to use stateful API is made.",
+          pyplot_call: "plt.plot() on the second panel is also part of the mixed-API problem, but the fragility is introduced by the choice to use plt.subplot() at all rather than creating axes upfront with plt.subplots().",
+        },
+        branches: {
+          stateful_mix: "tight_layout_stage",
+          subplot_switch: "layout_recovery",
+          pyplot_call: "layout_recovery",
+        },
       },
-      mo_v1_terminal: {
-        id: "mo_v1_terminal",
+      layout_recovery: {
+        id: "layout_recovery",
         type: "scenario_choice",
-        badge: "Complete",
-        title: "Complete · Data-ink ratio",
-        prompt: "Apply Tufte's data-ink ratio principle to a cluttered chart. What should you remove?",
+        badge: "Recovery · Multi-Panel Layouts",
+        title: "Recovery · Building Multi-Panel Figures Correctly",
+        prompt: `You need a two-panel figure side by side. Which line of code gives you two explicit axes objects you can pass to helper functions?`,
         choices: [
-          { id: "a", label: "Top and right spines, heavy gridlines, background fills, 3D effects — every visual element that doesn't encode data", description: "Remove ink that doesn't carry information." },
+          { id: "a", label: "fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))", description: "Tuple unpacking gives named axes objects for each panel." },
+          { id: "b", label: "plt.subplot(1, 2, 1); plt.subplot(1, 2, 2)", description: "This creates panels statelessly — you must call plt.gca() to retrieve each one." },
+          { id: "c", label: "fig = plt.figure(); ax1 = fig.add_axes([0, 0, 0.45, 1]); ax2 = fig.add_axes([0.55, 0, 0.45, 1])", description: "add_axes with manual positioning works but requires exact coordinate math — subplots() is far more practical." },
         ],
-        branches: { a: "mo_v1_terminal" },
+        branches: { a: "tight_layout_stage", b: "tight_layout_stage", c: "tight_layout_stage" },
+        rationale: `\`fig, (ax1, ax2) = plt.subplots(1, 2)\` is the idiomatic OO pattern. Python tuple unpacking assigns each axes to a named variable. You can then pass ax1 or ax2 to any helper function without touching pyplot global state.`,
+      },
+      tight_layout_stage: {
+        id: "tight_layout_stage",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Preventing Label Overlap",
+        prompt: `A 2×2 subplot grid is rendering with y-axis labels of the right column clipped by the left column's plot area. What is the most direct fix?`,
+        choices: [
+          { id: "a", label: "Increase figsize width to give more horizontal room", description: "This can help but does not address the root cause — layout engine not accounting for label widths." },
+          { id: "b", label: "Call fig.tight_layout() before fig.savefig()", description: "tight_layout() automatically adjusts subplot spacing so labels don't overlap." },
+          { id: "c", label: "Remove y-axis labels from all subplots except the leftmost", description: "Removing labels loses information — not the right trade-off here." },
+          { id: "d", label: "Use plt.subplots_adjust(wspace=0.5) to add horizontal space between panels", description: "subplots_adjust works but requires manual tuning; tight_layout() does this automatically." },
+        ],
+        branches: { a: "twinx_stage", b: "twinx_stage", c: "twinx_stage", d: "twinx_stage" },
+        rationale: `\`fig.tight_layout()\` (equivalently \`plt.tight_layout()\`) uses Matplotlib's layout engine to compute the minimum spacing between subplots that prevents any labels, titles, or tick marks from overlapping. It should be called immediately before \`fig.savefig()\` as a standard practice. \`subplots_adjust\` is an older, manual alternative that tight_layout() replaced for most use cases.`,
+      },
+      twinx_stage: {
+        id: "twinx_stage",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Dual Y-Axis Design",
+        prompt: `A product manager wants a single chart showing monthly revenue (in millions, range 0–50) and the conversion rate (percentage, range 0–5%) on the same x-axis (months). What is the correct Matplotlib pattern?`,
+        choices: [
+          { id: "a", label: "Plot both series on the same axes and rely on the legend to disambiguate the scales", description: "Without scale separation, the conversion rate (0–5%) would appear flat against revenue (0–50M)." },
+          { id: "b", label: "Create ax2 = ax.twinx() and plot revenue on ax, conversion rate on ax2 with its own y-axis", description: "twinx() creates a second y-axis sharing the same x-axis — the standard dual-scale pattern." },
+          { id: "c", label: "Normalize both series to 0–1 before plotting on the same axes", description: "Normalization loses the original units — the PM specifically wants to see the raw scales." },
+          { id: "d", label: "Use two separate subplots stacked vertically with sharex=True", description: "This works and is sometimes preferable, but the PM asked for a single chart — twinx() is the right call here." },
+        ],
+        branches: { a: "savefig_stage", b: "savefig_stage", c: "savefig_stage", d: "savefig_stage" },
+        rationale: `\`ax2 = ax.twinx()\` creates a new \`Axes\` instance overlaid on the original, sharing the x-axis but with an independent y-axis on the right side. Plot the primary metric on \`ax\` and the secondary on \`ax2\`. Colour-code both lines and their corresponding y-axis labels to make the dual scale legible. Stacked subplots with \`sharex=True\` is a valid alternative but does not satisfy the "single chart" requirement.`,
+      },
+      savefig_stage: {
+        id: "savefig_stage",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Saving for Publication",
+        prompt: `You are preparing a figure for a scientific journal submission. The journal requires 300 DPI, no surrounding whitespace, and a vector format. Which savefig call is correct?`,
+        choices: [
+          { id: "a", label: 'fig.savefig("figure1.png", dpi=300)', description: "PNG is raster — not vector. Also, bbox_inches='tight' is missing, so whitespace may be included." },
+          { id: "b", label: 'fig.savefig("figure1.pdf", dpi=300, bbox_inches="tight")', description: "PDF is a vector format; dpi=300 is specified; bbox_inches='tight' removes whitespace." },
+          { id: "c", label: 'plt.savefig("figure1.svg")', description: "SVG is vector, but no dpi is set and bbox_inches is missing. Also uses the stateful plt.savefig()." },
+          { id: "d", label: 'fig.savefig("figure1.eps", dpi=72, bbox_inches="tight")', description: "EPS is vector but 72 DPI is screen resolution — below the 300 DPI requirement. dpi matters even for vector formats when the file contains rasterized elements." },
+        ],
+        branches: { a: "rcparams_stage", b: "rcparams_stage", c: "rcparams_stage", d: "rcparams_stage" },
+        rationale: `PDF and SVG are vector formats — resolution-independent by nature, which is what journals prefer. \`bbox_inches="tight"\` clips to the figure content, removing the default padding. \`dpi=300\` covers any rasterized elements embedded in the vector file (e.g. a scatter plot with many points may be rasterized internally). Always use \`fig.savefig()\` (OO) rather than \`plt.savefig()\` so the correct figure object is written.`,
+      },
+      rcparams_stage: {
+        id: "rcparams_stage",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · Global Style Configuration",
+        prompt: `You want every figure in a 20-notebook project to use the same font size (13pt), hidden top/right spines, and a consistent color palette without adding boilerplate to each notebook. What is the best approach?`,
+        choices: [
+          { id: "a", label: "Copy-paste plt.rcParams.update({...}) into the top of every notebook", description: "This achieves the goal but duplicates configuration — updating styles later requires editing 20 files." },
+          { id: "b", label: "Create a shared Python module (e.g. plot_style.py) that calls plt.rcParams.update({...}) and sns.set_theme(), then import it at the top of each notebook", description: "A single source of truth — change the module once and all notebooks inherit the update." },
+          { id: "c", label: "Use a Matplotlib stylesheet (.mplstyle file) registered at the project level and activate with plt.style.use('project_style')", description: "Also valid — .mplstyle files are the official Matplotlib mechanism for reusable styles, avoiding Python imports entirely." },
+          { id: "d", label: "Apply styles per-axes using ax.set(...) calls in each notebook", description: "Per-axes styling does not provide global defaults — each figure still needs explicit configuration." },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage", d: "terminal_stage" },
+        rationale: `Both a shared Python module and a \`.mplstyle\` file are production-grade solutions. The module approach (option b) integrates seaborn themes alongside rcParams and can contain helper functions. The stylesheet approach (option c) is pure Matplotlib and avoids import side-effects. Option a is a valid but fragile start — the DRY principle pushes you toward a central config. Option d addresses individual axes but not global defaults.`,
+      },
+      terminal_stage: {
+        id: "terminal_stage",
+        type: "scenario_choice",
+        badge: "Stage 7",
+        title: "Stage 7 · Putting It All Together",
+        prompt: `A senior engineer reviews your visualization code and notes: "This is great — but your reusable plot function will silently fail in async dashboard code." You used \`plt.show()\` at the end of the function. What should you replace it with, and why?`,
+        choices: [
+          { id: "a", label: "Replace plt.show() with fig.savefig() — dashboards consume image files, not interactive windows", description: "In a dashboard pipeline, write the figure to disk or a bytes buffer; plt.show() opens a GUI window that blocks the process." },
+          { id: "b", label: "Remove plt.show() entirely and return the fig object — let the caller decide whether to display or save", description: "The cleanest OO pattern: the function returns fig (and optionally axes), and the caller calls fig.savefig() or display() as appropriate." },
+          { id: "c", label: "Replace plt.show() with plt.draw() — it renders without blocking", description: "plt.draw() updates an existing interactive window but does not solve the blocking issue in non-interactive environments." },
+          { id: "d", label: "Wrap plt.show() in a try/except so dashboard environments skip it silently", description: "Hiding errors with try/except is an anti-pattern; it does not cleanly separate rendering from IO." },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage", d: "terminal_stage" },
+        rationale: `The most composable OO pattern is to return \`fig\` (and \`axes\` if useful) from the function and never call \`plt.show()\` inside it. The caller decides the output: interactive display, file save, bytes buffer for a web response, or Jupyter inline rendering. This is why the OO API is described as "production-quality" — it decouples chart construction from output rendering.`,
         terminal: true,
-        rationale: "Tufte: maximize data-ink ratio by removing non-data ink. Top and right spines are redundant (axes already defined), heavy gridlines compete with data, background fills add noise. What remains should be data and necessary reference.",
       },
     },
   },
   knowledgeCheck: [
     {
-      question: "What is the difference between plt.plot() and ax.plot() in matplotlib?",
+      question: "What is the fundamental difference between Matplotlib's pyplot API and the Object-Oriented API?",
       options: [
-        "plt.plot() is for line charts; ax.plot() is for scatter plots",
-        "plt.plot() is the functional interface (implicit current axes); ax.plot() is the object-oriented interface (explicit axes object) — the latter is recommended for multi-panel figures and production code",
-        "ax.plot() produces higher resolution output",
+        "pyplot is faster for large datasets; OO API is faster for small ones",
+        "pyplot maintains a global current-axes state; the OO API uses explicit Figure and Axes object references",
+        "pyplot supports more chart types than the OO API",
+        "The OO API requires seaborn to be installed as a dependency",
       ],
       correctIndex: 1,
-      explanation: "plt.plot() operates on whatever axes is currently active — convenient for single plots but ambiguous for multiple subplots. ax.plot() operates on a specific named axes object, giving explicit control over multi-panel layouts. For any figure with more than one subplot, use the object-oriented (ax) interface.",
+      explanation: "pyplot tracks a 'current figure' and 'current axes' as global state — convenient for one-off plots but fragile in functions and loops. The OO API gives you explicit fig and ax references, making the code predictable regardless of call order or context.",
     },
     {
-      question: "You want to visualize the correlation matrix of 8 features. Which chart type is most appropriate?",
+      question: "You call `fig, axes = plt.subplots(2, 3)`. What is the type and shape of `axes`?",
       options: [
-        "Bar chart with one bar per feature pair",
-        "Heatmap with annotated correlation coefficients (e.g., seaborn heatmap with annot=True)",
-        "Scatter plot matrix (pairplot)",
+        "A Python list of 6 Axes objects",
+        "A single Axes object representing the active panel",
+        "A NumPy array of shape (2, 3) containing Axes objects",
+        "A tuple of two lists, each containing 3 Axes objects",
       ],
-      correctIndex: 1,
-      explanation: "A heatmap is the standard for correlation matrices: color encodes correlation strength, annotations show exact values, and the symmetric matrix is instantly interpretable at a glance. A pairplot shows scatter plots between each pair — useful for exploring non-linear relationships but visually overwhelming for 8 features (56 scatter plots). Bar charts are not appropriate for pairwise relationships.",
+      correctIndex: 2,
+      explanation: "plt.subplots(m, n) with both m > 1 and n > 1 returns a NumPy 2D array of shape (m, n). Access individual panels with axes[row, col]. Use axes.flat to iterate over all panels in a loop.",
     },
     {
-      question: "What does bbox_inches='tight' do in fig.savefig()?",
+      question: "When is `ax.twinx()` the appropriate choice over `plt.subplots(2, 1, sharex=True)`?",
       options: [
-        "It compresses the image to reduce file size",
-        "It removes extra whitespace around the figure so the saved image's bounding box tightly fits the visible content",
-        "It enforces a fixed aspect ratio for the saved figure",
+        "When both metrics have the same units and similar value ranges",
+        "When you need to display two metrics on different y-axis scales within a single panel",
+        "When the x-axis values are categorical rather than continuous",
+        "When you want to share y-axis scaling across multiple subplots",
       ],
       correctIndex: 1,
-      explanation: "By default, matplotlib may include extra whitespace around figures. bbox_inches='tight' calculates the minimum bounding box that contains all visible elements (title, axis labels, legend) and clips to that. This is essential for figures embedded in reports or papers where extra whitespace looks unprofessional.",
+      explanation: "ax.twinx() creates an overlaid axes sharing the same x-axis but with an independent right-side y-axis. It is the standard solution when two series have incompatible scales (e.g., revenue in millions vs. conversion rate in percent) and the requirement is a single combined panel. Stacked subplots with sharex=True are preferred when side-by-side comparison is more important than overlay.",
     },
   ],
 },
@@ -40891,191 +41320,479 @@ fig.savefig("analysis.png", dpi=300, bbox_inches='tight',
 "mo-v2": {
   durationLabel: "18 min",
   outcomes: [
-    "Create interactive charts with plotly.express and go.Figure",
-    "Build a Dash callback that connects a dropdown filter to a chart",
-    "Choose between scattergl and scatter for large datasets",
-    "Identify when Plotly is and is not appropriate vs matplotlib",
+    "Use plotly.express for rapid, one-liner interactive charts",
+    "Use plotly.graph_objects for full trace-level control",
+    "Combine px and go in a single figure",
+    "Customize layouts, hover templates, and facets",
+    "Export charts to HTML and static images",
   ],
-  learnMarkdown: `## Plotly: Interactive Visualizations
+  learnMarkdown: `## Why Interactive Charts?
 
-Plotly creates interactive, web-ready charts. Users can hover for details, zoom, pan, and filter. For exploratory analysis and dashboards, this interactivity is invaluable.
+Static plots tell a story, but interactive charts let your audience *explore* the story themselves. In data science, interactivity matters across three workflows:
 
----
+- **Exploration**: Hover tooltips, zoom, and pan reveal outliers and clusters that are invisible in a static PNG. When you're EDA-ing a new dataset, being able to hover over a point and see its label is faster than annotating a matplotlib figure manually.
+- **Stakeholder presentations**: Business audiences want to filter, hover, and highlight. A Plotly HTML file sent by email is infinitely more engaging than a slide screenshot.
+- **Dashboards**: Plotly underpins Dash, the most popular Python framework for building production analytics apps. Every chart you build with Plotly is one step away from being a live dashboard component.
 
-## plotly.express vs go.Figure
+## plotly.express — High-Level API
 
-**plotly.express** (recommended starting point):
+\`plotly.express\` (aliased as \`px\`) is Plotly's one-liner interface. It infers axis labels, color scales, and legends from your DataFrame columns.
+
 \`\`\`python
 import plotly.express as px
 
-fig = px.scatter(df, x='feature_a', y='feature_b',
-                 color='segment', hover_data=['user_id'],
-                 title='Feature Correlation by Segment')
+# Scatter
+fig = px.scatter(df, x='gdp_per_capita', y='life_expectancy', color='continent', size='population')
+
+# Bar
+fig = px.bar(df, x='category', y='sales', color='region', barmode='group')
+
+# Line
+fig = px.line(df, x='date', y='revenue', color='product_line')
+
+# Histogram
+fig = px.histogram(df, x='age', nbins=30, color='gender')
+
+# Box plot
+fig = px.box(df, x='department', y='salary', color='department', points='outliers')
+
 fig.show()
 \`\`\`
 
-One-liners for common chart types: px.scatter, px.bar, px.histogram, px.box, px.line, px.imshow.
+Every \`px\` function returns a \`go.Figure\` object, so you can always drill down for finer control.
 
-**go.Figure** (full control):
+## plotly.graph_objects — Full Control
+
+\`plotly.graph_objects\` (aliased as \`go\`) gives you trace-level control. Each trace is a layer added to a figure.
+
 \`\`\`python
 import plotly.graph_objects as go
 
 fig = go.Figure()
-fig.add_trace(go.Scatter(x=x, y=y, mode='lines', name='Model'))
-fig.add_trace(go.Scatter(x=x, y=y_baseline, mode='lines',
-                          name='Baseline', line=dict(dash='dash')))
-fig.update_layout(title='Model vs Baseline',
-                  xaxis_title='Date', yaxis_title='Metric')
+
+fig.add_trace(go.Scatter(
+    x=df['date'],
+    y=df['revenue'],
+    mode='lines+markers',
+    name='Revenue',
+    line=dict(color='#0EA5E9', width=2),
+))
+
+fig.add_trace(go.Bar(
+    x=df['date'],
+    y=df['cost'],
+    name='Cost',
+    marker_color='rgba(239,68,68,0.6)',
+))
+
+fig.update_layout(title='Revenue vs Cost Over Time', xaxis_title='Date', yaxis_title='USD')
+fig.show()
 \`\`\`
 
-Use go when you need multiple traces, custom colors, or layout configurations not exposed by express.
+Use \`go\` when you need mixed chart types, precise color control, secondary y-axes, or annotations.
 
----
+## Combining px and go
 
-## Dash for Interactive Dashboards
+The most practical pattern: start fast with \`px\`, then extend with \`go\`.
 
 \`\`\`python
-from dash import Dash, dcc, html, Input, Output
+import plotly.express as px
+import plotly.graph_objects as go
 
-app = Dash(__name__)
-app.layout = html.Div([
-    dcc.Dropdown(id='segment-filter',
-                 options=['All', 'New', 'Returning'],
-                 value='All'),
-    dcc.Graph(id='scatter-chart')
-])
+fig = px.scatter(df, x='revenue', y='profit', color='region')
 
-@app.callback(
-    Output('scatter-chart', 'figure'),
-    Input('segment-filter', 'value')
-)
-def update_chart(selected_segment):
-    filtered = df if selected_segment == 'All' else df[df.segment == selected_segment]
-    return px.scatter(filtered, x='feature_a', y='feature_b')
+# Overlay a trend line
+fig.add_trace(go.Scatter(
+    x=trend_x,
+    y=trend_y,
+    mode='lines',
+    name='Trend',
+    line=dict(color='black', dash='dash'),
+))
+fig.show()
 \`\`\`
 
-Dash uses React under the hood. Callbacks connect component inputs to outputs — no JavaScript required.
+## Key Layout Customizations
 
----
+\`fig.update_layout()\` is the single method for all figure-level styling:
 
-## Performance with Large Data
+\`\`\`python
+fig.update_layout(
+    title='My Chart Title',
+    xaxis_title='Revenue (USD)',
+    yaxis_title='Profit Margin (%)',
+    template='plotly_white',   # clean white background
+    showlegend=True,
+    height=500,
+    width=900,
+    font=dict(family='Arial', size=13),
+)
+\`\`\`
 
-| Scenario | Solution |
-|----------|---------|
-| > 10,000 points scatter | Use \`go.Scattergl\` (WebGL renderer) instead of go.Scatter |
-| > 100,000 points | Use Datashader to pre-rasterize, display as image |
-| Streaming data | Use Plotly's extendData for incremental updates |
+Common templates: \`'plotly'\`, \`'plotly_white'\`, \`'plotly_dark'\`, \`'simple_white'\`, \`'ggplot2'\`, \`'seaborn'\`. Avoid \`'none'\` — it strips all default styling and produces hard-to-read charts.
 
----
+## Hover Customization
 
-## When NOT to Use Plotly
+Control exactly what appears on hover:
 
-- **Static reports/PDFs**: use matplotlib (Plotly requires a browser or Jupyter for interactivity)
-- **Very large datasets without filtering**: WebGL handles 100K+ points, but CPU-side rendering is slow
-- **Publication figures**: matplotlib with vector output (SVG, PDF) is standard for papers
+\`\`\`python
+fig = px.scatter(
+    df,
+    x='revenue',
+    y='profit',
+    hover_data=['customer_id', 'region'],   # add extra columns to tooltip
+    hover_name='product_name',              # bold label at top of tooltip
+)
+
+# Full custom template (go traces)
+fig.update_traces(
+    hovertemplate='<b>%{customdata[0]}</b><br>Revenue: $%{x:,.0f}<br>Profit: %{y:.1%}<extra></extra>'
+)
+\`\`\`
+
+The \`<extra></extra>\` tag removes the default trace-name box.
+
+## Facets — Small Multiples
+
+Break one chart into a grid of subplots by a categorical column:
+
+\`\`\`python
+fig = px.scatter(
+    df,
+    x='revenue', y='profit',
+    facet_col='region',       # columns = region values
+    facet_row='product_line', # rows = product line values
+    color='segment',
+)
+\`\`\`
+
+This is far faster than manually creating subplots with matplotlib.
+
+## Dash Integration
+
+Plotly powers **Dash**, the Python framework for production dashboards. A Plotly figure drops straight into a Dash layout:
+
+\`\`\`python
+import dash
+from dash import dcc, html
+
+app = dash.Dash()
+app.layout = html.Div([
+    dcc.Graph(figure=fig)   # any go.Figure works here
+])
+\`\`\`
+
+Everything you learn about Plotly applies directly to Dash components.
+
+## Exporting Charts
+
+\`\`\`python
+fig.write_html('chart.html')           # interactive, shareable
+fig.write_image('chart.png')           # static — requires kaleido
+fig.write_image('chart.pdf')           # PDF — requires kaleido
+\`\`\`
+
+Install kaleido for static export: \`pip install kaleido\`. Without it, \`write_image\` raises a \`ValueError\`.
+
+## Interview-Ready Summary
+
+- \`plotly.express\` (px) is the fast, DataFrame-aware API — one-liners for scatter, bar, line, histogram, box
+- \`plotly.graph_objects\` (go) gives trace-level control for mixed types, custom colors, and annotations
+- Combine both: \`px\` builds the figure, \`fig.add_trace(go.Scatter(...))\` extends it
+- \`fig.update_layout()\` handles all figure-level styling — title, axes, template, size, legend
+- Choose \`template='plotly_white'\` or \`'simple_white'\` for presentation-ready charts; never \`'none'\`
+- \`fig.write_html()\` produces interactive files; \`fig.write_image()\` produces static exports (needs kaleido)
 `,
+
   video: null,
-  videoFallbackMarkdown: `## Deep Dive: Dash vs Streamlit
 
-**Dash**: React-based, full-featured web app framework. Steeper learning curve but highly customizable. Production-ready, deployable as a standard web app. Better for complex multi-page applications with custom layouts.
+  videoFallbackMarkdown: `## Deep Dive: go.Figure Trace Architecture
 
-**Streamlit**: simpler API, faster prototyping, runs top-to-bottom like a script. Better for quick DS demos and internal tools. Less suitable for complex interactive dashboards with many interdependent widgets.
+Understanding how Plotly stores chart data unlocks its full power. Every \`go.Figure\` is a Python object with three top-level keys internally: \`data\` (a list of traces), \`layout\` (all figure-level styling), and \`frames\` (for animations). When you call \`fig.add_trace()\`, you are appending to \`fig.data\`.
 
-For quick prototyping: Streamlit. For production dashboards with complex interactivity: Dash. For maximum flexibility: a React frontend calling FastAPI endpoints.
+### update_traces vs update_layout
+
+\`update_traces\` applies changes to every trace in the figure (or a filtered subset), while \`update_layout\` changes figure-level properties:
+
+\`\`\`python
+# Apply to ALL traces
+fig.update_traces(marker=dict(size=8, opacity=0.7))
+
+# Apply only to traces named 'Revenue'
+fig.update_traces(line=dict(width=3), selector=dict(name='Revenue'))
+
+# Layout changes
+fig.update_layout(
+    template='plotly_white',
+    legend=dict(orientation='h', yanchor='bottom', y=1.02),
+    margin=dict(l=60, r=30, t=60, b=60),
+)
+\`\`\`
+
+The \`selector\` parameter accepts any trace attribute as a filter key — powerful for multi-trace figures.
+
+### update_xaxes / update_yaxes
+
+For axis-specific formatting:
+
+\`\`\`python
+fig.update_xaxes(tickformat='%b %Y', title_font=dict(size=14))
+fig.update_yaxes(tickprefix='$', tickformat=',.0f', rangemode='tozero')
+\`\`\`
+
+### Building Reusable Chart Functions
+
+In a real data science codebase, wrap Plotly figures in functions so teammates can generate consistent charts:
+
+\`\`\`python
+def make_scatter(df, x, y, color=None, title='', template='plotly_white'):
+    fig = px.scatter(df, x=x, y=y, color=color)
+    fig.update_layout(
+        title=title,
+        template=template,
+        height=450,
+        font=dict(family='Arial', size=12),
+    )
+    fig.update_traces(marker=dict(size=7, opacity=0.75))
+    return fig
+
+# Usage
+fig = make_scatter(sales_df, x='revenue', y='profit', color='region', title='Sales Overview')
+fig.write_html('sales_overview.html')
+\`\`\`
+
+This pattern enforces a consistent visual style, prevents each analyst from reinventing layout boilerplate, and makes charts trivially exportable. In a Dash app, such functions become the backend of \`@app.callback\` handlers, keeping callback logic clean and the chart factory independently testable.
 `,
-  tryGuidance: "Interact with the Plotly examples — hover, zoom, filter by segment — to experience the interactivity available before building your own.",
+
+  tryGuidance: `Use the interactive Plotly sandbox to experiment with px vs go patterns. Select different chart types, adjust templates, and observe how hover data changes. Try the facet controls to see how small multiples decompose a dataset by category.`,
+
   interviewGraph: {
-    initialStageId: "mo_v2_stage1",
+    initialStageId: "bug_stage",
     artifactDimensions: [
-      { label: "Tool Selection", recoveryStageId: "mo_v2_rec1" },
-      { label: "Performance", recoveryStageId: "mo_v2_terminal", passLabel: "Interactive Viz" },
+      { label: "Express vs Graph Objects", recoveryStageId: "api_recovery" },
+      { label: "Layout and Styling", recoveryStageId: "layout_recovery" },
     ],
     stages: {
-      mo_v2_stage1: {
-        id: "mo_v2_stage1",
-        type: "scenario_choice",
+      bug_stage: {
+        id: "bug_stage",
+        type: "click_target",
         badge: "Stage 1",
-        title: "Stage 1 · Tool choice",
-        prompt: "A PM asks for a scatter plot they can hover over and filter by customer segment. Should you use matplotlib or Plotly?",
-        choices: [
-          { id: "a", label: "Matplotlib — it's the standard for all data visualization", description: "Matplotlib produces static images. Hover and filter require interactivity." },
-          { id: "b", label: "Plotly — it provides hover tooltips, zoom/pan, and filter interactivity natively; appropriate for interactive web-delivered charts", description: "px.scatter with color='segment' and hover_data gives this in one line." },
-          { id: "c", label: "Neither — export to a BI tool like Tableau", description: "Plotly can do this directly without an external tool." },
-        ],
-        branches: { a: "mo_v2_rec1", b: "mo_v2_stage2", c: "mo_v2_rec1" },
-        rationale: "B is correct. Matplotlib outputs static images (PNG, SVG, PDF) — no interactivity. Plotly renders interactive HTML/JavaScript charts with hover, zoom, and filter. For stakeholder exploration, Plotly is the right tool.",
+        title: "Stage 1 · Spot the Plotly Bug",
+        prompt: "Your colleague built a scatter plot that combines px and go, but the output looks washed out and hard to read. Click the line of code that is causing the problem.",
+        code_snippet: `import plotly.express as px
+import plotly.graph_objects as go
+
+fig = px.scatter(df, x='revenue', y='profit', color='region')
+
+# Add a trend line trace
+fig.add_trace(
+    go.Scatter(
+        x=trend_x,
+        y=trend_y,
+        mode='lines',
+        name='Trend',
+        line=dict(color='black', width=2),
+        showlegend=True,
+    )
+)
+
+fig.update_layout(
+    title='Revenue vs Profit',
+    template='none',                    # -- ds-target:bad_template
+    height=400,
+    width=800,
+)
+
+fig.show()
+fig.write_image('chart.png')           # -- ds-target:missing_kaleido`,
+        validationCopy: {
+          bad_template: "Correct! \`template='none'\` strips all default Plotly styling — grid lines, axis formatting, color scales — leaving a raw, hard-to-read chart. Use \`template='plotly_white'\` or \`'simple_white'\` for clean, presentation-ready visuals.",
+          missing_kaleido: "Not quite. \`fig.write_image()\` will fail if kaleido isn't installed, but that's a runtime import error, not a visual quality problem. The washed-out appearance points to a different line — look at the layout settings.",
+        },
+        branches: {
+          bad_template: "template_recovery",
+          missing_kaleido: "layout_recovery",
+        },
       },
-      mo_v2_rec1: {
-        id: "mo_v2_rec1",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · Static vs interactive",
-        prompt: "When is matplotlib preferred over Plotly?",
-        choices: [
-          { id: "a", label: "Static reports, PDFs, and academic papers — matplotlib produces publication-quality vector output; Plotly's interactivity adds no value when the medium doesn't support it", description: "Match the tool to the output medium." },
-        ],
-        branches: { a: "mo_v2_stage2" },
-        rationale: "Plotly's interactivity requires a browser. For PDF reports or printed figures, matplotlib with dpi=300 is the standard.",
-      },
-      mo_v2_stage2: {
-        id: "mo_v2_stage2",
+
+      template_recovery: {
+        id: "template_recovery",
         type: "scenario_choice",
         badge: "Stage 2",
-        title: "Stage 2 · Large dataset performance",
-        prompt: "You're plotting 500,000 user engagement events as a scatter plot. The page loads slowly. What's the fix?",
+        title: "Stage 2 · Fix the Template",
+        prompt: "You've identified that `template='none'` is the bug. What is the best replacement, and why?",
         choices: [
-          { id: "a", label: "Sample down to 1,000 points for faster rendering", description: "Sampling loses information — patterns in the full dataset may not appear in a sample." },
-          { id: "b", label: "Use go.Scattergl (WebGL renderer) instead of go.Scatter — handles hundreds of thousands of points with GPU-accelerated rendering", description: "WebGL renders in the browser's GPU, bypassing the Python-side CPU bottleneck." },
-          { id: "c", label: "Use a bar chart instead of scatter for large datasets", description: "Changing chart type to avoid the performance issue loses the scatter relationship information." },
+          { id: "a", label: "template='plotly_white'", description: "Use plotly_white or simple_white — clean white background with subtle grid lines, ideal for presentations and reports." },
+          { id: "b", label: "template='none' is correct", description: "template='none' is best because it shows raw data without visual bias introduced by default styling." },
+          { id: "c", label: "Remove the template key entirely", description: "Omitting template defaults to the dark Plotly theme which is more modern." },
+          { id: "d", label: "Templates only affect colors", description: "Templates only control color palettes, not grid lines or axis formatting, so it doesn't affect readability." },
         ],
-        branches: { a: "mo_v2_rec1", b: "mo_v2_terminal" },
-        rationale: "B is correct. go.Scattergl uses WebGL for rendering — the browser's GPU handles the 500K points instead of the CPU DOM renderer. This is 10-100× faster for large point sets.",
+        branches: { a: "api_choice", b: "layout_recovery", c: "layout_recovery", d: "layout_recovery" },
+        rationale: "Templates in Plotly control the entire visual baseline — background color, grid lines, axis tick formatting, font defaults, and color sequences. `template='none'` removes all of this, producing a minimalist but hard-to-read chart. `'plotly_white'` and `'simple_white'` are the standard choices for reports and presentations because they provide clean backgrounds with readable grid lines while remaining printer-friendly.",
       },
-      mo_v2_terminal: {
-        id: "mo_v2_terminal",
+
+      layout_recovery: {
+        id: "layout_recovery",
         type: "scenario_choice",
-        badge: "Complete",
-        title: "Complete · px vs go",
-        prompt: "When do you use go.Figure instead of plotly.express?",
+        badge: "Recovery · Layout",
+        title: "Recovery · Layout and Styling",
+        prompt: "Which `fig.update_layout()` argument controls the overall visual theme of the chart — background color, grid lines, and axis formatting defaults?",
         choices: [
-          { id: "a", label: "When you need multiple traces on one figure, custom layouts, or configurations not exposed by express's simplified API", description: "express is a convenience wrapper; go gives full control." },
+          { id: "a", label: "template", description: "The template key sets the visual baseline — background, grid, fonts, and color sequences." },
+          { id: "b", label: "bgcolor", description: "bgcolor is a separate layout key that only controls background color, not grid or font defaults." },
+          { id: "c", label: "style", description: "style is not a valid Plotly layout argument; it belongs to HTML/CSS contexts." },
         ],
-        branches: { a: "mo_v2_terminal" },
+        branches: { a: "api_choice", b: "api_choice", c: "api_choice" },
+        rationale: "The `template` parameter in `fig.update_layout()` is the master control for visual theming in Plotly. It sets the baseline for background colors, grid line visibility, axis tick styles, default color sequences, and font families. Common values: `'plotly'`, `'plotly_white'`, `'plotly_dark'`, `'simple_white'`, `'ggplot2'`, `'seaborn'`.",
+      },
+
+      api_choice: {
+        id: "api_choice",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · px vs go API Choice",
+        prompt: "A data analyst needs to build a scatter plot from a Pandas DataFrame in under 5 lines of code, with automatic color coding by a 'region' column. Which API is the right starting point?",
+        choices: [
+          { id: "a", label: "plotly.express (px)", description: "px.scatter() accepts a DataFrame directly and infers color, labels, and legend from column names — one-liner approach." },
+          { id: "b", label: "plotly.graph_objects (go)", description: "go.Scatter() gives more control and is appropriate even for simple cases." },
+          { id: "c", label: "matplotlib with plotly backend", description: "Matplotlib can render through Plotly for interactive output." },
+          { id: "d", label: "Either — they produce identical code length", description: "px and go require roughly the same amount of code for a simple scatter." },
+        ],
+        branches: { a: "hover_stage", b: "api_recovery", c: "api_recovery", d: "api_recovery" },
+        rationale: "plotly.express is purpose-built for DataFrame-aware, high-level chart creation. `px.scatter(df, x='revenue', y='profit', color='region')` produces a fully interactive, color-coded scatter plot in one line, with axis labels and legend generated automatically from column names. go.Scatter requires manually extracting series, constructing the figure, and adding all metadata — appropriate when you need trace-level control, not for quick exploration.",
+      },
+
+      api_recovery: {
+        id: "api_recovery",
+        type: "scenario_choice",
+        badge: "Recovery · API",
+        title: "Recovery · Express vs Graph Objects",
+        prompt: "You need to combine a `px.scatter()` base chart with a custom trend line. Which pattern correctly adds a go trace to a px figure?",
+        choices: [
+          { id: "a", label: "fig = px.scatter(...); fig.add_trace(go.Scatter(...))", description: "Create the base with px, then extend using fig.add_trace() with a go trace." },
+          { id: "b", label: "fig = go.Figure(px.scatter(...))", description: "Wrap the px figure in go.Figure() to gain access to add_trace()." },
+          { id: "c", label: "px.scatter(..., traces=[go.Scatter(...)])", description: "Pass go traces as a keyword argument to the px function." },
+        ],
+        branches: { a: "hover_stage", b: "hover_stage", c: "hover_stage" },
+        rationale: "The canonical pattern is: build with px for speed, then call `fig.add_trace(go.Scatter(...))` to extend. Since `px.scatter()` already returns a `go.Figure` object, `add_trace()` is available immediately — no wrapping needed. This hybrid approach is the standard in production data science codebases.",
+      },
+
+      hover_stage: {
+        id: "hover_stage",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Hover Customization",
+        prompt: "You want to include 'customer_id' and 'region' in the hover tooltip for a px.scatter chart, with 'product_name' as a bold title at the top of the tooltip. Which argument controls the extra columns?",
+        choices: [
+          { id: "a", label: "hover_data=['customer_id', 'region'], hover_name='product_name'", description: "hover_data adds extra columns to the tooltip; hover_name sets the bold title." },
+          { id: "b", label: "tooltip=['customer_id', 'region', 'product_name']", description: "tooltip is not a valid px argument; it belongs to other charting libraries." },
+          { id: "c", label: "hovertemplate with all fields explicitly", description: "hovertemplate on update_traces works but requires manually referencing every column — more verbose for simple additions." },
+          { id: "d", label: "text='product_name', hover_data=['customer_id', 'region']", description: "text places the label as a visible annotation on the chart point, not as the bold tooltip title." },
+        ],
+        branches: { a: "facet_stage", b: "layout_recovery", c: "facet_stage", d: "facet_stage" },
+        rationale: "In plotly.express, `hover_data` accepts a list of column names to append to the tooltip, and `hover_name` sets the bold header line at the top of the tooltip box. For full custom formatting, `fig.update_traces(hovertemplate='...')` gives complete control — use `%{x}`, `%{y}`, `%{customdata[0]}` placeholders, and end with `<extra></extra>` to suppress the trace-name box.",
+      },
+
+      facet_stage: {
+        id: "facet_stage",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Facets and Small Multiples",
+        prompt: "A product manager asks for a single chart that shows the revenue-vs-profit relationship broken out by region in separate subplots — one subplot per region, arranged as columns. Which px argument produces this layout?",
+        choices: [
+          { id: "a", label: "facet_col='region'", description: "facet_col creates one subplot column per unique value of the specified column." },
+          { id: "b", label: "subplot_col='region'", description: "subplot_col is not a valid plotly.express argument." },
+          { id: "c", label: "color='region' with barmode='group'", description: "color='region' overlays groups on a single chart; barmode applies only to bar charts." },
+          { id: "d", label: "facet_row='region'", description: "facet_row creates one subplot row per region — arranged vertically, not as columns." },
+        ],
+        branches: { a: "dash_stage", b: "layout_recovery", c: "api_recovery", d: "dash_stage" },
+        rationale: "`facet_col='region'` instructs px to create one subplot column for each unique value of the 'region' column, sharing the same y-axis scale. `facet_row` does the same but arranges subplots as rows. You can combine both: `facet_col='region', facet_row='product_line'` creates a full grid. This is dramatically faster than manually building subplot grids with `make_subplots()`.",
+      },
+
+      dash_stage: {
+        id: "dash_stage",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · Dash Integration",
+        prompt: "You want to embed a Plotly `go.Figure` object inside a Dash application layout. Which Dash component accepts a figure object directly?",
+        choices: [
+          { id: "a", label: "dcc.Graph(figure=fig)", description: "dcc.Graph is the Dash core component designed to render any go.Figure object interactively." },
+          { id: "b", label: "html.Img(src=fig)", description: "html.Img renders static image URLs; it cannot accept a go.Figure object." },
+          { id: "c", label: "dcc.Plot(figure=fig)", description: "dcc.Plot does not exist in the Dash core components library." },
+          { id: "d", label: "go.DashComponent(fig)", description: "go.DashComponent is not a real Plotly or Dash class." },
+        ],
+        branches: { a: "export_stage", b: "layout_recovery", c: "layout_recovery", d: "layout_recovery" },
+        rationale: "`dcc.Graph(figure=fig)` is the standard Dash component for rendering any Plotly figure. It accepts a `go.Figure` object directly and renders it as a fully interactive chart inside the Dash layout. Since every `px` chart also returns a `go.Figure`, the same pattern works for both. Callbacks can update the `figure` property dynamically in response to user inputs.",
+      },
+
+      export_stage: {
+        id: "export_stage",
+        type: "scenario_choice",
+        badge: "Stage 7",
+        title: "Stage 7 · Exporting Charts",
+        prompt: "A stakeholder wants both a shareable interactive version and a static PNG for a PowerPoint deck. You call `fig.write_html('chart.html')` and `fig.write_image('chart.png')`. What must be installed for the PNG export to work?",
+        choices: [
+          { id: "a", label: "kaleido", description: "kaleido is the Plotly-recommended package for static image export (`pip install kaleido`)." },
+          { id: "b", label: "pillow", description: "Pillow is a Python image processing library but is not used by Plotly for figure export." },
+          { id: "c", label: "No extra package — write_image is built-in", description: "write_image requires an external renderer; without one it raises a ValueError." },
+          { id: "d", label: "selenium with a webdriver", description: "Selenium was a legacy approach for Plotly static export but kaleido is now the standard." },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage", d: "terminal_stage" },
+        rationale: "`fig.write_html()` is pure Python and has no extra dependencies — it serializes the figure to a self-contained HTML file with the Plotly.js bundle embedded. `fig.write_image()` requires an external renderer to rasterize the chart; kaleido is the current recommended package (`pip install kaleido`). Without it, Plotly raises: `ValueError: No renderer found for write_image`. The legacy orca renderer also works but is no longer recommended.",
+      },
+
+      terminal_stage: {
+        id: "terminal_stage",
+        type: "scenario_choice",
+        badge: "Stage 8",
+        title: "Stage 8 · Final Check",
+        prompt: "You are presenting your Plotly workflow to a new team. Which single statement best describes when to choose go.Figure over px in a professional data science codebase?",
+        choices: [
+          { id: "a", label: "Use go when you need mixed chart types, secondary axes, or custom annotations that px cannot express", description: "go gives trace-level control for complex, multi-layer figures." },
+          { id: "b", label: "Always use go — px is only for prototyping and should never appear in production code", description: "px is production-ready and is widely used in Dash apps and reporting pipelines." },
+          { id: "c", label: "Use go only when the DataFrame has more than 1 million rows", description: "API choice is about expressiveness and control, not data size." },
+          { id: "d", label: "Use go whenever the chart has more than two traces", description: "px can produce multi-trace charts (e.g. via color or facet) without switching to go." },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage", d: "terminal_stage" },
+        rationale: "The practical rule is: start with px for speed and DataFrame ergonomics, then reach for go (or hybrid px + add_trace) when you need mixed chart types on the same axes, secondary y-axes, custom shapes and annotations, or precise per-trace styling. Both are production-ready — many Dash applications use px for the bulk of charts and go only for complex figures.",
         terminal: true,
-        rationale: "plotly.express is excellent for standard single-trace charts. go.Figure is needed for: multiple traces (model vs baseline), mixed chart types, custom colorscales, annotations, shapes, or layout configurations beyond express's defaults.",
       },
     },
   },
+
   knowledgeCheck: [
     {
-      question: "What is the key tradeoff between plotly.express and go.Figure?",
+      question: "You need to create a scatter plot from a Pandas DataFrame with automatic color coding by a 'segment' column in three lines of code or fewer. Which is the most appropriate approach?",
       options: [
-        "plotly.express is faster to render; go.Figure is more memory-efficient",
-        "plotly.express is a convenient high-level API for standard charts with a one-liner syntax; go.Figure provides full control over every trace and layout property but requires more code",
-        "plotly.express only works in Jupyter; go.Figure works everywhere",
+        "px.scatter(df, x='revenue', y='profit', color='segment')",
+        "go.Figure(data=[go.Scatter(x=df['revenue'], y=df['profit'], marker=dict(color=df['segment']))])",
+        "go.Scatter(df, x='revenue', y='profit', color='segment')",
+        "px.Figure(df, type='scatter', color='segment')",
       ],
-      correctIndex: 1,
-      explanation: "plotly.express wraps common chart types into concise one-liners with sensible defaults — great for 80% of use cases. go.Figure gives access to every Plotly API property: multiple traces, custom colors, annotations, subplots, mixed chart types. Start with express; switch to go when you hit express's limits.",
+      correctIndex: 0,
+      explanation: "plotly.express is the DataFrame-aware, high-level API. `px.scatter(df, x='revenue', y='profit', color='segment')` produces a fully interactive scatter plot with automatic color coding, legend, and axis labels in one line. The go approach requires manually extracting series, mapping colors, and constructing the figure — several more lines for the same result.",
     },
     {
-      question: "Why use go.Scattergl instead of go.Scatter for a chart with 200,000 data points?",
+      question: "A chart using `template='none'` in `fig.update_layout()` looks washed out and is hard to read. What is the most likely cause and the correct fix?",
       options: [
-        "Scattergl supports more hover tooltip configurations",
-        "Scattergl uses WebGL rendering in the browser's GPU, which is 10-100× faster than the SVG/DOM renderer used by Scatter — essential for large point sets",
-        "Scattergl automatically samples the data to 10,000 points for display",
+        "`template='none'` strips all default styling including grid lines and axis formatting. Fix: use `template='plotly_white'` or `template='simple_white'`.",
+        "`template='none'` sets the background to transparent, which only affects rendered HTML. Fix: add `paper_bgcolor='white'`.",
+        "`template='none'` is deprecated. Fix: remove the template argument entirely to use the default dark theme.",
+        "`template='none'` causes a rendering error in some browsers. Fix: use `template='plotly'` for maximum compatibility.",
       ],
-      correctIndex: 1,
-      explanation: "go.Scatter renders using SVG/DOM, where each point is an SVG element. At 200K points, this creates 200K DOM nodes — extremely slow. go.Scattergl renders via WebGL: the GPU handles all 200K points as a single draw call, making rendering near-instant for even millions of points.",
+      correctIndex: 0,
+      explanation: "`template='none'` removes the entire Plotly styling baseline — background color, grid lines, axis tick formatting, default color sequences, and font defaults. The result is a minimal but visually noisy chart. The standard fix is `template='plotly_white'` or `template='simple_white'`, both of which provide a clean white background with readable grid lines suitable for presentations and reports.",
     },
     {
-      question: "In a Dash callback, what do the Input() and Output() decorators specify?",
+      question: "You want the hover tooltip for a px.scatter chart to include 'product_name' as a bold header and show 'sku_id' as an extra field. Which px arguments achieve this?",
       options: [
-        "Input() specifies the data source; Output() specifies the chart title",
-        "Input() specifies which component property triggers the callback (e.g., dropdown value change); Output() specifies which component property the callback updates (e.g., a graph's figure)",
-        "They specify the HTTP methods for the Dash server endpoints",
+        "`hover_name='product_name', hover_data=['sku_id']`",
+        "`tooltip_title='product_name', tooltip_extra=['sku_id']`",
+        "`text='product_name', hover_columns=['sku_id']`",
+        "`label='product_name', extra_hover=['sku_id']`",
       ],
-      correctIndex: 1,
-      explanation: "Dash callbacks use a reactive programming model. Output('graph-id', 'figure') means 'this function updates the figure property of the component with id graph-id.' Input('dropdown-id', 'value') means 'run this function whenever the value property of dropdown-id changes.' The callback function takes the Input values and returns the Output values.",
+      correctIndex: 0,
+      explanation: "In plotly.express, `hover_name` sets the bold title at the top of the hover tooltip box, and `hover_data` accepts a list of column names to include as additional fields. `text` is a different argument that renders labels as visible annotations on the chart itself. The other option names (`tooltip_title`, `hover_columns`, `extra_hover`) do not exist in the px API.",
     },
   ],
 },
@@ -41083,173 +41800,387 @@ For quick prototyping: Streamlit. For production dashboards with complex interac
 "mo-v3": {
   durationLabel: "15 min",
   outcomes: [
-    "Apply Tufte's data-ink ratio and chartjunk principles to redesign cluttered dashboards",
-    "Select the correct chart type for each communication goal",
-    "Structure a dashboard with a hero KPI row, trend layer, and drill-down layer",
-    "Identify common visualization mistakes: 3D charts, dual Y-axis, misleading truncation",
+    "Apply Tufte's data-ink ratio to remove chartjunk and improve clarity",
+    "Select the correct chart type for a given analytical question",
+    "Use color purposefully and accessibly in data visualizations",
+    "Write insight-driven chart titles that communicate findings",
+    "Identify and fix common visualization mistakes in code reviews",
   ],
-  learnMarkdown: `## Dashboard Design Principles
+  learnMarkdown: `## Tufte's Data-Ink Ratio
 
-A dashboard with 20 KPIs communicates nothing. A dashboard with 5 well-chosen KPIs, arranged hierarchically, lets a decision-maker understand the business state in 30 seconds.
+Edward Tufte introduced the **data-ink ratio** as a foundational principle of visualization design. The idea is simple: every drop of ink on a chart should serve the data. The ratio is defined as:
 
----
+> Data-Ink Ratio = Data Ink ÷ Total Ink Used
 
-## Tufte's Core Principles
+A high ratio means most of the visual elements encode actual information. A low ratio means you're wasting ink — and your audience's attention — on decoration.
 
-**Data-ink ratio**: maximize the proportion of ink (or pixels) that encodes data. Remove everything that doesn't.
+**Maximize data ink by removing:**
+- Heavy gridlines (use faint, minimal guides or none at all)
+- Redundant axis labels and tick marks
+- Outer borders and chart frames
+- Legends when direct labeling works better
+- 3D effects that add depth without adding information
 
-**Chartjunk**: visual elements that add complexity without information:
-- 3D effects (distort area, add non-data depth)
-- Heavy gridlines (compete with data)
-- Decorative fills and gradients
-- Excessive tick marks
-- Dual Y-axis (implies a relationship that may not exist; confuses scale)
+The goal is a clean "data rectangle" where the viewer's eye goes directly to the data, not the furniture around it.
 
-**Small multiples**: instead of one complex chart, use many small identical charts with a single variable changing. Easier to compare than a cluttered overlay.
+## Chartjunk
 
----
+**Chartjunk** is Tufte's term for visual elements that clutter a chart without contributing meaning. Common offenders:
 
-## Chart Type Rules
+- **3D charts**: A 3D bar chart uses perspective to make bars look dramatic, but it distorts the actual heights and makes precise reading impossible. Never use 3D for data charts.
+- **Gradient fills**: A bar that fades from dark blue to light blue implies a gradient in the data where none exists.
+- **Decorative clip art**: Icons, illustrations, or themed backgrounds that compete with the data.
+- **Excessive gridlines**: A grid line every 5 units on a 0–1000 scale creates 200 lines fighting for attention.
+- **Drop shadows and bevels**: These are purely ornamental and add visual noise.
 
-| Goal | Chart | Avoid |
-|------|-------|-------|
-| Change over time | Line chart | Bar chart for many time points |
-| Compare categories | Bar chart | Pie chart (>4 slices unreadable) |
-| Part-to-whole | Stacked bar or treemap | 3D pie |
-| Distribution | Histogram, violin | 3D bar |
-| Correlation | Scatter | Bubble chart (3rd variable as bubble size is hard to read) |
+Chartjunk is not just aesthetically unpleasant — it actively impairs comprehension. Studies show viewers extract data more accurately and faster from clean charts.
 
-**Never** use pie charts with more than 4 slices — humans can't compare angles accurately.
+## Common Chart Type Mistakes
 
----
+Choosing the wrong chart type is one of the most common visualization errors:
 
-## Dashboard Hierarchy
+**Pie charts** are overused and misused. Humans are poor at comparing angles and arc lengths. A reader comparing two slices at 28% and 32% will struggle to see the difference. Use a **horizontal bar chart** instead — lengths are far easier to compare.
 
-Structure dashboards in three layers:
+**Dual-axis charts** (two y-axes on one chart) are frequently used to imply a correlation between two unrelated metrics. By scaling each axis independently, you can make any two series appear to track each other. If the relationship is real, prove it with a scatter plot or a correlation coefficient.
 
-1. **Hero KPIs** (top row): 3-5 large numbers with trend arrows. "Revenue: $4.2M ↑ 8%." These answer: is the business healthy right now?
+**Truncated y-axes** start the y-axis above zero to "zoom in" on differences. This visually exaggerates variation and can mislead stakeholders into thinking changes are dramatic when they are modest. Always start at zero for bar charts unless the baseline is physically meaningless (e.g., temperature in Celsius).
 
-2. **Trend layer**: line charts of key metrics over 90 days. Answers: is this a recent change or sustained?
+**3D charts** distort front bars to look taller and back bars to look shorter due to perspective. They should never appear in analytical work.
 
-3. **Segment/drill-down**: breakdowns by platform, geo, cohort. Answers: where is the change coming from?
+## Choosing the Right Chart Type
 
-Decision-makers scan top to bottom. Put the most important information at the top.
+| Question | Best Chart |
+|---|---|
+| How does a whole divide into parts? | Stacked bar, treemap (avoid pie) |
+| How do values compare across categories? | Bar chart (horizontal for many categories) |
+| How is data distributed? | Histogram, box plot, violin plot |
+| What is the relationship between two variables? | Scatter plot |
+| How does a metric change over time? | Line chart |
+| How do multiple metrics change over time? | Small multiples (not dual-axis) |
 
----
+When in doubt: bar charts and line charts are your workhorses. They are accurate, fast to read, and universally understood.
 
-## Common Mistakes to Avoid
+## Color Principles
 
-**Y-axis truncation**: starting the Y-axis at 89% instead of 0% makes a 0.5% change look like a 50% change. Always start at zero for bar charts; annotation is acceptable for line charts.
+Color is a powerful preattentive attribute — but only when used with purpose.
 
-**Too many colors**: more than 7 colors are indistinguishable. Use color only when it encodes a data dimension, not for decoration.
+**Use color to encode data, not decorate.** If every bar in a bar chart is a different color, you're implying a categorical distinction that doesn't exist. Use a single color for a single series.
 
-**Colorblind accessibility**: avoid pure red/green combinations. Use blue/orange or viridis palette.
+**Accessibility**: ~8% of men have red-green colorblindness. Avoid red/green combinations. Use palettes designed for accessibility:
+- **ColorBrewer** palettes (colorbrewer2.org) — categorical, sequential, diverging
+- **Viridis** — perceptually uniform, works in grayscale, accessible to colorblind viewers
+- **Okabe-Ito** — eight-color qualitative palette designed for colorblindness
 
-**Dual Y-axis**: two Y-axes imply a relationship between the two series. If there's no causal relationship, a dual axis misleads. Use small multiples instead.
+**Limit distinct colors to 5–7 maximum.** Beyond that, viewers cannot reliably distinguish categories and a legend becomes a lookup table rather than a guide.
+
+For sequential data (low to high), use a single-hue gradient. For diverging data (negative to positive), use two contrasting hues with a neutral midpoint.
+
+## Preattentive Attributes
+
+Preattentive attributes are visual properties the human visual system processes in under 250 milliseconds — before conscious thought. They include:
+
+- **Length** and **position** — the most accurate for quantitative comparison
+- **Color hue** — excellent for categorical distinction
+- **Size/area** — perceived inaccurately (bubble charts require care)
+- **Orientation** and **shape** — useful for nominal categories
+
+Design visualizations so that the most important comparison uses the most accurate preattentive attribute. For precise comparison of values, use position on a common scale (bar chart). For showing magnitude across geography, size or color saturation works.
+
+## Storytelling Structure
+
+A chart is not self-explanatory. Structure your visualization for the story it tells:
+
+**Titles should state the insight, not describe the data.** "Revenue Over Time" tells viewers nothing. "Q3 Revenue Declined 12% in EMEA" tells viewers exactly what to think about. Write your title as the takeaway.
+
+**Annotations** draw attention to the critical moment — the spike, the dip, the crossover. A single callout with three words ("Lockdown begins") is more powerful than a paragraph of prose.
+
+**Subtitles and captions** can provide context (data source, time range, units) so the chart body stays clean.
+
+## Interview-Ready Summary
+
+- **Data-ink ratio**: maximize ink that encodes data; ruthlessly remove gridlines, borders, 3D effects, and decorations
+- **Chartjunk** — gratuitous visual complexity — slows comprehension and erodes trust in analytical work
+- **Chart type selection**: bar for comparison, line for time series, scatter for relationships, histogram/box for distribution — avoid pie and dual-axis
+- **Truncated y-axes** on bar charts visually exaggerate differences; always start at zero for bar charts
+- **Color**: one color per series, accessible palettes (viridis/ColorBrewer), max 5–7 distinct colors, never red-green
+- **Insight-driven titles** communicate the finding ("Sales up 18% YoY") rather than labeling the data ("Sales Chart")
 `,
   video: null,
-  videoFallbackMarkdown: `## Deep Dive: Storytelling with Data
+  videoFallbackMarkdown: `## Redesigning a Cluttered Dashboard with Tufte's Principles
 
-A dashboard is a tool for monitoring. A presentation is a tool for persuasion. They have different design requirements.
+Imagine you inherit a sales dashboard with six charts, each packed with 3D bars, rainbow color schemes, heavy gridlines, and titles like "Monthly Revenue Data." How do you fix it?
 
-**Dashboard**: must be readable at a glance, updated in real time or near-real time, self-explanatory. Minimize text — use chart titles as questions ("Did CTR improve after the launch?"), not descriptions.
+### Step 1 — Strip to the Signal
 
-**Analysis presentation**: narrative arc. Start with the question, show the data, reveal the answer, recommend the action. Each chart should advance the narrative — if a chart doesn't change what the audience thinks or does, cut it.
+Start by removing everything that doesn't carry information. Kill the 3D effects — they serve no one. Remove the outer chart borders. Replace the 10px gridlines with faint 0.5px guides at major intervals only, or remove them entirely and let the bar heights speak.
 
-Cole Nussbaumer Knaflic's *Storytelling with Data* is the standard reference for DS communication design.
+Now check the y-axes. If a bar chart's y-axis starts at 85,000 instead of 0, you've inherited a misleading chart. A sales figure that went from 91K to 96K looks like a doubling when the axis is truncated. Reset it to zero. The 5K gain is still good news — let it stand on its own merits.
+
+### Step 2 — Choose Colors for Meaning, Not Beauty
+
+Rainbow color schemes feel festive but encode nothing. If you have five product lines and all five bars are a different color, that's fine — color is encoding the category. But if you have a single time series broken into one bar per month and each month is a different color, you're implying twelve different categories where there is only one series. Switch to a single muted color. Reserve a highlight color (e.g., a saturated orange) for the bar representing the current period or an anomaly.
+
+For colorblind accessibility, run your palette through a simulator (Coblis or the "Color Blind" mode in Figma). Avoid pure red/green pairings. If your chart compares actual vs. target, use blue vs. orange rather than green vs. red. Viridis or ColorBrewer's "Dark2" palette are safe defaults for qualitative categories.
+
+### Step 3 — Write the Story in the Title
+
+Before writing anything else, ask: "What is the one thing I want the reader to take away from this chart?" The answer is your title.
+
+Transform these weak titles:
+- "Revenue by Region" → **"APAC Overtook EMEA in Revenue for the First Time in Q2"**
+- "Customer Churn Rate" → **"Churn Dropped 3 Points After the Onboarding Redesign"**
+- "Support Ticket Volume" → **"Ticket Volume Peaks Every Monday — Invest in Weekend Coverage"**
+
+Add a short annotation at the inflection point on the chart to reinforce the title. A two-word callout ("Redesign launched") at the right x-position is worth more than a paragraph in the footnotes.
+
+### The Result
+
+A redesigned dashboard with clean axes, purposeful color, and insight-driven titles communicates its findings in seconds rather than minutes. Stakeholders trust it more because it doesn't look like it's hiding anything behind decoration. That trust is the ultimate goal of good visualization design.
 `,
-  tryGuidance: "No interactive viz — apply the design principles to the mock dashboard scenarios in the interview simulation.",
+  tryGuidance: `Use the interactive chart critique tool below to explore visualization design decisions. You can toggle different issues on and off to see how each principle affects chart clarity. Try switching the y-axis range, changing color schemes, and rewriting the chart title to see the before/after impact of each Tufte principle in practice.`,
   interviewGraph: {
-    initialStageId: "mo_v3_stage1",
+    initialStageId: "find_primary_bug",
     artifactDimensions: [
-      { label: "Chartjunk Removal", recoveryStageId: "mo_v3_rec1" },
-      { label: "Dashboard Structure", recoveryStageId: "mo_v3_terminal", passLabel: "Design Mastery" },
+      { label: "Visualization Principles", recoveryStageId: "tufte_recovery" },
+      { label: "Chart Type Selection", recoveryStageId: "chart_recovery" },
     ],
     stages: {
-      mo_v3_stage1: {
-        id: "mo_v3_stage1",
-        type: "scenario_choice",
+      find_primary_bug: {
+        id: "find_primary_bug",
+        type: "click_target",
         badge: "Stage 1",
-        title: "Stage 1 · Bad chart critique",
-        prompt: "A colleague's dashboard has: 3D pie chart with 12 slices, dual Y-axis showing revenue and NPS, Y-axis starting at 95% for a metric that ranges 95-99%. What should you fix?",
-        choices: [
-          { id: "a", label: "The colors — pie charts need more distinct colors", description: "Color is a secondary issue; the chart type and axis problems are primary." },
-          { id: "b", label: "Replace pie with bar chart (12 slices are unreadable as pie), remove dual Y-axis (use small multiples), start Y-axis at 0 or annotate the truncation clearly", description: "Three separate design violations, three specific fixes." },
-          { id: "c", label: "Add more data to fill the chart better", description: "More data won't fix structural design problems." },
-        ],
-        branches: { a: "mo_v3_rec1", b: "mo_v3_stage2", c: "mo_v3_rec1" },
-        rationale: "B correctly identifies three distinct issues: (1) 12-slice pie is unreadable — bar chart sorts by value and is readable at any count; (2) dual Y-axis implies a relationship between revenue and NPS that may not be meaningful — small multiples are cleaner; (3) Y-axis starting at 95% makes a 1-point change look like a massive swing.",
+        title: "Stage 1 · Spot the primary visualization bug",
+        prompt: "Your colleague sent you this matplotlib chart for a stakeholder presentation. Click the single most misleading element in the code — the one that will cause the audience to misinterpret the magnitude of differences between quarters.",
+        code_snippet: `import matplotlib.pyplot as plt
+
+# Sales comparison chart
+fig, ax = plt.subplots(figsize=(10, 6))
+
+categories = ['Q1', 'Q2', 'Q3', 'Q4']
+values = [120, 135, 128, 142]
+
+ax.bar(categories, values, color=['red', 'green', 'blue', 'orange'])  # -- ds-target:categorical_colors
+ax.set_ylim(115, 145)                     # -- ds-target:truncated_axis
+ax.set_title('Quarterly Sales Revenue')   # -- ds-target:weak_title
+ax.grid(True, which='both', linewidth=1)  # -- ds-target:heavy_grid
+
+ax.set_ylabel('Revenue ($K)')
+plt.show()`,
+        validationCopy: {
+          truncated_axis: "Correct. The y-axis runs from 115 to 145 — a 30-unit window that makes a 22K range look enormous. Visually, Q4 appears to be double Q1, when in reality it's only 18% higher. Always start bar chart axes at zero.",
+          categorical_colors: "This is a real issue — using different colors for quarters with no categorical meaning implies a distinction that doesn't exist. But there's an even more misleading element: the truncated y-axis distorts the perceived magnitude of differences far more severely. Click on set_ylim.",
+          weak_title: "Good instinct — 'Quarterly Sales Revenue' is a weak, descriptive title that misses the opportunity to communicate an insight. But the most misleading element is something that will cause stakeholders to misread the actual data values. Click on set_ylim.",
+          heavy_grid: "Heavy gridlines are chartjunk and reduce the data-ink ratio, but they don't cause stakeholders to misread the magnitude of differences between bars. The most misleading element distorts how large or small the differences appear. Click on set_ylim.",
+        },
+        branches: {
+          truncated_axis: "axis_recovery_choice",
+          categorical_colors: "axis_recovery_choice",
+          weak_title: "axis_recovery_choice",
+          heavy_grid: "axis_recovery_choice",
+        },
       },
-      mo_v3_rec1: {
-        id: "mo_v3_rec1",
-        type: "scenario_choice",
-        badge: "Recovery",
-        title: "Recovery · Chartjunk definition",
-        prompt: "What is Tufte's concept of chartjunk and why does it matter?",
-        choices: [
-          { id: "a", label: "Visual elements that add complexity without encoding data — they increase cognitive load without improving understanding", description: "3D effects, heavy gridlines, decorative fills are classic chartjunk." },
-        ],
-        branches: { a: "mo_v3_stage2" },
-        rationale: "Chartjunk forces the viewer to process visual information that carries no data signal. Every unnecessary element is cognitive overhead that detracts from data comprehension.",
-      },
-      mo_v3_stage2: {
-        id: "mo_v3_stage2",
+
+      axis_recovery_choice: {
+        id: "axis_recovery_choice",
         type: "scenario_choice",
         badge: "Stage 2",
-        title: "Stage 2 · Dashboard hierarchy",
-        prompt: "You're redesigning an executive dashboard with 20 KPIs. How do you structure it?",
+        title: "Stage 2 · Fix the y-axis",
+        prompt: "The y-axis is set to `set_ylim(115, 145)`. A stakeholder argues: 'But we want to zoom in on the differences — starting at zero wastes space and makes the chart look flat.' How do you respond?",
         choices: [
-          { id: "a", label: "Show all 20 KPIs in a grid — executives need full information", description: "20 equal KPIs overwhelm — there's no signal in undifferentiated noise." },
-          { id: "b", label: "3-layer hierarchy: 3-5 hero KPIs (large, trend arrows) → trend charts for key metrics → segment drill-downs; prioritize by decision importance", description: "Hierarchy guides the eye from summary to detail." },
+          { id: "a", label: "Start at zero", description: "Truncating the y-axis for bar charts visually exaggerates differences and misleads the audience about magnitude — the axis must start at zero." },
+          { id: "b", label: "Keep the zoom", description: "Zooming in shows more detail and helps stakeholders see differences more clearly, which is the goal of data visualization." },
+          { id: "c", label: "Label it clearly", description: "y-axis range doesn't matter as long as you add a note that says 'axis does not start at zero.'" },
         ],
-        branches: { a: "mo_v3_rec1", b: "mo_v3_terminal" },
-        rationale: "B is correct. Not all metrics are equal in an executive dashboard. The hero layer (3-5 KPIs) answers 'are we healthy?' The trend layer answers 'is this sustained?' The drill-down answers 'where is the issue?' Executives read top-to-bottom — put the most critical information first.",
+        branches: {
+          a: "color_choice",
+          b: "tufte_recovery",
+          c: "tufte_recovery",
+        },
+        rationale: "Bar charts encode value through the height of the bar relative to a zero baseline. When you truncate the axis, you remove the baseline and destroy that encoding. A 22K difference (115→137) looks like a 100% increase rather than an 18% increase. The stakeholder's instinct to 'zoom in' is valid for line charts showing trends, but not for bar charts showing magnitude. Add an annotation to call out the key difference instead.",
       },
-      mo_v3_terminal: {
-        id: "mo_v3_terminal",
+
+      tufte_recovery: {
+        id: "tufte_recovery",
+        type: "scenario_choice",
+        badge: "Recovery · Tufte Principles",
+        title: "Recovery · Tufte's data-ink ratio",
+        prompt: "Let's reinforce the core principle. According to Tufte's data-ink ratio, which of the following chart elements should you REMOVE first to improve a cluttered bar chart?",
+        choices: [
+          { id: "a", label: "The axis labels", description: "Remove the axis labels to reduce visual noise and let the bars speak for themselves." },
+          { id: "b", label: "Heavy gridlines and chart border", description: "Remove heavy gridlines and the outer chart frame — these are non-data ink that clutter the chart without adding information." },
+          { id: "c", label: "The data bars themselves", description: "Reduce the number of data bars to simplify the chart." },
+          { id: "d", label: "The chart title", description: "Remove the title to give more space to the data." },
+        ],
+        branches: {
+          a: "color_choice",
+          b: "color_choice",
+          c: "color_choice",
+          d: "color_choice",
+        },
+        rationale: "The first thing to remove is always the non-data ink: heavy gridlines, outer borders, redundant tick marks, and decorative fills. Axis labels and titles are data-supporting ink — they help the reader interpret the chart and should be kept (though improved). The data itself is obviously essential. Heavy gridlines are the classic first target: replace with faint guides at major intervals only, or remove entirely.",
+      },
+
+      color_choice: {
+        id: "color_choice",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Fix the color scheme",
+        prompt: "The chart uses `color=['red', 'green', 'blue', 'orange']` — four different colors for four quarters of the same metric. A designer suggests replacing this with a single blue for all bars and using a highlighted orange only for Q4 (the most recent quarter). What is the primary reason this is an improvement?",
+        choices: [
+          { id: "a", label: "Aesthetics", description: "Single-color charts look more professional and modern than rainbow schemes." },
+          { id: "b", label: "Color encodes meaning, not decoration", description: "Using different colors implies categorical distinction where none exists — one series should be one color, with a highlight only where there is a meaningful reason to draw attention." },
+          { id: "c", label: "Colorblind accessibility", description: "Red and green together are unreadable for colorblind viewers, so removing them solves the accessibility problem." },
+          { id: "d", label: "Printing", description: "Single-color charts reproduce better in black-and-white printing." },
+        ],
+        branches: {
+          a: "chart_type_choice",
+          b: "chart_type_choice",
+          c: "chart_type_choice",
+          d: "chart_type_choice",
+        },
+        rationale: "The primary reason is that color should encode meaning. When every bar in a single-series chart gets a different color, the viewer's brain searches for a pattern — 'what does red mean? what does blue mean?' — and finds nothing. This is cognitive overhead with no payoff. Use one color for one series. Reserve a second, contrasting color for a specific bar that needs attention (the current period, an outlier, a target). Colorblind accessibility is a real concern but secondary to the encoding principle here.",
+      },
+
+      chart_type_choice: {
+        id: "chart_type_choice",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Right chart for the question",
+        prompt: "A product manager asks: 'I want to show how our five product lines each contribute to total revenue, and how that mix has shifted over the last four quarters.' Which chart type is most appropriate?",
+        choices: [
+          { id: "a", label: "Pie chart for each quarter", description: "Four side-by-side pie charts, one per quarter, each showing the five product line slices." },
+          { id: "b", label: "Stacked bar chart", description: "A stacked bar chart with one bar per quarter, each bar divided into five segments representing the product lines." },
+          { id: "c", label: "Dual-axis line chart", description: "Plot total revenue on the left axis and product mix percentages on the right axis across time." },
+          { id: "d", label: "Scatter plot", description: "Plot each product line as a point with revenue on the x-axis and quarter on the y-axis." },
+        ],
+        branches: {
+          a: "chart_recovery",
+          b: "title_choice",
+          c: "chart_recovery",
+          d: "chart_recovery",
+        },
+        rationale: "This question asks about composition (how parts make up a whole) AND change over time. A stacked bar chart handles both: each bar's total height shows overall revenue, and the segments show the mix. Pie charts struggle with comparison across time — four separate pies require the reader to memorize slices from one chart and compare to the next. Dual-axis charts are misleading and inappropriate here. Scatter plots show relationships between two continuous variables, not composition over time.",
+      },
+
+      chart_recovery: {
+        id: "chart_recovery",
+        type: "scenario_choice",
+        badge: "Recovery · Chart Type Selection",
+        title: "Recovery · Matching chart to question",
+        prompt: "A data scientist wants to show the relationship between customer tenure (months) and monthly spend ($). What chart type should they use?",
+        choices: [
+          { id: "a", label: "Bar chart", description: "Group customers into tenure buckets and show average spend per bucket as bars." },
+          { id: "b", label: "Scatter plot", description: "Plot each customer as a point with tenure on the x-axis and monthly spend on the y-axis." },
+          { id: "c", label: "Pie chart", description: "Show what proportion of total spend comes from customers in each tenure bucket." },
+          { id: "d", label: "Line chart", description: "Connect data points by tenure to show how spend changes over time." },
+        ],
+        branches: {
+          a: "title_choice",
+          b: "title_choice",
+          c: "title_choice",
+          d: "title_choice",
+        },
+        rationale: "A scatter plot is the right answer. When the question is 'what is the relationship between two continuous variables,' the scatter plot is the correct tool — each point represents one customer, and the pattern of points reveals correlation, clusters, or outliers. A bar chart with tenure buckets would work as a secondary view but loses individual-level detail. Pie charts show composition, not relationships. A line chart implies a sequential or time-ordered connection between points that doesn't exist here.",
+      },
+
+      title_choice: {
+        id: "title_choice",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Write an insight-driven title",
+        prompt: "You've built a line chart showing monthly support ticket volume from January to December. In October, volume spiked 40% after a major product release and never fully recovered. Which title best follows Tufte's storytelling principles?",
+        choices: [
+          { id: "a", label: "Monthly Support Ticket Volume (Jan–Dec)", description: "A descriptive title that labels the data shown in the chart." },
+          { id: "b", label: "Support Tickets Over Time", description: "A brief descriptive title." },
+          { id: "c", label: "October Product Release Triggered a 40% Spike in Support Load That Persists", description: "A title that states the finding and draws attention to the causal event." },
+          { id: "d", label: "Ticket Volume Analysis — Annual Report", description: "A formal title indicating the chart's context in a report." },
+        ],
+        branches: {
+          a: "chartjunk_choice",
+          b: "chartjunk_choice",
+          c: "chartjunk_choice",
+          d: "chartjunk_choice",
+        },
+        rationale: "Option C is the insight-driven title. It answers the question 'so what?' before the reader even looks at the chart. Descriptive titles ('Monthly Support Ticket Volume') tell the reader what data is shown — the reader already knows that from looking at the axes. Insight-driven titles tell the reader what to conclude. In a business context, this matters: stakeholders often glance at a title and a chart for five seconds. Make those five seconds count by putting the finding in the title.",
+      },
+
+      chartjunk_choice: {
+        id: "chartjunk_choice",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · Identify chartjunk",
+        prompt: "You are reviewing a colleague's chart for a board presentation. The chart is a 3D clustered bar chart with gradient fills on each bar, a textured background, and a drop shadow on the legend box. Your colleague defends it: 'The 3D effect and gradients make it more visually engaging for executives.' What is your response?",
+        choices: [
+          { id: "a", label: "Agree — engagement matters", description: "Executive presentations benefit from visual flair. If it looks impressive, they'll pay more attention to the data." },
+          { id: "b", label: "Compromise — keep gradients, remove 3D", description: "Gradients are fine aesthetically; only 3D is a problem because it distorts bar heights." },
+          { id: "c", label: "Disagree — chartjunk reduces accuracy", description: "3D effects, gradients, and decorative backgrounds are chartjunk: they reduce data-ink ratio, distort accurate reading, and undermine the credibility of the analysis." },
+          { id: "d", label: "Defer to designer", description: "Design decisions should be left to whoever owns the visual style guide for the organization." },
+        ],
+        branches: {
+          a: "terminal_stage",
+          b: "terminal_stage",
+          c: "terminal_stage",
+          d: "terminal_stage",
+        },
+        rationale: "Chartjunk actively reduces the accuracy with which viewers read data. 3D bars distort heights through perspective — front bars look taller, back bars shorter. Gradient fills imply a gradient in the data where none exists. A textured background competes with the data for visual attention. The goal of a chart in a board presentation is to communicate a finding clearly and credibly — decorative complexity signals style over substance and erodes trust. The correct answer is C: remove all chartjunk and let the data make the visual impact.",
+      },
+
+      terminal_stage: {
+        id: "terminal_stage",
         type: "scenario_choice",
         badge: "Complete",
-        title: "Complete · Design principle",
-        prompt: "What is the single most important dashboard design principle?",
+        title: "Complete · Accessible color palette",
+        prompt: "You are finalizing a chart that compares performance across six customer segments. A colleague flags that one of your team members is red-green colorblind. You are currently using a red-to-green diverging palette. Which is the best replacement?",
         choices: [
-          { id: "a", label: "Maximize the data-ink ratio: every visual element should encode data, and anything that doesn't should be removed", description: "This principle naturally leads to all other improvements." },
+          { id: "a", label: "Add a pattern fill to red and green bars", description: "Keep the red/green colors but add diagonal stripes to one of them so colorblind viewers can distinguish by texture." },
+          { id: "b", label: "Switch to a blue-to-orange diverging palette", description: "Replace red/green with blue/orange — a diverging palette that is distinguishable by colorblind viewers and perceptually balanced." },
+          { id: "c", label: "Use the viridis sequential palette", description: "Viridis is perceptually uniform and colorblind-safe, making it ideal for any quantitative color encoding." },
+          { id: "d", label: "Switch to grayscale", description: "Grayscale is always accessible because it doesn't rely on color discrimination." },
         ],
-        branches: { a: "mo_v3_terminal" },
+        branches: {
+          a: "terminal_stage",
+          b: "terminal_stage",
+          c: "terminal_stage",
+          d: "terminal_stage",
+        },
+        rationale: "Blue-to-orange (option B) is the standard replacement for red-to-green diverging scales — it encodes the same positive/negative or above/below meaning while being fully accessible to red-green colorblind viewers. Viridis (option C) is an excellent sequential palette but is not optimized for diverging data (it goes from dark purple to yellow, not from a neutral midpoint). Grayscale works in principle but loses categorical distinction when you have six segments. Pattern fills are a workaround but create visual complexity. The professional standard is to use a well-designed diverging palette like blue-orange from ColorBrewer.",
         terminal: true,
-        rationale: "The data-ink ratio principle subsumes all other design guidance: remove gridlines, spines, 3D effects, decorative fills — all of these are non-data ink. What remains is clear, focused, and readable.",
       },
     },
   },
   knowledgeCheck: [
     {
-      question: "Why should you avoid pie charts with more than 4 slices?",
+      question: "Edward Tufte's data-ink ratio principle recommends that you should:",
       options: [
-        "Pie charts are computationally expensive to render",
-        "Humans cannot accurately compare angles — it's nearly impossible to determine which of 12 slices is larger when they're close in size; bar charts allow direct length comparison which is far more accurate",
-        "Pie charts with many slices are not supported by most visualization libraries",
+        "Use as many visual elements as possible to make charts engaging",
+        "Maximize the proportion of ink used to encode data, removing all non-data decorations",
+        "Always include gridlines and borders for professional-looking charts",
+        "Use different colors for each data point to improve readability",
       ],
       correctIndex: 1,
-      explanation: "Human visual perception is good at comparing lengths (bar charts) but poor at comparing angles and areas (pie charts). With more than 4 slices, the differences become too small to perceive accurately. A sorted bar chart achieves the same goal (part-to-whole comparison) with far better perceptual accuracy.",
+      explanation: "The data-ink ratio = data ink / total ink. A high ratio means most visual elements encode actual information. Tufte recommends ruthlessly removing chartjunk: heavy gridlines, outer borders, 3D effects, gradient fills, and decorative elements that add ink without adding data. Every visual element should earn its place by contributing to the reader's understanding.",
     },
     {
-      question: "What is the problem with a Y-axis that starts at 97% for a metric ranging from 97% to 99%?",
+      question: "A product analyst wants to visualize the distribution of customer lifetime value (CLV) across 50,000 customers to identify skewness and outliers. Which chart type is most appropriate?",
       options: [
-        "A Y-axis starting at 97% is fine — it zooms in to show meaningful variation",
-        "It makes a 1-percentage-point change (97% to 98%) look as large as a 97-percentage-point change would on a full-range axis — misleading stakeholders about the magnitude of change",
-        "Starting the Y-axis at a non-zero value is only problematic for line charts",
+        "Pie chart showing CLV broken into equal-sized buckets",
+        "Dual-axis bar chart with count on one axis and CLV on the other",
+        "Histogram or box plot showing the shape and spread of the CLV distribution",
+        "Line chart connecting each customer's CLV in order of acquisition date",
       ],
-      correctIndex: 1,
-      explanation: "Y-axis truncation inflates the visual magnitude of changes. If the Y-axis shows 97–99%, a line going from 97% to 98% fills the entire chart height, making it look like a massive improvement. A stakeholder unfamiliar with the axis range could easily misinterpret the scale. For bar charts, always start at zero. For line charts, truncation is more defensible but should be clearly annotated.",
+      correctIndex: 2,
+      explanation: "Distribution questions call for distribution charts. A histogram shows the shape of the distribution — skewness, modality, spread, and outliers — across the full dataset. A box plot summarizes the same information with median, quartiles, and outlier points. Pie charts show composition (parts of a whole), not distribution. Dual-axis charts are misleading tools for a different purpose. A line chart of 50,000 points by date answers a different question entirely.",
     },
     {
-      question: "When is a dual Y-axis appropriate, and when should you use small multiples instead?",
+      question: "You are designing a chart comparing performance across eight product categories for a stakeholder who is red-green colorblind. Which approach is most appropriate?",
       options: [
-        "Dual Y-axis is always appropriate when showing two metrics with different scales on the same time series",
-        "Dual Y-axis is only appropriate when there's a meaningful quantitative relationship between the two series; use small multiples (separate charts) when you just want to show trends on the same time period without implying a causal or proportional relationship",
-        "Small multiples are only for geographic data; dual Y-axis is standard for time series",
+        "Use the default matplotlib color cycle — it is designed to be colorblind-safe",
+        "Use only shades of gray to avoid all color discrimination issues",
+        "Use a qualitative palette such as ColorBrewer's 'Dark2' or 'Set2', which avoids red-green combinations and is designed for categorical data",
+        "Use red and green but add text labels on each bar so the colors aren't needed",
       ],
-      correctIndex: 1,
-      explanation: "A dual Y-axis visually implies that the two series are related — their relative positions and slopes appear meaningful. If you show revenue and NPS on a dual axis, viewers will look for the relationship between them. Small multiples (two separate charts aligned vertically) allow comparison of trends without implying a quantitative relationship between the two series.",
+      correctIndex: 2,
+      explanation: "ColorBrewer's qualitative palettes (Dark2, Set2, Paired) are specifically designed for categorical data and are tested for colorblind accessibility. They avoid red-green pairs and provide perceptually distinct colors for up to 8–12 categories. The default matplotlib cycle is not optimized for colorblind accessibility. Grayscale limits categorical discrimination across 8 categories. Text labels are a partial workaround but don't replace a properly designed palette — preattentive color processing is faster than reading labels.",
     },
   ],
 },
@@ -42334,181 +43265,352 @@ Use cases: forecasting sales with known promotions, demand with weather data.
   },
 
   "sp-t3": {
-    durationLabel: "15 min",
-    outcomes: [
-      "Explain how Prophet decomposes trend, seasonality, and holidays",
-      "Compare Prophet to ARIMA for different use cases",
-      "Identify when modern ML-based forecasting outperforms classical methods",
-    ],
-    learnMarkdown: `## Prophet & Modern Forecasting
+  durationLabel: "15 min",
+  outcomes: [
+    "Explain Prophet's additive decomposition model: trend + seasonality + holidays + error",
+    "Configure Prophet with correct column names, changepoints, and holiday calendars",
+    "Tune changepoint_prior_scale to balance under- and over-fitting",
+    "Decide when to use Prophet vs ARIMA for business forecasting problems",
+  ],
+  learnMarkdown: `## What Is Facebook Prophet?
 
-Facebook's Prophet (2017) made production-grade time series forecasting accessible to non-specialists. It's designed for business time series with strong seasonal patterns and irregular holidays.
+Facebook Prophet is an open-source forecasting library released by Meta's Core Data Science team. Unlike classical statistical methods, it was designed to be used by **analysts and data scientists who are not time-series specialists**. Prophet works best on business time series — daily revenue, weekly active users, monthly signups — that have strong seasonal patterns and occasional holiday spikes.
 
-### Prophet's Decomposition
-\`\`\`python
-from prophet import Prophet
+At its core, Prophet is an **additive regression model**:
 
-model = Prophet(
-    seasonality_mode='multiplicative',
-    holidays=holiday_df,
-    changepoint_prior_scale=0.05  # flexibility of trend changes
-)
-model.fit(df[['ds', 'y']])  # ds=date, y=value
-future = model.make_future_dataframe(periods=365)
-forecast = model.predict(future)
-\`\`\`
-
-### Prophet Components
 \`\`\`
 y(t) = trend(t) + seasonality(t) + holidays(t) + error(t)
 \`\`\`
 
-**Trend**: piecewise linear or logistic growth with automatic changepoint detection
+Each component is estimated independently and then summed. This decomposition makes the model highly interpretable: you can inspect exactly how much of a Black Friday spike comes from the holiday effect vs. the underlying trend.
 
-**Seasonality**: Fourier series approximation — flexible, handles multiple periods:
+---
+
+## Trend: Piecewise Linear and Logistic Growth
+
+Prophet models trend in two ways:
+
+- **Piecewise linear** (default): the trend is a straight line that is allowed to change slope at specific "changepoints." Prophet automatically detects up to 25 changepoints in the historical data where the growth rate shifted.
+- **Logistic growth**: for metrics that have a natural saturation ceiling (e.g., market penetration), you can set \`growth='logistic'\` and provide a \`cap\` column.
+
+The key tuning knob is \`changepoint_prior_scale\` (default \`0.05\`). Increasing it makes the trend more flexible and responsive — but risks **overfitting** to noise. Decreasing it smooths the trend — but risks **underfitting** and missing real breakpoints.
+
+---
+
+## Seasonality: Fourier Series Decomposition
+
+Prophet models seasonality using **Fourier series** — sums of sine and cosine terms at different frequencies. This lets the model capture smooth, periodic patterns without assuming a rigid shape.
+
+- \`weekly_seasonality=True\` — captures the Monday–Sunday pattern (7-day cycle)
+- \`yearly_seasonality=True\` — captures annual cycles like summer peaks or Q4 surges
+- **Custom seasonality**: add any period with \`model.add_seasonality(name='monthly', period=30.5, fourier_order=5)\`
+
+The \`fourier_order\` parameter controls how many sine/cosine pairs are used. Higher order = more flexibility but more overfitting risk.
+
+The \`seasonality_prior_scale\` controls the strength of the seasonality regularization, similar to \`changepoint_prior_scale\` for trend.
+
+---
+
+## Holiday Effects
+
+Prophet lets you inject a **custom holiday calendar** that captures one-off spikes and dips — things a Fourier series can't model because they don't repeat on a regular cycle.
+
 \`\`\`python
-model.add_seasonality(name='monthly', period=30.5, fourier_order=5)
+from prophet import Prophet
+import pandas as pd
+
+holidays = pd.DataFrame({
+    'holiday': ['black_friday', 'cyber_monday'],
+    'ds': pd.to_datetime(['2023-11-24', '2023-11-27']),
+    'lower_window': [-1, 0],   # days before the event to include
+    'upper_window': [1, 1],    # days after the event to include
+})
+
+model = Prophet(holidays=holidays)
 \`\`\`
 
-**Holidays**: explicit event effects with optional windows (before/after the holiday)
+You can also pass a country code to use built-in public holiday calendars: \`model.add_country_holidays(country_name='US')\`.
 
-### Prophet vs ARIMA
-| Aspect | ARIMA | Prophet |
-|--------|-------|---------|
-| Seasonality | Single, fixed period | Multiple, flexible periods |
-| Missing data | Requires imputation | Handles natively |
-| Holidays/events | Manual exogenous vars | Built-in holiday modeling |
-| Tuning | Requires ACF/PACF expertise | Few interpretable parameters |
-| Short series | Works well | Needs enough data for seasonality |
+---
 
-### When Modern ML Beats Classical
-- **LightGBM/XGBoost**: When many external features (weather, promotions, prices) matter
-- **N-BEATS / N-HiTS**: Pure DL models that outperform ARIMA on M4/M5 competition benchmarks
-- **Temporal Fusion Transformer**: Multi-horizon with interpretable attention weights
-- Classical still wins on: very short series, high interpretability requirements, low data regimes`,
+## Uncertainty Intervals
 
-    video: null,
-    videoFallbackMarkdown: `## Global vs Local Forecasting Models
+Prophet generates **forecast intervals** using Monte Carlo sampling over the changepoint locations and magnitude. The \`interval_width\` parameter (default \`0.80\`) controls how wide the uncertainty band is. Wider intervals are more conservative; narrower intervals may understate real uncertainty.
 
-**Local models** (ARIMA, Prophet): one model per time series. Great for series with idiosyncratic patterns. Doesn't share information across series.
+---
 
-**Global models** (LightGBM, DeepAR): one model trained on many series simultaneously. Learns common patterns; handles new series with cold-start. Requires feature engineering (lags, rolling stats, calendar features) for ML approaches.
+## The Prophet API
 
-The M5 Accuracy competition (Walmart sales) was won by LightGBM ensembles using 1000+ features — demonstrating the power of global tree models at scale.`,
+\`\`\`python
+from prophet import Prophet
+import pandas as pd
 
-    tryGuidance: "No interactive visualization for this lesson. Focus on understanding when to choose Prophet vs ARIMA vs ML approaches.",
+# DataFrame MUST have columns named 'ds' (dates) and 'y' (target values)
+df = pd.read_csv('daily_sales.csv')
+df = df.rename(columns={'date': 'ds', 'revenue': 'y'})
 
-    interviewGraph: {
-      initialStageId: "sp_t3_stage1",
-      artifactDimensions: [
-        { label: "Prophet Mechanics", recoveryStageId: "sp_t3_rec1" },
-        { label: "Model Selection", recoveryStageId: "sp_t3_rec2", passLabel: "Forecasting Strategist" },
-      ],
-      stages: {
-        sp_t3_stage1: {
-          id: "sp_t3_stage1",
-          type: "scenario_choice",
-          badge: "Stage 1",
-          title: "Stage 1 · Prophet Configuration",
-          prompt: "You're forecasting daily website traffic. Traffic spikes during product launches and drops during major holidays. The trend shows exponential growth with a known saturation cap. Which Prophet settings matter most?",
-          choices: [
-            { id: "a", label: "growth='logistic', cap=saturation_value, holidays=event_df", description: "Logistic growth for saturation; holidays for irregular events" },
-            { id: "b", label: "changepoint_prior_scale=0.001 (very rigid trend)", description: "Rigid trend would miss the exponential growth pattern" },
-            { id: "c", label: "seasonality_mode='additive' with no holidays", description: "Missing the saturation cap and holiday effects" },
-            { id: "d", label: "fourier_order=1 for simplicity", description: "Low Fourier order underfits complex seasonal patterns" },
-          ],
-          branches: { a: "sp_t3_stage2", b: "sp_t3_rec1", c: "sp_t3_rec1", d: "sp_t3_rec1" },
-          rationale: "For exponential growth with a ceiling: use logistic growth with a cap. Product launches and holidays are irregular events that don't fit Fourier seasonality — add them as custom holidays. changepoint_prior_scale controls trend flexibility (default 0.05 is usually good for startup growth curves).",
+model = Prophet(
+    yearly_seasonality=True,
+    weekly_seasonality=True,
+    changepoint_prior_scale=0.05,
+    interval_width=0.95,
+)
+model.fit(df)
+
+future = model.make_future_dataframe(periods=365)
+forecast = model.predict(future)
+
+# Decomposition plot — shows trend, seasonality, holidays separately
+fig = model.plot_components(forecast)
+\`\`\`
+
+The two most common mistakes: (1) forgetting to rename columns to \`ds\` and \`y\`, and (2) enabling \`daily_seasonality=True\` on daily data, which adds redundant complexity and overfits.
+
+---
+
+## Prophet vs. ARIMA: When to Use Which
+
+| Dimension | Prophet | ARIMA |
+|---|---|---|
+| Data granularity | Daily / weekly business KPIs | Any frequency including intra-day |
+| Interpretability | High — decomposed components | Moderate |
+| Seasonality handling | Built-in, multi-period | Requires SARIMA extension |
+| Holiday effects | First-class feature | Requires external regressors |
+| Autocorrelation | Not explicitly modeled | Core strength |
+| Skill required | Analyst-friendly | Requires statistical expertise |
+
+**Use Prophet when**: you have daily/weekly business data, multiple seasonal patterns, holiday spikes, and need interpretable forecasts for non-technical stakeholders.
+
+**Use ARIMA when**: data is high-frequency (hourly, minutely), autocorrelation structure matters most, or you need tight precision on short horizons.
+
+---
+
+## Interview-Ready Summary
+
+- Prophet decomposes a time series as **y(t) = trend + seasonality + holidays + error**, fitting each component separately
+- The dataframe passed to \`model.fit()\` **must** have columns named \`ds\` (datetime) and \`y\` (numeric target)
+- Trend uses **piecewise linear changepoints**; tune \`changepoint_prior_scale\` to balance flexibility vs. overfitting
+- Seasonality uses **Fourier series**; weekly, annual, and custom periods are supported
+- Holiday calendars let you model **irregular spikes and dips** that seasonal terms cannot capture
+- Prophet beats ARIMA on interpretability and holiday handling; ARIMA beats Prophet on high-frequency data and complex autocorrelation
+`,
+  video: null,
+  videoFallbackMarkdown: `## Deep Dive: Changepoints, Fourier Seasonality, and Tuning
+
+### How Changepoint Detection Works
+
+Prophet fits the trend as a **piecewise linear function** with up to \`n_changepoints\` (default 25) potential breakpoints, placed uniformly across the first 80% of the training data. Rather than doing explicit structural-break tests, Prophet uses a **sparse prior** on the changepoint magnitudes: most changepoints are shrunk to near-zero, and only the ones where the data strongly supports a slope change survive.
+
+The key parameter is \`changepoint_prior_scale\` (default \`0.05\`):
+
+- **Too small (e.g., 0.001)**: trend is nearly a single straight line — misses real growth accelerations or decelerations. Forecast will be too rigid, especially in volatile series.
+- **Too large (e.g., 0.5)**: trend snakes through every fluctuation in the training set — absorbs noise as trend, producing wild out-of-sample extrapolations.
+- **Sweet spot**: cross-validate using \`prophet.diagnostics.cross_validation()\` and minimize MAE or MAPE on held-out windows.
+
+You can also explicitly specify changepoint locations with \`changepoints=['2022-01-01', '2023-06-01']\` when you know a major event caused a permanent shift (e.g., product launch, market entry).
+
+### Fourier Series Seasonality
+
+For a seasonality with period \`P\` days, Prophet adds \`2N\` features to the regression — \`N\` sine terms and \`N\` cosine terms:
+
+\`\`\`
+seasonality(t) = Σ (a_n * sin(2πnt/P) + b_n * cos(2πnt/P))  for n=1..N
+\`\`\`
+
+The \`fourier_order\` N controls smoothness. Prophet defaults: yearly seasonality N=10, weekly N=3. Increasing N lets the model capture sharper intra-week or intra-year patterns but increases overfitting risk when training data is short.
+
+For sub-daily seasonality (hourly data), set \`daily_seasonality=True\` or add a custom 1-day period — but be aware this adds 14 extra features and can overfit dramatically on sparse data.
+
+### Avoiding Common Tuning Mistakes
+
+| Symptom | Likely Cause | Fix |
+|---|---|---|
+| Forecast curves unrealistically up/down | changepoint_prior_scale too high | Lower to 0.01–0.05 |
+| Trend misses obvious bend in history | changepoint_prior_scale too low | Raise to 0.1–0.3 |
+| Seasonality too spiky | fourier_order too high | Reduce N |
+| Confidence intervals too narrow | interval_width default 0.80 too tight | Set 0.90 or 0.95 |
+
+Use \`cross_validation(model, initial='730 days', period='90 days', horizon='180 days')\` to objectively compare configurations across rolling forecast windows before committing to a production tuning.
+`,
+  tryGuidance: "Use the interactive visualization to see how each Prophet component — trend, weekly seasonality, annual seasonality, and holiday effects — contributes to the final forecast. Adjust the changepoint prior scale slider to observe how it controls trend flexibility, and toggle individual components on and off to understand additive decomposition.",
+  interviewGraph: {
+    initialStageId: "click_bug",
+    artifactDimensions: [
+      { label: "Prophet Configuration", recoveryStageId: "prophet_recovery" },
+      { label: "Seasonality Modeling", recoveryStageId: "seasonal_recovery" },
+    ],
+    stages: {
+      click_bug: {
+        id: "click_bug",
+        type: "click_target",
+        badge: "Stage 1",
+        title: "Stage 1 · Spot the Prophet Bug",
+        prompt: "You're reviewing a colleague's Prophet forecasting code. There are two issues: one will cause an immediate runtime error, and one will cause overfitting. Click the most critical bug — the one that will crash the model before any forecast is produced.",
+        code_snippet: `from prophet import Prophet
+import pandas as pd
+
+df = pd.read_csv('daily_sales.csv')
+# df has 'date' and 'revenue' columns
+
+model = Prophet(
+    yearly_seasonality=True,
+    weekly_seasonality=True,
+    daily_seasonality=True,    # -- ds-target:daily_seasonality
+)
+model.fit(df)                  # -- ds-target:wrong_column_names
+
+future = model.make_future_dataframe(periods=90)
+forecast = model.predict(future)`,
+        validationCopy: {
+          daily_seasonality: "Close — daily_seasonality=True on daily data does cause overfitting, but it won't crash the model. The crash happens at model.fit(df) because Prophet requires columns named 'ds' and 'y', but this dataframe has 'date' and 'revenue'. Click the model.fit() line.",
+          wrong_column_names: "Correct! Prophet requires the dataframe to have exactly two columns: 'ds' (the date column) and 'y' (the target column). Since this dataframe has 'date' and 'revenue', model.fit(df) will raise a KeyError immediately. You must rename the columns before fitting.",
         },
-        sp_t3_rec1: {
-          id: "sp_t3_rec1",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Prophet Mechanics",
-          prompt: "Prophet's seasonality uses Fourier series. What does increasing the fourier_order parameter do?",
-          choices: [
-            { id: "a", label: "Allows more flexible (complex) seasonal shapes at the risk of overfitting", description: "More Fourier terms = more wiggles = more flexibility" },
-            { id: "b", label: "Extends the forecast horizon", description: "Fourier order controls shape, not horizon" },
-            { id: "c", label: "Forces the seasonal pattern to be the same each period", description: "Same effect regardless of order" },
-            { id: "d", label: "Makes seasonality additive instead of multiplicative", description: "seasonality_mode controls additive vs multiplicative" },
-          ],
-          branches: { a: "sp_t3_stage2", b: "sp_t3_stage2", c: "sp_t3_stage2", d: "sp_t3_stage2" },
-          rationale: "Fourier series approximates any periodic function as a sum of sine and cosine waves. Higher fourier_order = more terms = more complex seasonal shapes. Default is 10 for yearly, 3 for weekly. Too high → overfitting to noise in seasonal pattern.",
+        branches: {
+          daily_seasonality: "prophet_recovery",
+          wrong_column_names: "fix_columns",
         },
-        sp_t3_stage2: {
-          id: "sp_t3_stage2",
-          type: "scenario_choice",
-          badge: "Stage 2",
-          title: "Stage 2 · Prophet vs ML",
-          prompt: "Forecasting 50,000 retail SKU-store combinations for 28-day horizon. You have rich features: price history, promotions, holidays, local weather, and neighboring store sales. What approach wins?",
-          choices: [
-            { id: "a", label: "LightGBM global model with lag + rolling features", description: "ML handles many series + rich features; won the M5 competition" },
-            { id: "b", label: "Run 50,000 separate Prophet models", description: "Doesn't use cross-series patterns; extremely slow; ignores feature interactions" },
-            { id: "c", label: "ARIMA for each SKU-store combination", description: "50,000 ARIMA models × automated fitting = days of compute, no feature usage" },
-            { id: "d", label: "Simple moving average of last 28 days", description: "Ignores promotions, seasonality, and all external features" },
-          ],
-          branches: { a: "sp_t3_end", b: "sp_t3_rec2", c: "sp_t3_rec2", d: "sp_t3_rec2" },
-          rationale: "At 50K series with rich feature sets, global ML (LightGBM/XGBoost) dominates: (1) shares information across series, (2) naturally incorporates external features, (3) scales efficiently. The M5 Walmart competition winner used ~2000 LightGBM features. Prophet and ARIMA work per-series and can't use cross-series signals.",
-        },
-        sp_t3_rec2: {
-          id: "sp_t3_rec2",
-          type: "scenario_choice",
-          badge: "Recovery",
-          title: "Recovery · Model Selection",
-          prompt: "A small bakery wants to forecast daily bread sales for next month using 2 years of daily data. No external features. What's the best approach?",
-          choices: [
-            { id: "a", label: "Prophet — handles daily + weekly + yearly seasonality with holidays out of the box", description: "Exactly the use case Prophet was designed for" },
-            { id: "b", label: "Transformer model — state of the art for time series", description: "Transformers need large datasets; 2 years of daily = 730 points — not enough" },
-            { id: "c", label: "LightGBM with engineered lag features", description: "Valid but overkill for a single series with no external features" },
-            { id: "d", label: "LSTM with 100 epochs", description: "Deep learning needs more data and is harder to tune for this simple case" },
-          ],
-          branches: { a: "sp_t3_end", b: "sp_t3_end", c: "sp_t3_end", d: "sp_t3_end" },
-          rationale: "Prophet is ideal here: ~730 data points, strong weekly and yearly seasonality (bakery sales), interpretable output, and easy holiday integration. Transformers and LSTMs need more data. LightGBM would work but Prophet requires less feature engineering for a single series.",
-        },
-        sp_t3_end: {
-          id: "sp_t3_end",
-          type: "scenario_choice",
-          badge: "Complete",
-          title: "Modern Forecasting Mastered",
-          prompt: "Your Prophet model performs well in backtesting but poorly in live production. Traffic in the last 3 months is structurally different from the training period (post-pandemic normalization). What do you do?",
-          choices: [
-            { id: "a", label: "Set a cutoff date and retrain only on recent data, or use change-point detection", description: "Structural breaks require either retraining from the break or explicit changepoints" },
-            { id: "b", label: "Increase the forecast horizon to smooth out the anomaly", description: "Longer horizon doesn't fix a structural break in the training data" },
-            { id: "c", label: "Add more Fourier terms to capture the new pattern", description: "More Fourier terms address seasonal shape, not structural level shifts" },
-            { id: "d", label: "Switch to ARIMA which handles structural breaks automatically", description: "ARIMA doesn't automatically handle structural breaks either" },
-          ],
-          branches: { a: "sp_t3_end", b: "sp_t3_end", c: "sp_t3_end", d: "sp_t3_end" },
-          terminal: true,
-          rationale: "Structural breaks invalidate historical patterns. Solutions: (1) retrain on post-break data only, (2) add the break as a changepoint in Prophet (changepoints parameter), (3) use robust models with rolling windows. Monitoring for distribution shift and automatic retraining are essential MLOps practices for forecasting in production.",
-        },
+      },
+      prophet_recovery: {
+        id: "prophet_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Prophet Column Requirements",
+        prompt: "Prophet's model.fit(df) crashes with a KeyError. The dataframe was loaded from a CSV with columns 'date' and 'revenue'. Which of the following correctly fixes the issue so Prophet can fit the model?",
+        choices: [
+          { id: "a", label: "df.rename(columns={'date': 'ds', 'revenue': 'y'}, inplace=True) before calling model.fit(df)", description: "Rename the columns to the names Prophet requires" },
+          { id: "b", label: "Prophet automatically maps columns by their data types — no renaming needed", description: "Prophet detects date columns and numeric columns automatically" },
+          { id: "c", label: "Pass column_ds='date', column_y='revenue' as constructor arguments to Prophet()", description: "Specify alternate column names in the Prophet constructor" },
+        ],
+        branches: { a: "fix_columns", b: "prophet_recovery", c: "prophet_recovery" },
+        rationale: "Prophet has a hard requirement: the input dataframe must have a column named exactly 'ds' containing timestamps and a column named exactly 'y' containing the numeric target. There are no constructor arguments to override this — you must rename the columns before calling model.fit(). Option (a) is correct.",
+      },
+      fix_columns: {
+        id: "fix_columns",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Changepoint Prior Scale",
+        prompt: "After fixing the column names, you fit a Prophet model on 3 years of daily revenue data. When you plot the trend component, you notice it snakes through every short-term fluctuation in the training set — it even captures a one-week dip caused by a server outage as if it were a permanent trend change. Which adjustment should you make?",
+        choices: [
+          { id: "a", label: "Increase changepoint_prior_scale from 0.05 to 0.5 to give the model more trend flexibility", description: "Higher scale allows more aggressive trend changes" },
+          { id: "b", label: "Decrease changepoint_prior_scale from 0.05 to 0.01 to regularize the trend more strongly", description: "Lower scale shrinks changepoint magnitudes toward zero" },
+          { id: "c", label: "Set n_changepoints=0 to disable automatic changepoint detection entirely", description: "Eliminate all changepoints so the trend is a single straight line" },
+          { id: "d", label: "Set growth='logistic' instead of linear to constrain the trend shape", description: "Logistic growth imposes a saturation ceiling on the trend" },
+        ],
+        branches: { a: "seasonal_recovery", b: "holiday_effects", c: "seasonal_recovery", d: "seasonal_recovery" },
+        rationale: "The symptom — trend snaking through every short-term fluctuation — is classic **overfitting of the trend**, caused by changepoint_prior_scale being too permissive. The fix is to **decrease** it (option b), which increases regularization and shrinks the magnitudes of spurious changepoints toward zero. Increasing it (a) makes the problem worse. Setting n_changepoints=0 (c) is too aggressive and would miss real trend shifts. Logistic growth (d) addresses saturation, not overfitting.",
+      },
+      seasonal_recovery: {
+        id: "seasonal_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Seasonality Tuning",
+        prompt: "Your Prophet model's seasonality component looks jagged and noisy — it's fitting sharp spikes within each week rather than a smooth pattern. Which approach is most likely to fix this?",
+        choices: [
+          { id: "a", label: "Increase fourier_order for weekly seasonality to capture more detail", description: "More Fourier terms gives the model more expressive power" },
+          { id: "b", label: "Decrease fourier_order or reduce seasonality_prior_scale to smooth the seasonality", description: "Fewer Fourier terms or stronger regularization smooths the pattern" },
+          { id: "c", label: "Disable weekly_seasonality entirely and rely only on yearly_seasonality", description: "Remove the problematic seasonality component" },
+        ],
+        branches: { a: "holiday_effects", b: "holiday_effects", c: "holiday_effects" },
+        rationale: "Jagged, noisy seasonality components indicate overfitting — the model is using too many Fourier terms or has weak regularization. Reducing fourier_order or lowering seasonality_prior_scale both increase smoothing. Disabling the seasonality entirely (c) throws away real signal. Increasing fourier_order (a) makes the problem worse.",
+      },
+      holiday_effects: {
+        id: "holiday_effects",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Modeling Holiday Spikes",
+        prompt: "You're forecasting daily e-commerce revenue. Black Friday and Cyber Monday cause massive one-day spikes each November. Your Prophet model with yearly_seasonality=True is still significantly underestimating these days. What is the best way to capture these effects?",
+        choices: [
+          { id: "a", label: "Increase yearly_seasonality fourier_order so the annual Fourier series can model the sharp November spikes", description: "More Fourier terms to capture the spike shape" },
+          { id: "b", label: "Add a custom holiday DataFrame with 'holiday', 'ds', 'lower_window', and 'upper_window' columns", description: "Use Prophet's built-in holiday effect feature" },
+          { id: "c", label: "Add a binary external regressor column for Black Friday and Cyber Monday dates", description: "Use add_regressor() to include a manual indicator feature" },
+          { id: "d", label: "Switch to ARIMA with a transfer function for holiday indicators", description: "Use a different modeling framework" },
+        ],
+        branches: { a: "seasonal_recovery", b: "uncertainty_stage", c: "uncertainty_stage", d: "seasonal_recovery" },
+        rationale: "Fourier series (a) model smooth, periodic patterns — they cannot capture one-off spikes that are sharp and irregular. The correct Prophet-native approach is option (b): pass a holiday DataFrame that explicitly tells the model which dates are special and how many surrounding days to include. Option (c) using add_regressor() also works but requires more manual setup. Option (b) is the idiomatic, recommended Prophet approach.",
+      },
+      uncertainty_stage: {
+        id: "uncertainty_stage",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Uncertainty Intervals",
+        prompt: "Your product manager sees a forecast with very narrow confidence bands and confidently commits to inventory orders based on it. Later, actual demand falls outside the predicted interval on 40% of days — far more than expected for an 80% interval. What is the most likely cause?",
+        choices: [
+          { id: "a", label: "The interval_width was left at the default 0.80, which means 20% of days are expected to fall outside by design — 40% suggests model misspecification", description: "Question the model's calibration, not just the interval width setting" },
+          { id: "b", label: "Prophet's uncertainty intervals are always correctly calibrated — the issue must be with the data preprocessing", description: "Trust the intervals and look elsewhere" },
+          { id: "c", label: "Increase interval_width to 0.99 to ensure nearly all days fall inside the bands", description: "Make the intervals wider to cover more outcomes" },
+        ],
+        branches: { a: "prophet_vs_arima", b: "seasonal_recovery", c: "prophet_vs_arima" },
+        rationale: "An 80% interval should have about 20% of actual values fall outside — so 40% exceedance is a clear sign of **model misspecification or underestimated uncertainty**, not just a narrow interval setting. The right response is to investigate whether key drivers are missing (seasonality, holidays, external regressors) and to use cross_validation() to check calibration empirically. Simply widening to 0.99 (c) hides the problem rather than solving it.",
+      },
+      prophet_vs_arima: {
+        id: "prophet_vs_arima",
+        type: "scenario_choice",
+        badge: "Stage 5",
+        title: "Stage 5 · Prophet vs. ARIMA",
+        prompt: "An interviewer asks: 'You have 18 months of hourly server CPU utilization data, sampled every minute. You need to forecast the next 4 hours for autoscaling decisions. Should you use Prophet or ARIMA?'",
+        choices: [
+          { id: "a", label: "Prophet — it handles multiple seasonality periods (hourly, daily) and is easier to configure", description: "Use Prophet's multi-period seasonality support" },
+          { id: "b", label: "ARIMA (or SARIMA) — high-frequency data with complex autocorrelation is ARIMA's core strength, and short-horizon precision matters most", description: "Use the method designed for this data type" },
+          { id: "c", label: "Both produce identical results for this use case — choose based on team preference", description: "The choice is purely organizational" },
+          { id: "d", label: "Neither — high-frequency autoscaling forecasts require deep learning (LSTM or Transformer)", description: "Deep learning is always superior for complex time series" },
+        ],
+        branches: { a: "seasonal_recovery", b: "terminal_stage", c: "seasonal_recovery", d: "seasonal_recovery" },
+        rationale: "ARIMA (option b) is the right choice here. The data is high-frequency (minutely), the horizon is short (4 hours), and autocorrelation structure — what happens in the last few minutes strongly predicts the next few minutes — is the dominant signal. Prophet excels at daily/weekly business KPIs with human-scale seasonality and holiday effects, not high-frequency operational metrics where milliseconds of lag matter. Deep learning (d) can work but is far heavier than needed for a 4-hour horizon.",
+      },
+      terminal_stage: {
+        id: "terminal_stage",
+        type: "scenario_choice",
+        badge: "Stage 6",
+        title: "Stage 6 · Decomposition Interpretation",
+        prompt: "After running Prophet on a year of weekly app downloads, you call model.plot_components(forecast). The yearly seasonality component shows a strong positive peak every August and a negative trough every January. What does this tell you, and how would you act on it?",
+        choices: [
+          { id: "a", label: "August downloads are driven by the trend, not seasonality — the components are mixed together", description: "Decomposition separates trend from seasonality" },
+          { id: "b", label: "There is a repeating annual pattern: summer peaks and January slumps independent of trend — useful for campaign planning and inventory decisions", description: "Interpret the seasonal component as a standalone insight" },
+          { id: "c", label: "The seasonality component is unreliable with only 1 year of data — at least 3 years are needed to trust annual seasonality estimates", description: "Question the data sufficiency" },
+          { id: "d", label: "You should disable yearly_seasonality and re-fit since the pattern is too obvious to need modeling", description: "Remove the component that shows a clear pattern" },
+        ],
+        branches: { a: "terminal_stage", b: "terminal_stage", c: "terminal_stage", d: "terminal_stage" },
+        terminal: true,
+        rationale: "Option (b) is the correct interpretation. The \`plot_components()\` output separates the trend from the seasonality, so a summer peak in the yearly seasonality component tells you that — **holding trend constant** — downloads are systematically higher in August. This is exactly the kind of actionable insight Prophet is designed to surface for business planning. Option (c) raises a fair concern (more data improves seasonal estimates), but it's not a reason to distrust the pattern — it's a reason to widen the uncertainty interval. Disabling a well-identified seasonal component (d) would actively harm forecast accuracy.",
       },
     },
-
-    knowledgeCheck: [
-      {
-        question: "Prophet uses 'changepoints' in its trend model. What are changepoints?",
-        options: [
-          "Dates when the seasonal pattern resets to zero",
-          "Points in time where the trend growth rate is allowed to change",
-          "Outlier dates that are excluded from the model",
-          "The future dates for which forecasts are generated",
-        ],
-        correctIndex: 1,
-        explanation: "Changepoints are dates where the trend slope is allowed to change abruptly — e.g., a new product launch changes the growth rate. Prophet automatically detects likely changepoints from the training data. changepoint_prior_scale controls how flexible the trend is: higher values = more changepoints = more flexible but potentially overfit trend.",
-      },
-      {
-        question: "What is cross-validation in the context of time series, and why can't you use standard k-fold CV?",
-        options: [
-          "Standard k-fold is fine for time series; temporal ordering doesn't matter",
-          "Time series CV uses expanding or sliding windows to preserve temporal order; k-fold would let future data train past predictions",
-          "Cross-validation isn't applicable to time series — use AIC instead",
-          "You must hold out the last 20% as a test set; no CV needed",
-        ],
-        correctIndex: 1,
-        explanation: "Standard k-fold randomly assigns data to folds, so future values can appear in the training set — creating data leakage. Time series CV uses walk-forward validation: train on data up to time t, test on t+1 to t+h, then expand the window. Prophet has built-in cross_validation() that implements this correctly.",
-      },
-    ],
   },
+  knowledgeCheck: [
+    {
+      question: "You load a CSV with columns 'timestamp' and 'sales_usd' and pass it directly to Prophet's model.fit(). What happens?",
+      options: [
+        "Prophet automatically detects the date column by its data type and fits successfully",
+        "Prophet raises a KeyError because it requires columns named exactly 'ds' and 'y'",
+        "Prophet fits but silently uses the wrong columns, producing garbage forecasts",
+        "Prophet renames the columns internally before fitting",
+      ],
+      correctIndex: 1,
+      explanation: "Prophet has a hard requirement: the input dataframe must have a column named 'ds' (the timestamp column) and a column named 'y' (the numeric target). If these columns are missing, model.fit() raises a KeyError immediately. You must rename the columns — e.g., df.rename(columns={'timestamp': 'ds', 'sales_usd': 'y'}) — before calling fit().",
+    },
+    {
+      question: "A Prophet model's trend component is snaking through every short-term fluctuation in training data, including a one-week dip caused by a data pipeline outage. Which change is most appropriate?",
+      options: [
+        "Increase changepoint_prior_scale from 0.05 to 0.5 to capture more trend changes",
+        "Decrease changepoint_prior_scale from 0.05 to 0.001 to strongly regularize the trend",
+        "Set n_changepoints=0 to remove all automatic changepoint detection",
+        "Switch to logistic growth to impose a saturation ceiling",
+      ],
+      correctIndex: 1,
+      explanation: "Snaking trend = overfitting caused by changepoint_prior_scale being too high. Decreasing it (e.g., to 0.001–0.01) applies stronger regularization, shrinking spurious changepoint magnitudes toward zero. Setting n_changepoints=0 is too aggressive — it forces a single straight-line trend and would miss real shifts. Logistic growth addresses saturation, not overfitting.",
+    },
+    {
+      question: "You need to forecast hourly server traffic for the next 6 hours for an autoscaling system. Accuracy and low latency matter most. Which approach is most appropriate?",
+      options: [
+        "Facebook Prophet with daily_seasonality=True and hourly_seasonality=True",
+        "ARIMA or SARIMA — high-frequency data with strong autocorrelation is its core strength",
+        "Prophet with add_country_holidays() to account for traffic dips on public holidays",
+        "Either approach produces equivalent results — choose based on team familiarity",
+      ],
+      correctIndex: 1,
+      explanation: "ARIMA/SARIMA is the right choice for high-frequency, short-horizon forecasting where autocorrelation is the dominant signal. What happened in the last few minutes is the strongest predictor of the next few minutes — and ARIMA explicitly models this. Prophet is designed for daily/weekly business KPIs with multi-period seasonality and holiday effects, not minutely operational metrics where short-horizon precision is critical.",
+    },
+  ],
+},
 
   "sp-t4": {
     durationLabel: "16 min",
