@@ -390,7 +390,7 @@ function CallBinderMode() {
       </SectionFrame>
 
       <SectionFrame title="TOKEN PALETTE · click to append">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginTop: 8 }}>
+        <div className="ds-g3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginTop: 8 }}>
           {TOKEN_GROUPS.map((g) => (
             <div
               key={g.title}
@@ -553,7 +553,7 @@ function MutableDefaultMode() {
   return (
     <div>
       <SectionFrame title="THE TWO VERSIONS">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8 }}>
+        <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8 }}>
           <div
             onClick={() => { setVariant("buggy"); setCalls([]); }}
             style={{

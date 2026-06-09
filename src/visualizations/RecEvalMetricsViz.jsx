@@ -95,7 +95,7 @@ export default function RecEvalMetricsViz() {
       </div>
 
       {/* ── Group headers ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+      <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
         {/* Accuracy metrics */}
         <div>
           <div

@@ -378,7 +378,7 @@ function RaceTab() {
       </div>
 
       {/* Side-by-side race panels */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+      <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
         {/* Loop panel */}
         <div style={{ padding: "12px 14px", borderRadius: 14, border: "1px solid rgba(248,113,113,0.2)", background: "rgba(248,113,113,0.04)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
@@ -518,7 +518,7 @@ function AntiPatternsTab() {
             {isOpen && (
               <div style={{ marginTop: 14 }}>
                 {/* Code side by side */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+                <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
                   <div>
                     <SectionLabel>Bad — slow</SectionLabel>
                     <CodeBlock code={ap.bad} bad />

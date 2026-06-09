@@ -497,7 +497,7 @@ function LSTMTab() {
       </div>
 
       {/* Gate cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+      <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
         {LSTM_GATES.map((gate) => {
           const isActive = activeGate === gate.id;
           return (

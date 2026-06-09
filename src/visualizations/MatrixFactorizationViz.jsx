@@ -436,7 +436,7 @@ export default function MatrixFactorizationViz() {
       </div>
 
       {/* Bottom explanation */}
-      <div
+      <div className="ds-g3"
         style={{
           marginTop: 12,
           display: "grid",

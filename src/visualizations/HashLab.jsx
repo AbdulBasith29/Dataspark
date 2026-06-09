@@ -536,7 +536,7 @@ function AlgebraMode() {
   return (
     <div>
       {/* A & B builders */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+      <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
         <SetBuilder
           name="A"
           color="#60A5FA"

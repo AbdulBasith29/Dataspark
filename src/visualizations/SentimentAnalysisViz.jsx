@@ -490,7 +490,7 @@ export default function SentimentAnalysisViz() {
       </div>
 
       {/* Three approach panels */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 24 }}>
+      <div className="ds-g3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 24 }}>
 
         {/* ── Panel 1: VADER ── */}
         <div style={{

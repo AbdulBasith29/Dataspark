@@ -186,7 +186,7 @@ function ProtocolMode() {
       </div>
 
       {/* Yielded tray + state log */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 14 }}>
+      <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 14 }}>
         <SectionFrame title="YIELDED · what next() has returned" tone={state.yielded.length ? "ok" : "neutral"}>
           {state.yielded.length === 0 ? (
             <div style={{ marginTop: 6, fontSize: 12, color: DS.dim, fontFamily: "var(--ds-mono), monospace" }}>
@@ -291,7 +291,7 @@ function PipelineMode() {
   return (
     <div>
       {/* Pipeline configurator */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
+      <div className="ds-g3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
         <StagePicker
           label="STAGE 1 · filter"
           options={FILTERS}
@@ -396,7 +396,7 @@ out      = list(islice(mapped, ${takeN}))`}
       )}
 
       {/* Memory bookkeeping */}
-      <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div className="ds-g2" style={{ marginTop: 14, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <SectionFrame title="MEMORY IN FLIGHT" tone={eager ? "danger" : "ok"}>
           <div style={{ marginTop: 6, fontSize: 12, color: DS.t2, fontFamily: "var(--ds-mono), monospace", lineHeight: 1.7 }}>
             {eager ? (
@@ -446,7 +446,7 @@ function LazyPipeline({ events, visible, lastEvent, finished, tick, totalYielded
   return (
     <div style={{ marginTop: 14 }}>
       <SectionFrame title="LAZY PIPELINE · one item at a time" tone="neutral">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginTop: 8 }}>
+        <div className="ds-g3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginTop: 8 }}>
           <StageBox
             label="filter"
             doc={filter.doc}

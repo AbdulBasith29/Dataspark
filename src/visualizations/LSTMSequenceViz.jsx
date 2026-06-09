@@ -262,7 +262,7 @@ export default function LSTMSequenceViz() {
       </div>
 
       {/* Main card: diagram + detail */}
-      <div style={{
+      <div className="ds-g2" style={{
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
         gap: 16,

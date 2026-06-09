@@ -406,7 +406,7 @@ export default function ComprehensionForge() {
       </div>
 
       {/* Side-by-side: comprehension vs for-loop */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+      <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
         <CodeBlock label="comprehension" color="#34D399" code={comp} />
         <CodeBlock label="equivalent for-loop" color={DS.t3} code={forLoop} />
       </div>

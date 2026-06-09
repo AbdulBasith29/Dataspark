@@ -170,7 +170,7 @@ export default function StatTypeErrorsViz() {
           </div>
 
           {/* 2x2 matrix */}
-          <div
+          <div className="ds-g2"
             style={{
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
@@ -180,7 +180,7 @@ export default function StatTypeErrorsViz() {
             }}
           >
             {/* column headers */}
-            <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+            <div className="ds-g2" style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
               {["Fail to Reject H₀", "Reject H₀"].map((h) => (
                 <div key={h} style={{ textAlign: "center", fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace", paddingBottom: 4 }}>
                   {h}
@@ -370,7 +370,7 @@ export default function StatTypeErrorsViz() {
               <div style={{ fontSize: 14, fontWeight: 700, color: DS.t1, marginBottom: 10, fontFamily: "var(--ds-sans), sans-serif" }}>
                 {activeScenario.icon} {activeScenario.label}
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+              <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
                 <div style={{ background: "rgba(248,113,113,0.07)", border: "1px solid rgba(248,113,113,0.3)", borderRadius: 8, padding: "8px 10px" }}>
                   <div style={{ fontSize: 10, color: "rgba(248,113,113,0.8)", fontFamily: "var(--ds-mono), monospace", marginBottom: 4 }}>TYPE I COST (False Alarm)</div>
                   <div style={{ fontSize: 11, color: DS.t2, lineHeight: 1.5 }}>{activeScenario.typeICost}</div>

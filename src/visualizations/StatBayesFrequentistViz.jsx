@@ -169,7 +169,7 @@ export default function StatBayesFrequentistViz() {
 
       {/* Tab: Side-by-side comparison */}
       {tab === "compare" && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {/* Frequentist */}
           <div style={{ ...CARD }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: DS.ind, ...SANS, marginBottom: 10 }}>Frequentist</div>
@@ -266,7 +266,7 @@ export default function StatBayesFrequentistViz() {
             <span>p = 100%</span>
           </div>
 
-          <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 10, ...MONO }}>
+          <div className="ds-g2" style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 10, ...MONO }}>
             <div style={{ color: DS.t3 }}>
               <span style={{ display: "inline-block", width: 10, height: 10, background: "rgba(129,140,248,0.3)", borderRadius: 2, marginRight: 4 }} />
               Prior: {prior.label}
@@ -287,7 +287,7 @@ export default function StatBayesFrequentistViz() {
       {/* Tab: Key differences */}
       {tab === "differences" && (
         <div style={{ display: "grid", gap: 12 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <div style={{ ...CARD }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: DS.ind, ...SANS, marginBottom: 8 }}>Frequentist</div>
               <ul style={{ fontSize: 10, color: DS.t3, ...MONO, lineHeight: 1.8, margin: 0, paddingLeft: 16 }}>
@@ -314,7 +314,7 @@ export default function StatBayesFrequentistViz() {
 
           <div style={{ ...CARD }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: DS.t2, ...SANS, marginBottom: 8 }}>Confidence vs Credible intervals</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 10, ...MONO }}>
+            <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 10, ...MONO }}>
               <div style={{ lineHeight: 1.7, color: DS.t3 }}>
                 <strong style={{ color: DS.ind }}>95% Confidence interval:</strong><br />
                 "95% of intervals built by this procedure will contain the true θ."<br />

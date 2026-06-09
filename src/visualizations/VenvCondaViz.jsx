@@ -164,7 +164,7 @@ export default function VenvCondaViz() {
         </div>
 
         {/* two columns: code block + facts */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+        <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
           {/* setup code block */}
           <div>
             <div style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6, letterSpacing: "0.05em" }}>

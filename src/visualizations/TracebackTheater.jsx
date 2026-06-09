@@ -224,7 +224,7 @@ function TryRouterMode() {
 
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+      <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
         <SectionFrame title="WHAT HAPPENS INSIDE try" tone="neutral">
           <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 8 }}>
             {TRY_ACTIONS.map((a) => (

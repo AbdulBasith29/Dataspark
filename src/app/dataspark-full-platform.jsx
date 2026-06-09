@@ -1665,6 +1665,8 @@ export default function DataSparkPlatform() {
         @media (max-width: 640px) {
           .ds-nav { flex-wrap: wrap !important; padding: 8px 16px 6px !important; gap: 6px !important; }
           .ds-nav-right { max-width: 100% !important; width: 100%; padding-bottom: 4px; }
+          .ds-g2 { grid-template-columns: 1fr !important; }
+          .ds-g3 { grid-template-columns: 1fr !important; }
         }
       `}</style>
 

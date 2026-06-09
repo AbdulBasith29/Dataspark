@@ -273,7 +273,7 @@ export default function SQLStarSnowflakeViz() {
       </div>
 
       {/* Query comparison */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         {Object.entries(QUERIES).map(([key, q]) => {
           const isActive = key === schema;
           const qColor = key === "star" ? DIM_COLOR : SUB_DIM_COLOR;
@@ -320,7 +320,7 @@ export default function SQLStarSnowflakeViz() {
         gap: 6,
       }}>
         <div style={{ fontSize: 11, color: DS.ind, fontFamily: "var(--ds-mono), monospace", fontWeight: 700, letterSpacing: "0.1em" }}>TRADE-OFF SUMMARY</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, color: DIM_COLOR, marginBottom: 4 }}>Star Schema</div>
             <ul style={{ margin: 0, padding: "0 0 0 16px", color: DS.t3, fontSize: 12, lineHeight: 1.7 }}>

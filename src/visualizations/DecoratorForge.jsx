@@ -718,7 +718,7 @@ function DecoratorLayers() {
           Pick at least one decorator above to see the code and execution trace.
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
           {/* Left: Python code */}
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <PyCodePanel stack={stack} />
@@ -988,7 +988,7 @@ function ContextManagerLifecycle() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+      <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         {/* Left: code preview + path toggle */}
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {/* Code */}

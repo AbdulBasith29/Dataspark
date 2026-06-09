@@ -455,7 +455,7 @@ export default function ChunkingStrategyViz() {
       </div>
 
       {/* Stats Row */}
-      <div
+      <div className="ds-g3"
         style={{
           display: "grid",
           gridTemplateColumns: "1fr 1fr 1fr",
@@ -508,7 +508,7 @@ export default function ChunkingStrategyViz() {
       </div>
 
       {/* Pros / Cons Panel */}
-      <div
+      <div className="ds-g2"
         style={{
           display: "grid",
           gridTemplateColumns: "1fr 1fr",

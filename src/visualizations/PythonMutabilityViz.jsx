@@ -25,7 +25,7 @@ export default function PythonMutabilityViz() {
       <p style={{ fontSize: 12, color: DS.t3, fontFamily: "var(--ds-mono)", lineHeight: 1.55, marginBottom: 16 }}>
         Lists are mutable — methods like <code style={{ color: DS.ind }}>.append()</code> change the object in place. Tuples are fixed sequences; &quot;changing&quot; one means making a new tuple.
       </p>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+      <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
         <div style={codeStyle}>
           <div style={{ fontSize: 9, color: DS.grn, letterSpacing: 1.2, marginBottom: 8 }}>LIST</div>
           <div style={{ color: DS.ind }}>a</div> = {JSON.stringify(listA)}
