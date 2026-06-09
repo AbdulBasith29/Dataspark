@@ -43592,7 +43592,7 @@ blended = 0.7 * cf_score + 0.3 * cb_score`,
         ],
         branches: {
           a: "hybrid_recovery",
-          b: "spr3_hybrid_choice",
+          b: "spr3_ncf_choice",
           c: "hybrid_recovery",
           d: "hybrid_recovery",
         },
