@@ -127,12 +127,32 @@ import ProgressArtifactCard from "../components/platform/ProgressArtifactCard.js
 import LiveRegion from "../components/platform/LiveRegion.jsx";
 
 const PlatformLogo = () => (
-  <svg width="26" height="26" viewBox="0 0 40 40" fill="none" style={{ display: "block", flexShrink: 0 }}>
-    <circle cx="20" cy="8" r="4" fill={DS.ind} /><circle cx="10" cy="30" r="4" fill={DS.grn} />
-    <circle cx="30" cy="30" r="4" fill={DS.ind} /><circle cx="20" cy="20" r="4.5" fill={DS.t2} />
-    <line x1="20" y1="8" x2="20" y2="20" stroke={DS.ind} strokeWidth="2" opacity=".5" />
-    <line x1="10" y1="30" x2="20" y2="20" stroke={DS.grn} strokeWidth="2" opacity=".5" />
-    <line x1="30" y1="30" x2="20" y2="20" stroke={DS.ind} strokeWidth="2" opacity=".5" />
+  <svg width="26" height="26" viewBox="0 0 32 32" fill="none" style={{ display: "block", flexShrink: 0 }}>
+    <defs>
+      <radialGradient id="pl-bg" cx="40%" cy="25%" r="75%">
+        <stop offset="0%" stopColor="#1e1b4b" />
+        <stop offset="100%" stopColor="#07081a" />
+      </radialGradient>
+      <radialGradient id="pl-peak" cx="35%" cy="35%" r="65%">
+        <stop offset="0%" stopColor="#e0e7ff" />
+        <stop offset="100%" stopColor="#818CF8" />
+      </radialGradient>
+      <filter id="pl-glow" x="-100%" y="-100%" width="300%" height="300%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="2.2" result="blur" />
+        <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+      </filter>
+    </defs>
+    <rect width="32" height="32" rx="7.5" fill="url(#pl-bg)" />
+    <ellipse cx="16" cy="1.5" rx="12" ry="5" fill="rgba(129,140,248,0.1)" />
+    <rect x="0.5" y="0.5" width="31" height="31" rx="7" fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="1" />
+    <line x1="7.5" y1="24.5" x2="24.5" y2="9" stroke="rgba(129,140,248,0.28)" strokeWidth="1.5" strokeLinecap="round" />
+    <circle cx="7.5" cy="24.5" r="2" fill="#4F46E5" opacity="0.7" />
+    <circle cx="16" cy="16.75" r="2.5" fill="#6366F1" opacity="0.88" />
+    <circle cx="24.5" cy="9" r="5.5" fill="rgba(129,140,248,0.18)" filter="url(#pl-glow)" />
+    <circle cx="24.5" cy="9" r="3" fill="url(#pl-peak)" filter="url(#pl-glow)" />
+    <line x1="25.5" y1="3.5" x2="25.5" y2="6" stroke="rgba(224,231,255,0.85)" strokeWidth="1.2" strokeLinecap="round" />
+    <line x1="24.25" y1="4.75" x2="26.75" y2="4.75" stroke="rgba(224,231,255,0.85)" strokeWidth="1.2" strokeLinecap="round" />
+    <circle cx="25.5" cy="4.75" r="0.8" fill="white" />
   </svg>
 );
 
