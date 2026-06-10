@@ -5167,7 +5167,38 @@ HAVING status = 'completed' AND SUM(total_amount) > 1000;`,
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "In SQL's logical order of execution, which clause is evaluated first?",
+        options: [
+          "FROM — the engine resolves table sources before anything else",
+          "SELECT — you write it first so it runs first",
+          "WHERE — filtering must happen before columns are chosen",
+        ],
+        correctIndex: 0,
+        explanation: "FROM (and any JOINs) is resolved first — the engine needs to know which rows exist before it can filter, group, or project columns. SELECT runs sixth, which is why you cannot reference a SELECT alias in WHERE.",
+      },
+      {
+        question: "You alias a DATE_TRUNC expression as sale_month in SELECT and reference it in WHERE. Why does the query fail?",
+        options: [
+          "SELECT runs after WHERE, so the alias does not exist when WHERE is evaluated",
+          "DATE_TRUNC returns a timestamp and WHERE requires a string",
+          "Aliases must be upper-case to be visible in WHERE",
+        ],
+        correctIndex: 0,
+        explanation: "SELECT is evaluated after WHERE in logical order. The alias only exists in SELECT output — WHERE executes before SELECT runs and sees an unrecognised identifier. Use a CTE or subquery to reference the computed value in a filter.",
+      },
+      {
+        question: "Why does HAVING exist as a separate clause from WHERE?",
+        options: [
+          "WHERE runs before GROUP BY when no aggregate values exist yet; HAVING runs after GROUP BY against the grouped results",
+          "HAVING filters individual rows; WHERE filters aggregated groups",
+          "They are interchangeable — HAVING is just syntactic sugar for WHERE",
+        ],
+        correctIndex: 0,
+        explanation: "WHERE cannot reference aggregate functions like SUM or COUNT because aggregation has not happened yet. HAVING runs after GROUP BY, when groups and their aggregate values exist. Mixing them up is one of the most common SQL interview mistakes.",
+      },
+    ],
   },
 
   "sql-found-02": {
@@ -5330,7 +5361,38 @@ END AS paid_flag`,
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "What does SELECT * FROM orders WHERE status != 'cancelled' return when a row has NULL in the status column?",
+        options: [
+          "The NULL row is excluded — NULL != 'cancelled' evaluates to UNKNOWN, not TRUE",
+          "The NULL row is included because NULL means not set",
+          "The query throws a runtime error on the NULL value",
+        ],
+        correctIndex: 0,
+        explanation: "WHERE only passes rows where the predicate evaluates to TRUE. NULL != 'cancelled' returns UNKNOWN, which is treated the same as FALSE. To include NULLs you must add OR status IS NULL explicitly.",
+      },
+      {
+        question: "Which predicate correctly matches rows where referral_code is NULL?",
+        options: [
+          "WHERE referral_code IS NULL",
+          "WHERE referral_code = NULL",
+          "WHERE referral_code == NULL",
+        ],
+        correctIndex: 0,
+        explanation: "NULL comparisons using = always return UNKNOWN, never TRUE. The only correct way to test for NULL is IS NULL. This is the three-valued logic rule: NULL = NULL evaluates to UNKNOWN, not TRUE.",
+      },
+      {
+        question: "A score column has 5 rows: 90, 85, NULL, 70, 95. What does SELECT COUNT(score) return?",
+        options: [
+          "4 — COUNT(column) ignores NULL values",
+          "5 — COUNT counts all rows including NULL",
+          "NULL — any aggregate on a column with NULLs returns NULL",
+        ],
+        correctIndex: 0,
+        explanation: "COUNT(column_name) counts only non-NULL values — the NULL row is skipped. COUNT(*) would return 5. This matters whenever you compute aggregates on nullable columns or check for data gaps.",
+      },
+    ],
   },
 
   "sql-found-03": {
@@ -5492,7 +5554,38 @@ COUNT(refund_amount) AS refund_count`,
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "Which columns can legally appear in SELECT without being inside an aggregate function?",
+        options: [
+          "Only columns listed in GROUP BY",
+          "Any column from any table in the FROM clause",
+          "Only columns that contain unique values",
+        ],
+        correctIndex: 0,
+        explanation: "After GROUP BY, each output row represents a group, not an individual row. A column not in GROUP BY could have multiple different values within that group — the database cannot pick one, so it raises an error. Every non-aggregate SELECT column must appear in GROUP BY.",
+      },
+      {
+        question: "What does GROUP BY dept HAVING AVG(salary) > 80000 do?",
+        options: [
+          "Returns only departments whose average salary exceeds 80000",
+          "Filters individual employees earning over 80000 before averaging",
+          "Returns all departments, showing 0 for those below the threshold",
+        ],
+        correctIndex: 0,
+        explanation: "HAVING filters on aggregate results after GROUP BY. It keeps only groups where the computed AVG(salary) > 80000. Using WHERE AVG(salary) > 80000 would fail because aggregates do not exist at the WHERE stage.",
+      },
+      {
+        question: "You GROUP BY user_id and date. What does each output row represent?",
+        options: [
+          "One unique combination of user_id + date — the same user appears multiple times, once per date",
+          "One transaction — GROUP BY does not change the number of rows",
+          "One user — GROUP BY user_id collapses all rows for a user",
+        ],
+        correctIndex: 0,
+        explanation: "Grain equals the combination of columns in your GROUP BY. Grouping by user_id and date means each output row is one user on one day. The same user_id appears multiple times if that user has activity on multiple dates.",
+      },
+    ],
   },
 
   "sql-found-04": {
@@ -5650,7 +5743,38 @@ LEFT JOIN user_devices d ON d.user_id = u.user_id;`,
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "What makes a correlated subquery different from a regular subquery?",
+        options: [
+          "A correlated subquery references a column from the outer query and re-executes once per outer row",
+          "A correlated subquery always runs faster because it filters data earlier",
+          "A correlated subquery can only be used in SELECT, not in WHERE",
+        ],
+        correctIndex: 0,
+        explanation: "A correlated subquery references a value from the outer query's current row, causing it to re-execute once per outer row. On large tables this creates O(n) inner queries — a performance trap. The fix is usually to replace the correlated scan with a JOIN.",
+      },
+      {
+        question: "An EXPLAIN plan shows loops=500000 on an inner scan. What does this reveal?",
+        options: [
+          "The inner query executed 500000 times — once for each outer row — a classic N+1 problem",
+          "The query is efficiently cached and re-used 500000 times",
+          "The table has 500000 indexed rows, making lookups fast",
+        ],
+        correctIndex: 0,
+        explanation: "loops=500000 means the inner plan node executed 500000 times — once per outer row. This is the N+1 anti-pattern. The fix is replacing the correlated subquery with a JOIN so the inner table is accessed once rather than once per outer row.",
+      },
+      {
+        question: "When is a subquery generally preferred over a JOIN?",
+        options: [
+          "When you only need to check existence or set membership and do not need columns from the inner table",
+          "Subqueries are always faster than JOINs on large tables",
+          "When the subquery references the same table as the outer query",
+        ],
+        correctIndex: 0,
+        explanation: "EXISTS and IN subqueries are natural for set membership tests — give me orders that have at least one return does not need columns from the returns table. JOINs are better when you need data from both tables. Forcing a JOIN where EXISTS would do often produces harder-to-read code.",
+      },
+    ],
   },
 
   "ml-f2": {
@@ -5950,7 +6074,38 @@ FROM employees;
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "Four rows are tied for rank 1. ROW_NUMBER gives 1,2,3,4. RANK gives all four rank 1. What does DENSE_RANK give?",
+        options: [
+          "All four get 1, and the next distinct row gets rank 2 — no gaps",
+          "All four get 1, and the next distinct row gets rank 5 — like RANK",
+          "Each tied row gets NULL since the rank is ambiguous",
+        ],
+        correctIndex: 0,
+        explanation: "DENSE_RANK gives tied rows the same rank and continues with the next consecutive integer — no gaps. RANK also groups ties but skips subsequent ranks to account for them. ROW_NUMBER always assigns unique integers regardless of ties.",
+      },
+      {
+        question: "You want exactly one row per customer — the most recent order, breaking ties by order_id. Which window function is correct?",
+        options: [
+          "ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY created_at DESC, order_id DESC)",
+          "RANK() OVER (PARTITION BY customer_id ORDER BY created_at DESC)",
+          "DENSE_RANK() OVER (PARTITION BY customer_id ORDER BY created_at DESC)",
+        ],
+        correctIndex: 0,
+        explanation: "For deduplication you need exactly one row per group. ROW_NUMBER always produces unique integers, so WHERE rn = 1 guarantees one row. RANK and DENSE_RANK can return multiple rows with rank 1 when timestamps tie.",
+      },
+      {
+        question: "What does PARTITION BY do in a window function?",
+        options: [
+          "Divides rows into independent groups so the function resets and runs separately within each group",
+          "Sorts rows within the window — equivalent to ORDER BY",
+          "Limits the window to a fixed number of rows around the current row",
+        ],
+        correctIndex: 0,
+        explanation: "PARTITION BY is like GROUP BY but without collapsing rows. It divides the result set into partitions and the window function computes independently within each partition. Without PARTITION BY the function runs over the entire result set as one partition.",
+      },
+    ],
   },
 
   "sq-a2": {
@@ -6167,7 +6322,38 @@ FROM daily_sales;`,
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "What does LAG(revenue, 1) OVER (PARTITION BY product ORDER BY month) return for each row?",
+        options: [
+          "The previous month's revenue for the same product",
+          "The next month's revenue for the same product",
+          "The difference between current and previous month revenue",
+        ],
+        correctIndex: 0,
+        explanation: "LAG looks backward: LAG(col, 1) returns the value from 1 row behind in the ORDER BY sequence. LEAD looks forward. LAG(revenue, 1) ORDER BY month gives last month's revenue, which you subtract from the current row to compute month-over-month change.",
+      },
+      {
+        question: "A window uses ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW. What does it calculate?",
+        options: [
+          "An aggregate from the first row of the partition up to the current row — a running cumulative total",
+          "An aggregate from the current row to the last row in the partition",
+          "Only the value of the current row — the frame contains a single row",
+        ],
+        correctIndex: 0,
+        explanation: "UNBOUNDED PRECEDING means start from the very first row of the partition. Combined with CURRENT ROW as the upper bound, the frame grows with each row. SUM() with this frame gives a running total — the canonical cumulative aggregate pattern.",
+      },
+      {
+        question: "You write SUM(sales) OVER (PARTITION BY region) with no ORDER BY. What does each row show?",
+        options: [
+          "The total sales for the entire region, repeated on every row in that region",
+          "A running total up to the current row within the region",
+          "An error — ORDER BY is required for all window functions",
+        ],
+        correctIndex: 0,
+        explanation: "Without ORDER BY, the default frame covers the entire partition — every row in the region. Every row gets the same value: the grand total for that region. Adding ORDER BY changes the default frame to RANGE UNBOUNDED PRECEDING AND CURRENT ROW, producing a running total instead.",
+      },
+    ],
   },
 
   "sq-a3": {
@@ -6410,7 +6596,38 @@ SELECT * FROM org;`,
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "What is the main readability advantage of a CTE over a deeply nested subquery?",
+        options: [
+          "A CTE is defined once at the top with a name, making complex multi-step logic easier to follow",
+          "CTEs always execute faster because the optimizer materializes them separately",
+          "CTEs are stored permanently in the database so subsequent queries can reuse them",
+        ],
+        correctIndex: 0,
+        explanation: "CTEs let you name an intermediate result and reference it by name instead of nesting query inside query. Whether a CTE performs better depends on the optimizer — it may inline the CTE making it identical to a subquery. Readability is the reliable win.",
+      },
+      {
+        question: "When would you choose a CTE over a subquery for performance reasons?",
+        options: [
+          "When you need to reference the same intermediate result more than once in the same query",
+          "Always — CTEs are optimized better by every major database engine",
+          "When the subquery contains a JOIN to a large table",
+        ],
+        correctIndex: 0,
+        explanation: "If a subquery would be repeated in two places, a CTE defines it once and the optimizer may materialize it — avoiding double computation. If referenced only once, the optimizer typically inlines the CTE making it identical to a subquery. Reuse is the main performance argument.",
+      },
+      {
+        question: "What makes a recursive CTE different from a regular CTE?",
+        options: [
+          "A recursive CTE references itself — each iteration's output feeds into the next, enabling hierarchy traversal",
+          "Recursive CTEs use indexes automatically, making them faster than regular CTEs",
+          "Recursive CTEs can reference tables from other databases in the same query",
+        ],
+        correctIndex: 0,
+        explanation: "A recursive CTE has two parts: an anchor member (starting rows) and a recursive member that joins the CTE back to itself. Each iteration expands the result until no rows qualify. Classic use cases: org hierarchies, bill-of-materials, graph path traversal.",
+      },
+    ],
   },
 
   "sq-a4": {
@@ -6620,7 +6837,38 @@ SELECT DISTINCT product FROM sales;
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "What does SUM(CASE WHEN category = 'Food' THEN amount ELSE 0 END) compute?",
+        options: [
+          "The total amount for Food rows, treating all other categories as 0",
+          "The count of rows in the Food category",
+          "The maximum amount found in the Food category",
+        ],
+        correctIndex: 0,
+        explanation: "CASE WHEN returns the amount only when the category matches — all other rows contribute 0. SUM adds those up, effectively isolating the Food total. This is the portable PIVOT pattern: one SUM(CASE WHEN) expression per output column you want to produce.",
+      },
+      {
+        question: "You have categories Food, Travel, and Tech. How many SUM(CASE WHEN) expressions are needed to pivot into one column per category?",
+        options: [
+          "3 — one expression per output column",
+          "1 — a single expression can generate all columns dynamically",
+          "It depends on the number of rows in the table",
+        ],
+        correctIndex: 0,
+        explanation: "Each target column requires its own SUM(CASE WHEN category = 'X' THEN amount END). With 3 categories you need 3 expressions. This is why dynamic pivoting is preferable when the set of categories is unknown at query-write time.",
+      },
+      {
+        question: "What does CASE WHEN x = 1 THEN 'yes' END return when x is not 1 and ELSE is omitted?",
+        options: [
+          "NULL — an omitted ELSE is equivalent to ELSE NULL",
+          "An empty string",
+          "A runtime error — ELSE is required in CASE expressions",
+        ],
+        correctIndex: 0,
+        explanation: "An omitted ELSE is equivalent to ELSE NULL. For SUM(CASE WHEN ... THEN amount END) this means non-matching rows return NULL — and SUM ignores NULLs — so the aggregate behaves the same as ELSE 0. Writing ELSE 0 explicitly is clearer intent.",
+      },
+    ],
   },
 
   "sq-a5": {
@@ -6826,7 +7074,38 @@ GROUP BY customer_id;`,
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "An EXPLAIN plan shows Seq Scan on orders (rows=500000). What does this mean?",
+        options: [
+          "The database is reading every row in the table — no index is being used",
+          "The query is using an index and efficiently scanning 500000 matching rows",
+          "The result set contains 500000 duplicate rows that need deduplication",
+        ],
+        correctIndex: 0,
+        explanation: "Seq Scan means a sequential full-table scan — the engine reads every page of the table. It appears when no suitable index exists for the WHERE predicate, or when the planner decides scanning the whole table is cheaper than random index lookups (e.g., when returning more than roughly 15% of rows).",
+      },
+      {
+        question: "An EXPLAIN plan shows Hash Join between two large tables. What typically triggers Hash Join over Nested Loop?",
+        options: [
+          "Both tables are large and an equi-join condition exists — Hash Join builds a hash table from the smaller side",
+          "One table has no indexes, so nested loops cannot proceed",
+          "The query has an ORDER BY referencing both tables",
+        ],
+        correctIndex: 0,
+        explanation: "The planner chooses Hash Join when both inputs are large. It builds an in-memory hash table from the smaller relation then probes it with the larger. Nested Loop is preferred when the outer set is small and the inner side has an index — the index lookup cost beats building a hash table.",
+      },
+      {
+        question: "EXPLAIN shows (actual rows=1 loops=500000) on an inner scan inside a Nested Loop. What does this reveal?",
+        options: [
+          "The inner query executed 500000 times — once per outer row — a classic N+1 problem",
+          "The query is efficiently cached across 500000 executions",
+          "The join produced 500000 matching pairs, which is expected for a many-to-many join",
+        ],
+        correctIndex: 0,
+        explanation: "loops=500000 means the inner plan node executed 500000 times — once per outer row. This is the N+1 anti-pattern from a correlated subquery or a Nested Loop with no index on the inner table. The fix is replacing the correlated scan with a JOIN so the inner table is accessed once.",
+      },
+    ],
   },
 
   "sq-d1": {
@@ -7036,7 +7315,38 @@ Given table: Enrollment(student_id, course_id, student_name, instructor_id, inst
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "A table stores multiple phone numbers in one column as a comma-separated string. Which normal form does this violate?",
+        options: [
+          "1NF — values must be atomic and there must be no repeating groups within a cell",
+          "2NF — this creates a partial functional dependency on the primary key",
+          "3NF — phone numbers are transitively dependent on the user address",
+        ],
+        correctIndex: 0,
+        explanation: "1NF requires every column to hold atomic values and no repeating groups. Storing phone1,phone2,phone3 in a single cell violates atomicity. The fix is a separate PhoneNumbers table with a foreign key back to the parent entity.",
+      },
+      {
+        question: "An Orders table has (order_id, product_id, customer_name, product_name) where customer_name depends only on order_id and product_name only on product_id. Which normal form is violated?",
+        options: [
+          "2NF — non-key attributes depend on only part of the composite primary key",
+          "1NF — multiple names are stored in the same column",
+          "3NF — there is a transitive dependency between customer_name and product_name",
+        ],
+        correctIndex: 0,
+        explanation: "2NF requires every non-key attribute to depend on the whole primary key. Here the key is (order_id, product_id), but customer_name depends only on order_id and product_name only on product_id — both are partial dependencies. Fix: separate Customers and Products tables.",
+      },
+      {
+        question: "A table has (employee_id, department_id, department_location) where department_id determines department_location. Which normal form is violated?",
+        options: [
+          "3NF — department_location depends on a non-key attribute, creating a transitive dependency",
+          "2NF — department_location is only partially dependent on employee_id",
+          "1NF — department_location should be stored as an array",
+        ],
+        correctIndex: 0,
+        explanation: "3NF requires non-key attributes to depend only on the primary key. Here employee_id determines department_id which determines department_location — a transitive dependency. Fix: move department_location to a separate Departments table keyed on department_id.",
+      },
+    ],
   },
 
   "sq-d2": {
@@ -7264,7 +7574,38 @@ LIMIT 20;`,
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "A query filters on WHERE UPPER(email) = 'FOO@BAR.COM' but an index exists on the raw email column. Will the index be used?",
+        options: [
+          "No — wrapping a column in a function prevents the database from using a standard index on that column",
+          "Yes — the database automatically applies the index to the function output",
+          "Only if the index is a composite index that includes the UPPER expression",
+        ],
+        correctIndex: 0,
+        explanation: "Indexes are built on stored column values. UPPER(email) produces a derived value the index does not know about — the engine must scan every row and apply the function. Fix: store email in normalized lowercase, or create a function-based index on UPPER(email).",
+      },
+      {
+        question: "You have a composite index on (country, city, zip). Which query makes full use of this index?",
+        options: [
+          "WHERE country = 'UK' AND city = 'London' — uses the leftmost prefix",
+          "WHERE city = 'London' — skips the leading column so cannot use the index",
+          "WHERE zip = '10001' — rightmost column only, cannot use the index",
+        ],
+        correctIndex: 0,
+        explanation: "Composite indexes work on a leftmost-prefix basis. A query must start from the leftmost column and cannot skip columns. WHERE country AND city uses two columns efficiently. WHERE zip alone cannot use the index because it bypasses country and city.",
+      },
+      {
+        question: "You add an index to a 50M-row table but the slow query shows no improvement. Which scenario explains this?",
+        options: [
+          "The query returns roughly 40% of all rows — at that selectivity a full scan is cheaper than random index lookups",
+          "The table is too large for indexes to be effective",
+          "Indexes require a manual rebuild before they take effect on existing rows",
+        ],
+        correctIndex: 0,
+        explanation: "Indexes are most effective at high selectivity — returning a tiny fraction of rows. When a query returns 10-20% or more of the table, the random I/O cost of following index pointers row-by-row exceeds the cost of a sequential scan. The planner ignores the index in this case.",
+      },
+    ],
   },
 
   "sq-d3": {
@@ -7491,7 +7832,38 @@ GROUP BY c.category_name;`,
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "In a star schema, dimension tables connect directly to which table?",
+        options: [
+          "The central fact table — each dimension has a foreign key pointing to the fact table",
+          "Each other, forming a ring around the fact table",
+          "A central aggregation layer that pre-computes summaries",
+        ],
+        correctIndex: 0,
+        explanation: "In a star schema the fact table holds foreign keys to every dimension table directly. Dimensions are denormalized — they do not connect to each other. This simpler structure minimizes JOINs in analytical queries at the cost of some data redundancy in the dimension tables.",
+      },
+      {
+        question: "A snowflake schema normalizes its dimension tables. What is the main trade-off vs a star schema?",
+        options: [
+          "Snowflake uses less storage but queries require more JOINs to traverse normalized dimension hierarchies",
+          "Snowflake uses more storage but queries are faster due to smaller dimension tables",
+          "Snowflake only works with columnar databases — star schemas work everywhere",
+        ],
+        correctIndex: 0,
+        explanation: "Normalization reduces redundancy and storage. But traversing a region to country to customer hierarchy in a snowflake requires multiple JOINs where a star schema needs one. In OLAP workloads on billions of fact rows, the extra JOIN overhead compounds significantly.",
+      },
+      {
+        question: "Your fact table has 10 billion rows. A query computes total sales by product category. Which schema makes this fastest?",
+        options: [
+          "Star schema with a denormalized product dimension — category lives directly in the dimension, only one JOIN needed",
+          "Snowflake schema — normalized dimensions reduce the size of each individual JOIN",
+          "3NF normalized schema — fewest redundant writes, best for large tables",
+        ],
+        correctIndex: 0,
+        explanation: "For analytical queries on large fact tables, minimizing JOINs is critical. A star schema stores category directly in the product dimension so the query needs only one JOIN. Snowflake would require product to subcategory to category, adding JOIN overhead multiplied across 10 billion rows.",
+      },
+    ],
   },
 
   "sq-d4": {
@@ -7720,7 +8092,38 @@ GROUP BY region;`,
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "Which pattern characterizes OLTP vs OLAP workloads?",
+        options: [
+          "OLTP: fast read/write of individual rows; OLAP: scan millions of rows to compute aggregates",
+          "OLTP: scan millions of rows for reports; OLAP: fast point lookups for transactions",
+          "They are interchangeable — modern databases handle both equally well",
+        ],
+        correctIndex: 0,
+        explanation: "OLTP optimizes for low-latency single-row operations: order entries, balance updates, logins. OLAP optimizes for high-throughput scans across millions of rows to compute aggregates. These access patterns require different storage layouts and indexing strategies.",
+      },
+      {
+        question: "Why is columnar storage better for analytical queries than row storage?",
+        options: [
+          "Columnar stores each column's values contiguously — the engine reads only needed columns and compresses repetitive values efficiently",
+          "Columnar storage keeps rows in sorted order, making range scans faster",
+          "Columnar storage eliminates NULLs, which are expensive for aggregates",
+        ],
+        correctIndex: 0,
+        explanation: "Analytical queries typically read a few columns across many rows. Columnar storage puts all values of a column on contiguous pages — only relevant columns are read. High repetition in column values also enables aggressive compression such as run-length encoding and dictionary encoding.",
+      },
+      {
+        question: "An OLAP aggregate query is running directly on your production OLTP database. What is the primary risk?",
+        options: [
+          "Full-table scans compete for I/O and buffer pool with transactional queries, degrading response time for all users",
+          "OLAP queries silently return incorrect results when run on OLTP engines",
+          "The OLTP database automatically routes the query to a read replica",
+        ],
+        correctIndex: 0,
+        explanation: "Full-table scans needed for OLAP queries compete for I/O bandwidth, CPU, and buffer pool space with transactional queries. Long-running analytical scans can cause lock contention or cache thrashing. The solution is to replicate data to a separate analytical store and run reports there.",
+      },
+    ],
   },
 
   // ── injected from stat_foundations_lessons.js ──
