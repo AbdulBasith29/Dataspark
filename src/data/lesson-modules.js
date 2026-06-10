@@ -17892,8 +17892,9 @@ Long-range information propagates through multiple layers (layer k can access in
     initialStageId: "f3_stage1",
     artifactDimensions: [
       { label: "Attention Mathematics", recoveryStageId: "f3_recovery1" },
+      { label: "Multi-Head Attention", recoveryStageId: "f3_mha_recovery" },
       { label: "KV Cache", recoveryStageId: "f3_recovery2" },
-      { label: "Positional Encodings", recoveryStageId: "f3_recovery1", passLabel: "Transformer Architecture Mastery" },
+      { label: "Flash Attention", recoveryStageId: "f3_flash_recovery", passLabel: "Transformer Expert" },
     ],
     stages: {
       f3_stage1: {
@@ -17907,17 +17908,18 @@ import torch.nn.functional as F
 
 def attention(Q, K, V, mask=None):
     # Q, K, V shapes: (batch, heads, seq_len, d_k)
-    d_k = Q.size(-1)  # head dimension
+    d_k = Q.size(-1)
 
     scores = torch.matmul(Q, K.transpose(-2, -1))  -- ds-target:f3_no_scale
-    
+    # BUG: missing division by math.sqrt(d_k)
+
     if mask is not None:
         scores = scores.masked_fill(mask == 0, float('-inf'))
-    
+
     weights = F.softmax(scores, dim=-1)
     return torch.matmul(weights, V)`,
         validationCopy: {
-          f3_no_scale: "Correct. The scores must be divided by √d_k before the softmax. Without this scaling, dot products grow with d_k (their variance scales as d_k for random Q, K). Large scores produce extreme softmax outputs near 0 or 1, causing near-zero gradients and training instability. The fix: scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(d_k). This is why the operation is called *scaled* dot-product attention.",
+          f3_no_scale: "Correct. Scores must be divided by sqrt(d_k) before softmax. Without scaling, dot products grow with d_k, pushing softmax into saturation — near-zero gradients and training instability. Fix: scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(d_k).",
         },
         branches: { f3_no_scale: "f3_stage2" },
       },
@@ -17931,49 +17933,125 @@ def attention(Q, K, V, mask=None):
 seq_len = 4096   # 4K context
 d_k = 128        # head dimension
 
-# Q · Kᵀ produces:
-attention_matrix_shape = (seq_len, seq_len)  # 4096 × 4096 = 16.7M entries
-# Memory per layer per head: 16.7M × 2 bytes (fp16) = 33.6MB
-
-# Scaling to 128K context:
-seq_len_128k = 131072
-attention_matrix_128k = seq_len_128k ** 2   # = 17.2 BILLION entries
-# Memory: 17.2B × 2 bytes = 34.4GB per head per layer (!!!)`,
+# Q @ K.T produces:
+attn_matrix = (seq_len, seq_len)  # 4096 x 4096 = 16.7M entries
+# Memory (fp16): 16.7M x 2 bytes = 33.5MB per layer
+# At 128K: 128K x 128K x 2 = 32GB for ONE layer`,
         choices: [
-          { id: "a", label: "O(n²) because the model must re-read the entire training corpus for each sequence; longer sequences require more passes.", description: "This confuses training data access with the attention computation. Attention operates over the current sequence at inference time, not the training corpus." },
-          { id: "b", label: "O(n²) because the Q · Kᵀ matrix multiplication produces an n×n attention matrix — every token must compute a score against every other token. Going from 4K to 128K context is a 1024× increase in attention compute and memory.", description: "Correct. The n×n attention matrix is the bottleneck. 128K tokens: 128K × 128K = 16.4B entries per head per layer. At fp16, that's 32.8GB just for one head in one layer — clearly requiring algorithmic innovations like FlashAttention's block-sparse or sliding window approaches." },
-          { id: "c", label: "O(n²) because each token requires n separate forward passes through the FFN layer.", description: "The FFN processes each token independently (position-wise) in O(n) total, not O(n²). The O(n²) bottleneck is specifically the attention operation." },
-          { id: "d", label: "O(n²) only applies to decoder models; encoder models like BERT are O(n log n).", description: "Both encoder and decoder models use standard scaled dot-product attention with O(n²) complexity. The decoder's causal mask makes half the attention matrix zero but doesn't change the asymptotic complexity." },
+          { id: "a", label: "O(n²) because the model re-reads the training corpus for each sequence", description: "Longer sequences require more passes over training data." },
+          { id: "b", label: "O(n²) because Q @ K.T produces an n×n matrix — every token scores against every other token", description: "4K to 128K context is a 1024× increase in attention compute and memory." },
+          { id: "c", label: "O(n²) because each token requires n separate FFN forward passes", description: "The FFN, not attention, is the compute bottleneck." },
+          { id: "d", label: "O(n²) only applies to decoders; BERT-style encoders are O(n log n)", description: "Encoders also use full self-attention and have the same O(n²) cost." },
         ],
-        branches: { a: "f3_recovery1", b: "f3_stage3", c: "f3_recovery1", d: "f3_recovery1" },
-        rationale: "The Q·Kᵀ product computes a score for every pair of tokens (i, j) — all n² pairs. This produces an n×n matrix that must be stored and operated on. For 4K tokens, this is manageable; for 128K tokens, it requires algorithmic solutions. FlashAttention avoids materializing the full matrix in HBM by tiling the computation to fit in faster SRAM. Sparse attention patterns (Longformer's sliding window, BigBird's random+global) reduce the number of pairs computed. These innovations are what make 128K context feasible.",
+        branches: { a: "f3_recovery1", b: "f3_mha", c: "f3_recovery1", d: "f3_recovery1" },
+        rationale: "The Q·Kᵀ product scores every token pair (i, j) — all n² pairs — producing an n×n matrix that must be stored and operated on. Going 4K→28K context is a 1024× increase in attention compute and memory. This is why efficient attention variants (Flash, sparse, linear) are an active research area.",
+      },
+      f3_mha: {
+        id: "f3_mha",
+        type: "scenario_choice",
+        badge: "Stage 3 · Multi-Head Attention",
+        title: "Stage 3 · Why multiple heads beat one wide head",
+        prompt: "A colleague proposes replacing 8 attention heads (d_k=64 each) with a single head at d_k=512. Parameter count is identical. What is the strongest argument against this?",
+        code_snippet: `# Current architecture: 8-head attention
+num_heads = 8
+d_k = 64          # per-head dimension
+d_model = 512     # total = num_heads * d_k
+
+# Proposed: 1-head attention
+num_heads_new = 1
+d_k_new = 512     # same total parameters
+
+# W_Q, W_K, W_V: (512, 512) either way
+# But each head learns a DIFFERENT projection matrix
+# Head 1: W_Q_1, W_K_1, W_V_1
+# Head 2: W_Q_2, W_K_2, W_V_2  (learns different relationships)
+# ...`,
+        choices: [
+          { id: "a", label: "Multi-head is slower due to head-split and concatenation overhead", description: "The overhead is negligible compared to the matrix multiplications." },
+          { id: "b", label: "Each head specializes in different relationship types simultaneously — syntax, coreference, positional — a single head must fit all patterns into one attention distribution", description: "Empirical interpretability research confirms this specialization." },
+          { id: "c", label: "Single-head attention cannot be parallelized across GPU cores", description: "Single-head attention is fully parallelizable." },
+          { id: "d", label: "The 1/sqrt(512) scaling causes worse gradients than 1/sqrt(64)", description: "The scaling factor compensates proportionally — gradient flow is not the main concern." },
+        ],
+        branches: { a: "f3_mha_recovery", b: "f3_stage3", c: "f3_mha_recovery", d: "f3_mha_recovery" },
+        rationale: "Multi-head attention's advantage is representational diversity. Different heads learn qualitatively different relationships: syntactic dependencies, coreference, positional proximity, semantic similarity. A single wide head produces one global attention pattern that must compromise between all relationship types. Interpretability research on BERT and GPT models has empirically confirmed this head specialization.",
       },
       f3_stage3: {
         id: "f3_stage3",
         type: "scenario_choice",
-        badge: "Stage 3 · KV Cache",
-        title: "Stage 3 · KV cache memory calculation",
-        prompt: "Your team is deploying a model with 32 transformer layers, 32 KV heads (after GQA), head dimension d_k=128, generating sequences of 2048 tokens at fp16. Approximately how much GPU memory does the KV cache use per active user request?",
+        badge: "Stage 4 · KV Cache",
+        title: "Stage 4 · KV cache memory calculation",
+        prompt: "Your team deploys a model with 32 transformer layers, 32 KV heads (after GQA), d_k=128, generating 2048-token sequences at fp16. Approximately how much GPU memory does the KV cache consume per active user request?",
         code_snippet: `# KV cache memory formula:
-# 2 (K and V) × num_layers × num_kv_heads × d_k × seq_len × bytes_per_elem
+# 2 (K and V) x layers x kv_heads x d_k x seq_len x bytes
 
-num_layers    = 32
-num_kv_heads  = 32   # after GQA (could be 8 for LLaMA-3-70B)
-d_k           = 128  # head dimension = d_model / num_q_heads
-seq_len       = 2048 # tokens generated
-bytes_fp16    = 2
+num_layers   = 32
+num_kv_heads = 32
+d_k          = 128
+seq_len      = 2048
+bytes_fp16   = 2
 
-kv_bytes = 2 * num_layers * num_kv_heads * d_k * seq_len * bytes_fp16
-# = 2 * 32 * 32 * 128 * 2048 * 2
-# = ?`,
+# 2 x 32 x 32 x 128 x 2048 x 2 = ?
+# At 1000 concurrent users, how much GPU RAM just for KV caches?`,
         choices: [
-          { id: "a", label: "~32MB per request", description: "Close but check the math: 2 × 32 × 32 × 128 × 2048 × 2 = 1,073,741,824 bytes = 1GB, not 32MB." },
-          { id: "b", label: "~512MB per request", description: "Off by ~2×. The correct calculation: 2 × 32 × 32 × 128 × 2048 × 2 = 1,073,741,824 bytes ≈ 1GB." },
-          { id: "c", label: "~1GB per request", description: "Correct. 2 × 32 × 32 × 128 × 2048 × 2 = 1,073,741,824 bytes ≈ 1GB. Supporting 40 simultaneous users at 2048 tokens would require 40GB for KV cache alone — before counting the model weights (typically 13–14GB for a 7B fp16 model)." },
-          { id: "d", label: "~16GB per request", description: "Off by 16×. This would require either a much larger model (512+ heads, or much longer sequences). The 1GB figure correctly accounts for 32 layers × 32 KV heads × 128 dim × 2048 tokens × fp16." },
+          { id: "a", label: "~32 MB per request", description: "2 x 32 x 32 x 128 x 2048 x 2 / 1e6 = 1073 MB, not 32 MB." },
+          { id: "b", label: "~512 MB per request", description: "Off by 2x — re-check the formula." },
+          { id: "c", label: "~1 GB per request", description: "2 x 32 x 32 x 128 x 2048 x 2 = 1,073,741,824 bytes ≈ 1 GB." },
+          { id: "d", label: "~16 GB per request", description: "That is closer to the full model weight size, not just the KV cache." },
         ],
-        branches: { a: "f3_recovery2", b: "f3_recovery2", c: "f3_terminal", d: "f3_recovery2" },
-        rationale: "KV cache = 2 × 32 × 32 × 128 × 2048 × 2 bytes = 1,073,741,824 bytes ≈ 1GB per request. This is a critical calculation for production capacity planning. A typical serving GPU (A100-80GB) holds 80GB total: ~14GB for 7B model weights (fp16) leaves ~66GB for KV cache, supporting ~66 simultaneous users at 2048 tokens. Real deployments use GQA (reducing num_kv_heads from 32 to 8, saving 4× KV memory) and PagedAttention (vLLM) for efficient KV cache management across variable-length sequences.",
+        branches: { a: "f3_recovery2", b: "f3_recovery2", c: "f3_flash", d: "f3_recovery2" },
+        rationale: "KV cache = 2 x 32 x 32 x 128 x 2048 x 2 bytes = 1,073,741,824 bytes ≈ 1 GB per user request. At 100 concurrent users: 100 GB just for KV caches, before model weights. This is why Grouped Query Attention (GQA) reduces num_kv_heads (e.g., LLaMA-3-70B uses 8 instead of 64), cutting KV cache memory by 8x.",
+      },
+      f3_flash: {
+        id: "f3_flash",
+        type: "scenario_choice",
+        badge: "Stage 5 · Flash Attention",
+        title: "Stage 5 · What problem does Flash Attention solve?",
+        prompt: "Your GPU profiler shows attention is 25% compute-utilized but pegging memory bandwidth at 100%. A colleague recommends Flash Attention. What is the core mechanism it uses?",
+        code_snippet: `# Standard attention: 3 HBM round-trips per layer
+scores  = Q @ K.T          # writes n x n matrix to slow HBM
+weights = softmax(scores)  # reads n x n from HBM, writes back
+output  = weights @ V      # reads n x n from HBM again
+
+# For n=2048: 3 x (2048^2) x 2 bytes = 48 MB of HBM traffic
+# just for intermediate results, per layer
+
+# Flash Attention: tile Q, K, V to fit in fast SRAM (20-40 MB)
+# Compute entire softmax-weighted output per tile
+# Never write the n x n matrix to HBM
+# Same result, ~16x less HBM traffic for n=2048`,
+        choices: [
+          { id: "a", label: "Flash Attention uses random sparse masks to reduce O(n²) to O(n log n)", description: "That describes Longformer / BigBird sparse attention, not Flash Attention." },
+          { id: "b", label: "Flash Attention tiles Q, K, V to stay in fast on-chip SRAM — it never writes the n×n attention matrix to HBM", description: "IO-bound problem, IO-focused solution." },
+          { id: "c", label: "Flash Attention quantizes Q, K, V to int8 to reduce memory bandwidth", description: "That is quantization — a separate technique." },
+          { id: "d", label: "Flash Attention replaces softmax with a linear approximation, avoiding the full n×n dot product", description: "That is linear attention (Performer, etc.) — mathematically different from Flash Attention." },
+        ],
+        branches: { a: "f3_flash_recovery", b: "f3_terminal", c: "f3_flash_recovery", d: "f3_flash_recovery" },
+        rationale: "Flash Attention's core insight: transformer attention is IO-bottlenecked, not compute-bottlenecked. Standard attention writes the n×n matrix to HBM 3 times per layer. Flash Attention tiles the computation so intermediates fit in fast SRAM, making a single pass through HBM. Same mathematical result, same model weights — just far fewer slow memory round-trips.",
+      },
+      f3_terminal: {
+        id: "f3_terminal",
+        type: "scenario_choice",
+        badge: "Stage 6 · Final Challenge",
+        title: "Stage 6 · What breaks without positional encodings?",
+        prompt: "An interviewer asks: 'If you removed positional encodings entirely from a transformer, what would and would not break?' What is the most accurate and complete answer?",
+        code_snippet: `# Transformer without positional encodings
+
+tokens_1 = ["The", "cat", "sat"]
+tokens_2 = ["sat", "cat", "The"]
+
+# Self-attention is permutation-equivariant:
+# attention(permute(X)) = permute(attention(X))
+# => both sequences produce IDENTICAL attention outputs
+# => word order is completely invisible to the model`,
+        choices: [
+          { id: "a", label: "Nothing breaks for short sentences — PEs only help beyond 512 tokens", description: "Order matters even in 3-word sentences (subject vs object)." },
+          { id: "b", label: "All permutations of the same words become identical — word order is invisible, breaking syntax, causality, and sequential understanding", description: "Bag-of-words tasks might partially survive; everything order-dependent fails." },
+          { id: "c", label: "Text generation breaks but classification survives", description: "Classification also depends on word order (subject/object/predicate distinctions)." },
+          { id: "d", label: "Only the first and last tokens are affected", description: "Self-attention is a set operation — it treats all tokens equally regardless of position." },
+        ],
+        branches: { a: "f3_terminal", b: "f3_terminal", c: "f3_terminal", d: "f3_terminal" },
+        terminal: true,
+        rationale: "Without positional encodings, self-attention is a pure set operation. 'The cat chased the dog' and 'The dog chased the cat' produce identical outputs. This breaks any task requiring sequential understanding: subject-verb agreement, dependency parsing, causal reasoning, and generation. Modern approaches: sinusoidal PE (original), learned absolute PE (BERT), relative PE (T5), rotary PE/RoPE (LLaMA/Mistral) — each with different long-context scaling properties.",
       },
       f3_recovery1: {
         id: "f3_recovery1",
@@ -17981,81 +18059,106 @@ kv_bytes = 2 * num_layers * num_kv_heads * d_k * seq_len * bytes_fp16
         badge: "Recovery · Attention Mathematics",
         title: "Recovery · The role of Q, K, V",
         prompt: "In self-attention, what is the conceptual role of the Query, Key, and Value projections?",
-        code_snippet: `# Self-attention projections
-# All inputs come from the SAME source X (self-attention)
+        code_snippet: `# Self-attention: all from the SAME input X
+Q = X @ W_Q  # What is each token looking for?
+K = X @ W_K  # What does each token advertise/offer?
+V = X @ W_V  # What content does each token contribute?
 
-Q = X @ W_Q  # "What is each token looking for?"
-K = X @ W_K  # "What does each token offer/advertise?"
-V = X @ W_V  # "What information does each token contribute if attended to?"
+# Score: how relevant is token j to query token i?
+score_ij = dot(Q[i], K[j]) / sqrt(d_k)
 
-# Attention score(i, j) = Q_i · K_j  / √d_k
-# = "How well does what token j offers match what token i seeks?"
-
-# Output[i] = Σ_j softmax(score(i,j)) × V_j
-# = weighted combination of all values, weighted by relevance`,
+# Output: weighted sum of values
+output_i = sum(softmax(scores_i) * V)`,
         choices: [
-          { id: "a", label: "Q, K, V are just three copies of the input with different weights to prevent gradient collapse.", description: "Q, K, V serve distinct semantic roles — they are not merely regularization copies. Each has a specific function in the attention computation." },
-          { id: "b", label: "Query is what each token seeks; Key is what each token advertises; Value is the content contributed when a token is attended to. The dot product of Q and K measures relevance, and the softmax-weighted average of V produces the output.", description: "Correct. This is the foundational intuition. Q asks a question about relevance; K is the token's answer to what it can offer; V is the actual content delivered. The Q·K dot product is the relevance score, and V is what you receive when you attend." },
-          { id: "c", label: "Q controls which layers are active; K controls attention head selection; V controls the output projection.", description: "None of these descriptions are accurate. Q, K, V all operate within a single attention layer and head — they do not control layer/head selection." },
-          { id: "d", label: "Q, K, and V are used only during training; at inference time, they are replaced by cached activations.", description: "Q, K, V are computed at every forward pass during both training and inference. The KV cache stores K and V for previously generated tokens to avoid recomputation — Q is always freshly computed for the current token." },
+          { id: "a", label: "Q, K, V are three identical copies of the input — used to prevent gradient collapse", description: "They serve distinct roles, not just different initialization." },
+          { id: "b", label: "Query = what a token seeks; Key = what it advertises; Value = content it contributes when attended to", description: "Q·K dot product measures relevance; softmax-weighted V produces output." },
+          { id: "c", label: "Q selects active layers; K selects attention heads; V controls the output projection", description: "These are not layer or head selection mechanisms." },
+          { id: "d", label: "Q, K, V are only computed during training; at inference they are replaced by cached activations", description: "Q must always be computed from the new token; K and V are what get cached." },
         ],
-        branches: { a: "f3_stage2", b: "f3_stage2", c: "f3_stage2", d: "f3_stage2" },
-        rationale: "The Q-K-V formulation is a learned soft retrieval mechanism. Each token generates a query (what am I looking for?), each token presents a key (here's what I have), and the dot product scores how well each key matches the query. The softmax normalizes these scores into attention weights. The value vectors are then combined according to those weights — tokens with high relevance contribute more to the output representation. Different attention heads learn different notions of relevance (syntactic, semantic, positional), producing a rich multi-perspective representation.",
+        branches: { a: "f3_mha", b: "f3_mha", c: "f3_mha", d: "f3_mha" },
+        rationale: "Q-K-V is a learned soft retrieval system. Each token queries for relevant context (Q), each token advertises what it can contribute (K), and each token's content is extracted when attended to (V). The Q·K dot product measures relevance; softmax converts scores to probabilities; the output is a weighted combination of V vectors. This is why K and V can be cached at inference (they depend only on past tokens) while Q must be computed fresh for each new token.",
+      },
+      f3_mha_recovery: {
+        id: "f3_mha_recovery",
+        type: "scenario_choice",
+        badge: "Recovery · Multi-Head Attention",
+        title: "Recovery · What each attention head captures",
+        prompt: "Interpretability research visualizes trained BERT attention heads: Head 1 strongly attends to the grammatical subject; Head 4 attends across sentence boundaries. What does this tell us?",
+        code_snippet: `# Observed specialization in a trained transformer (BERT-base)
+# Head 1:  syntactic subject tracking
+# Head 2:  tokens within the same noun phrase
+# Head 4:  long-range coreference across sentences
+# Head 7:  [SEP] token (sequence boundary signal)
+# Head 11: immediate previous token (local dependency)
+
+# Each head has independent weight matrices:
+# W_Q_i, W_K_i, W_V_i in R^(d_model x d_k)
+# Outputs: [h_1; h_2; ...; h_n] @ W_O  (concat + project)`,
+        choices: [
+          { id: "a", label: "Heads are redundant by design — training learns to prune most of them", description: "Redundancy exists but is an inefficiency, not a design goal." },
+          { id: "b", label: "Each head captures a different type of relationship — the model builds a richer multi-dimensional representation than any single head could", description: "This is the functional justification for multi-head attention." },
+          { id: "c", label: "Heads split the vocabulary — head 1 handles nouns, head 2 handles verbs", description: "Heads split the representation space (d_k dimensions), not the token vocabulary." },
+          { id: "d", label: "Multi-head specialization only occurs in multilingual models", description: "Specialization is observed in monolingual models too." },
+        ],
+        branches: { a: "f3_stage3", b: "f3_stage3", c: "f3_stage3", d: "f3_stage3" },
+        rationale: "Head specialization is empirical evidence for multi-head attention's value. Different heads learn qualitatively different relationships (syntax, coreference, positional, semantic). Concatenating these diverse representations before the output projection gives each token a richer context vector. A single head of the same total dimension would need to blend all relationship types into one global attention distribution.",
       },
       f3_recovery2: {
         id: "f3_recovery2",
         type: "scenario_choice",
         badge: "Recovery · KV Cache",
         title: "Recovery · KV cache purpose and trade-offs",
-        prompt: "Without a KV cache, generating 1000 tokens with a 32-layer transformer would be extremely slow. Why, and what does the KV cache do to fix it?",
-        code_snippet: `# Without KV cache: generating token 1000
-# Must compute K and V for tokens 1-999 AGAIN (redundant!)
-for token_idx in range(1000):
-    Q, K, V = project(all_tokens[:token_idx+1])  # full recompute
-    output = attention(Q, K, V)  # O(token_idx²) each step
+        prompt: "Without a KV cache, generating 1000 tokens with a 32-layer transformer is extremely slow. Why, and what does the KV cache fix?",
+        code_snippet: `# Without KV cache: generating token t requires recomputing
+# K and V for ALL tokens 0..t-1 from scratch
+for t in range(1000):
+    Q, K, V = project(all_tokens[:t+1])  # full O(t) recompute!
+    output = attention(Q, K, V)           # O(t^2) per step
 
-# Total cost: O(1²) + O(2²) + ... + O(1000²) ≈ O(n³)
+# Total cost: O(n^3) for n tokens
 
-# With KV cache: generating token 1000
-kv_cache = {}  # stores K, V for tokens 1-999
-Q_new, K_new, V_new = project(token_1000)  # only new token
-kv_cache[1000] = (K_new, V_new)
-K_all = concat(kv_cache.values(), K_new)
-output = attention(Q_new, K_all, V_all)  # O(n) per step, O(n²) total`,
+# With KV cache:
+for t in range(1000):
+    Q_t, K_t, V_t = project(token[t])  # only the new token
+    K_cache.append(K_t)
+    V_cache.append(V_t)
+    output = attention(Q_t, K_cache, V_cache)  # O(t) per step
+
+# Total cost: O(n^2) — saves the inner O(n) recompute`,
         choices: [
-          { id: "a", label: "The KV cache stores model weights to avoid reloading them from disk at each generation step.", description: "Model weights are loaded once into GPU memory before any generation begins. The KV cache stores intermediate activations (K and V tensors), not weights." },
-          { id: "b", label: "The KV cache stores K and V tensors for previously generated tokens so they don't need to be recomputed at each step, reducing per-step cost from O(n²) to O(n).", description: "Correct. Without the cache, generating each new token would require recomputing K and V for all prior tokens — redundant work. The cache stores these tensors and only computes K, V for the new token at each step, making generation O(n) per step instead of O(n²)." },
-          { id: "c", label: "The KV cache reduces memory usage by compressing attention weights using quantization.", description: "The KV cache increases memory usage (stores K, V tensors) but dramatically reduces compute. Quantization is a separate optimization that can be applied to KV cache tensors to reduce their size." },
-          { id: "d", label: "The KV cache allows batching multiple user requests together by sharing keys and values across users.", description: "KV cache is per-sequence — it stores the cached context for one generation sequence. Shared KV prefixes (prefix caching) is a related but distinct optimization for sharing common prefixes like system prompts across requests." },
+          { id: "a", label: "KV cache stores model weights to avoid reloading from disk", description: "Model weights are always in GPU memory — KV cache is separate." },
+          { id: "b", label: "KV cache stores K and V tensors for all past tokens — no recomputation needed, per-step cost drops from O(seq^2) to O(seq)", description: "This is the core inference optimization." },
+          { id: "c", label: "KV cache compresses attention weights via quantization", description: "KV quantization exists as a further optimization, but it is separate from the basic KV cache." },
+          { id: "d", label: "KV cache lets multiple users share K and V across requests", description: "That is prompt/prefix caching — a different technique." },
         ],
-        branches: { a: "f3_stage3", b: "f3_stage3", c: "f3_stage3", d: "f3_stage3" },
-        rationale: "The KV cache is the most important inference optimization in transformer-based LLMs. Without it, generating N tokens requires recomputing K and V for all previous tokens at each step — O(n²) per step, O(n³) total. With the cache, each step only computes K and V for the one new token (O(1) compute for the new keys/values, O(n) for the attention over all cached K/V). The cost is memory: the cache grows linearly with sequence length, and for long sequences with large models, it dominates GPU memory usage.",
+        branches: { a: "f3_flash", b: "f3_flash", c: "f3_flash", d: "f3_flash" },
+        rationale: "Without KV cache, generating token t requires recomputing K and V for all t-1 previous tokens — O(n³) total. With KV cache, each step only computes K, V for the new token and appends them; the model attends over the cached values. Total cost becomes O(n²). The tradeoff: KV cache memory grows linearly with sequence length (hence the 1 GB/request calculation in Stage 4).",
       },
-      f3_terminal: {
-        id: "f3_terminal",
+      f3_flash_recovery: {
+        id: "f3_flash_recovery",
         type: "scenario_choice",
-        badge: "Stage 4 · Final Challenge",
-        title: "Stage 4 · What breaks without positional encodings?",
-        prompt: "An interviewer asks: 'If you removed positional encodings entirely from a transformer, what would and would not break?' What is the most accurate and complete answer?",
-        code_snippet: `# Transformer without positional encodings
-# Each token embedding: only semantic content, no position signal
+        badge: "Recovery · Flash Attention",
+        title: "Recovery · IO-bound vs compute-bound",
+        prompt: "A profiler shows: compute units 25% utilized, HBM bandwidth 100% saturated. What is the correct optimization strategy?",
+        code_snippet: `# GPU profiling output
+compute_utilization  = 25%   # ALUs mostly idle
+memory_bandwidth     = 100%  # HBM fully saturated
 
-# Self-attention is permutation-invariant:
-tokens_1 = ["The", "cat", "sat", "on", "the", "mat"]
-tokens_2 = ["mat", "the", "on", "sat", "cat", "The"]  # shuffled
+# Standard attention intermediates (n=2048, fp16, 1 layer):
+n x n scores  = 2048 x 2048 x 2 bytes =  8 MB  (written to HBM)
+n x n weights = 2048 x 2048 x 2 bytes =  8 MB  (written to HBM)
+output        = 2048 x 128  x 2 bytes =  0.5 MB
 
-# Without positional encodings:
-# attention(tokens_1) == attention(tokens_2)
-# Output is identical regardless of word order!`,
+# 16 MB of HBM traffic to produce 0.5 MB of useful output
+# Roofline model: IO-bound, not compute-bound`,
         choices: [
-          { id: "a", label: "Nothing would break for short sentences; positional encodings only help for sequences longer than 512 tokens.", description: "Word order matters even for two-word sequences. 'Dog bites man' vs 'Man bites dog' have opposite meanings. Positional encodings are not a long-sequence optimization — they are fundamental to any sequence understanding." },
-          { id: "b", label: "The model would be unable to distinguish word order, treating all permutations of the same words as identical. Tasks requiring sequential understanding (subject-verb agreement, dependency parsing, causal reasoning) would fail completely. Bag-of-words style tasks (topic classification) might partially survive.", description: "Correct. Without positional encodings, attention is permutation-invariant — 'cat bites dog' and 'dog bites cat' produce the same representations. Any task where meaning depends on word order (syntax, semantics, most NLP tasks) would fail. Only tasks where word order doesn't matter (e.g., detecting that a document is about finance vs medicine) might partially work." },
-          { id: "c", label: "The model would lose the ability to generate text but could still classify documents correctly.", description: "Classification would also fail for order-dependent tasks. Subject-verb agreement, negation, causal relationships — all require positional awareness. And generation without positional encodings would produce word-order-incoherent output even for short sequences." },
-          { id: "d", label: "Only the first and last tokens would be affected; middle tokens would retain their positional information through the attention pattern.", description: "Without explicit positional signals, no token has any positional information. The attention pattern itself is the output of attention, not an input — it cannot provide positional information that wasn't in the Q and K projections." },
+          { id: "a", label: "Add more compute-intensive operations to keep ALUs busy", description: "Adding compute to an IO-bound workload does not improve throughput." },
+          { id: "b", label: "Fuse operations and keep intermediate results in fast on-chip SRAM — reduce HBM round-trips", description: "This is the Flash Attention approach: tile to SRAM, compute locally, write only the final output." },
+          { id: "c", label: "Switch to a smaller model — HBM bandwidth is proportional to parameter count", description: "The bottleneck is the n×n attention matrix, not parameter count." },
+          { id: "d", label: "Increase batch size to amortize HBM access cost per token", description: "Larger batches increase the n×n matrices, making the IO bottleneck worse." },
         ],
         branches: { a: "f3_terminal", b: "f3_terminal", c: "f3_terminal", d: "f3_terminal" },
-        rationale: "Positional encodings solve a fundamental structural problem: self-attention is a set operation that ignores order. Without them, 'I am not happy' and 'I am happy not' are indistinguishable. Nearly every NLP task — parsing, translation, QA, generation — depends on word order. The one exception is tasks where word order truly doesn't matter (keyword-based document classification), but these are rare in practice. Modern positional encodings (RoPE, ALiBi) are designed to be relative rather than absolute, which helps with length generalization beyond the training sequence length.",
-        terminal: true,
+        rationale: "An IO-bound workload requires reducing memory round-trips, not adding compute. Flash Attention tiles Q, K, V blocks to fit in fast on-chip SRAM (20-40 MB, 10-40x faster than HBM) and computes the attention output entirely within each tile. The n×n attention matrix is never written to HBM. Result: same output, same numerics, but 16x less HBM traffic for n=2048.",
       },
     },
   },
@@ -18451,113 +18554,157 @@ The assistant turn is your ground truth — your labeled data. Collecting 500–
 `,
   tryGuidance: "Use the interactive visualization to explore how the three strategies compare across real decision dimensions. Select a use case scenario and trace which strategy (or combination) best fits. Pay attention to the trade-off sliders — cost, freshness, consistency — and how they shift the optimal choice. Try the hybrid mode to see how RAG and fine-tuning complement each other in production architectures.",
   interviewGraph: {
-    initialStageId: "f4_stage1",
+    initialStageId: "f4_intro",
     artifactDimensions: [
       { label: "Strategy Selection", recoveryStageId: "f4_stage1_recovery" },
       { label: "Trade-off Analysis", recoveryStageId: "f4_stage2_recovery" },
-      { label: "Hybrid Architectures", recoveryStageId: "f4_stage3", passLabel: "Production Architect" },
+      { label: "Prompting Limits", recoveryStageId: "f4_prompting_recovery", passLabel: "LLM Architect" },
     ],
     stages: {
+      f4_intro: {
+        id: "f4_intro",
+        type: "click_target",
+        badge: "Stage 1 · Strategy Audit",
+        title: "Stage 1 · Spot the wrong strategy",
+        prompt: "A team filed this Architecture Decision Record for their AI customer support bot. One selected strategy will cause the system to give stale, incorrect answers within hours of deployment. Click it.",
+        code_snippet: `# Architecture Decision Record: AI Customer Support Bot
+# SaaS platform — 2M SKUs, pricing and plan limits updated hourly
+
+STRATEGY_DECISION = {
+  "problem": "Users ask about current pricing and plan feature limits",
+  "data_freshness": "Pricing changes daily; plan limits change hourly",
+
+  "selected": "Fine-tune GPT-4o on pricing docs — quarterly refresh",  -- ds-target:f4_wrong_finetune
+  "rejected": [
+    "RAG with live pricing database",       # 'too complex to build'
+    "Dynamic prompts with current context"  # 'context window too small'
+  ],
+  "rationale": "Fine-tuned weights eliminate retrieval latency"
+}`,
+        validationCopy: {
+          f4_wrong_finetune: "Correct. Fine-tuning encodes knowledge in static weights. With pricing changing hourly and a quarterly refresh schedule, the model is stale within hours and will confidently quote wrong prices. RAG backed by a live pricing database always reflects current state, provides citation provenance, and needs no retraining as data changes.",
+        },
+        branches: { f4_wrong_finetune: "f4_stage1" },
+      },
       f4_stage1: {
         id: "f4_stage1",
         type: "scenario_choice",
-        badge: "Stage 1",
-        title: "Stage 1 · Strategy Selection",
-        prompt: "A legal firm has 100,000 proprietary case documents. Lawyers need to find relevant precedents quickly — and new cases are filed every day. Which primary adaptation strategy do you recommend?",
+        badge: "Stage 2 · Strategy Selection",
+        title: "Stage 2 · Strategy Selection",
+        prompt: "A legal firm has 100,000 proprietary case documents. Lawyers need to find relevant precedents quickly, and new cases are filed every day. Which primary adaptation strategy do you recommend?",
         choices: [
-          { id: "a", label: "Prompting (few-shot)", description: "Give the model example case lookups in the system prompt and let it answer from its training data." },
-          { id: "b", label: "RAG", description: "Embed all case documents into a vector store; retrieve relevant cases at query time and inject them into context." },
-          { id: "c", label: "Fine-tuning on all documents", description: "Fine-tune the model on the full corpus of 100K cases so the knowledge is baked into the weights." },
-          { id: "d", label: "No LLM needed — use full-text search", description: "Build a traditional keyword search system over the document store." },
+          { id: "a", label: "Prompting (few-shot)", description: "Include example precedents directly in the prompt." },
+          { id: "b", label: "RAG", description: "Vector-index all 100K documents; retrieve relevant precedents at query time." },
+          { id: "c", label: "Fine-tuning on all documents", description: "Train the model on the full case corpus." },
+          { id: "d", label: "Full-text search only — no LLM", description: "Traditional BM25/TF-IDF is sufficient for legal research." },
         ],
-        branches: {
-          a: "f4_stage1_recovery",
-          b: "f4_stage2",
-          c: "f4_stage1_recovery",
-          d: "f4_stage1_recovery",
-        },
-        rationale: "RAG is the correct choice here. The corpus is large (100K documents — far exceeding any context window), new cases arrive daily (freshness is critical — fine-tuning would immediately go stale), and lawyers need citations pointing to specific source documents (RAG provides provenance; fine-tuning does not). Prompting alone cannot surface documents the model was never trained on. Traditional full-text search is useful as part of a hybrid retriever (BM25 + dense embeddings) but doesn't leverage the LLM's synthesis capability.",
-      },
-      f4_stage1_recovery: {
-        id: "f4_stage1_recovery",
-        type: "scenario_choice",
-        badge: "Stage 1 · Recovery",
-        title: "Stage 1 Recovery · Strategy Selection",
-        prompt: "Let's revisit. The firm has 100K documents updated daily, and lawyers need source citations. Prompting can't access unseen documents. Fine-tuning goes stale and loses provenance. Which strategy handles large, fresh, citable document collections?",
-        choices: [
-          { id: "a", label: "Prompting with a very large context window", description: "Use a 1M-token context model and stuff all documents in." },
-          { id: "b", label: "RAG with a vector store", description: "Embed documents, retrieve relevant chunks at inference time." },
-          { id: "c", label: "Fine-tuning quarterly", description: "Retrain on the full corpus every three months." },
-          { id: "d", label: "Rule-based retrieval only", description: "Use keyword matching without any LLM synthesis." },
-        ],
-        branches: {
-          a: "f4_stage2",
-          b: "f4_stage2",
-          c: "f4_stage2",
-          d: "f4_stage2",
-        },
-        rationale: "RAG is the right answer. Even with million-token context windows, stuffing 100K full documents is economically prohibitive (cost scales with tokens) and quality degrades with very long contexts (lost-in-the-middle problem). Quarterly fine-tuning is too slow for daily updates and loses provenance. RAG handles all three requirements: scale, freshness, and citations.",
+        branches: { a: "f4_stage1_recovery", b: "f4_stage2", c: "f4_stage1_recovery", d: "f4_stage1_recovery" },
+        rationale: "RAG is correct. The corpus is large (100K documents — exceeds any context window), new cases arrive daily (stale fine-tunes become wrong), and lawyers need source citations (fine-tuning loses provenance). RAG handles all three: live index, accurate retrieval, traceable sources, no retraining.",
       },
       f4_stage2: {
         id: "f4_stage2",
         type: "scenario_choice",
-        badge: "Stage 2",
-        title: "Stage 2 · Trade-off Analysis",
-        prompt: "A different problem: the LLM correctly understands legal concepts, but it consistently formats case citations incorrectly — writing 'Smith v. Jones 2020' instead of the required Bluebook format 'Smith v. Jones, 123 F.3d 456 (2d Cir. 2020)'. Which strategy most reliably fixes this?",
+        badge: "Stage 3 · Trade-off Analysis",
+        title: "Stage 3 · Trade-off Analysis",
+        prompt: "The LLM correctly understands legal concepts, but consistently formats citations wrong — 'Smith v. Jones 2020' instead of Bluebook format 'Smith v. Jones, 123 F.3d 456 (2d Cir. 2020)'. Which strategy most reliably fixes this?",
         choices: [
-          { id: "a", label: "RAG — retrieve correct citation formats", description: "Build a vector store of correctly formatted citations and retrieve them to guide the model." },
-          { id: "b", label: "Fine-tuning — train on correctly formatted examples", description: "Collect (input, correctly formatted output) pairs and fine-tune the model to internalize the citation format." },
-          { id: "c", label: "More detailed prompting only", description: "Add a thorough system prompt explaining Bluebook citation format with examples." },
-          { id: "d", label: "Post-processing regex", description: "Parse model output and reformat citations with a rule-based system." },
+          { id: "a", label: "RAG — retrieve correctly formatted citations", description: "Retrieval brings in examples but does not change how the model generates." },
+          { id: "b", label: "Fine-tuning — train on correctly formatted citation examples", description: "Directly teaches the generation behavior." },
+          { id: "c", label: "Longer system prompt with format instructions", description: "Prompting can help but degrades under long context." },
+          { id: "d", label: "Post-processing regex to reformat citations", description: "Brittle — any citation variant breaks the regex." },
         ],
-        branches: {
-          a: "f4_stage2_recovery",
-          b: "f4_stage3",
-          c: "f4_stage3",
-          d: "f4_stage2_recovery",
-        },
-        rationale: "Fine-tuning is the best primary fix for consistent output format. This is a behavior problem, not a knowledge problem — the model knows what Smith v. Jones means, it just formats it wrong. Fine-tuning on (input, correctly-formatted output) pairs bakes the format into the model's generation behavior. Detailed few-shot prompting is also a valid lightweight first attempt — it can work well for format consistency and has near-zero cost. RAG won't help here: the issue isn't missing knowledge, it's inconsistent formatting behavior. Post-processing regex is fragile and doesn't scale to the diversity of legal citation patterns.",
+        branches: { a: "f4_stage2_recovery", b: "f4_prompting", c: "f4_stage2_recovery", d: "f4_stage2_recovery" },
+        rationale: "Fine-tuning is the right lever for consistent output format. This is a behavior problem, not a knowledge gap — the model knows the cases, it just generates the wrong format. RAG retrieves data but does not change how the model writes; prompting drifts; fine-tuning directly shapes generation behavior.",
       },
-      f4_stage2_recovery: {
-        id: "f4_stage2_recovery",
+      f4_prompting: {
+        id: "f4_prompting",
         type: "scenario_choice",
-        badge: "Stage 2 · Recovery",
-        title: "Stage 2 Recovery · Trade-off Analysis",
-        prompt: "The citation format problem is a behavior issue, not a knowledge gap. The model knows the cases — it just doesn't format them right. RAG retrieves knowledge. Post-processing is brittle. Which lever directly changes how the model generates output format?",
+        badge: "Stage 4 · Prompting Limits",
+        title: "Stage 4 · When is prompting enough?",
+        prompt: "A startup needs the LLM to always respond in JSON with a fixed schema: {intent, entities, confidence}. They have 500 labeled examples and a standard GPT-4o API subscription. Most cost-effective first approach?",
+        code_snippet: `# Target output schema (every response must match)
+{
+  "intent": "book_flight",
+  "entities": [
+    {"type": "destination", "value": "Paris"},
+    {"type": "date",        "value": "2024-03-15"}
+  ],
+  "confidence": 0.87
+}
+
+# Available:
+# - 500 labeled (input, expected_output) pairs
+# - GPT-4o API with JSON mode / structured outputs
+# - No GPU for self-hosted fine-tuning`,
         choices: [
-          { id: "a", label: "Fine-tuning on format examples", description: "Train the model to produce correctly formatted citations every time." },
-          { id: "b", label: "RAG with format templates", description: "Retrieve citation format templates from a vector store." },
-          { id: "c", label: "Larger base model", description: "Upgrade to a bigger model — it'll know the format." },
-          { id: "d", label: "Hard-code all citations", description: "Build a lookup table for every known case citation." },
+          { id: "a", label: "Fine-tune GPT-4o-mini on all 500 examples immediately", description: "Upfront training + deployment overhead for a task prompting can handle." },
+          { id: "b", label: "Few-shot prompting with 5-10 examples + JSON mode (structured outputs) in the API", description: "Fastest to ship; enforces schema via grammar-constrained decoding." },
+          { id: "c", label: "RAG — retrieve similar past examples to guide output format", description: "Adding retrieval overhead for a pure-format constraint is over-engineering." },
+          { id: "d", label: "Build a rule-based NER pipeline — LLMs are overkill here", description: "Rule-based NER requires extensive hand-engineering and misses semantic cases." },
         ],
-        branches: {
-          a: "f4_stage3",
-          b: "f4_stage3",
-          c: "f4_stage3",
-          d: "f4_stage3",
-        },
-        rationale: "Fine-tuning (or detailed few-shot prompting) directly addresses consistent output format. RAG with templates is a creative approach but adds retrieval overhead for what is fundamentally a style problem — it's not the right tool. A larger model may happen to know Bluebook format better, but it doesn't guarantee consistency. The key insight: format/style = fine-tuning; knowledge/facts = RAG.",
+        branches: { a: "f4_prompting_recovery", b: "f4_stage3", c: "f4_prompting_recovery", d: "f4_prompting_recovery" },
+        rationale: "Prompting with JSON mode (structured outputs) is the right first choice. The task is a well-defined format constraint, not a knowledge gap. Modern APIs enforce schema compliance via grammar-constrained decoding — no fine-tuning needed. Fine-tune only when prompt approaches consistently fail after iteration, OR when per-token cost matters at very high volume (millions of requests/day where a smaller fine-tuned model pays back the training cost).",
       },
       f4_stage3: {
         id: "f4_stage3",
         type: "scenario_choice",
-        badge: "Stage 3",
-        title: "Stage 3 · Hybrid Architectures",
-        prompt: "A junior engineer proposes: 'Instead of building RAG infrastructure, let's just fine-tune the model on all 100K case documents. Then we have the knowledge in the weights and don't need a vector store.' What is the most complete and accurate rebuttal?",
+        badge: "Stage 5 · Hybrid Architecture",
+        title: "Stage 5 · Hybrid Architecture Challenge",
+        prompt: "A junior engineer proposes: 'Instead of RAG infrastructure, let's fine-tune on all 100K case documents. Then knowledge is in the weights and we skip the vector store.' What is the most complete and accurate rebuttal?",
         choices: [
-          { id: "a", label: "Fine-tuning doesn't scale — 100K documents is too many training examples", description: "The training dataset would be too large to process efficiently." },
-          { id: "b", label: "Fine-tuning on documents causes hallucination, loses freshness, and provides no provenance — RAG solves all three", description: "The model learns statistical patterns, not a queryable knowledge base; new documents require retraining; and there is no citation trail." },
-          { id: "c", label: "Fine-tuning is too expensive and RAG is cheaper", description: "The primary issue is cost, not correctness." },
-          { id: "d", label: "The model might forget other knowledge due to catastrophic forgetting", description: "Training on legal documents would overwrite general language understanding." },
+          { id: "a", label: "Fine-tuning cannot handle 100K training examples at that scale", description: "100K is actually a reasonable fine-tuning dataset size." },
+          { id: "b", label: "Fine-tuning on documents causes three compounding failures: knowledge goes stale, hallucinations increase, and source provenance disappears", description: "All three are real and serious for this use case." },
+          { id: "c", label: "Fine-tuning costs too much — that alone rules it out", description: "Cost matters but is not the primary or most complete argument." },
+          { id: "d", label: "Catastrophic forgetting would erase other legal knowledge", description: "A real concern, but not the most complete rebuttal." },
         ],
-        branches: {
-          a: "f4_stage3",
-          b: "f4_stage3",
-          c: "f4_stage3",
-          d: "f4_stage3",
-        },
+        branches: { a: "f4_stage3", b: "f4_stage3", c: "f4_stage3", d: "f4_stage3" },
         terminal: true,
-        rationale: "Option B is the most complete and accurate rebuttal, hitting all three critical failure modes: (1) Hallucination — fine-tuning on facts does not make the model reliably recall them; it learns surface statistical patterns and will confidently fabricate plausible-sounding citations. (2) No freshness — as new cases are filed, the fine-tuned model is immediately stale; RAG indexes updates in minutes while retraining takes days. (3) No provenance — regulated industries need to know which document produced an answer; fine-tuning buries knowledge diffusely across billions of weights with no audit trail. Cost (C) and catastrophic forgetting (D) are real concerns but secondary to the fundamental architectural mismatch. The correct mental model: fine-tuning teaches behavior, RAG provides knowledge.",
+        rationale: "Option B is the most complete rebuttal. (1) Staleness: new cases filed daily make the fine-tuned model wrong within days. (2) Hallucination: fine-tuning on documents teaches the model to sound like those documents, not to retrieve accurately — it invents citations. (3) Provenance: lawyers need 'this conclusion comes from case X, paragraph Y'; fine-tuned weights cannot provide this. RAG solves all three: live index, grounded retrieval, traceable citations.",
+      },
+      f4_stage1_recovery: {
+        id: "f4_stage1_recovery",
+        type: "scenario_choice",
+        badge: "Recovery · Strategy Selection",
+        title: "Recovery · Strategy Selection",
+        prompt: "Revisit: 100K documents updated daily, lawyers need citations. Prompting cannot access unseen documents. Fine-tuning goes stale and loses provenance. Which strategy handles large, fresh, citable corpora?",
+        choices: [
+          { id: "a", label: "Prompting with a very large context window", description: "Even 1M context windows cannot hold 100K full legal documents." },
+          { id: "b", label: "RAG with a vector store", description: "Index all documents; retrieve the relevant ones at query time." },
+          { id: "c", label: "Quarterly fine-tuning", description: "Stale within days; loses citation provenance." },
+          { id: "d", label: "Rule-based keyword retrieval", description: "Cannot handle semantic queries like 'precedents where defendant argued entrapment'." },
+        ],
+        branches: { a: "f4_stage2", b: "f4_stage2", c: "f4_stage2", d: "f4_stage2" },
+        rationale: "RAG. Even million-token context windows cannot hold 100K full documents economically. Fine-tuning goes stale (daily updates) and loses provenance. RAG retrieves only what is relevant from a live index, always current, with traceable citations — the right architecture for large, dynamic, citable document collections.",
+      },
+      f4_stage2_recovery: {
+        id: "f4_stage2_recovery",
+        type: "scenario_choice",
+        badge: "Recovery · Trade-off Analysis",
+        title: "Recovery · Behavior vs knowledge",
+        prompt: "The citation format problem is a behavior issue — the model knows the cases, it just formats them wrong. Which lever directly changes generation behavior?",
+        choices: [
+          { id: "a", label: "Fine-tuning on correctly formatted examples", description: "Teaches the generation behavior directly." },
+          { id: "b", label: "RAG with format templates", description: "Retrieves examples but does not change how the model generates." },
+          { id: "c", label: "Switch to a larger base model", description: "Larger models follow instructions better but do not guarantee a specific format." },
+          { id: "d", label: "Hard-code all citations after generation", description: "Brittle and requires maintaining a separate citation database." },
+        ],
+        branches: { a: "f4_prompting", b: "f4_prompting", c: "f4_prompting", d: "f4_prompting" },
+        rationale: "Fine-tuning directly shapes generation behavior. RAG retrieves data but the model still generates in its old style. Fine-tuning — or careful multi-shot prompting with format examples — is the correct lever when the problem is consistent output formatting rather than missing knowledge.",
+      },
+      f4_prompting_recovery: {
+        id: "f4_prompting_recovery",
+        type: "scenario_choice",
+        badge: "Recovery · Prompting Limits",
+        title: "Recovery · When volume flips the decision",
+        prompt: "Same startup, 6 months later: 10M requests/day, $50K/month on GPT-4o for JSON formatting. Fine-tuning GPT-4o-mini on 500 examples costs $200 upfront and 10x cheaper per token. Does this change the recommendation?",
+        choices: [
+          { id: "a", label: "Yes — at scale, a fine-tuned smaller model pays back its training cost within days", description: "Prompting is only cheaper below a request-volume threshold." },
+          { id: "b", label: "No — GPT-4o quality justifies the cost regardless of volume", description: "Cost optimization at 10M requests/day is a real engineering requirement." },
+          { id: "c", label: "Switch to regex — avoid LLMs entirely at that scale", description: "The task still requires language understanding for intent and entity extraction." },
+          { id: "d", label: "Add aggressive caching — most requests are duplicates", description: "Caching helps for repeated inputs but does not solve the unique-request cost." },
+        ],
+        branches: { a: "f4_stage3", b: "f4_stage3", c: "f4_stage3", d: "f4_stage3" },
+        rationale: "At high volume, fine-tuning a smaller model is the correct cost optimization. At 10M requests/day, even a 10x cost reduction ($5K vs $50K/month) pays back $200 training cost in hours. The decision framework: start with prompting (fast iteration), graduate to fine-tuning when (a) prompting fails consistently, or (b) per-token cost at scale makes a smaller fine-tuned model economically dominant.",
       },
     },
   },
@@ -23023,16 +23170,17 @@ The MCP runtime handles marshalling, schema generation, and protocol negotiation
     initialStageId: "ag1_schema_audit",
     artifactDimensions: [
       { label: "Tool Schema Design", recoveryStageId: "ag1_loop_recovery" },
-      { label: "Tool Safety", recoveryStageId: "ag1_privilege_recovery" },
-      { label: "Error Handling", recoveryStageId: "ag1_mcp_terminal", passLabel: "Production Readiness" },
+      { label: "Agentic Safety", recoveryStageId: "ag1_loop_recovery" },
+      { label: "Parallel Tool Calls", recoveryStageId: "ag1_parallel_recovery" },
+      { label: "Error Handling", recoveryStageId: "ag1_error_recovery", passLabel: "Agent Architect" },
     ],
     stages: {
       ag1_schema_audit: {
         id: "ag1_schema_audit",
         type: "click_target",
-        badge: "Stage 1",
+        badge: "Stage 1 · Schema Audit",
         title: "Stage 1 · Tool Schema Audit",
-        prompt: "Below is a tool definition for a data warehouse agent. One element will critically mislead the model and cause wrong tool selection. Click the part of the schema that is the highest-risk problem.",
+        prompt: "Below is a tool definition for a data warehouse agent. One element will critically mislead the model and cause wrong tool selection. Click the highest-risk problem.",
         code_snippet: `tools = [
   {
     "type": "function",
@@ -23042,26 +23190,25 @@ The MCP runtime handles marshalling, schema generation, and protocol negotiation
       "parameters": {
         "type": "object",
         "properties": {
-          "sql": {
+          "sql_query": {
             "type": "string",  -- ds-target:ag1_sql_param
-            "description": "SQL query to run"
+            "description": "The SQL query to execute"
           },
           "limit": {
             "type": "integer",  -- ds-target:ag1_limit_param
-            "description": "Max rows to return",
-            "default": 100
+            "description": "Maximum rows to return"
           }
         },
-        "required": ["sql"]  -- ds-target:ag1_required
+        "required": ["sql_query"]  -- ds-target:ag1_required
       }
     }
   }
 ]`,
         validationCopy: {
-          ag1_vague_description: "Correct. The description 'Query database.' is critically vague — the model has no signal about which database, what data it contains, when to use it vs. other tools, or what it returns. This causes wrong tool selection and hallucinated arguments. A production description should state: (1) what system it connects to, (2) what data it covers, (3) when to use it, (4) when NOT to use it with explicit alternatives, and (5) the return format.",
-          ag1_sql_param: "The SQL param type is fine — 'string' is correct. But the description 'SQL query to run' is also too vague (doesn't say read-only, doesn't say which SQL dialect). The bigger problem is the tool description itself, not a single parameter.",
-          ag1_limit_param: "The limit param is acceptable — a reasonable safety default. This isn't the highest-risk element. The tool description is the model's primary signal for tool selection, and that description is the critical failure point.",
-          ag1_required: "The required array is correct — sql should be required. This isn't the problem. The tool description 'Query database.' is what will cause the model to misuse this tool.",
+          ag1_vague_description: "Correct. The description field is the highest-leverage element. The LLM cannot inspect the implementation — it reads only the description to decide when to call this tool and how to construct arguments. 'Query database.' provides no schema, no scope, no read/write status. A good description: 'Query the production data warehouse (read-only). Tables available: orders, users, products, events. Scope: current fiscal year unless date range specified.'",
+          ag1_sql_param: "The sql_query param description is acceptable. The more dangerous issue is the vague top-level description — it prevents the model from knowing when or how to use this tool at all.",
+          ag1_limit_param: "The limit param is optional and typed correctly. The vague top-level description is the higher-risk element.",
+          ag1_required: "Making sql_query required is correct design. The vague description is the higher-risk issue.",
         },
         branches: {
           ag1_vague_description: "ag1_loop_scenario",
@@ -23069,108 +23216,202 @@ The MCP runtime handles marshalling, schema generation, and protocol negotiation
           ag1_limit_param: "ag1_loop_scenario",
           ag1_required: "ag1_loop_scenario",
         },
-        rationale: "The description field is the highest-leverage element in any tool schema. The model cannot inspect the underlying implementation — it uses only the name and description to decide when and how to call the tool. 'Query database.' provides zero guidance: the model doesn't know which database, what data lives there, when to prefer this tool over another, or what format the results come in. Good descriptions follow the 4-element pattern: what it does, when to use it, when NOT to use it, and what it returns.",
+        rationale: "The description field is the primary signal the LLM uses to decide (1) whether to call this tool and (2) how to construct its arguments. 'Query database.' is dangerously vague — the model has no idea what data is available, whether writes are permitted, or what the expected input looks like. A rich description prevents wrong tool selection and incorrect argument construction.",
       },
       ag1_loop_scenario: {
         id: "ag1_loop_scenario",
         type: "scenario_choice",
-        badge: "Stage 2",
+        badge: "Stage 2 · Runaway Tool Loop",
         title: "Stage 2 · Runaway Tool Loop",
-        prompt: "Your agent has a 'send_email' tool. During testing you observe it being called 3 times in a row for the same email. Each call returns: {\"status\": \"queued\", \"message\": \"Email added to queue\"}. The model interprets 'queued' as 'not yet sent' and retries. How do you fix this?",
+        prompt: "Your agent has a send_email tool. During testing it is called 3 times for the same email. Each call returns: {status: 'queued', message: 'Email added to queue'}. The model interprets 'queued' as 'not yet sent' and retries. How do you fix this?",
+        code_snippet: `# Observed: model calls send_email 3x for the same email
+# Tool response after each call:
+{
+  "status": "queued",            # model reads: "not done yet"
+  "message": "Email added to queue"
+}
+
+# Model chain-of-thought (simplified):
+# Call 1: "queued" => pending => retry
+# Call 2: "queued" => still pending => retry
+# Call 3: ...
+
+# The response is TECHNICALLY correct — but ambiguous to the model`,
         choices: [
-          { id: "a", label: "Add idempotency key + unambiguous status", description: "Add a unique message_id to each call. Return status: 'success' with a clear sent_at timestamp. Store sent message_ids server-side and deduplicate. Add loop detection: if the same tool is called with the same arguments 2+ times in a turn, abort and surface an error." },
-          { id: "b", label: "Change the tool name to 'send_email_now'", description: "Rename the tool to make it sound more immediate, so the model understands it fires synchronously." },
-          { id: "c", label: "Increase the model temperature", description: "Higher temperature will make the model less likely to repeat the same action because it will explore more diverse next steps." },
-          { id: "d", label: "Tell the model not to call tools multiple times in the system prompt", description: "Add a rule in the system prompt: 'Never call the same tool more than once per turn.'" },
+          { id: "a", label: "Return an unambiguous terminal state: {status: 'sent', email_id: 'abc123', sent_at: '...'}", description: "Clear completion signal with idempotency key." },
+          { id: "b", label: "Rename the tool to 'send_email_now' to signal immediacy", description: "Tool naming does not fix ambiguous response semantics." },
+          { id: "c", label: "Increase model temperature so it is less likely to retry", description: "Temperature does not change how the model interprets 'queued'." },
+          { id: "d", label: "Add 'do not call tools more than once' to the system prompt", description: "Prompt instructions are unreliable for preventing agentic loops." },
         ],
-        branches: {
-          a: "ag1_privilege_scenario",
-          b: "ag1_loop_recovery",
-          c: "ag1_loop_recovery",
-          d: "ag1_loop_recovery",
-        },
-        rationale: "The root cause is ambiguous tool response semantics — 'queued' is correctly interpreted by the model as 'not done yet.' The fix has three layers: (1) return unambiguous status ('success'/'failure', not 'queued'), (2) idempotency key so duplicate calls are deduplicated server-side even if the model does retry, and (3) loop detection in your agent harness as a last-resort circuit breaker. Renaming the tool does nothing to the response semantics. Temperature affects diversity, not repetition caused by misread responses. System prompt rules are fragile — the model will still retry if its reasoning concludes the email hasn't sent.",
+        branches: { a: "ag1_parallel", b: "ag1_loop_recovery", c: "ag1_loop_recovery", d: "ag1_loop_recovery" },
+        rationale: "Root cause: ambiguous tool response semantics. 'Queued' is a valid pending state that any model will interpret as 'not completed yet.' Fix: return a clear terminal status — 'sent' with a timestamp and email_id — so the model knows unambiguously that the action completed. Adding an idempotency_key parameter makes accidental duplicates safe even if the model does retry.",
       },
-      ag1_loop_recovery: {
-        id: "ag1_loop_recovery",
+      ag1_parallel: {
+        id: "ag1_parallel",
         type: "scenario_choice",
-        badge: "Stage 2 (Recovery)",
-        title: "Stage 2 · Loop Recovery",
-        prompt: "An agent tool returns {\"status\": \"queued\"} after sending an email. The model calls it 3 times because it thinks 'queued' means 'not sent'. What is the most important single fix?",
+        badge: "Stage 3 · Parallel Tool Calls",
+        title: "Stage 3 · Sequential vs Parallel Execution",
+        prompt: "Your research agent needs: (A) get user account info, (B) get last 30 orders, (C) look up current prices for those orders. A colleague wants all three sequential. What is the optimal execution pattern?",
+        code_snippet: `# Option 1: Sequential (naive)
+account = get_account(user_id)      # 200ms
+orders  = get_orders(user_id)       # 350ms
+prices  = get_prices(orders.ids)    # 280ms
+# Total: ~830ms
+
+# Option 2: Parallel A+B, then C
+account, orders = await asyncio.gather(
+    get_account(user_id),   # 200ms (independent)
+    get_orders(user_id),    # 350ms (independent, bottleneck)
+)
+prices = await get_prices(orders.ids)  # 280ms (depends on B)
+# Total: ~630ms  (25% faster)
+
+# Key insight: C depends on B's output — cannot parallelize C`,
         choices: [
-          { id: "a", label: "Return status: 'success' with a sent_at timestamp instead of 'queued'", description: "Change the tool response to use unambiguous terminal status that the model can reason about correctly." },
-          { id: "b", label: "Rate-limit the email tool to 1 call per session", description: "A hard rate limit prevents duplicate sends at the cost of preventing legitimate use." },
-          { id: "c", label: "Switch to a different LLM that doesn't retry", description: "Different models may behave differently, but this doesn't fix the root cause." },
-          { id: "d", label: "Remove the email tool entirely", description: "Removing the tool eliminates the problem but also the feature." },
+          { id: "a", label: "Always sequential — parallel calls can interleave responses incorrectly", description: "The latency cost of sequential is significant; parallelism is safe for independent calls." },
+          { id: "b", label: "A and B in parallel (independent), then C sequentially (depends on B's results)", description: "Minimizes wall-clock time while respecting data dependencies." },
+          { id: "c", label: "All three in parallel — modern LLM runtimes handle dependencies automatically", description: "C needs B's order IDs as input — calling C before B returns produces empty or wrong results." },
+          { id: "d", label: "Use a job queue — tools in the same turn should never share intermediate results", description: "Intra-turn data flow is a core feature of function-calling agents." },
         ],
-        branches: {
-          a: "ag1_privilege_scenario",
-          b: "ag1_privilege_scenario",
-          c: "ag1_privilege_scenario",
-          d: "ag1_privilege_scenario",
-        },
-        rationale: "The root cause is ambiguous response semantics. 'Queued' is correctly interpreted by the model as 'pending' — so it retries. Returning 'success' with a timestamp gives the model a definitive terminal state. This is the most important fix. Idempotency keys and loop detection are additional layers of defense, but they don't fix the reasoning confusion at the source.",
+        branches: { a: "ag1_parallel_recovery", b: "ag1_privilege_scenario", c: "ag1_parallel_recovery", d: "ag1_parallel_recovery" },
+        rationale: "The rule: identify data dependencies, then parallelize what is independent. A (account) and B (orders) both take user_id as input — independent, call simultaneously. C (prices) requires order IDs from B — call it after B returns. This captures the latency savings of parallelism without violating the data dependency that would produce incorrect results.",
       },
       ag1_privilege_scenario: {
         id: "ag1_privilege_scenario",
         type: "scenario_choice",
-        badge: "Stage 3",
-        title: "Stage 3 · Tool Privilege & Safety",
-        prompt: "Your LLM agent has a SQL tool with full read/write/delete permissions on the data warehouse. A user types: 'Clean up the old test data from Q1.' What is the likely failure mode and what is the correct design?",
+        badge: "Stage 4 · Tool Privilege",
+        title: "Stage 4 · Tool Privilege and Safety",
+        prompt: "Your LLM agent has a SQL tool with full read/write/delete permissions on the data warehouse. A user asks: 'Clean up the old test data from Q1.' What is the likely failure mode and the correct design?",
+        code_snippet: `# Current tool: full permissions (dangerous)
+tools = [{
+  "name": "execute_sql",
+  "description": "Execute any SQL query on the data warehouse",
+  "parameters": {"query": {"type": "string"}}
+}]
+
+# User: "Clean up the old test data from Q1"
+# Model generates:
+#   DELETE FROM events
+#   WHERE created_at < '2024-04-01' AND test_flag = true
+#
+# Result: 2.3M rows deleted. No dry-run. No confirmation.`,
         choices: [
-          { id: "a", label: "Read-only tool by default; separate privileged tool with human approval", description: "Give the agent a read-only query tool. Create a separate 'propose_deletion' tool that generates a preview and a proposal_id. Require explicit human approval before executing. Apply principle of least privilege." },
-          { id: "b", label: "Add 'be careful with deletes' to the system prompt", description: "Instruct the model in the system prompt to ask for confirmation before deleting data." },
-          { id: "c", label: "Only allow the agent to run DELETE with a WHERE clause", description: "Require WHERE clauses to prevent full-table deletes, but still allow autonomous deletion." },
-          { id: "d", label: "Log all DELETE statements so you can audit them later", description: "Logging lets you review what was deleted, but doesn't prevent the deletion from happening autonomously." },
+          { id: "a", label: "Read-only tool by default; separate write/delete tool with explicit human approval step", description: "Principle of least privilege enforced at the connection level." },
+          { id: "b", label: "Add 'be careful with DELETE statements' to the system prompt", description: "Prompt instructions can be overridden by user input or model error." },
+          { id: "c", label: "Only allow DELETE with a WHERE clause — prevent unbounded deletes", description: "WHERE clause constraint is insufficient — model can generate WHERE 1=1." },
+          { id: "d", label: "Log all DELETE statements so you can audit and restore later", description: "Logging aids recovery but does not prevent the data loss." },
         ],
-        branches: {
-          a: "ag1_mcp_terminal",
-          b: "ag1_privilege_recovery",
-          c: "ag1_privilege_recovery",
-          d: "ag1_privilege_recovery",
-        },
-        rationale: "This is a principle of least privilege problem. Giving the agent DELETE access 'just in case' is the same mistake as running your application database user as root. The correct design: (1) default tool is read-only enforced at the database connection level, not just in the description, (2) a separate privileged tool exists for mutations but it only proposes and previews — it does not execute, (3) execution requires an out-of-band human approval step. System prompt instructions are not security controls — they can be overridden by prompt injection or model errors. Logging is a detective control, not a preventive one.",
+        branches: { a: "ag1_error", b: "ag1_privilege_recovery", c: "ag1_privilege_recovery", d: "ag1_privilege_recovery" },
+        rationale: "Principle of least privilege: give the agent only the permissions it actually needs. For read-only data access, use a read-only database connection — not a prompt instruction, an actual connection-level constraint. For write/delete operations, require an explicit human approval step before execution. Security must be enforced at the infrastructure layer; prompt-based guardrails are always bypassable.",
       },
-      ag1_privilege_recovery: {
-        id: "ag1_privilege_recovery",
+      ag1_error: {
+        id: "ag1_error",
         type: "scenario_choice",
-        badge: "Stage 3 (Recovery)",
-        title: "Stage 3 · Privilege Recovery",
-        prompt: "An agent with DELETE permissions autonomously deletes rows when a user asks to 'clean up test data.' Which single design change would have prevented this?",
+        badge: "Stage 5 · Error Handling",
+        title: "Stage 5 · Tool Error Response Design",
+        prompt: "Your search_inventory tool fails because the database is temporarily down. Which error response best enables the model to handle this gracefully?",
+        code_snippet: `# Option A: bare error flag
+{"error": true}
+
+# Option B: raw exception dump
+{"error": "psycopg2.OperationalError: could not connect to server;
+  is the server on host db-prod-03 accepting TCP on port 5432?"}
+
+# Option C: structured recoverable error
+{
+  "success": false,
+  "error_code": "SERVICE_UNAVAILABLE",
+  "message": "Inventory database is temporarily unavailable.",
+  "retry_after_seconds": 30,
+  "fallback": "Use cached_inventory tool for approximate stock data"
+}
+
+# Option D: silent empty result
+{"results": [], "count": 0}`,
         choices: [
-          { id: "a", label: "Enforce read-only at the database connection level, not just in the tool description", description: "The database user the tool connects as should have no DELETE privilege — even if the model constructs a DELETE query, the DB will reject it." },
-          { id: "b", label: "Use a stronger model that is less likely to run DELETE", description: "More capable models may be more cautious, but this is not a reliable safety guarantee." },
-          { id: "c", label: "Add 'never delete data' to the tool description", description: "Tool descriptions influence behavior but are not security controls — the model can still generate DELETE statements." },
-          { id: "d", label: "Wrap all agent outputs in a content filter", description: "Content filters check for harmful text, not SQL semantics." },
+          { id: "a", label: "Option A — concise, unambiguous failure signal", description: "Too minimal: model does not know whether to retry, use a fallback, or stop." },
+          { id: "b", label: "Option B — full exception with maximum diagnostic detail", description: "Exposes internal infrastructure; model may hallucinate based on host/port details." },
+          { id: "c", label: "Option C — structured error with error_code, message, retry_after, and fallback suggestion", description: "Actionable without over-exposing internals." },
+          { id: "d", label: "Option D — empty results silently", description: "Model interprets empty as 'no inventory exists' and generates confidently wrong conclusions." },
         ],
-        branches: {
-          a: "ag1_mcp_terminal",
-          b: "ag1_mcp_terminal",
-          c: "ag1_mcp_terminal",
-          d: "ag1_mcp_terminal",
-        },
-        rationale: "Security must be enforced at the infrastructure layer, not the prompt layer. The database connection should use a read-only role — then even if the model generates a DELETE statement and the tool executes it, the database will reject the operation. Description-level instructions are soft constraints; database permissions are hard constraints.",
+        branches: { a: "ag1_error_recovery", b: "ag1_error_recovery", c: "ag1_mcp_terminal", d: "ag1_error_recovery" },
+        rationale: "Option C. Structured error responses give the model actionable information without over-exposing implementation details. 'error_code' enables programmatic handling; 'retry_after_seconds' tells the model when to retry; 'fallback' points to an alternative. Option D (silent empty result) is the most dangerous pattern in agentic systems — the model treats no results as ground truth and generates confidently wrong answers.",
       },
       ag1_mcp_terminal: {
         id: "ag1_mcp_terminal",
         type: "scenario_choice",
-        badge: "Stage 4",
-        title: "Stage 4 · MCP vs. Provider Function Calling",
-        prompt: "A colleague says: 'MCP (Model Context Protocol) is just OpenAI function calling with extra steps — we should stick to OpenAI's format since everyone uses it.' How do you respond?",
+        badge: "Stage 6 · Final Challenge",
+        title: "Stage 6 · MCP vs Provider Function Calling",
+        prompt: "A colleague says: 'MCP is just OpenAI function calling with extra steps — stick to OpenAI's format since everyone uses it.' How do you respond?",
         choices: [
-          { id: "a", label: "MCP is a provider-agnostic open protocol — tools defined once work across Claude, GPT-4, Gemini, and any MCP runtime", description: "OpenAI's format locks tool definitions to the OpenAI API. MCP separates tool definition from LLM provider. MCP also supports resources and prompts, not just function calls. If you want portability or are in a multi-model environment, MCP is the right investment." },
-          { id: "b", label: "MCP is better because Anthropic built it and Claude is more capable", description: "The argument for MCP is about protocol standardization and portability, not about model quality." },
-          { id: "c", label: "OpenAI format is better because it has wider adoption and more tooling", description: "While OpenAI's format is widely adopted today, betting on a provider-specific format creates lock-in. MCP is growing as the standard for multi-model, enterprise tool ecosystems." },
-          { id: "d", label: "They are equivalent — both produce the same JSON and execute the same way", description: "They are not equivalent. MCP is a full protocol with resources and prompts; OpenAI's format is a JSON schema convention. MCP enables reuse across providers; OpenAI's format does not." },
+          { id: "a", label: "MCP is a provider-agnostic open protocol — tools defined once work across Claude, GPT-4, Gemini, and any MCP runtime; it adds Resources and Prompts beyond functions", description: "Standardization enables portability across models and vendors." },
+          { id: "b", label: "MCP is better because Anthropic built it and Claude is stronger at tool use", description: "Protocol design and model capability are separate concerns." },
+          { id: "c", label: "OpenAI format is better — wider adoption and more existing tooling", description: "Adoption is a reasonable operational concern but misses the architectural argument." },
+          { id: "d", label: "They are equivalent — both produce the same JSON and execute the same way", description: "MCP adds Resources, Prompts, and a standardized transport layer beyond function schemas." },
         ],
-        branches: {
-          a: "ag1_mcp_terminal",
-          b: "ag1_mcp_terminal",
-          c: "ag1_mcp_terminal",
-          d: "ag1_mcp_terminal",
-        },
+        branches: { a: "ag1_mcp_terminal", b: "ag1_mcp_terminal", c: "ag1_mcp_terminal", d: "ag1_mcp_terminal" },
         terminal: true,
-        rationale: "MCP (Model Context Protocol) is a standardized, open protocol that decouples tool definitions from any specific LLM provider. Tools defined as MCP servers work with Claude, GPT-4, Gemini, and any MCP-compatible runtime without modification. OpenAI's function calling is a provider-specific JSON convention — well-designed and widely used, but tightly coupled to the OpenAI API. MCP also extends beyond function calls to support 'resources' (read-only data context like files and schemas) and 'prompts' (reusable prompt templates). For enterprise teams building on multiple models or wanting to future-proof their tooling, MCP is the correct investment. For a single-model prototype, OpenAI's format is fine — just understand the tradeoff.",
+        rationale: "MCP (Model Context Protocol) is a standardized open protocol that decouples tool definitions from any specific LLM provider. It defines three primitives: Tools (functions the model calls), Resources (data the model reads), and Prompts (reusable templates). Tools written in MCP work across Claude, GPT-4, Gemini, and any MCP-compatible runtime — no vendor lock-in. OpenAI's format is fine for single-provider use; MCP is the right choice for multi-provider or long-lived production systems.",
+      },
+      ag1_loop_recovery: {
+        id: "ag1_loop_recovery",
+        type: "scenario_choice",
+        badge: "Recovery · Runaway Tool Loop",
+        title: "Recovery · Fixing ambiguous tool responses",
+        prompt: "An agent tool returns {status: 'queued'} after sending an email. The model retries 3 times. What is the most important single fix?",
+        choices: [
+          { id: "a", label: "Return {status: 'sent', sent_at: '...', email_id: '...'} — unambiguous terminal state", description: "Clear terminal status with timestamp prevents retries." },
+          { id: "b", label: "Rate-limit the tool to 1 call per session", description: "Breaks legitimate multi-email workflows." },
+          { id: "c", label: "Switch to a model less likely to retry ambiguous statuses", description: "Any model will retry a 'pending' response — this is correct model behavior." },
+          { id: "d", label: "Remove the tool and use a different channel", description: "The problem is response design, not the existence of the tool." },
+        ],
+        branches: { a: "ag1_parallel", b: "ag1_parallel", c: "ag1_parallel", d: "ag1_parallel" },
+        rationale: "Root cause: 'queued' is an ambiguous pending state. Fix: return a clear terminal status ('sent') with a timestamp and unique email_id. This signals completion definitively. Adding an idempotency_key parameter makes duplicate calls safe even if they occur — both the server and the model treat duplicate calls as no-ops.",
+      },
+      ag1_parallel_recovery: {
+        id: "ag1_parallel_recovery",
+        type: "scenario_choice",
+        badge: "Recovery · Parallel Tool Calls",
+        title: "Recovery · Identifying safe parallelism",
+        prompt: "You need: (1) get customer profile, (2) get customer order history, (3) summarize orders with product names looked up. Which tools can run in parallel?",
+        choices: [
+          { id: "a", label: "All three simultaneously", description: "Step 3 depends on steps 1 and 2 — it needs both before it can run." },
+          { id: "b", label: "Steps 1 and 2 in parallel; step 3 after both complete", description: "1 and 2 are independent; 3 depends on their combined outputs." },
+          { id: "c", label: "All three sequentially — customer ID must be established first", description: "Customer ID is already known upfront; steps 1 and 2 can run concurrently." },
+          { id: "d", label: "Steps 1 and 3 in parallel; step 2 first", description: "Step 3 cannot run without the order history from step 2." },
+        ],
+        branches: { a: "ag1_privilege_scenario", b: "ag1_privilege_scenario", c: "ag1_privilege_scenario", d: "ag1_privilege_scenario" },
+        rationale: "Parallelism rule: identify data dependencies, parallelize what is independent. Steps 1 (profile) and 2 (orders) both take customer_id (available at start) — no dependency between them, run concurrently. Step 3 needs both the profile and the order list — run it after both complete. Never parallelize a call whose required input is the output of another call in the same batch.",
+      },
+      ag1_privilege_recovery: {
+        id: "ag1_privilege_recovery",
+        type: "scenario_choice",
+        badge: "Recovery · Tool Privilege",
+        title: "Recovery · Enforcing privilege at the right layer",
+        prompt: "An agent with DELETE permissions deletes rows when asked to 'clean up test data.' Which single change would have prevented this?",
+        choices: [
+          { id: "a", label: "Enforce read-only at the database connection level, not just in the tool description", description: "Connection-level enforcement cannot be bypassed by prompt injection or model error." },
+          { id: "b", label: "Use a stronger model — fewer erroneous DELETE queries", description: "Stronger models make fewer mistakes but cannot be relied upon as a security guarantee." },
+          { id: "c", label: "Add 'never delete data' to the tool description", description: "Prompt instructions can be overridden by user messages or jailbreaks." },
+          { id: "d", label: "Wrap outputs in a content filter before executing SQL", description: "Content filters miss semantic intent — 'remove old records' bypasses keyword filters." },
+        ],
+        branches: { a: "ag1_error", b: "ag1_error", c: "ag1_error", d: "ag1_error" },
+        rationale: "Security must be enforced at the infrastructure layer. A read-only database connection cannot execute DELETE regardless of what SQL the model generates — this is the only reliable guarantee. Prompts, content filters, and model quality are all bypassable. Principle of least privilege: give the agent only the database permissions it actually needs for its stated task.",
+      },
+      ag1_error_recovery: {
+        id: "ag1_error_recovery",
+        type: "scenario_choice",
+        badge: "Recovery · Error Handling",
+        title: "Recovery · Silent failures are the most dangerous",
+        prompt: "A payment_process tool fails and returns {result: []}. The model infers 'no payment needed' and ships the order without charging. What design principle would have prevented this?",
+        choices: [
+          { id: "a", label: "Never return empty success on failure — use explicit error codes and make success/failure unambiguous in every response", description: "The model must distinguish empty results from errors." },
+          { id: "b", label: "Always return HTTP 200 — let the application layer detect failures", description: "The model cannot see HTTP status codes — it only reads the JSON response body." },
+          { id: "c", label: "Auto-retry all failed calls — transient failures resolve themselves", description: "Silent failures should not be retried blindly — the model needs to understand what failed." },
+          { id: "d", label: "Log errors server-side — the model does not need to know about failures", description: "The model needs explicit failure signals to make correct downstream decisions." },
+        ],
+        branches: { a: "ag1_mcp_terminal", b: "ag1_mcp_terminal", c: "ag1_mcp_terminal", d: "ag1_mcp_terminal" },
+        rationale: "Silent failures ({result: []}) are the most dangerous tool error pattern. When an error looks like an empty result, the model correctly interprets it as 'no data' and makes catastrophically wrong decisions — in this case, shipping without charging. Every tool response must have an unambiguous success/failure signal: a boolean 'success' field, an error_code for programmatic handling, and a human-readable message the model can use to choose the correct recovery path.",
       },
     },
   },
