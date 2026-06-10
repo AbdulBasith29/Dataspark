@@ -4973,18 +4973,60 @@ This module still ships a full **written** walkthrough and the mutability lab �
       "Fix alias-in-WHERE and HAVING misuse under interview pressure.",
       "Choose WHERE vs HAVING based on correctness and early-filter performance.",
     ],
-    learnMarkdown: `## Rapid revision: SQL does not execute top-to-bottom
+    learnMarkdown: `## SQL logical execution order
 
-Your eyes read SELECT, FROM, WHERE. The database reasons in a logical order: FROM/JOIN, WHERE, GROUP BY, HAVING, SELECT, then ORDER BY/LIMIT.
+Your eyes read SELECT first. The engine does not. SQL's logical processing order is:
 
-That is why a SELECT alias does not exist when WHERE runs. WHERE filters individual rows before SELECT creates aliases. HAVING filters grouped buckets after aggregation.
+**FROM → JOIN → WHERE → GROUP BY → HAVING → SELECT → DISTINCT → ORDER BY → LIMIT**
+
+This order controls what is available at each stage, which is the source of many bugs that appear subtle in interviews.
+
+## Why this matters in practice
+
+**Why SELECT aliases break in WHERE:**
+
+\`\`\`sql
+-- This fails: sale_month alias does not exist when WHERE runs
+SELECT DATE_TRUNC('month', order_date) AS sale_month, SUM(revenue) AS total
+FROM orders
+WHERE sale_month = '2024-01-01'  -- ERROR: column "sale_month" does not exist
+GROUP BY sale_month;
+
+-- Fix: repeat the expression, or use a CTE
+WITH monthly AS (
+  SELECT DATE_TRUNC('month', order_date) AS sale_month, SUM(revenue) AS total
+  FROM orders
+  GROUP BY 1
+)
+SELECT * FROM monthly WHERE sale_month = '2024-01-01';
+\`\`\`
+
+**Why HAVING is required for aggregate filters:**
+
+\`\`\`sql
+-- Wrong: WHERE cannot see aggregate results
+SELECT dept, AVG(salary)
+FROM employees
+WHERE AVG(salary) > 80000  -- ERROR: aggregate functions not allowed in WHERE
+GROUP BY dept;
+
+-- Correct: HAVING runs after GROUP BY
+SELECT dept, AVG(salary) AS avg_sal
+FROM employees
+GROUP BY dept
+HAVING AVG(salary) > 80000;
+\`\`\`
+
+## The ORDER BY / LIMIT optimization insight
+
+ORDER BY and LIMIT run last, which means the database must compute the entire intermediate result set before sorting and truncating. On large tables, a query like \`ORDER BY created_at DESC LIMIT 10\` scans the full table unless \`created_at\` is indexed. Adding an index on the sort column lets the engine read the 10 most-recent rows directly without a full scan.
 
 ## Interview muscle memory
 
-- Use WHERE for row-level filters before aggregation.
-- Use HAVING for aggregate filters after GROUP BY.
-- If you need a SELECT alias in a filter, wrap the query in a subquery/CTE or repeat the expression where the dialect permits it.
-- Prefer filtering early in WHERE when the predicate is row-level; it reduces rows before grouping and usually lowers compute cost.`,
+- \`WHERE\` filters rows before aggregation — no access to aggregate functions.
+- \`HAVING\` filters after \`GROUP BY\` — has access to aggregated values.
+- A \`SELECT\` alias is invisible to \`WHERE\`, \`GROUP BY\`, and \`HAVING\` in the same query. Repeat the expression or wrap in a CTE.
+- Filtering early in \`WHERE\` reduces rows before grouping and lowers compute cost — always prefer row-level filters in \`WHERE\` over equivalent \`HAVING\` clauses.`,
     video: null,
     videoFallbackMarkdown: `## 3-minute execution-order drill
 
@@ -5208,11 +5250,57 @@ HAVING status = 'completed' AND SUM(total_amount) > 1000;`,
       "Avoid NOT IN traps when subqueries can emit NULL.",
       "Choose COALESCE, IFNULL, or CASE based on portability and semantic clarity.",
     ],
-    learnMarkdown: `## Rapid revision: NULL means unknown, not empty
+    learnMarkdown: `## NULL and three-valued logic
 
-SQL predicates can evaluate to TRUE, FALSE, or UNKNOWN. WHERE only keeps TRUE. This is why one hidden NULL inside a NOT IN subquery can make every comparison unknown and return zero rows.
+NULL does not mean zero, empty string, or false. NULL means *unknown*. SQL predicates evaluate to TRUE, FALSE, or **UNKNOWN** — and WHERE only passes rows where the predicate is TRUE. UNKNOWN is silently treated the same as FALSE.
 
-Use NOT EXISTS when checking absence against nullable subquery output. Use explicit CASE branches and ELSE clauses when NULL propagation would hide a business state.`,
+## The three-valued logic trap
+
+\`\`\`sql
+-- This looks like it should return all non-cancelled orders
+SELECT * FROM orders WHERE status != 'cancelled';
+
+-- But if status IS NULL, then NULL != 'cancelled' → UNKNOWN → row is excluded
+-- Fix: explicitly handle NULL
+SELECT * FROM orders
+WHERE status != 'cancelled'
+   OR status IS NULL;
+\`\`\`
+
+## The NOT IN + NULL disaster
+
+This is one of the most dangerous NULL traps in SQL interviews:
+
+\`\`\`sql
+-- Suppose cancelled_ids contains one NULL value
+SELECT * FROM orders
+WHERE order_id NOT IN (SELECT order_id FROM cancelled_orders);
+
+-- If any row in cancelled_orders has order_id = NULL:
+-- NOT IN becomes: NOT (x = 1 OR x = 2 OR x = NULL)
+--              → NOT (x = 1 OR x = 2 OR UNKNOWN)
+--              → UNKNOWN for every row
+-- Result: zero rows returned — silently!
+
+-- Safe alternative: NOT EXISTS
+SELECT * FROM orders o
+WHERE NOT EXISTS (
+  SELECT 1 FROM cancelled_orders c
+  WHERE c.order_id = o.order_id
+);
+-- NOT EXISTS treats NULL correctly — NULL rows in the subquery do not poison the result
+\`\`\`
+
+## Aggregate functions and NULL
+
+\`COUNT(column)\` skips NULL values. \`COUNT(*)\` counts all rows. \`SUM\`, \`AVG\`, \`MIN\`, \`MAX\` all ignore NULLs. This means \`AVG(score)\` on a column with NULLs computes the average of non-NULL rows only — potentially misleading if NULLs represent "zero" rather than "unknown."
+
+## NULL-safe patterns
+
+- Use \`IS NULL\` / \`IS NOT NULL\` — never \`= NULL\`
+- Use \`COALESCE(col, default)\` to substitute a default for NULL: \`COALESCE(discount, 0)\`
+- Use \`NULLIF(a, b)\` to prevent division-by-zero: \`revenue / NULLIF(units, 0)\`
+- Prefer \`NOT EXISTS\` over \`NOT IN\` when the subquery column is nullable`,
     video: null,
     videoFallbackMarkdown: `## Drill
 
@@ -5402,11 +5490,66 @@ END AS paid_flag`,
       "Explain COUNT(*), COUNT(1), and COUNT(column) under NULLs.",
       "Choose between raw-table aggregation and pre-grouped subqueries based on cost and grain clarity.",
     ],
-    learnMarkdown: `## Rapid revision: GROUP BY changes the row grain
+    learnMarkdown: `## GROUP BY and aggregation
 
-After GROUP BY, each output row represents a bucket. Non-aggregated selected columns must be part of that bucket definition in standard SQL.
+GROUP BY collapses multiple rows into a single bucket per unique combination of grouping columns. After GROUP BY, each output row represents a *group*, not an individual row. This is called the **grain** of the query.
 
-COUNT(*) and COUNT(1) count rows. COUNT(column) counts non-NULL values in that column. That single difference causes many interview mistakes.`,
+## Non-aggregated columns must be in GROUP BY
+
+\`\`\`sql
+-- This fails: product_name is not in GROUP BY
+SELECT category, product_name, SUM(revenue)
+FROM products
+GROUP BY category;
+-- ERROR: column "product_name" must appear in the GROUP BY clause
+-- or be used in an aggregate function
+
+-- Fix: add it to GROUP BY
+SELECT category, product_name, SUM(revenue)
+FROM products
+GROUP BY category, product_name;
+\`\`\`
+
+The rule exists because within a group, \`product_name\` could have multiple different values. The database has no rule for which one to show, so it raises an error (MySQL with default settings is a famous exception — it picks an arbitrary row, which is worse).
+
+## COUNT(*) vs COUNT(column)
+
+\`\`\`sql
+-- Table: scores(user_id, score)
+-- Data:  (1, 90), (2, NULL), (3, 85), (4, NULL), (5, 70)
+
+SELECT
+  COUNT(*)     AS total_rows,    -- 5: counts all rows
+  COUNT(score) AS non_null_scores -- 3: ignores NULL values
+FROM scores;
+\`\`\`
+
+\`COUNT(*)\` and \`COUNT(1)\` are identical — both count rows including NULLs. \`COUNT(column)\` counts only rows where that column is not NULL. In interviews, always clarify which you mean when counting nullable columns.
+
+## WHERE vs HAVING — the right filter at the right stage
+
+\`\`\`sql
+-- Filter rows BEFORE aggregation → WHERE
+SELECT dept, COUNT(*) AS headcount
+FROM employees
+WHERE status = 'active'           -- applied before grouping
+GROUP BY dept;
+
+-- Filter groups AFTER aggregation → HAVING
+SELECT dept, AVG(salary) AS avg_sal
+FROM employees
+GROUP BY dept
+HAVING AVG(salary) > 75000;       -- applied after grouping
+\`\`\`
+
+Putting a row-level filter in HAVING instead of WHERE is a performance anti-pattern — it groups all rows first, then discards groups. WHERE eliminates rows before grouping, reducing the work.
+
+## Interview muscle memory
+
+- Every non-aggregate SELECT column must be in GROUP BY.
+- \`COUNT(*)\` counts rows; \`COUNT(col)\` counts non-NULLs — different results on nullable columns.
+- Use WHERE for row-level filters (applied before grouping), HAVING for aggregate filters (applied after grouping).
+- Applying a row-level filter in HAVING instead of WHERE is a common interview mistake that signals poor understanding of execution order.`,
     video: null,
     videoFallbackMarkdown: `## Drill
 
@@ -5595,11 +5738,78 @@ COUNT(refund_amount) AS refund_count`,
       "Predict join fan-out when the right-hand side is one-to-many.",
       "Choose EXISTS vs INNER JOIN when verifying presence.",
     ],
-    learnMarkdown: `## Rapid revision: joins change row counts
+    learnMarkdown: `## Subqueries and JOIN semantics
 
-A correlated subquery in SELECT may execute conceptually once per outer row. Optimizers can sometimes decorrelate it, but you should not rely on magic when a simple grouped join expresses the intent clearly.
+A subquery is a query nested inside another query. Subqueries can appear in SELECT, FROM, WHERE, and HAVING. Understanding when a subquery runs — and how many times — is one of the most tested SQL concepts in data interviews.
 
-A LEFT JOIN does not guarantee one output row per left row. If the right table has multiple matches, it duplicates the left row.`,
+## Correlated vs non-correlated subqueries
+
+\`\`\`sql
+-- Non-correlated: runs ONCE, result reused for all outer rows
+SELECT order_id, amount
+FROM orders
+WHERE amount > (SELECT AVG(amount) FROM orders);
+
+-- Correlated: re-executes for EVERY outer row (O(n) inner queries)
+SELECT o.order_id, o.amount,
+       (SELECT COUNT(*) FROM order_items i
+        WHERE i.order_id = o.order_id) AS item_count  -- references outer o
+FROM orders o;
+\`\`\`
+
+The correlated subquery above executes once per row in \`orders\`. On a 10M-row table, that is 10M executions of the inner query. Modern optimizers can sometimes decorrelate these automatically, but you should not rely on it — express the intent as a JOIN.
+
+## The JOIN alternative for correlated subqueries
+
+\`\`\`sql
+-- Equivalent to the correlated subquery above, but efficient:
+SELECT o.order_id, o.amount, COUNT(i.item_id) AS item_count
+FROM orders o
+LEFT JOIN order_items i ON i.order_id = o.order_id
+GROUP BY o.order_id, o.amount;
+\`\`\`
+
+A single JOIN + GROUP BY replaces N correlated lookups with one pass through both tables.
+
+## LEFT JOIN row-multiplication trap
+
+LEFT JOIN does **not** guarantee one output row per left table row:
+
+\`\`\`sql
+-- orders: 3 rows (id=1, id=2, id=3)
+-- order_tags: tags for order 1 are ('urgent', 'vip') — two rows
+
+SELECT o.order_id, t.tag
+FROM orders o
+LEFT JOIN order_tags t ON t.order_id = o.order_id;
+
+-- Result: 4 rows (order 1 appears TWICE, once per tag)
+-- If you COUNT(*) after this join, you get the wrong count
+\`\`\`
+
+To avoid accidental row multiplication: know the cardinality of the right-hand table before joining. If you only need to check *existence*, use EXISTS or a deduplicating subquery instead of a JOIN.
+
+## EXISTS vs IN — use EXISTS for nullable subqueries
+
+\`\`\`sql
+-- IN with a nullable column can silently return zero rows (see NULL lesson)
+SELECT * FROM orders WHERE customer_id IN (SELECT id FROM vip_customers);
+
+-- EXISTS is NULL-safe and often more readable for existence checks
+SELECT o.*
+FROM orders o
+WHERE EXISTS (
+  SELECT 1 FROM vip_customers v
+  WHERE v.id = o.customer_id
+);
+\`\`\`
+
+## Interview muscle memory
+
+- Correlated subqueries run once per outer row — replace with JOIN + GROUP BY on large tables.
+- LEFT JOIN can multiply rows if the right table has multiple matches — always check cardinality.
+- Use EXISTS (not IN) when checking membership against a nullable column.
+- A subquery in SELECT that is not correlated runs once and is reused — safe for scalar lookups like \`(SELECT MAX(date) FROM ...)\`.`,
     video: null,
     videoFallbackMarkdown: `## Drill
 
