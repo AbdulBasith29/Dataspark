@@ -7621,7 +7621,71 @@ FIX: Move dept_head to a Departments table keyed by dept
 
 - Name the dependency, name the fix, name the table it moves to.
 - BCNF is stricter: every determinant must be a candidate key. Mention it if the interviewer pushes.
-- Normalization reduces write anomalies; star-schema denormalization improves analytics read speed. Both are valid — state the workload that drives the choice.`,
+- Normalization reduces write anomalies; star-schema denormalization improves analytics read speed. Both are valid — state the workload that drives the choice.
+
+## Worked example — normalize an orders table
+
+\`\`\`sql
+-- Unnormalized (violates 2NF and 3NF)
+CREATE TABLE orders_bad (
+  order_id      INT,
+  product_id    INT,
+  customer_name TEXT,   -- depends only on order_id (partial dep → 2NF violation)
+  product_name  TEXT,   -- depends only on product_id (partial dep → 2NF violation)
+  category_name TEXT,   -- depends on product_id → category_id → name (transitive → 3NF violation)
+  quantity      INT,
+  unit_price    NUMERIC
+);
+
+-- After normalization to 3NF
+CREATE TABLE customers (
+  customer_id   SERIAL PRIMARY KEY,
+  name          TEXT NOT NULL
+);
+
+CREATE TABLE categories (
+  category_id   SERIAL PRIMARY KEY,
+  name          TEXT NOT NULL
+);
+
+CREATE TABLE products (
+  product_id    SERIAL PRIMARY KEY,
+  name          TEXT NOT NULL,
+  unit_price    NUMERIC,
+  category_id   INT REFERENCES categories(category_id)
+);
+
+CREATE TABLE orders (
+  order_id      SERIAL PRIMARY KEY,
+  customer_id   INT REFERENCES customers(customer_id),
+  order_date    DATE
+);
+
+CREATE TABLE order_items (
+  order_item_id SERIAL PRIMARY KEY,
+  order_id      INT REFERENCES orders(order_id),
+  product_id    INT REFERENCES products(product_id),
+  quantity      INT,
+  unit_price    NUMERIC  -- snapshot at time of purchase
+);
+\`\`\`
+
+## Update anomaly — why normalization matters
+
+Without normalization, changing a product's name requires updating every row in \`orders_bad\` that references it. One missed row creates inconsistent data. With normalization, you update one row in \`products\` and every order automatically reflects the change.
+
+## BCNF — when 3NF is not enough
+
+A table is in **Boyce-Codd Normal Form** if every determinant is a candidate key. 3NF allows non-key determinants if the determined column is part of a candidate key — BCNF does not.
+
+\`\`\`sql
+-- Example: course_bookings(student, course, teacher)
+-- A teacher teaches only one course, so: teacher → course
+-- But teacher is not a key — this violates BCNF
+-- Fix: split into teachers(teacher, course) + bookings(student, teacher)
+\`\`\`
+
+BCNF violations are rare in practice but appear in advanced interviews. If asked, state: "3NF is usually sufficient for OLTP systems; BCNF resolves edge cases where a non-key column determines part of a candidate key."`,
     video: null,
     videoFallbackMarkdown: `## 3-minute normalization drill
 
@@ -7866,7 +7930,65 @@ An index on multiple columns in a defined order: \`(email, created_at)\`.
 
 ## Interview muscle memory
 
-Always ask: what is the query shape? What is the cardinality? What is the write frequency?`,
+Always ask: what is the query shape? What is the cardinality? What is the write frequency?
+
+## Worked example — designing indexes for a dashboard
+
+\`\`\`sql
+-- Table: events(user_id, event_type, created_at, country, device)
+
+-- Query A: filter by event_type + date range (most common query)
+CREATE INDEX idx_events_type_time ON events(event_type, created_at);
+-- event_type first (equality), created_at second (range) — composite prefix rule
+
+-- Query B: filter by user_id + date range, sort by created_at
+CREATE INDEX idx_events_user_time ON events(user_id, created_at DESC);
+-- Covering the ORDER BY in the index avoids a separate sort step
+
+-- Query C: recent rows only — partial index keeps it small
+CREATE INDEX idx_events_recent ON events(created_at, event_type)
+WHERE created_at >= NOW() - INTERVAL '90 days';
+-- Partial index only on recent data — ~10% the size of a full index
+\`\`\`
+
+## Function-based indexes
+
+\`\`\`sql
+-- This query cannot use a standard index on email:
+SELECT * FROM users WHERE LOWER(email) = 'foo@bar.com';
+
+-- Fix: index the expression itself
+CREATE INDEX idx_users_email_lower ON users(LOWER(email));
+
+-- Now this works:
+SELECT * FROM users WHERE LOWER(email) = 'foo@bar.com';
+-- Also: store emails normalized to lowercase at insert time to avoid the issue entirely
+\`\`\`
+
+## Covering indexes — eliminate heap fetches
+
+\`\`\`sql
+-- Without covering index: Index Scan → fetch each row from the heap (table)
+SELECT user_id, created_at FROM events WHERE event_type = 'purchase';
+
+-- With covering index (INCLUDE adds columns without affecting sort order):
+CREATE INDEX idx_events_type_cover
+  ON events(event_type)
+  INCLUDE (user_id, created_at);
+-- Now the query is satisfied entirely from the index — Index Only Scan, no heap fetch
+\`\`\`
+
+## Index maintenance cost — the write trade-off
+
+Every INSERT/UPDATE/DELETE must update all indexes on the table. A table with 8 indexes pays 8× the index-maintenance overhead on every write. On high-write tables (>10K writes/sec), audit your indexes regularly with:
+
+\`\`\`sql
+-- PostgreSQL: find indexes that are never used
+SELECT schemaname, tablename, indexname, idx_scan
+FROM pg_stat_user_indexes
+WHERE idx_scan = 0 AND indexname NOT LIKE '%pkey%'
+ORDER BY tablename;
+\`\`\``,
     video: null,
     videoFallbackMarkdown: `## 3-minute indexing drill
 
@@ -8127,7 +8249,68 @@ Use Snowflake when: dimension attributes change frequently (category renaming) o
 
 - **Type 1**: Overwrite — no history, just current value
 - **Type 2**: New row with effective/expiry date — full history preserved
-- **Type 3**: Add a previous-value column — one step of history`,
+- **Type 3**: Add a previous-value column — one step of history
+
+## Worked schema comparison
+
+\`\`\`sql
+-- STAR SCHEMA: dim_product is denormalized
+CREATE TABLE dim_product (
+  product_key   INT PRIMARY KEY,
+  sku           TEXT,
+  product_name  TEXT,
+  category      TEXT,    -- stored directly — no JOIN to a category table
+  subcategory   TEXT,
+  brand         TEXT
+);
+
+-- SNOWFLAKE SCHEMA: dim_product normalizes category
+CREATE TABLE dim_category (
+  category_key  INT PRIMARY KEY,
+  category      TEXT,
+  subcategory   TEXT
+);
+CREATE TABLE dim_product_sf (
+  product_key   INT PRIMARY KEY,
+  sku           TEXT,
+  product_name  TEXT,
+  brand         TEXT,
+  category_key  INT REFERENCES dim_category(category_key)  -- extra JOIN required
+);
+\`\`\`
+
+A "total sales by category" query on the star schema: \`JOIN fact_sales → dim_product\` (1 JOIN). On the snowflake schema: \`JOIN fact_sales → dim_product_sf → dim_category\` (2 JOINs). At 10 billion fact rows this difference compounds.
+
+## SCD Type 2 — full history in practice
+
+\`\`\`sql
+-- SCD Type 2: dim_customer tracks every address change
+CREATE TABLE dim_customer (
+  customer_key  SERIAL PRIMARY KEY,  -- surrogate key
+  customer_id   INT,                 -- natural key (same across versions)
+  name          TEXT,
+  city          TEXT,
+  effective_date DATE NOT NULL,
+  expiry_date    DATE,               -- NULL = current record
+  is_current     BOOLEAN DEFAULT TRUE
+);
+
+-- When a customer moves, insert a new row (don't update the old one):
+UPDATE dim_customer SET is_current = FALSE, expiry_date = CURRENT_DATE
+WHERE customer_id = 42 AND is_current = TRUE;
+
+INSERT INTO dim_customer(customer_id, name, city, effective_date, is_current)
+VALUES (42, 'Alice', 'London', CURRENT_DATE, TRUE);
+
+-- Query: what city was Alice in when she made her 2023-06 orders?
+SELECT o.*, c.city
+FROM fact_orders o
+JOIN dim_customer c
+  ON c.customer_id = o.customer_id
+  AND o.order_date BETWEEN c.effective_date AND COALESCE(c.expiry_date, '9999-12-31');
+\`\`\`
+
+SCD Type 2 is the most common type in real data warehouses. Type 1 (overwrite) is simpler but destroys history — avoid it for any attribute that might be queried historically.`,
     video: null,
     videoFallbackMarkdown: `## 3-minute schema drill
 
@@ -8384,7 +8567,59 @@ A \`SELECT SUM(revenue) FROM orders GROUP BY region\` on a 500 M row OLTP table:
 ## Data warehouse vs data lake
 
 - **Warehouse**: structured, schema-on-write, SQL query engine built-in, fast aggregations
-- **Data lake**: raw files (Parquet, ORC), schema-on-read, flexible, cheaper storage`,
+- **Data lake**: raw files (Parquet, ORC), schema-on-read, flexible, cheaper storage
+
+## Columnar storage — why it wins for aggregates
+
+\`\`\`sql
+-- Row store: to compute SUM(revenue), the engine reads every column of every row:
+-- [order_id | customer_id | product_id | status | revenue | created_at | ...]
+--     ↑ only revenue is needed but all columns are read per row
+
+-- Column store: revenue values are contiguous on disk:
+-- [100.0 | 250.5 | 75.0 | 899.0 | 42.0 | ...]
+--   ↑ single sequential scan of only the revenue column, nothing else
+
+-- Same query, different I/O:
+SELECT SUM(revenue) FROM orders WHERE region = 'APAC';
+-- Row store on 500M rows: reads ~40 bytes × 500M = 20 GB of data
+-- Column store on 500M rows: reads ~8 bytes × 500M = 4 GB (only revenue + region columns)
+-- Plus compression: columnar data compresses 5-10x → effectively ~400 MB scanned
+\`\`\`
+
+## Partitioning — the OLAP performance lever
+
+\`\`\`sql
+-- Partition a large fact table by month so queries skip irrelevant partitions
+CREATE TABLE fact_orders (
+  order_id    BIGINT,
+  order_date  DATE,
+  revenue     NUMERIC,
+  region      TEXT
+) PARTITION BY RANGE (order_date);
+
+CREATE TABLE fact_orders_2024_01 PARTITION OF fact_orders
+  FOR VALUES FROM ('2024-01-01') TO ('2024-02-01');
+
+CREATE TABLE fact_orders_2024_02 PARTITION OF fact_orders
+  FOR VALUES FROM ('2024-02-01') TO ('2024-03-01');
+
+-- Query with a date filter: planner reads ONLY the matching partition(s)
+SELECT SUM(revenue) FROM fact_orders
+WHERE order_date BETWEEN '2024-01-01' AND '2024-01-31';
+-- Scans ~1/12 of the table instead of all rows — "partition pruning"
+\`\`\`
+
+## Modern lakehouse architecture
+
+The data warehouse vs data lake distinction has blurred. Modern architectures use a **lakehouse** pattern:
+
+- Raw files stored in object storage (S3/GCS) in open formats: **Parquet** or **Delta Lake**
+- Query engines (Spark, DuckDB, Trino) read files directly — no proprietary format lock-in
+- Schema enforced at write time via Delta/Iceberg table format (adds ACID transactions)
+- OLAP engine (BigQuery, Redshift Spectrum) sits on top for SQL access
+
+The interview-relevant point: when asked "where would you store 5 years of click events for ad-hoc analysis?", answer with columnar format (Parquet) + partitioning by date + a query engine that supports partition pruning — not a row-oriented OLTP database.`,
     video: null,
     videoFallbackMarkdown: `## 3-minute OLTP vs OLAP drill
 
