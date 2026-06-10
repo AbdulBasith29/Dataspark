@@ -316,6 +316,715 @@ const CAPSTONE_HINT = `Tables: users(user_id, email, plan_type, created_at)
          streams(stream_id, user_id, artist_id, song_id, country, streamed_at)
 SQLite date hint: datetime('now','-N days') · strftime('%Y-%m-01','now')`;
 
+// ── Per-lesson starter queries (all use the default seed schema) ─────────────
+
+const LESSON_STARTERS = {
+  "sql-found-01": [
+    {
+      label: "Full execution pipeline",
+      sql: `-- FROM → WHERE → GROUP BY → HAVING → SELECT → ORDER BY → LIMIT
+SELECT status,
+       COUNT(*)                AS orders,
+       ROUND(SUM(amount), 2)   AS revenue
+FROM orders
+WHERE created_at >= '2024-03-01'  -- WHERE runs before GROUP BY
+GROUP BY status
+HAVING COUNT(*) > 3               -- HAVING runs after GROUP BY
+ORDER BY revenue DESC
+LIMIT 10;`,
+    },
+    {
+      label: "WHERE vs HAVING",
+      sql: `-- WHERE filters individual rows; HAVING filters groups.
+-- Try moving the WHERE clause to a HAVING clause — what changes?
+SELECT product_id,
+       COUNT(*) AS orders
+FROM orders
+WHERE status = 'completed'   -- row filter (before aggregation)
+GROUP BY product_id
+HAVING COUNT(*) >= 5;        -- group filter (after aggregation)`,
+    },
+    {
+      label: "Alias scope (SELECT runs late)",
+      sql: `-- ORDER BY can reference a SELECT alias.
+-- Try using 'total' in the WHERE clause — it will fail.
+SELECT user_id,
+       ROUND(SUM(amount), 2) AS total
+FROM orders
+GROUP BY user_id
+ORDER BY total DESC   -- alias works: ORDER BY runs after SELECT
+LIMIT 5;`,
+    },
+    {
+      label: "LIMIT after ORDER BY",
+      sql: `-- LIMIT is the final step — it truncates an already-sorted result.
+-- Without ORDER BY first, LIMIT returns an arbitrary subset.
+SELECT order_id, user_id, amount, created_at
+FROM orders
+ORDER BY created_at DESC  -- sort first
+LIMIT 5;                  -- then slice`,
+    },
+  ],
+
+  "sql-found-02": [
+    {
+      label: "NULL propagates through arithmetic",
+      sql: `-- NULL + anything = NULL. Try predicting the output.
+SELECT order_id,
+       amount,
+       CASE WHEN status = 'refunded' THEN NULL ELSE amount END AS net_amount,
+       amount + CASE WHEN status = 'refunded' THEN NULL ELSE 0 END AS plus_null
+FROM orders
+WHERE status = 'refunded';`,
+    },
+    {
+      label: "COUNT(*) vs COUNT(column)",
+      sql: `-- COUNT(*) counts all rows. COUNT(col) skips NULLs.
+-- Generate a nullable column and compare.
+SELECT
+  COUNT(*)                                              AS count_all_rows,
+  COUNT(CASE WHEN status = 'completed' THEN 1 END)      AS count_non_null,
+  COUNT(CASE WHEN status = 'refunded'  THEN NULL END)   AS count_nulls_skipped
+FROM orders;`,
+    },
+    {
+      label: "COALESCE — substitute NULLs",
+      sql: `-- COALESCE returns the first non-NULL argument.
+-- Useful to replace NULLs with a default value.
+SELECT order_id,
+       amount,
+       CASE WHEN status = 'refunded' THEN NULL ELSE amount END AS nullable_amount,
+       COALESCE(
+         CASE WHEN status = 'refunded' THEN NULL ELSE amount END,
+         0
+       ) AS safe_amount
+FROM orders
+LIMIT 8;`,
+    },
+    {
+      label: "Anti-join (LEFT JOIN IS NULL)",
+      sql: `-- LEFT JOIN keeps all left rows; IS NULL on right = no match.
+-- Find users who have NEVER placed an order.
+-- (Force no-match by joining on impossible condition for demo)
+SELECT u.user_id, u.name, o.order_id
+FROM users u
+LEFT JOIN orders o ON u.user_id = o.user_id AND o.status = 'pending'
+WHERE o.order_id IS NULL;  -- NULL here means the join found no match`,
+    },
+  ],
+
+  "sql-found-03": [
+    {
+      label: "Multi-aggregate GROUP BY",
+      sql: `-- Multiple aggregates in one GROUP BY query
+SELECT status,
+       COUNT(*)                AS order_count,
+       ROUND(AVG(amount), 2)   AS avg_order,
+       ROUND(MIN(amount), 2)   AS min_order,
+       ROUND(MAX(amount), 2)   AS max_order,
+       ROUND(SUM(amount), 2)   AS total_revenue
+FROM orders
+GROUP BY status
+ORDER BY total_revenue DESC;`,
+    },
+    {
+      label: "GROUP BY multiple columns",
+      sql: `-- Group by two columns to get a breakdown matrix
+SELECT u.country,
+       o.status,
+       COUNT(*)                AS orders,
+       ROUND(SUM(o.amount), 2) AS revenue
+FROM orders o
+JOIN users u ON o.user_id = u.user_id
+GROUP BY u.country, o.status
+ORDER BY u.country, revenue DESC;`,
+    },
+    {
+      label: "HAVING — filter groups",
+      sql: `-- Only show product categories that generated > $500 revenue
+SELECT p.category,
+       COUNT(*)                AS orders,
+       ROUND(SUM(o.amount), 2) AS revenue
+FROM orders o
+JOIN products p ON o.product_id = p.product_id
+WHERE o.status = 'completed'
+GROUP BY p.category
+HAVING SUM(o.amount) > 500
+ORDER BY revenue DESC;`,
+    },
+    {
+      label: "COUNT(DISTINCT ...)",
+      sql: `-- How many distinct users placed orders each month?
+SELECT SUBSTR(created_at, 1, 7)   AS month,
+       COUNT(DISTINCT user_id)     AS unique_buyers,
+       COUNT(*)                    AS total_orders
+FROM orders
+GROUP BY month
+ORDER BY month;`,
+    },
+  ],
+
+  "sql-found-04": [
+    {
+      label: "INNER JOIN",
+      sql: `-- INNER JOIN: only rows that match on BOTH sides
+SELECT o.order_id, u.name, p.name AS product, o.amount, o.status
+FROM orders o
+INNER JOIN users u    ON o.user_id    = u.user_id
+INNER JOIN products p ON o.product_id = p.product_id
+ORDER BY o.created_at DESC
+LIMIT 10;`,
+    },
+    {
+      label: "LEFT JOIN — show missing matches",
+      sql: `-- LEFT JOIN keeps ALL left-table rows.
+-- Rows with no match on the right get NULL in right-side columns.
+-- Here: force a mismatch to show the NULL behaviour.
+SELECT u.user_id, u.name,
+       o.order_id, o.amount
+FROM users u
+LEFT JOIN orders o ON u.user_id = o.user_id AND o.status = 'refunded'
+ORDER BY u.user_id;`,
+    },
+    {
+      label: "Subquery in WHERE",
+      sql: `-- Find users whose total spend is above the average spend per user.
+-- The subquery computes the average; the outer query filters.
+SELECT user_id,
+       ROUND(SUM(amount), 2) AS total_spend
+FROM orders
+WHERE status = 'completed'
+GROUP BY user_id
+HAVING SUM(amount) > (
+  SELECT AVG(user_total)
+  FROM (
+    SELECT SUM(amount) AS user_total
+    FROM orders WHERE status = 'completed'
+    GROUP BY user_id
+  )
+)
+ORDER BY total_spend DESC;`,
+    },
+    {
+      label: "Subquery vs JOIN — same result",
+      sql: `-- These two queries return identical results.
+-- The subquery version can be slower on large tables.
+
+-- Version A: correlated subquery
+SELECT o.order_id, o.amount,
+       (SELECT p.name FROM products p WHERE p.product_id = o.product_id) AS product
+FROM orders o LIMIT 5;
+
+-- Version B: JOIN (uncomment to compare)
+-- SELECT o.order_id, o.amount, p.name AS product
+-- FROM orders o JOIN products p ON o.product_id = p.product_id LIMIT 5;`,
+    },
+  ],
+
+  "sq-a1": [
+    {
+      label: "ROW_NUMBER() over orders",
+      sql: `-- Assign a unique sequential number to every order per user
+SELECT user_id, order_id, amount, created_at,
+       ROW_NUMBER() OVER (
+         PARTITION BY user_id
+         ORDER BY created_at
+       ) AS order_seq
+FROM orders
+ORDER BY user_id, order_seq
+LIMIT 15;`,
+    },
+    {
+      label: "RANK vs DENSE_RANK — ties",
+      sql: `-- Products ranked by revenue. Ties expose RANK vs DENSE_RANK gap.
+SELECT product_id,
+       ROUND(SUM(amount), 2) AS revenue,
+       RANK()       OVER (ORDER BY SUM(amount) DESC) AS rank_w_gap,
+       DENSE_RANK() OVER (ORDER BY SUM(amount) DESC) AS dense_rank_no_gap
+FROM orders
+WHERE status = 'completed'
+GROUP BY product_id
+ORDER BY revenue DESC;`,
+    },
+    {
+      label: "PARTITION BY — rank within country",
+      sql: `-- Rank each user's total spend within their own country
+WITH spend AS (
+  SELECT u.user_id, u.name, u.country,
+         ROUND(SUM(o.amount), 2) AS total_spend
+  FROM orders o JOIN users u ON o.user_id = u.user_id
+  WHERE o.status = 'completed'
+  GROUP BY u.user_id, u.name, u.country
+)
+SELECT country, name, total_spend,
+       RANK() OVER (PARTITION BY country ORDER BY total_spend DESC) AS country_rank
+FROM spend
+ORDER BY country, country_rank;`,
+    },
+    {
+      label: "Top-1 order per user",
+      sql: `-- Keep only each user's highest-value completed order
+WITH ranked AS (
+  SELECT user_id, order_id, amount,
+         ROW_NUMBER() OVER (
+           PARTITION BY user_id
+           ORDER BY amount DESC
+         ) AS rn
+  FROM orders
+  WHERE status = 'completed'
+)
+SELECT user_id, order_id, amount
+FROM ranked
+WHERE rn = 1
+ORDER BY amount DESC;`,
+    },
+  ],
+
+  "sq-a2": [
+    {
+      label: "LAG — previous month revenue",
+      sql: `-- LAG fetches the value from the previous row in the window
+WITH monthly AS (
+  SELECT SUBSTR(created_at, 1, 7)   AS month,
+         ROUND(SUM(amount), 2)       AS revenue
+  FROM orders WHERE status = 'completed'
+  GROUP BY month
+)
+SELECT month, revenue,
+       LAG(revenue) OVER (ORDER BY month)                    AS prev_month,
+       ROUND(revenue - LAG(revenue) OVER (ORDER BY month), 2) AS change
+FROM monthly
+ORDER BY month;`,
+    },
+    {
+      label: "LEAD — next order value",
+      sql: `-- LEAD looks forward in the window
+SELECT user_id, order_id, amount, created_at,
+       LEAD(amount) OVER (
+         PARTITION BY user_id
+         ORDER BY created_at
+       ) AS next_order_amount
+FROM orders
+ORDER BY user_id, created_at
+LIMIT 20;`,
+    },
+    {
+      label: "Running SUM (cumulative total)",
+      sql: `-- SUM() OVER with ORDER BY = running total (default RANGE frame)
+WITH monthly AS (
+  SELECT SUBSTR(created_at, 1, 7)   AS month,
+         ROUND(SUM(amount), 2)       AS revenue
+  FROM orders WHERE status = 'completed'
+  GROUP BY month
+)
+SELECT month, revenue,
+       ROUND(SUM(revenue) OVER (ORDER BY month), 2) AS running_total
+FROM monthly
+ORDER BY month;`,
+    },
+    {
+      label: "3-month rolling average",
+      sql: `-- ROWS BETWEEN 2 PRECEDING AND CURRENT ROW = 3-row window
+WITH monthly AS (
+  SELECT SUBSTR(created_at, 1, 7)   AS month,
+         ROUND(SUM(amount), 2)       AS revenue
+  FROM orders WHERE status = 'completed'
+  GROUP BY month
+)
+SELECT month, revenue,
+       ROUND(AVG(revenue) OVER (
+         ORDER BY month
+         ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+       ), 2) AS rolling_3mo_avg
+FROM monthly
+ORDER BY month;`,
+    },
+  ],
+
+  "sq-a3": [
+    {
+      label: "Simple CTE",
+      sql: `-- WITH defines a named subquery you can reference cleanly
+WITH completed_orders AS (
+  SELECT user_id, SUM(amount) AS total_spend
+  FROM orders
+  WHERE status = 'completed'
+  GROUP BY user_id
+)
+SELECT u.name, u.country,
+       ROUND(c.total_spend, 2) AS total_spend
+FROM completed_orders c
+JOIN users u ON c.user_id = u.user_id
+ORDER BY total_spend DESC;`,
+    },
+    {
+      label: "Two CTEs chained",
+      sql: `-- Chain CTEs: the second one references the first
+WITH monthly_revenue AS (
+  SELECT SUBSTR(created_at, 1, 7) AS month,
+         ROUND(SUM(amount), 2)    AS revenue
+  FROM orders WHERE status = 'completed'
+  GROUP BY month
+),
+avg_revenue AS (
+  SELECT ROUND(AVG(revenue), 2) AS avg_rev FROM monthly_revenue
+)
+SELECT m.month, m.revenue, a.avg_rev,
+       CASE WHEN m.revenue > a.avg_rev THEN 'above' ELSE 'below' END AS vs_avg
+FROM monthly_revenue m, avg_revenue a
+ORDER BY m.month;`,
+    },
+    {
+      label: "Recursive CTE — integer series",
+      sql: `-- Recursive CTE: anchor + recursive step
+-- Classic use: generate a date/integer series
+WITH RECURSIVE counter(n) AS (
+  SELECT 1                        -- anchor: start at 1
+  UNION ALL
+  SELECT n + 1 FROM counter       -- recursive step
+  WHERE n < 10                    -- termination condition
+)
+SELECT n FROM counter;`,
+    },
+    {
+      label: "CTE vs subquery — same result",
+      sql: `-- CTE version (easier to read and debug step-by-step):
+WITH top_spenders AS (
+  SELECT user_id FROM orders
+  WHERE status = 'completed'
+  GROUP BY user_id
+  HAVING SUM(amount) > 200
+)
+SELECT u.name, u.country FROM users u
+WHERE u.user_id IN (SELECT user_id FROM top_spenders);
+
+-- Equivalent subquery (uncomment to compare):
+-- SELECT u.name, u.country FROM users u
+-- WHERE u.user_id IN (
+--   SELECT user_id FROM orders WHERE status='completed'
+--   GROUP BY user_id HAVING SUM(amount) > 200
+-- );`,
+    },
+  ],
+
+  "sq-a4": [
+    {
+      label: "CASE WHEN pivot — status counts",
+      sql: `-- Pivot row values (status) into columns using CASE WHEN + SUM
+SELECT product_id,
+       SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
+       SUM(CASE WHEN status = 'refunded'  THEN 1 ELSE 0 END) AS refunded,
+       SUM(CASE WHEN status = 'pending'   THEN 1 ELSE 0 END) AS pending,
+       COUNT(*) AS total
+FROM orders
+GROUP BY product_id
+ORDER BY total DESC;`,
+    },
+    {
+      label: "Revenue pivot by category",
+      sql: `-- Pivot category revenue into separate columns
+SELECT SUBSTR(o.created_at, 1, 7) AS month,
+       ROUND(SUM(CASE WHEN p.category = 'subscription' THEN o.amount ELSE 0 END), 2) AS subscription_rev,
+       ROUND(SUM(CASE WHEN p.category = 'course'       THEN o.amount ELSE 0 END), 2) AS course_rev,
+       ROUND(SUM(CASE WHEN p.category = 'service'      THEN o.amount ELSE 0 END), 2) AS service_rev
+FROM orders o
+JOIN products p ON o.product_id = p.product_id
+WHERE o.status = 'completed'
+GROUP BY month
+ORDER BY month;`,
+    },
+    {
+      label: "Conditional aggregation with ratio",
+      sql: `-- What fraction of each user's orders were refunded?
+SELECT user_id,
+       COUNT(*)                                              AS total_orders,
+       SUM(CASE WHEN status = 'refunded' THEN 1 ELSE 0 END) AS refunds,
+       ROUND(
+         100.0 * SUM(CASE WHEN status = 'refunded' THEN 1 ELSE 0 END) / COUNT(*),
+         1
+       ) AS refund_pct
+FROM orders
+GROUP BY user_id
+HAVING refunds > 0
+ORDER BY refund_pct DESC;`,
+    },
+    {
+      label: "UNPIVOT with UNION ALL",
+      sql: `-- SQLite has no UNPIVOT keyword; use UNION ALL to melt columns into rows
+SELECT product_id, 'completed' AS status_type,
+       SUM(CASE WHEN status = 'completed' THEN amount ELSE 0 END) AS revenue
+FROM orders GROUP BY product_id
+UNION ALL
+SELECT product_id, 'refunded',
+       SUM(CASE WHEN status = 'refunded' THEN amount ELSE 0 END)
+FROM orders GROUP BY product_id
+ORDER BY product_id, status_type;`,
+    },
+  ],
+
+  "sq-a5": [
+    {
+      label: "EXPLAIN QUERY PLAN — full scan",
+      sql: `-- See how SQLite plans to execute this query (no index yet)
+EXPLAIN QUERY PLAN
+SELECT order_id, amount
+FROM orders
+WHERE user_id = 3
+  AND status = 'completed';
+-- Look for "SCAN orders" = full table scan (all 50 rows checked)`,
+    },
+    {
+      label: "Create index → re-EXPLAIN",
+      sql: `-- Create an index, then re-run the EXPLAIN above to compare
+CREATE INDEX IF NOT EXISTS idx_orders_user_status
+  ON orders (user_id, status);
+
+EXPLAIN QUERY PLAN
+SELECT order_id, amount
+FROM orders
+WHERE user_id = 3
+  AND status = 'completed';
+-- Now look for "SEARCH orders USING INDEX" = only matching rows scanned`,
+    },
+    {
+      label: "Avoid function on filter column",
+      sql: `-- Wrapping a column in a function prevents index use
+-- Bad (index on created_at cannot be used):
+EXPLAIN QUERY PLAN
+SELECT * FROM orders WHERE SUBSTR(created_at, 1, 4) = '2024';
+
+-- Good (store year separately, or use range filter):
+EXPLAIN QUERY PLAN
+SELECT * FROM orders
+WHERE created_at >= '2024-01-01' AND created_at < '2025-01-01';`,
+    },
+    {
+      label: "SELECT only needed columns",
+      sql: `-- SELECT * forces the engine to read every column.
+-- SELECT only what you need reduces I/O and enables covering indexes.
+
+-- Avoid:
+-- SELECT * FROM orders WHERE user_id = 1;
+
+-- Prefer (only the columns the query actually needs):
+SELECT order_id, amount, status
+FROM orders
+WHERE user_id = 1
+ORDER BY created_at DESC;`,
+    },
+  ],
+
+  "sq-d1": [
+    {
+      label: "Inspect current schema (3NF check)",
+      sql: `-- A well-normalized schema has:
+-- 1NF: atomic values (no repeating groups)
+-- 2NF: no partial dependencies on composite PK
+-- 3NF: no transitive dependencies
+SELECT name, sql
+FROM sqlite_master
+WHERE type = 'table'
+ORDER BY name;`,
+    },
+    {
+      label: "Transitive dependency example",
+      sql: `-- In this schema, products.category → products.price is not transitive
+-- because price varies per product. But if we had a categories table
+-- with a flat price, that would violate 3NF.
+-- Verify: do multiple products in the same category have different prices?
+SELECT category,
+       COUNT(DISTINCT price)   AS distinct_prices,
+       MIN(price)              AS min_price,
+       MAX(price)              AS max_price
+FROM products
+GROUP BY category;
+-- If distinct_prices > 1, price is NOT determined by category alone (good)`,
+    },
+    {
+      label: "Denormalized vs normalized query",
+      sql: `-- Normalized: join to get category name (stored once in products)
+SELECT o.order_id, p.name, p.category, o.amount
+FROM orders o
+JOIN products p ON o.product_id = p.product_id
+LIMIT 5;
+
+-- If category were repeated in orders (denormalized), updates would
+-- require touching every order row for a category rename — update anomaly.`,
+    },
+    {
+      label: "Referential integrity check",
+      sql: `-- Verify every order.user_id exists in users (FK constraint)
+-- A violation means orphaned rows (normalization/integrity issue)
+SELECT o.order_id, o.user_id
+FROM orders o
+LEFT JOIN users u ON o.user_id = u.user_id
+WHERE u.user_id IS NULL;
+-- Empty result = referential integrity holds`,
+    },
+  ],
+
+  "sq-d2": [
+    {
+      label: "Full scan (no index)",
+      sql: `-- Without an index, SQLite scans every row
+EXPLAIN QUERY PLAN
+SELECT order_id, amount, status
+FROM orders
+WHERE user_id = 5;
+-- "SCAN orders" = all 50 rows examined for 1 user's orders`,
+    },
+    {
+      label: "Single-column index",
+      sql: `CREATE INDEX IF NOT EXISTS idx_orders_user ON orders (user_id);
+
+EXPLAIN QUERY PLAN
+SELECT order_id, amount, status
+FROM orders
+WHERE user_id = 5;
+-- "SEARCH orders USING INDEX" = only user 5's rows examined`,
+    },
+    {
+      label: "Composite index — leftmost prefix rule",
+      sql: `-- Composite index on (user_id, status)
+-- Works for: WHERE user_id = X
+-- Works for: WHERE user_id = X AND status = Y
+-- Does NOT use index for: WHERE status = Y alone (skips leftmost column)
+CREATE INDEX IF NOT EXISTS idx_orders_user_status
+  ON orders (user_id, status);
+
+EXPLAIN QUERY PLAN
+SELECT * FROM orders WHERE user_id = 3 AND status = 'completed';
+
+-- Try this — should NOT use the composite index:
+EXPLAIN QUERY PLAN
+SELECT * FROM orders WHERE status = 'completed';`,
+    },
+    {
+      label: "Low-cardinality index (limited benefit)",
+      sql: `-- Index on 'status' has only 3 distinct values (low cardinality).
+-- For large tables, the query planner may prefer a full scan anyway.
+CREATE INDEX IF NOT EXISTS idx_orders_status ON orders (status);
+
+EXPLAIN QUERY PLAN
+SELECT * FROM orders WHERE status = 'completed';
+-- With only 50 rows, SQLite may still scan. On 50M rows, this matters.
+
+-- Check cardinality:
+SELECT status, COUNT(*) AS rows FROM orders GROUP BY status;`,
+    },
+  ],
+
+  "sq-d3": [
+    {
+      label: "Star schema query (fact → dimensions)",
+      sql: `-- orders = fact table; users + products = dimension tables
+-- Classic star query: join fact to all dimensions, aggregate
+SELECT p.category         AS dim_category,
+       u.country          AS dim_country,
+       COUNT(*)           AS order_count,
+       ROUND(SUM(o.amount), 2) AS revenue
+FROM orders o                          -- fact
+JOIN products p ON o.product_id = p.product_id  -- dimension
+JOIN users    u ON o.user_id    = u.user_id      -- dimension
+WHERE o.status = 'completed'
+GROUP BY p.category, u.country
+ORDER BY revenue DESC
+LIMIT 10;`,
+    },
+    {
+      label: "Drill-down by date dimension",
+      sql: `-- Drill down: year → month → week
+-- Date stored as TEXT; SUBSTR extracts the grain you need
+SELECT SUBSTR(created_at, 1, 7) AS month,
+       p.category,
+       ROUND(SUM(o.amount), 2)  AS revenue
+FROM orders o
+JOIN products p ON o.product_id = p.product_id
+WHERE o.status = 'completed'
+GROUP BY month, p.category
+ORDER BY month, revenue DESC;`,
+    },
+    {
+      label: "Snowflake vs star — extra join",
+      sql: `-- In a snowflake schema, category would be a separate table.
+-- Simulate what that extra join looks like:
+WITH categories AS (
+  SELECT DISTINCT category FROM products
+)
+SELECT c.category, COUNT(o.order_id) AS orders
+FROM orders o
+JOIN products  p ON o.product_id = p.product_id
+JOIN categories c ON p.category  = c.category   -- "extra snowflake join"
+WHERE o.status = 'completed'
+GROUP BY c.category
+ORDER BY orders DESC;`,
+    },
+    {
+      label: "Measure by two dimensions",
+      sql: `-- Analyst question: revenue per country per product category
+SELECT u.country, p.category,
+       COUNT(*)                  AS orders,
+       ROUND(SUM(o.amount), 2)   AS revenue,
+       ROUND(AVG(o.amount), 2)   AS avg_order_value
+FROM orders o
+JOIN users    u ON o.user_id    = u.user_id
+JOIN products p ON o.product_id = p.product_id
+WHERE o.status = 'completed'
+GROUP BY u.country, p.category
+ORDER BY u.country, revenue DESC;`,
+    },
+  ],
+
+  "sq-d4": [
+    {
+      label: "OLTP pattern — single-row lookup",
+      sql: `-- OLTP: high-frequency, low-latency, single-row operations
+-- Typical transaction: fetch one order by PK (uses index)
+EXPLAIN QUERY PLAN
+SELECT * FROM orders WHERE order_id = 17;
+-- Should show SEARCH using INTEGER PRIMARY KEY (O(log n))`,
+    },
+    {
+      label: "OLAP pattern — full-scan aggregate",
+      sql: `-- OLAP: infrequent, long-running, scans millions of rows
+-- This query must touch every completed order row
+EXPLAIN QUERY PLAN
+SELECT p.category,
+       COUNT(*)                AS orders,
+       ROUND(SUM(o.amount), 2) AS revenue
+FROM orders o
+JOIN products p ON o.product_id = p.product_id
+WHERE o.status = 'completed'
+GROUP BY p.category;
+-- "SCAN orders" — touches all rows. Fine for analytics, kills OLTP throughput.`,
+    },
+    {
+      label: "Mixed workload contention",
+      sql: `-- OLTP and OLAP competing on the same table:
+-- The OLAP scan (below) would block or be blocked by concurrent INSERTs/UPDATEs.
+
+-- Simulate: both run against the same orders table
+SELECT order_id FROM orders WHERE order_id = 42;              -- OLTP point read
+SELECT COUNT(*), SUM(amount) FROM orders WHERE status='completed'; -- OLAP scan
+
+-- Solution: replicate to a read-only analytics replica or data warehouse.`,
+    },
+    {
+      label: "Row vs column store intuition",
+      sql: `-- Row store (OLTP): retrieve all columns for one row efficiently
+SELECT * FROM orders WHERE order_id = 25;  -- needs all columns
+
+-- Column store (OLAP): scan one column across all rows efficiently
+-- SQLite is row-store; simulate the column-scan pattern:
+SELECT SUM(amount) FROM orders;  -- touches only 'amount' column logically
+SELECT COUNT(DISTINCT user_id) FROM orders;  -- only 'user_id' column needed
+
+-- In a real column store (Redshift, BigQuery), the 2nd type is much faster
+-- because only the relevant column is read from disk.`,
+    },
+  ],
+};
+
 // ── Config registry ───────────────────────────────────────────────────────────
 
 const CONFIGS = {
@@ -334,7 +1043,12 @@ const CONFIGS = {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function SQLScratchpad({ lessonId }) {
-  const config = CONFIGS[lessonId] || CONFIGS.default;
+  // Lesson-specific config (capstone) overrides everything.
+  // Otherwise use default seed/hint but swap in lesson-matched starters.
+  const config = CONFIGS[lessonId] ?? {
+    ...CONFIGS.default,
+    starters: LESSON_STARTERS[lessonId] ?? DEFAULT_STARTERS,
+  };
 
   const [db, setDb] = useState(null);
   const [loading, setLoading] = useState(true);
