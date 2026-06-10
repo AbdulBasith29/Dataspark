@@ -4,6 +4,7 @@ import { DS, dsGlassCard } from "../../lib/ds-platform-tokens.js";
 import { renderInlineMarkdown } from "../../lib/inline-markdown.jsx";
 import { SimpleMarkdown } from "../../lib/simple-markdown.jsx";
 import VizLabShell from "./VizLabShell.jsx";
+import SQLScratchpad from "../../visualizations/SQLScratchpad.jsx";
 import AsyncActionButton from "../AsyncActionButton.jsx";
 import ConfidenceMeter from "./ConfidenceMeter.jsx";
 import IntentLessonIntro from "./IntentLessonIntro.jsx";
@@ -760,6 +761,34 @@ export default function LessonModule({
           <p style={{ margin: 0, color: DS.t3, fontSize: 14, lineHeight: 1.65 }}>
             No primary visualization is mapped for this lesson yet. Use the <strong style={{ color: DS.t1 }}>Practice</strong> tab and the tutor to run the same <strong style={{ color: course.accent }}>predict → verify</strong> loop.
           </p>
+        )}
+        {course.id === "sql" && (
+          <div style={{ marginTop: VizComponent ? 28 : 8 }}>
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              marginBottom: 14,
+              paddingTop: VizComponent ? 24 : 0,
+              borderTop: VizComponent ? `1px solid ${DS.border}` : "none",
+            }}>
+              <span style={{
+                fontSize: 9,
+                fontFamily: "var(--ds-mono), monospace",
+                fontWeight: 700,
+                letterSpacing: "0.16em",
+                color: "#F59E0B",
+                textTransform: "uppercase",
+              }}>
+                SQL Scratchpad
+              </span>
+              <span style={{ flex: 1, height: 1, background: DS.border, opacity: 0.6 }} />
+              <span style={{ fontSize: 10, color: DS.dim, fontFamily: "var(--ds-mono), monospace" }}>
+                in-browser SQLite · no server
+              </span>
+            </div>
+            <SQLScratchpad />
+          </div>
         )}
       </SectionCard>
 
