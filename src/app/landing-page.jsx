@@ -59,9 +59,9 @@ const HeroCard = () => {
   const [mode, setMode] = useState("strategy");
   return (
     <div style={{
-      background: "rgba(6,8,20,0.75)", backdropFilter: "blur(28px)", WebkitBackdropFilter: "blur(28px)",
+      background: "#0A0F1E",
       border: `1px solid ${P.border}`, borderRadius: 18, overflow: "hidden", width: "100%", maxWidth: 420,
-      boxShadow: "0 32px 64px rgba(0,0,0,0.5)",
+      boxShadow: "inset 0 1px 0 rgba(255,255,255,0.05)",
     }}>
       <div role="tablist" aria-label="Compare syntax-first vs strategy-first practice" style={{ display: "flex", borderBottom: `1px solid ${P.border}` }}>
         {[["syntax", "The Old Way"], ["strategy", "The DataSpark Way"]].map(([k, l]) => (

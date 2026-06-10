@@ -1323,7 +1323,7 @@ export default function DataSparkPlatform() {
         >
           {[{ n: CURRICULUM.length, l: "Courses" }, { n: totalLessons, l: "Lessons" }, { n: totalQuestions, l: "Practice Qs" }, { n: completedLessons, l: "Completed" }].map((s, i) => (
             <div key={i} style={{ textAlign: "center" }}>
-              <div style={{ fontSize: "clamp(22px, 4vw, 28px)", fontWeight: 800, color: DS.t1, fontFamily: "var(--ds-sans), sans-serif" }}>{s.n}</div>
+              <div style={{ fontSize: "clamp(22px, 4vw, 28px)", fontWeight: 650, color: DS.t1, fontFamily: "var(--ds-sans), sans-serif", letterSpacing: "-0.02em" }}>{s.n}</div>
               <div style={{ fontSize: 10, color: DS.dim, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "var(--ds-mono), monospace" }}>{s.l}</div>
             </div>
           ))}
@@ -1412,7 +1412,7 @@ export default function DataSparkPlatform() {
         );
       })()}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16, paddingBottom: 72 }}>
+      <div className="ds-stagger" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16, paddingBottom: 72 }}>
         {CURRICULUM.map((course) => {
           const lessonCount = course.topics.reduce((a, t) => a + t.lessons.length, 0);
           const doneCount = course.topics.reduce((a, t) => a + t.lessons.filter(l => progress[l.id] === "done").length, 0);
@@ -1426,20 +1426,20 @@ export default function DataSparkPlatform() {
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveCourse(course); setView("course"); setCourseTab("learn"); } }}
               onClick={() => { setActiveCourse(course); setView("course"); setCourseTab("learn"); }}
               style={{
-                ...dsGlassCard({ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s, border-color 0.2s" }),
+                ...dsGlassCard({ cursor: "pointer", transition: `transform ${DS.durBase} ${DS.easeOut}, background ${DS.durBase} ${DS.easeOut}, border-color ${DS.durFast} ${DS.easeOut}` }),
                 padding: "22px 20px",
                 position: "relative",
                 overflow: "hidden",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = `${course.color}40`;
-                e.currentTarget.style.transform = "translateY(-3px)";
-                e.currentTarget.style.boxShadow = `${DS.shadowCard}, 0 0 40px ${course.color}12`;
+                e.currentTarget.style.borderColor = `${course.color}55`;
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.background = DS.surface2;
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.borderColor = DS.border;
                 e.currentTarget.style.transform = "none";
-                e.currentTarget.style.boxShadow = DS.shadowCard;
+                e.currentTarget.style.background = DS.cardGlass;
               }}
             >
               <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${course.color}, ${DS.ind}40, transparent)` }} />
@@ -1478,7 +1478,7 @@ export default function DataSparkPlatform() {
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 8 }}>
           <CourseMark color={c.color} mark={c.mark} size="md" />
           <div>
-            <h1 style={{ fontSize: "clamp(22px, 4vw, 30px)", fontWeight: 800, color: DS.t1, margin: 0, letterSpacing: "-0.02em" }}>{c.title}</h1>
+            <h1 style={{ fontSize: "clamp(22px, 4vw, 30px)", fontWeight: 650, color: DS.t1, margin: 0, letterSpacing: "-0.03em" }}>{c.title}</h1>
             <p style={{ fontSize: 14, color: DS.t3, margin: "6px 0 0", fontWeight: 400, lineHeight: 1.55, maxWidth: 640 }}>{c.description}</p>
           </div>
         </div>
@@ -1503,7 +1503,7 @@ export default function DataSparkPlatform() {
             {c.topics.map(topic => (
               <div key={topic.id} style={{ marginBottom: 32 }}>
                 <h3 style={{ fontSize: 11, fontWeight: 700, color: c.accent, fontFamily: "var(--ds-mono), monospace", marginBottom: 12, paddingBottom: 8, borderBottom: `1px solid ${c.color}22`, letterSpacing: "0.14em", textTransform: "uppercase" }}>{topic.title}</h3>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div className="ds-stagger" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {topic.lessons.map((lesson, li) => {
                     const isDone = progress[lesson.id] === "done";
                     return (
@@ -1514,10 +1514,10 @@ export default function DataSparkPlatform() {
                         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveLesson(lesson); setView("lesson"); } }}
                         onClick={() => { setActiveLesson(lesson); setView("lesson"); }}
                         style={{
-                          ...dsGlassCard({ padding: "14px 16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "border-color 0.2s, box-shadow 0.2s" }),
+                          ...dsGlassCard({ padding: "14px 16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", transition: `border-color ${DS.durFast} ${DS.easeOut}, background ${DS.durBase} ${DS.easeOut}` }),
                         }}
-                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${c.color}40`; e.currentTarget.style.boxShadow = `${DS.shadowCard}, 0 0 24px ${c.color}10`; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = DS.border; e.currentTarget.style.boxShadow = DS.shadowCard; }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${c.color}55`; e.currentTarget.style.background = DS.surface2; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = DS.border; e.currentTarget.style.background = DS.cardGlass; }}
                       >
                         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                           <div style={{
@@ -1773,10 +1773,10 @@ export default function DataSparkPlatform() {
       </nav>
 
       <main style={{ paddingBottom: 72, position: "relative", zIndex: 1 }}>
-        {view === "home" && renderHome()}
-        {view === "course" && renderCourse()}
-        {view === "lesson" && renderLesson()}
-        {view === "question" && renderQuestion()}
+        {view === "home" && <div key="home" className="ds-animate-in">{renderHome()}</div>}
+        {view === "course" && <div key={`course-${activeCourse?.id}`} className="ds-animate-in">{renderCourse()}</div>}
+        {view === "lesson" && <div key={`lesson-${activeLesson?.id}`} className="ds-animate-in">{renderLesson()}</div>}
+        {view === "question" && <div key={`question-${activeQuestion?.id}`} className="ds-animate-in">{renderQuestion()}</div>}
       </main>
 
       {chatbotCourse && <AIChatbot course={chatbotCourse} seedInput={chatbotSeed} onClose={() => { setChatbotCourse(null); setChatbotSeed(""); }} />}

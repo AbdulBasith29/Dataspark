@@ -661,7 +661,7 @@ export default function LessonModule({
           <span style={{ color: DS.border }}>|</span>
           <span style={{ color: DS.grn }}>Module · {durationBadge}</span>
         </div>
-        <h1 style={{ fontSize: "clamp(22px, 4vw, 30px)", fontWeight: 800, color: DS.t1, margin: 0, letterSpacing: "-0.02em" }}>
+        <h1 style={{ fontSize: "clamp(22px, 4vw, 30px)", fontWeight: 650, color: DS.t1, margin: 0, letterSpacing: "-0.03em" }}>
           {lesson.title}
         </h1>
         {moduleSpec.outcomes?.length > 0 && (
