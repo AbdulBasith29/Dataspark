@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Check, Circle, ChevronRight, MessageCircle } from "lucide-react";
 import { DS, dsGlassCard } from "../../lib/ds-platform-tokens.js";
 import { SimpleMarkdown } from "../../lib/simple-markdown.jsx";
 
@@ -115,7 +116,7 @@ function RubricList({ evalResult, question }) {
               gap: 8,
             }}
           >
-            <span style={{ flexShrink: 0, marginTop: 1 }}>{rs.met ? "✓" : "○"}</span>
+            <span style={{ flexShrink: 0, marginTop: 1, color: rs.met ? DS.grn : DS.dim }}>{rs.met ? <Check size={13} strokeWidth={2.5} /> : <Circle size={13} />}</span>
             <span style={{ flex: 1 }}>{rs.criterion}</span>
             {rs.confidence && (
               <span style={{ color: DS.dim, flexShrink: 0 }}>({rs.confidence})</span>
@@ -145,7 +146,7 @@ function RubricList({ evalResult, question }) {
               gap: 8,
             }}
           >
-            <span style={{ flexShrink: 0, marginTop: 1 }}>○</span>
+            <span style={{ flexShrink: 0, marginTop: 1, color: DS.dim }}><Circle size={13} /></span>
             <span>{criterion}</span>
           </li>
         ))}
@@ -325,14 +326,12 @@ export default function PracticeQuestion({
               >
                 <span
                   style={{
-                    display: "inline-block",
+                    display: "inline-flex",
                     transition: "transform 0.2s",
                     transform: hintsOpen ? "rotate(90deg)" : "rotate(0deg)",
-                    fontSize: 10,
-                    lineHeight: 1,
                   }}
                 >
-                  ▶
+                  <ChevronRight size={13} />
                 </span>
                 {hintsOpen ? "Hide hints" : `Show hints (${question.hints.length})`}
               </button>
@@ -512,7 +511,7 @@ export default function PracticeQuestion({
                 gap: 6,
               }}
             >
-              <span style={{ fontSize: 14 }}>💬</span>
+              <MessageCircle size={15} />
               Ask AI tutor
             </button>
           </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { Check, ArrowLeft } from "lucide-react";
 import AIChatbot from "../chatbot/AIChatbot.jsx";
 import SQLJoins from "../visualizations/SQLJoins.jsx";
 import TrainValTestSplit from "../visualizations/TrainValTestSplit.jsx";
@@ -1308,7 +1309,7 @@ export default function DataSparkPlatform() {
           fontWeight: 400,
         }}
         >
-          The DataSpark approach: <span style={{ color: DS.ind }}>systems thinking</span>
+          The DataSpark approach: <span style={{ color: DS.t1, fontWeight: 600 }}>systems thinking</span>
           {" "}over syntax drills. Learn visually, practice with context, and use the tutor when you are stuck.
         </p>
         <div style={{
@@ -1368,10 +1369,10 @@ export default function DataSparkPlatform() {
             </div>
             {artifacts.unlockedSkills.length > 0 && (
               <div style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Unlocked skills</div>
+                <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Unlocked skills</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {artifacts.unlockedSkills.map((skill) => (
-                    <span key={skill} style={{ fontSize: 10, padding: "4px 10px", borderRadius: 999, background: "rgba(59,130,246,0.12)", color: "#60A5FA", fontFamily: "var(--ds-mono), monospace", fontWeight: 600, border: "1px solid rgba(59,130,246,0.3)" }}>
+                    <span key={skill} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 999, background: "rgba(59,130,246,0.12)", color: "#60A5FA", fontFamily: "var(--ds-mono), monospace", fontWeight: 600, border: "1px solid rgba(59,130,246,0.3)" }}>
                       {skill}
                     </span>
                   ))}
@@ -1380,10 +1381,10 @@ export default function DataSparkPlatform() {
             )}
             {artifacts.readinessMilestones.length > 0 && (
               <div>
-                <div style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Milestones reached</div>
+                <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Milestones reached</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {artifacts.readinessMilestones.map((m) => (
-                    <span key={m} style={{ fontSize: 10, padding: "4px 10px", borderRadius: 999, background: "rgba(52,211,153,0.12)", color: DS.grn, fontFamily: "var(--ds-mono), monospace", fontWeight: 600, border: "1px solid rgba(52,211,153,0.3)" }}>
+                    <span key={m} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 999, background: "rgba(52,211,153,0.12)", color: DS.grn, fontFamily: "var(--ds-mono), monospace", fontWeight: 600, border: "1px solid rgba(52,211,153,0.3)" }}>
                       {m}
                     </span>
                   ))}
@@ -1392,10 +1393,10 @@ export default function DataSparkPlatform() {
             )}
             {clusterNarratives.length > 0 && (
               <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${DS.border}`, display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace" }}>You can now</div>
+                <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace" }}>You can now</div>
                 {clusterNarratives.map((c) => (
                   <div key={c.title} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                    <span aria-hidden="true" style={{ color: DS.grn, fontWeight: 700, lineHeight: 1.5 }}>✓</span>
+                    <span aria-hidden="true" style={{ color: DS.grn, lineHeight: 1.5, flexShrink: 0, marginTop: 2 }}><Check size={13} strokeWidth={2.5} /></span>
                     <span style={{ fontSize: 13, color: DS.t2, lineHeight: 1.5, fontFamily: "var(--ds-sans), sans-serif" }}>{c.completionStatement}</span>
                   </div>
                 ))}
@@ -1442,23 +1443,23 @@ export default function DataSparkPlatform() {
                 e.currentTarget.style.background = DS.cardGlass;
               }}
             >
-              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${course.color}, ${DS.ind}40, transparent)` }} />
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${course.color}, ${course.color}00)` }} />
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <CourseMark color={course.color} mark={course.mark} size="lg" />
-                <span style={{ fontSize: 10, color: DS.dim, fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>{lessonCount} lessons · {course.questions.length} Qs</span>
+                <span style={{ fontSize: 11, color: DS.dim, fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>{lessonCount} lessons · {course.questions.length} Qs</span>
               </div>
               <div style={{ fontSize: 17, fontWeight: 700, color: DS.t1, fontFamily: "var(--ds-sans), sans-serif", marginBottom: 8 }}>{course.title}</div>
               <div style={{ fontSize: 13, color: DS.t3, lineHeight: 1.55, fontFamily: "var(--ds-sans), sans-serif", marginBottom: 14, minHeight: 44 }}>{course.description}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
                 {course.topics.slice(0, 3).map(t => (
-                  <span key={t.id} style={{ fontSize: 9, padding: "4px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: DS.t3, fontFamily: "var(--ds-mono), monospace", border: `1px solid ${DS.border}` }}>{t.title}</span>
+                  <span key={t.id} style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: DS.t3, fontFamily: "var(--ds-mono), monospace", border: `1px solid ${DS.border}` }}>{t.title}</span>
                 ))}
-                {course.topics.length > 3 && <span style={{ fontSize: 9, padding: "4px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: DS.dim, fontFamily: "var(--ds-mono), monospace", border: `1px solid ${DS.border}` }}>+{course.topics.length - 3}</span>}
+                {course.topics.length > 3 && <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: DS.dim, fontFamily: "var(--ds-mono), monospace", border: `1px solid ${DS.border}` }}>+{course.topics.length - 3}</span>}
               </div>
               <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 6, height: 4, overflow: "hidden" }}>
                 <div style={{ width: `${pct}%`, height: "100%", background: `linear-gradient(90deg, ${course.color}, ${course.accent})`, borderRadius: 6, transition: "width 0.4s" }} />
               </div>
-              <div style={{ fontSize: 10, color: DS.dim, marginTop: 6, fontFamily: "var(--ds-mono), monospace" }}>{pct}% complete</div>
+              <div style={{ fontSize: 11, color: DS.dim, marginTop: 6, fontFamily: "var(--ds-mono), monospace" }}>{pct}% complete</div>
             </div>
           );
         })}
@@ -1473,7 +1474,7 @@ export default function DataSparkPlatform() {
 
     return (
       <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 clamp(16px, 4vw, 28px)" }}>
-        <button type="button" onClick={() => setView("home")} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>← All courses</button>
+        <button type="button" onClick={() => setView("home")} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5 }}><ArrowLeft size={14} /> All courses</button>
 
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 8 }}>
           <CourseMark color={c.color} mark={c.mark} size="md" />
@@ -1527,15 +1528,15 @@ export default function DataSparkPlatform() {
                             display: "flex", alignItems: "center", justifyContent: "center",
                             fontSize: 12, color: isDone ? DS.grn : DS.dim, fontWeight: 700, fontFamily: "var(--ds-mono), monospace",
                           }}>
-                            {isDone ? "✓" : li + 1}
+                            {isDone ? <Check size={13} strokeWidth={2.5} /> : li + 1}
                           </div>
                           <div>
                             <div style={{ fontSize: 14, fontWeight: 600, color: DS.t1 }}>{lesson.title}</div>
-                            <div style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginTop: 2 }}>{lesson.duration}</div>
+                            <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginTop: 2 }}>{lesson.duration}</div>
                           </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          {lesson.hasViz && <span style={{ fontSize: 9, padding: "4px 8px", borderRadius: 6, background: `${c.color}18`, color: c.accent, fontFamily: "var(--ds-mono), monospace", fontWeight: 600, border: `1px solid ${c.color}30` }}>Interactive</span>}
+                          {lesson.hasViz && <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, background: `${c.color}18`, color: c.accent, fontFamily: "var(--ds-mono), monospace", fontWeight: 600, border: `1px solid ${c.color}30` }}>Interactive</span>}
                         </div>
                       </div>
                     );
@@ -1551,8 +1552,8 @@ export default function DataSparkPlatform() {
             <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
               {["All", "Easy", "Medium", "Hard"].map(d => (
                 <button key={d} type="button" onClick={() => setDiffFilter(d)} style={{
-                  background: diffFilter === d ? "rgba(99,102,241,0.12)" : "transparent", border: `1px solid ${diffFilter === d ? `${c.color}35` : DS.border}`,
-                  borderRadius: 8, padding: "6px 12px", color: diffFilter === d ? DS.t1 : DS.dim, fontSize: 11, cursor: "pointer", fontFamily: "var(--ds-mono), monospace", fontWeight: 600,
+                  background: diffFilter === d ? `${c.color}18` : "transparent", border: `1px solid ${diffFilter === d ? `${c.color}35` : DS.border}`,
+                  borderRadius: 8, padding: "6px 12px", color: diffFilter === d ? DS.t1 : DS.dim, fontSize: 12, cursor: "pointer", fontFamily: "var(--ds-mono), monospace", fontWeight: 600,
                 }}>{d}</button>
               ))}
             </div>
@@ -1575,11 +1576,11 @@ export default function DataSparkPlatform() {
                     <div>
                       <div style={{ fontSize: 15, fontWeight: 600, color: DS.t1, marginBottom: 6 }}>{q.title}</div>
                       <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                        {(q.tags || []).map(t => <span key={t} style={{ fontSize: 9, padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: DS.t3, fontFamily: "var(--ds-mono), monospace", border: `1px solid ${DS.border}` }}>{t}</span>)}
+                        {(q.tags || []).map(t => <span key={t} style={{ fontSize: 11, padding: "2px 7px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: DS.t3, fontFamily: "var(--ds-mono), monospace", border: `1px solid ${DS.border}` }}>{t}</span>)}
                       </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                      <span style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace" }}>{q.type === "code" ? "Coding" : "Open-ended"}</span>
+                      <span style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace" }}>{q.type === "code" ? "Coding" : "Open-ended"}</span>
                       {diffBadge(q.difficulty)}
                     </div>
                   </div>
@@ -1610,7 +1611,7 @@ export default function DataSparkPlatform() {
         VizComponent={VizComponent}
         vizComingSoon={!VizComponent && !!activeLesson.hasViz}
         onBack={() => setView("course")}
-        backLabel={`← Back to ${activeCourse.title}`}
+        backLabel={`Back to ${activeCourse.title}`}
         onMarkComplete={() => {
           try {
             trackLvsEvent({
@@ -1639,7 +1640,7 @@ export default function DataSparkPlatform() {
 
     return (
       <div style={{ padding: "0 clamp(8px, 2vw, 16px)" }}>
-        <button type="button" onClick={() => { setCourseTab("practice"); setView("course"); }} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "16px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>← Back to practice</button>
+        <button type="button" onClick={() => { setCourseTab("practice"); setView("course"); }} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "16px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5 }}><ArrowLeft size={14} /> Back to practice</button>
 
         <PracticeQuestion
           question={q}
@@ -1681,7 +1682,7 @@ export default function DataSparkPlatform() {
       `}</style>
 
       <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none" }}>
-        <div style={{ position: "absolute", width: 720, height: 720, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.07) 0%, transparent 68%)", top: "-18%", left: "-10%" }} />
+        <div style={{ position: "absolute", width: 720, height: 720, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.04) 0%, transparent 68%)", top: "-18%", left: "-10%" }} />
         <div style={{ position: "absolute", width: 480, height: 480, borderRadius: "50%", background: "radial-gradient(circle, rgba(52,211,153,0.05) 0%, transparent 70%)", bottom: "0%", right: "-8%" }} />
       </div>
 
@@ -1749,7 +1750,7 @@ export default function DataSparkPlatform() {
               type="button"
               onClick={() => { setActiveCourse(c); setView("course"); setCourseTab("learn"); }}
               style={{
-                background: activeCourse?.id === c.id ? "rgba(99,102,241,0.12)" : "transparent",
+                background: activeCourse?.id === c.id ? `${c.color}18` : "transparent",
                 border: `1px solid ${activeCourse?.id === c.id ? `${c.color}35` : "transparent"}`,
                 borderRadius: 8,
                 padding: "4px 8px 4px 4px",

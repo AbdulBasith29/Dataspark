@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Check, X, ArrowRight, Code2, Database, BarChart3, Brain, Cpu, Sparkles, PieChart, Network, Settings2 } from "lucide-react";
 import { emailDomainFromEmail, safeLogClientEvent } from "../lib/analytics.js";
 import { getSupabaseBrowserClient } from "../lib/supabaseClient.js";
 
@@ -42,7 +43,7 @@ const LogoMarquee = () => {
   const doubled = [...logos, ...logos];
   return (
     <div style={{ overflow: "hidden", padding: "20px 0", borderTop: `1px solid ${P.border}`, borderBottom: `1px solid ${P.border}`, position: "relative" }}>
-      <div style={{ textAlign: "center", marginBottom: 12, fontSize: 10, fontFamily: "var(--mono)", letterSpacing: 1.8, color: P.t3 }}>
+      <div style={{ textAlign: "center", marginBottom: 12, fontSize: 11, fontFamily: "var(--mono)", letterSpacing: 1.8, color: P.t3 }}>
         PRACTICE PROBLEMS INSPIRED BY INTERVIEWS AT
       </div>
       <div className="logo-marquee-track" style={{ display: "flex", gap: 48, width: "max-content" }}>
@@ -93,30 +94,38 @@ const HeroCard = () => {
       >
         {mode === "syntax" ? (
           <>
-            <div style={{ fontSize: 8, color: "#EF4444", fontFamily: "var(--mono)", letterSpacing: 2, fontWeight: 700, marginBottom: 10 }}>PROMPT</div>
+            <div style={{ fontSize: 10, color: "#EF4444", fontFamily: "var(--mono)", letterSpacing: 2, fontWeight: 700, marginBottom: 10 }}>PROMPT</div>
             <div style={{ fontSize: 11.5, color: P.t3, fontStyle: "italic", marginBottom: 14 }}>"Find top 5 customers by revenue"</div>
-            <div style={{ background: "rgba(255,255,255,.02)", borderRadius: 7, padding: "12px 14px", fontFamily: "var(--mono)", fontSize: 10.5, color: "#546380", lineHeight: 1.7 }}>
+            <div style={{ background: "rgba(255,255,255,.02)", borderRadius: 7, padding: "12px 14px", fontFamily: "var(--mono)", fontSize: 11, color: "#546380", lineHeight: 1.7 }}>
               <span style={{ color: P.ind }}>SELECT</span> customer_id,<br/>
               {"  "}<span style={{ color: P.ind }}>SUM</span>(amount) <span style={{ color: P.ind }}>AS</span> rev<br/>
               <span style={{ color: P.ind }}>FROM</span> orders<br/>
               <span style={{ color: P.ind }}>GROUP BY</span> 1 <span style={{ color: P.ind }}>ORDER BY</span> 2 <span style={{ color: P.ind }}>DESC</span><br/>
               <span style={{ color: P.ind }}>LIMIT</span> 5;
             </div>
-            <div style={{ marginTop: 12, fontSize: 9.5, color: "#EF4444", fontFamily: "var(--mono)", fontWeight: 600 }}>✓ Correct syntax · ✗ No context · ✗ No reasoning</div>
+            <div style={{ marginTop: 12, fontSize: 11, color: "#EF4444", fontFamily: "var(--mono)", fontWeight: 600, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><Check size={11} strokeWidth={2.5} /> Correct syntax</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><X size={11} strokeWidth={2.5} /> No context</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><X size={11} strokeWidth={2.5} /> No reasoning</span>
+            </div>
           </>
         ) : (
           <>
-            <div style={{ fontSize: 8, color: P.grn, fontFamily: "var(--mono)", letterSpacing: 2, fontWeight: 700, marginBottom: 10 }}>PROMPT</div>
+            <div style={{ fontSize: 10, color: P.grn, fontFamily: "var(--mono)", letterSpacing: 2, fontWeight: 700, marginBottom: 10 }}>PROMPT</div>
             <div style={{ fontSize: 11.5, color: P.t2, fontStyle: "italic", marginBottom: 14 }}>"Conversion dropped 25% over the weekend. Walk the VP through your investigation."</div>
             <div style={{ background: "rgba(52,211,153,.03)", borderRadius: 7, padding: "12px 14px", fontSize: 11, color: P.t3, lineHeight: 1.65 }}>
-              <div style={{ color: P.grn, fontWeight: 700, fontSize: 9, marginBottom: 6 }}>YOUR RESPONSE:</div>
+              <div style={{ color: P.grn, fontWeight: 700, fontSize: 10, marginBottom: 6 }}>YOUR RESPONSE:</div>
               1. First — is the data trustworthy? Check pipeline, recent deploys<br/>
               2. Segment the drop: iOS vs Android, new vs returning, by city<br/>
               3. Top hypothesis: Friday deploy broke the checkout flow<br/>
               4. Present findings + next steps to the VP with confidence levels
             </div>
             <div style={{ marginTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontSize: 9.5, color: P.grn, fontFamily: "var(--mono)", fontWeight: 600 }}>✓ Reasoning · ✓ Impact · ✓ Stakeholder-ready</span>
+              <span style={{ fontSize: 11, color: P.grn, fontFamily: "var(--mono)", fontWeight: 600, display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><Check size={11} strokeWidth={2.5} /> Reasoning</span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><Check size={11} strokeWidth={2.5} /> Impact</span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><Check size={11} strokeWidth={2.5} /> Stakeholder-ready</span>
+              </span>
               <span style={{ background: "rgba(52,211,153,.1)", border: "1px solid rgba(52,211,153,.2)", borderRadius: 5, padding: "3px 8px", fontSize: 11, fontWeight: 800, color: P.grn }}>87%</span>
             </div>
           </>
@@ -249,7 +258,7 @@ function WaitlistCTA({
             gap: 8,
           }}
         >
-          <span style={{ color: P.grn, fontWeight: 800 }}>✓</span>
+          <Check size={18} strokeWidth={2.5} style={{ color: P.grn, flexShrink: 0 }} />
           <span style={{ fontSize: 14, fontWeight: 600, color: P.grn }}>
             You&apos;re in - we will email you before launch with early access details.
           </span>
@@ -396,7 +405,7 @@ function FeatureDemo({ id }) {
 
   if (id === "retention") {
     return (
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 10.5, color: P.t2, fontFamily: "var(--mono)" }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 11, color: P.t2, fontFamily: "var(--mono)" }}>
         {["Day 1: replay", "Day 3: harder variant", "Day 8: cross-topic case"].map((step) => (
           <span key={step} style={{ border: `1px solid ${P.border}`, borderRadius: 999, padding: "5px 9px" }}>{step}</span>
         ))}
@@ -405,9 +414,9 @@ function FeatureDemo({ id }) {
   }
 
   return (
-    <div style={{ display: "grid", gap: 6, fontSize: 10.5, color: P.t2, fontFamily: "var(--mono)" }}>
-      <span>Python basics ✓</span>
-      <span>SQL joins ✓</span>
+    <div style={{ display: "grid", gap: 6, fontSize: 11, color: P.t2, fontFamily: "var(--mono)" }}>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>Python basics <Check size={11} strokeWidth={2.5} style={{ color: P.grn }} /></span>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>SQL joins <Check size={11} strokeWidth={2.5} style={{ color: P.grn }} /></span>
       <span style={{ color: P.grn }}>Product Sense (unlocked)</span>
       <span style={{ color: P.dim }}>System Design (locked)</span>
     </div>
@@ -730,7 +739,7 @@ export default function DS8() {
             </div>
             <div style={{ display: "grid", gap: 6 }}>
               {["Full access to all 9 launch courses and 285+ scenarios", "AI reasoning feedback and mission scorecards", "Founding member pricing before public launch (Q3 2026)"].map((perk, i) => (
-                <div key={i} style={{ fontSize: 12, color: P.t2, lineHeight: 1.5 }}>✓ {perk}</div>
+                <div key={i} style={{ fontSize: 12, color: P.t2, lineHeight: 1.5, display: "flex", alignItems: "flex-start", gap: 7 }}><Check size={12} strokeWidth={2.5} style={{ color: P.grn, flexShrink: 0, marginTop: 2 }} />{perk}</div>
               ))}
             </div>
             <Link
@@ -738,7 +747,7 @@ export default function DS8() {
               onClick={() => void track("preview_route_click", { location: "hero_perks", href: "/preview" })}
               style={{ display: "inline-block", marginTop: 12, fontSize: 12.5, color: "#fff", background: "rgba(99,102,241,.82)", borderRadius: 8, padding: "8px 12px", textDecoration: "none", fontWeight: 700 }}
             >
-              Explore product preview →
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>Explore product preview <ArrowRight size={13} /></span>
             </Link>
           </div>
         </div>
@@ -773,7 +782,7 @@ export default function DS8() {
             ))}
           </div>
           <div className="before-after-arrow" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(99,102,241,.06)", border: "1px solid rgba(99,102,241,.12)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: P.ind }}>→</div>
+            <div style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(255,255,255,.04)", border: `1px solid ${P.border}`, display: "flex", alignItems: "center", justifyContent: "center", color: P.t3 }}><ArrowRight size={14} /></div>
           </div>
           <div style={{ background: "rgba(52,211,153,.03)", border: "1px solid rgba(52,211,153,.08)", borderRadius: 16, padding: "clamp(20px,3vw,32px) clamp(16px,2.5vw,28px)" }}>
             <div style={{ fontSize: 10, color: P.grn, fontFamily: "var(--mono)", letterSpacing: 2, fontWeight: 700, marginBottom: 20 }}>DATASPARK</div>
@@ -906,9 +915,19 @@ export default function DS8() {
         <div style={{ fontSize: 12, color: P.ind, fontWeight: 600, marginBottom: 10 }}>9 courses · 285+ scenarios</div>
         <h2 style={{ fontSize: "clamp(20px, 3vw, 30px)", fontWeight: 800, letterSpacing: "-.5px", marginBottom: 28 }}>Python to system design. Syntax to strategy.</h2>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
-          {[["🐍","Python"],["🗄️","SQL"],["📐","Statistics"],["🧠","ML"],["🔮","Deep Learning"],["✨","GenAI"],["📊","Product Sense"],["🏗️","Architecture"],["⚙️","MLOps"]].map(([ic,nm],i) => (
-            <div key={i} style={{ background: P.card, border: `1px solid ${P.border}`, borderRadius: 9, padding: "9px 14px", display: "flex", alignItems: "center", gap: 6, cursor: "default" }}>
-              <span style={{ fontSize: 15 }}>{ic}</span><span style={{ fontSize: 12, fontWeight: 600 }}>{nm}</span>
+          {[
+            [<Code2 size={14} />, "Python"],
+            [<Database size={14} />, "SQL"],
+            [<BarChart3 size={14} />, "Statistics"],
+            [<Brain size={14} />, "ML"],
+            [<Cpu size={14} />, "Deep Learning"],
+            [<Sparkles size={14} />, "GenAI"],
+            [<PieChart size={14} />, "Product Sense"],
+            [<Network size={14} />, "Architecture"],
+            [<Settings2 size={14} />, "MLOps"],
+          ].map(([ic, nm], i) => (
+            <div key={i} style={{ background: P.card, border: `1px solid ${P.border}`, borderRadius: 9, padding: "9px 14px", display: "flex", alignItems: "center", gap: 6, cursor: "default", color: P.t3 }}>
+              {ic}<span style={{ fontSize: 12, fontWeight: 600, color: P.t2 }}>{nm}</span>
             </div>
           ))}
         </div>

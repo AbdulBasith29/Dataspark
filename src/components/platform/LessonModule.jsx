@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { ArrowLeft, ArrowRight, Check, MessageCircle } from "lucide-react";
 import { DS, dsGlassCard } from "../../lib/ds-platform-tokens.js";
 import { renderInlineMarkdown } from "../../lib/inline-markdown.jsx";
 import { SimpleMarkdown } from "../../lib/simple-markdown.jsx";
@@ -17,7 +18,7 @@ import {
 } from "../../lib/analytics.js";
 
 const sectionLabel = {
-  fontSize: 10,
+  fontSize: 11,
   color: DS.dim,
   fontFamily: "var(--ds-mono), monospace",
   fontWeight: 700,
@@ -172,7 +173,7 @@ function DecisionArtifactCard({ graph, branchPath, clickedTargets, graphChoices,
           width: "100%",
         }}
       >
-        Download artifact →
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>Download artifact <ArrowRight size={13} /></span>
       </button>
 
       {isCapstone && (
@@ -219,7 +220,7 @@ function DecisionArtifactCard({ graph, branchPath, clickedTargets, graphChoices,
               transition: "background 0.2s",
             }}
           >
-            Get my certificate →
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>Get my certificate <ArrowRight size={13} /></span>
           </button>
         </div>
       )}
@@ -511,8 +512,8 @@ export default function LessonModule({
   if (!moduleSpec) {
     return (
       <div style={{ maxWidth: 860, margin: "0 auto", padding: "0 clamp(16px, 4vw, 28px)" }}>
-        <button type="button" onClick={onBack} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>
-          {backLabel}
+        <button type="button" onClick={onBack} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5 }}>
+          <ArrowLeft size={14} />{backLabel}
         </button>
         <p style={{ color: DS.t3, fontSize: 14, marginTop: 40, textAlign: "center" }}>
           Module content is loading — please try again in a moment.
@@ -639,13 +640,16 @@ export default function LessonModule({
           padding: "20px 0 8px",
           fontFamily: "var(--ds-mono), monospace",
           fontWeight: 600,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 5,
         }}
       >
-        {backLabel}
+        <ArrowLeft size={14} />{backLabel}
       </button>
       <div style={{ marginBottom: 22 }}>
         <div style={{
-          fontSize: 10,
+          fontSize: 11,
           color: course.accent,
           fontFamily: "var(--ds-mono), monospace",
           textTransform: "uppercase",
@@ -1016,7 +1020,7 @@ export default function LessonModule({
               whiteSpace: "nowrap",
             }}
           >
-            Generate my drill →
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>Generate my drill <ArrowRight size={13} /></span>
           </button>
         </div>
       )}
@@ -1074,9 +1078,9 @@ export default function LessonModule({
           disabled={!canMarkComplete}
           style={{ flex: 1, minWidth: 220 }}
           pendingLabel="Saving…"
-          successLabel="Done ✓"
+          successLabel="Done"
         >
-          Mark complete & continue →
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>Mark complete &amp; continue <ArrowRight size={13} /></span>
         </AsyncActionButton>
         <button
           type="button"
@@ -1125,13 +1129,18 @@ export default function LessonModule({
                     cursor: onOpenPractice ? "pointer" : "default",
                     fontFamily: "var(--ds-sans), sans-serif",
                     lineHeight: 1.5,
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 8,
                   }}
                 >
-                  <span style={{ fontFamily: "var(--ds-mono), monospace", color: DS.grn, marginRight: 8, fontSize: 12 }}>→</span>
-                  <strong style={{ color: DS.t1 }}>{title}</strong>
-                  {detail && (
-                    <span style={{ display: "block", color: DS.t3, fontSize: 13, marginTop: 4 }}>{detail}</span>
-                  )}
+                  <ArrowRight size={13} style={{ color: DS.grn, flexShrink: 0, marginTop: 3 }} />
+                  <span>
+                    <strong style={{ color: DS.t1 }}>{title}</strong>
+                    {detail && (
+                      <span style={{ display: "block", color: DS.t3, fontSize: 13, marginTop: 4 }}>{detail}</span>
+                    )}
+                  </span>
                 </button>
               );
             })}
