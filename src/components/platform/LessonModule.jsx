@@ -787,7 +787,7 @@ export default function LessonModule({
                 in-browser SQLite · no server
               </span>
             </div>
-            <SQLScratchpad />
+            <SQLScratchpad lessonId={lesson.id} />
           </div>
         )}
       </SectionCard>
