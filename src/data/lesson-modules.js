@@ -6093,7 +6093,56 @@ Without PARTITION BY the function ranks across the entire result set. Add \`PART
 
 ## Interview mental model
 
-Ask: "Do I need unique row IDs (ROW_NUMBER), honest gap-showing rank (RANK), or consecutive tier labels (DENSE_RANK)?" Then ask: "Does rank need to reset per group?" If yes, add PARTITION BY.`,
+Ask: "Do I need unique row IDs (ROW_NUMBER), honest gap-showing rank (RANK), or consecutive tier labels (DENSE_RANK)?" Then ask: "Does rank need to reset per group?" If yes, add PARTITION BY.
+
+## Worked example — tie behavior side by side
+
+\`\`\`sql
+-- Scores: Alice=95, Bob=95, Carol=87, Dave=80
+SELECT
+  name,
+  score,
+  ROW_NUMBER() OVER (ORDER BY score DESC) AS row_num,
+  RANK()       OVER (ORDER BY score DESC) AS rank,
+  DENSE_RANK() OVER (ORDER BY score DESC) AS dense_rank
+FROM scores;
+
+-- name   score  row_num  rank  dense_rank
+-- Alice    95      1       1       1
+-- Bob      95      2       1       1      ← same rank as Alice
+-- Carol    87      3       3       2      ← RANK skips 2; DENSE_RANK does not
+-- Dave     80      4       4       3
+\`\`\`
+
+## The deduplication pattern — ROW_NUMBER is the right tool
+
+\`\`\`sql
+-- Keep only the most recent order per customer
+WITH ranked AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER (
+      PARTITION BY customer_id
+      ORDER BY created_at DESC, order_id DESC  -- tie-break by order_id
+    ) AS rn
+  FROM orders
+)
+SELECT * FROM ranked WHERE rn = 1;
+\`\`\`
+
+Use \`ROW_NUMBER\` here, not \`RANK\` or \`DENSE_RANK\` — if two orders share the same \`created_at\`, RANK would return both with rn=1, giving you duplicate customers.
+
+## PARTITION BY resets the counter per group
+
+\`\`\`sql
+-- Without PARTITION BY: ranked 1→N across all rows globally
+ROW_NUMBER() OVER (ORDER BY score DESC)
+
+-- With PARTITION BY: restarts at 1 for each department
+ROW_NUMBER() OVER (PARTITION BY dept ORDER BY score DESC)
+\`\`\`
+
+**Interview muscle memory:** always confirm whether rank should be global or per-group before writing the window function.`,
     video: null,
     videoFallbackMarkdown: `## 3-minute ranking drill
 
@@ -6346,7 +6395,68 @@ LAG(revenue, 1) OVER (PARTITION BY region ORDER BY sale_date)
 
 ## Interview trap: early rows in a moving average
 
-When fewer than N rows precede the current row, the engine uses whatever rows exist. Row 1 averages over only itself. Explicitly handle or document this boundary behavior in your answer.`,
+When fewer than N rows precede the current row, the engine uses whatever rows exist. Row 1 averages over only itself. Explicitly handle or document this boundary behavior in your answer.
+
+## Worked example — LAG for month-over-month change
+
+\`\`\`sql
+SELECT
+  product_id,
+  sale_month,
+  revenue,
+  LAG(revenue, 1) OVER (
+    PARTITION BY product_id
+    ORDER BY sale_month
+  ) AS prev_month_revenue,
+  revenue - LAG(revenue, 1) OVER (
+    PARTITION BY product_id
+    ORDER BY sale_month
+  ) AS mom_change,
+  ROUND(
+    100.0 * (revenue - LAG(revenue, 1) OVER (PARTITION BY product_id ORDER BY sale_month))
+    / NULLIF(LAG(revenue, 1) OVER (PARTITION BY product_id ORDER BY sale_month), 0),
+    1
+  ) AS mom_pct_change
+FROM monthly_sales
+ORDER BY product_id, sale_month;
+\`\`\`
+
+Note: \`NULLIF(..., 0)\` prevents division by zero when the previous month had zero revenue.
+
+## Running total vs window aggregate — the frame default trap
+
+\`\`\`sql
+-- SUM without ORDER BY → grand total repeated on every row (entire partition as frame)
+SUM(revenue) OVER (PARTITION BY region)
+
+-- SUM with ORDER BY → running total (default frame: RANGE UNBOUNDED PRECEDING AND CURRENT ROW)
+SUM(revenue) OVER (PARTITION BY region ORDER BY sale_date)
+
+-- Explicit ROWS frame → avoids RANGE semantics surprises with duplicate dates
+SUM(revenue) OVER (
+  PARTITION BY region
+  ORDER BY sale_date
+  ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+)
+\`\`\`
+
+\`ROWS\` counts physical rows; \`RANGE\` groups rows with identical ORDER BY values into the same frame boundary. Use \`ROWS\` when dates or values can repeat and you want exact running totals.
+
+## LEAD for next-event lookahead
+
+\`\`\`sql
+-- Flag orders that will be followed by a return within 30 days
+SELECT
+  order_id,
+  customer_id,
+  order_date,
+  LEAD(order_date) OVER (PARTITION BY customer_id ORDER BY order_date) AS next_order_date,
+  CASE
+    WHEN LEAD(event_type) OVER (PARTITION BY customer_id ORDER BY order_date) = 'return'
+    THEN 1 ELSE 0
+  END AS followed_by_return
+FROM customer_events;
+\`\`\``,
     video: null,
     videoFallbackMarkdown: `## Quick frame drill
 
@@ -6597,7 +6707,67 @@ Common bugs: forgetting \`RECURSIVE\` keyword, missing base case, or a recursive
 
 ## Mental model
 
-A recursive CTE is like a loop: anchor runs once, recursive step runs until empty. If the recursive step can always find new rows, the engine hits a depth limit and errors.`,
+A recursive CTE is like a loop: anchor runs once, recursive step runs until empty. If the recursive step can always find new rows, the engine hits a depth limit and errors.
+
+## When CTEs actually help performance
+
+\`\`\`sql
+-- This CTE is referenced TWICE — the optimizer may materialize it (run once)
+WITH expensive_cohort AS (
+  SELECT customer_id, DATE_TRUNC('month', first_purchase) AS cohort_month
+  FROM customers
+  WHERE lifetime_value > 1000
+)
+SELECT c.cohort_month, COUNT(*) AS new_users
+FROM expensive_cohort c
+GROUP BY c.cohort_month
+
+UNION ALL
+
+SELECT c.cohort_month, AVG(o.amount) AS avg_order
+FROM expensive_cohort c
+JOIN orders o ON o.customer_id = c.customer_id
+GROUP BY c.cohort_month;
+
+-- Force materialization in PostgreSQL 12+ when you know it is expensive:
+WITH expensive_cohort AS MATERIALIZED ( ... )
+\`\`\`
+
+Without \`MATERIALIZED\`, PostgreSQL may inline and re-run the CTE twice. Use \`AS MATERIALIZED\` only when the subquery is genuinely expensive and you confirm it is referenced multiple times.
+
+## Chaining CTEs for readable multi-step pipelines
+
+\`\`\`sql
+-- Each CTE builds on the previous — far more readable than nested subqueries
+WITH
+daily_revenue AS (
+  SELECT DATE_TRUNC('day', created_at) AS day, SUM(amount) AS revenue
+  FROM orders WHERE status = 'completed'
+  GROUP BY 1
+),
+with_running_total AS (
+  SELECT day, revenue,
+    SUM(revenue) OVER (ORDER BY day) AS cumulative_revenue
+  FROM daily_revenue
+),
+with_target AS (
+  SELECT *, 0.8 * MAX(cumulative_revenue) OVER () AS target_80pct
+  FROM with_running_total
+)
+SELECT day, revenue, cumulative_revenue,
+  CASE WHEN cumulative_revenue >= target_80pct THEN 'above 80%' ELSE 'below' END AS vs_target
+FROM with_target
+ORDER BY day;
+\`\`\`
+
+## CTE vs subquery — when to use which
+
+| Use case | Prefer |
+|---|---|
+| Intermediate result referenced once | Subquery — simpler |
+| Intermediate result referenced 2+ times | CTE — avoids duplication |
+| Hierarchy / graph traversal | Recursive CTE — subqueries can't recurse |
+| Debugging step-by-step | CTE — each step is named and testable |`,
     video: null,
     videoFallbackMarkdown: `## Quick CTE drill
 
@@ -6877,7 +7047,51 @@ PIVOT (SUM(revenue) FOR product IN ([Widget], [Gadget])) AS pvt;
 
 - Default to CASE-based aggregation in cross-dialect interviews.
 - Both PIVOT and CASE require static column lists — dynamic value sets need dynamic SQL or a BI layer.
-- UNPIVOT (or UNION ALL with literals) reverses the operation: wide table back to narrow.`,
+- UNPIVOT (or UNION ALL with literals) reverses the operation: wide table back to narrow.
+
+## COALESCE to clean up NULL pivot cells
+
+\`\`\`sql
+-- Without COALESCE: months with no Gadget sales show NULL, not 0
+SELECT
+  month,
+  SUM(CASE WHEN product = 'Widget' THEN revenue END)          AS widget_rev,
+  SUM(CASE WHEN product = 'Gadget' THEN revenue END)          AS gadget_rev
+FROM sales GROUP BY month;
+
+-- With COALESCE: clean 0 instead of NULL (safer for downstream SUM or display)
+SELECT
+  month,
+  COALESCE(SUM(CASE WHEN product = 'Widget' THEN revenue END), 0) AS widget_rev,
+  COALESCE(SUM(CASE WHEN product = 'Gadget' THEN revenue END), 0) AS gadget_rev
+FROM sales GROUP BY month;
+\`\`\`
+
+## UNPIVOT — wide to long
+
+\`\`\`sql
+-- Wide table: (month, widget_rev, gadget_rev) → long: (month, product, revenue)
+-- Portable UNION ALL approach:
+SELECT month, 'Widget' AS product, widget_rev AS revenue FROM monthly_pivot
+UNION ALL
+SELECT month, 'Gadget' AS product, gadget_rev AS revenue FROM monthly_pivot
+ORDER BY month, product;
+\`\`\`
+
+## Real-world use case — attendance matrix
+
+\`\`\`sql
+-- Turn event log (user_id, event_date, attended) into a user × day matrix
+SELECT
+  user_id,
+  MAX(CASE WHEN event_date = '2024-01-01' THEN attended END) AS day_1,
+  MAX(CASE WHEN event_date = '2024-01-02' THEN attended END) AS day_2,
+  MAX(CASE WHEN event_date = '2024-01-03' THEN attended END) AS day_3
+FROM attendance
+GROUP BY user_id;
+\`\`\`
+
+Using \`MAX\` instead of \`SUM\` when the value is a flag (0/1) avoids summing multiple entries per cell if there are duplicates in the source data.`,
     video: null,
     videoFallbackMarkdown: `## 3-minute pivot drill
 
@@ -7108,7 +7322,65 @@ EXPLAIN SELECT * FROM orders WHERE customer_id = 'C42';
 
 - Always check EXPLAIN before assuming a query is slow.
 - Composite indexes work left-to-right: \`(customer_id, created_at)\` supports predicates on \`customer_id\` alone or on both columns, but NOT on \`created_at\` alone.
-- High estimated rows under a Seq Scan node = primary optimization target.`,
+- High estimated rows under a Seq Scan node = primary optimization target.
+
+## Reading a real EXPLAIN ANALYZE output
+
+\`\`\`sql
+EXPLAIN ANALYZE
+SELECT o.order_id, c.name
+FROM orders o
+JOIN customers c ON c.id = o.customer_id
+WHERE o.created_at > '2024-01-01';
+
+-- Sample output:
+-- Hash Join  (cost=1842.00..4201.00 rows=85000)
+--            (actual time=45.3..198.4 rows=82341 loops=1)
+--   Hash Cond: (o.customer_id = c.id)
+--   ->  Seq Scan on orders  (cost=0..3800 rows=180000)
+--                           (actual time=0.1..87.2 rows=182000 loops=1)
+--         Filter: (created_at > '2024-01-01')
+--         Rows Removed by Filter: 318000
+--   ->  Hash  (cost=980..980 rows=50000)
+--       ->  Seq Scan on customers  (cost=0..980 rows=50000)
+\`\`\`
+
+Reading this output:
+- **Seq Scan on orders** scans 500K rows to return 182K after the date filter — 318K rows discarded. An index on \`created_at\` would let the engine skip the full scan.
+- **loops=1** means this node ran once — normal. If loops > 1 on an inner node, you have an N+1 problem.
+- **actual vs estimated rows**: 82341 actual vs 85000 estimated — close. Large mismatches indicate stale statistics; run \`ANALYZE orders\`.
+
+## The composite index leftmost-prefix rule
+
+\`\`\`sql
+-- Index: CREATE INDEX idx ON orders(status, customer_id, created_at);
+
+-- Uses index (status is the leftmost column)
+WHERE status = 'completed'
+
+-- Uses index (leftmost + second column)
+WHERE status = 'completed' AND customer_id = 42
+
+-- Uses index fully
+WHERE status = 'completed' AND customer_id = 42 AND created_at > '2024-01-01'
+
+-- Does NOT use the index (skips the leftmost column)
+WHERE customer_id = 42
+
+-- Does NOT use the index (skips to the third column)
+WHERE created_at > '2024-01-01'
+\`\`\`
+
+Design composite indexes with equality columns first, then range columns last. The planner can use any leftmost prefix but stops at the first missing column.
+
+## Interview checklist when asked to optimize a slow query
+
+1. Run \`EXPLAIN ANALYZE\` — never guess without data
+2. Find the most expensive node (highest actual time or rows)
+3. Seq Scan on a large table → check if an index on the filter column would help
+4. \`loops > 1\` on an inner node → N+1 / correlated subquery; replace with a JOIN
+5. Rows estimated ≠ actual rows by 10×+ → run \`ANALYZE table\` to refresh statistics
+6. Re-run \`EXPLAIN ANALYZE\` after the fix to confirm the plan changed`,
     video: null,
     videoFallbackMarkdown: `## 3-minute plan drill
 
