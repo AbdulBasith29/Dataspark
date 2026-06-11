@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { Check, ArrowLeft, LogOut } from "lucide-react";
+import { Check, ArrowLeft, LogOut, Shield } from "lucide-react";
 import { useAuth } from "../lib/authContext.jsx";
+import SecuritySettings from "../components/SecuritySettings.jsx";
 import AIChatbot from "../chatbot/AIChatbot.jsx";
 import SQLJoins from "../visualizations/SQLJoins.jsx";
 import TrainValTestSplit from "../visualizations/TrainValTestSplit.jsx";
@@ -159,37 +160,102 @@ const PlatformLogo = () => (
 
 function UserMenu() {
   const { user, signOut } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [showSecurity, setShowSecurity] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
   if (!user) return null;
+
   const initials = (user.user_metadata?.display_name || user.email || "?")
     .split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  const name = user.user_metadata?.display_name || user.email?.split("@")[0] || "Account";
+
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, marginLeft: 8 }}>
-      <div style={{
-        width: 28, height: 28, borderRadius: "50%",
-        background: "linear-gradient(135deg, #6366F1, #818CF8)",
-        display: "grid", placeItems: "center",
-        fontSize: 11, fontWeight: 700, color: "#fff",
-        flexShrink: 0,
-      }}>
-        {initials}
+    <>
+      <SecuritySettings open={showSecurity} onClose={() => setShowSecurity(false)} />
+      <div ref={menuRef} style={{ position: "relative", flexShrink: 0, marginLeft: 8 }}>
+        <button
+          type="button"
+          onClick={() => setOpen(v => !v)}
+          style={{
+            display: "flex", alignItems: "center", gap: 7,
+            background: open ? "rgba(255,255,255,0.07)" : "none",
+            border: `1px solid ${open ? DS.border : "transparent"}`,
+            borderRadius: 8, padding: "4px 8px 4px 4px",
+            cursor: "pointer", transition: "background 0.15s, border-color 0.15s",
+          }}
+          onMouseEnter={(e) => { if (!open) e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+          onMouseLeave={(e) => { if (!open) e.currentTarget.style.background = "none"; }}
+        >
+          <div style={{
+            width: 26, height: 26, borderRadius: "50%",
+            background: "linear-gradient(135deg, #6366F1, #818CF8)",
+            display: "grid", placeItems: "center",
+            fontSize: 10, fontWeight: 700, color: "#fff", flexShrink: 0,
+          }}>
+            {initials}
+          </div>
+          <span style={{ fontSize: 12, color: DS.t3, fontWeight: 500, maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {name}
+          </span>
+        </button>
+
+        {open && (
+          <div style={{
+            position: "absolute", top: "calc(100% + 8px)", right: 0,
+            background: "rgba(6,8,24,0.98)",
+            border: `1px solid ${DS.border}`,
+            borderRadius: 12, padding: "6px",
+            minWidth: 180, zIndex: 200,
+            boxShadow: "0 16px 40px rgba(0,0,0,0.5)",
+          }}>
+            <div style={{ padding: "8px 12px 10px", borderBottom: `1px solid ${DS.border}`, marginBottom: 4 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: DS.t1, marginBottom: 2 }}>{name}</div>
+              <div style={{ fontSize: 11, color: DS.dim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setOpen(false); setShowSecurity(true); }}
+              style={{
+                display: "flex", alignItems: "center", gap: 8, width: "100%",
+                background: "none", border: "none", cursor: "pointer",
+                padding: "9px 12px", borderRadius: 8, color: DS.t2, fontSize: 13,
+                transition: "background 0.15s",
+                fontFamily: "var(--ds-sans), sans-serif",
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.05)"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "none"}
+            >
+              <Shield size={14} />
+              Security
+            </button>
+            <button
+              type="button"
+              onClick={() => { setOpen(false); signOut(); }}
+              style={{
+                display: "flex", alignItems: "center", gap: 8, width: "100%",
+                background: "none", border: "none", cursor: "pointer",
+                padding: "9px 12px", borderRadius: 8, color: DS.t3, fontSize: 13,
+                transition: "background 0.15s",
+                fontFamily: "var(--ds-sans), sans-serif",
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.05)"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "none"}
+            >
+              <LogOut size={14} />
+              Sign out
+            </button>
+          </div>
+        )}
       </div>
-      <button
-        type="button"
-        onClick={signOut}
-        title="Sign out"
-        style={{
-          background: "none", border: `1px solid ${DS.border}`,
-          borderRadius: 7, padding: "5px 7px",
-          cursor: "pointer", color: DS.dim,
-          display: "flex", alignItems: "center",
-          transition: "color 0.15s, border-color 0.15s",
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.color = DS.t2; e.currentTarget.style.borderColor = DS.t3; }}
-        onMouseLeave={(e) => { e.currentTarget.style.color = DS.dim; e.currentTarget.style.borderColor = DS.border; }}
-      >
-        <LogOut size={13} />
-      </button>
-    </div>
+    </>
   );
 }
 
