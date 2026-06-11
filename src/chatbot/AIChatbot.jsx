@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { SYSTEM_PROMPTS } from "./system-prompts";
 import { CHATBOT_CONFIG } from "./chatbot-config";
+import { getSupabaseBrowserClient } from "../lib/supabaseClient";
 
 // Reusable AI Chatbot component, scoped per course.
 // Expects a full `course` object (from CURRICULUM) and an `onClose` handler.
@@ -57,6 +58,7 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
     typeof seedInput === "string" ? seedInput : ""
   );
   const [loading, setLoading] = useState(false);
+  const [remaining, setRemaining] = useState(null);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -71,6 +73,14 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
     setLoading(true);
 
     try {
+      const supabase = getSupabaseBrowserClient();
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const headers = { "Content-Type": "application/json" };
+      if (session?.access_token) {
+        headers["Authorization"] = `Bearer ${session.access_token}`;
+      }
+
       const system = buildSystemPrompt(course);
       const prior = messages
         .filter((m, idx) => !(idx === 0 && m.role === "assistant"))
@@ -79,9 +89,7 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
 
       const resp = await fetch("/api/ai/chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({
           max_tokens: 800,
           system,
@@ -90,6 +98,32 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
       });
 
       const data = await resp.json();
+
+      if (resp.status === 401) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: "Please **sign in** to use the AI tutor. Click the Sign In button at the top of the page.",
+          },
+        ]);
+        setLoading(false);
+        return;
+      }
+
+      if (resp.status === 429) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: data?.message || `You've reached your daily message limit. Come back tomorrow!`,
+          },
+        ]);
+        setRemaining(0);
+        setLoading(false);
+        return;
+      }
+
       if (!resp.ok || !data?.text) {
         const details =
           data?.details?.message ||
@@ -106,9 +140,9 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
         setLoading(false);
         return;
       }
-      const text = data.text;
 
-      setMessages((prev) => [...prev, { role: "assistant", content: text }]);
+      if (typeof data.remaining === "number") setRemaining(data.remaining);
+      setMessages((prev) => [...prev, { role: "assistant", content: data.text }]);
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -435,6 +469,21 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
           flexShrink: 0,
         }}
       >
+        {remaining !== null && (
+          <div
+            style={{
+              fontSize: 11,
+              color: remaining <= 3 ? "#F59E0B" : "#64748B",
+              fontFamily: "var(--ds-mono), monospace",
+              textAlign: "right",
+              marginBottom: 6,
+            }}
+          >
+            {remaining === 0
+              ? "Daily limit reached · resets tomorrow"
+              : `${remaining} message${remaining === 1 ? "" : "s"} left today`}
+          </div>
+        )}
         <div style={{ display: "flex", gap: 8 }}>
           <input
             value={input}
