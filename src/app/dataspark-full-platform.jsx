@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { Check, ArrowLeft } from "lucide-react";
+import { Check, ArrowLeft, LogOut } from "lucide-react";
+import { useAuth } from "../lib/authContext.jsx";
 import AIChatbot from "../chatbot/AIChatbot.jsx";
 import SQLJoins from "../visualizations/SQLJoins.jsx";
 import TrainValTestSplit from "../visualizations/TrainValTestSplit.jsx";
@@ -155,6 +156,42 @@ const PlatformLogo = () => (
     <circle cx="25.5" cy="4.75" r="0.8" fill="white" />
   </svg>
 );
+
+function UserMenu() {
+  const { user, signOut } = useAuth();
+  if (!user) return null;
+  const initials = (user.user_metadata?.display_name || user.email || "?")
+    .split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, marginLeft: 8 }}>
+      <div style={{
+        width: 28, height: 28, borderRadius: "50%",
+        background: "linear-gradient(135deg, #6366F1, #818CF8)",
+        display: "grid", placeItems: "center",
+        fontSize: 11, fontWeight: 700, color: "#fff",
+        flexShrink: 0,
+      }}>
+        {initials}
+      </div>
+      <button
+        type="button"
+        onClick={signOut}
+        title="Sign out"
+        style={{
+          background: "none", border: `1px solid ${DS.border}`,
+          borderRadius: 7, padding: "5px 7px",
+          cursor: "pointer", color: DS.dim,
+          display: "flex", alignItems: "center",
+          transition: "color 0.15s, border-color 0.15s",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = DS.t2; e.currentTarget.style.borderColor = DS.t3; }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = DS.dim; e.currentTarget.style.borderColor = DS.border; }}
+      >
+        <LogOut size={13} />
+      </button>
+    </div>
+  );
+}
 
 /** Monogram chip — consistent across OS/fonts (replaces emoji course icons). */
 function CourseMark({ color, mark, size = "lg" }) {
@@ -1791,6 +1828,8 @@ export default function DataSparkPlatform() {
             </button>
           ))}
         </div>
+
+        <UserMenu />
       </nav>
 
       <main style={{ paddingBottom: 72, position: "relative", zIndex: 1 }}>
