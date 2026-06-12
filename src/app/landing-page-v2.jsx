@@ -1324,6 +1324,579 @@ function TransformSection() {
   );
 }
 
+// ── Product showcase — auto-playing "video" demos of the platform ────────────
+const DEMO_TABS = [
+  { id: "mission", label: "Solve a mission", dur: 13000 },
+  { id: "tutor", label: "Get drilled by SPARK", dur: 12500 },
+  { id: "score", label: "Watch your scorecard", dur: 11000 },
+];
+
+const MISSION_SQL =
+  "SELECT plan_tier, COUNT(*) AS churned\nFROM churn_q3\nWHERE region = 'EMEA'\nGROUP BY plan_tier\nORDER BY churned DESC;";
+
+const MISSION_ROWS = [
+  { tier: "SMB", n: "1,204", pct: 100 },
+  { tier: "Mid-market", n: "312", pct: 26 },
+  { tier: "Enterprise", n: "88", pct: 7 },
+];
+
+const MISSION_LESSONS = ["Window functions", "Diagnose EMEA churn", "Index tuning", "NULL three-valued logic"];
+
+const TUTOR_MSG_1 =
+  "You said pricing caused the EMEA churn. The price change was global. Why did only EMEA react?";
+const TUTOR_CHIPS = ["EMEA has more annual plans", "Currency conversion hit", "Just a coincidence"];
+const TUTOR_MSG_2 =
+  "Better. Annual plans renew once a year — so a May price change hits EMEA's renewal-heavy Q3 hardest. Now: how would you verify the renewal mix?";
+
+// Master clock for a demo scene — loops 0→1 over `duration`, only while running
+function useDemoLoop(duration, running, onLoop) {
+  const [t, setT] = useState(0);
+  const onLoopRef = useRef(onLoop);
+  onLoopRef.current = onLoop;
+  useEffect(() => {
+    if (!running) return undefined;
+    let raf;
+    const start = performance.now();
+    let lastT = 0;
+    const tick = (now) => {
+      const nt = ((now - start) % duration) / duration;
+      if (nt < lastT && onLoopRef.current) onLoopRef.current();
+      lastT = nt;
+      setT(nt);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [duration, running]);
+  return t;
+}
+
+// Scripted cursor — glides between waypoints and ripples on click
+function DemoCursor({ t, waypoints }) {
+  let wp = waypoints[0];
+  for (const w of waypoints) {
+    if (t >= w.at) wp = w;
+    else break;
+  }
+  const rippling = wp.click && t - wp.at < 0.06;
+  return (
+    <div
+      aria-hidden
+      style={{
+        position: "absolute",
+        left: `${wp.x}%`,
+        top: `${wp.y}%`,
+        zIndex: 6,
+        pointerEvents: "none",
+        transition: "left 0.75s var(--ds-ease-in-out), top 0.75s var(--ds-ease-in-out)",
+      }}
+    >
+      {rippling && (
+        <span
+          key={wp.at}
+          style={{
+            position: "absolute",
+            left: -9,
+            top: -9,
+            width: 30,
+            height: 30,
+            borderRadius: "50%",
+            border: `2px solid ${CYAN}`,
+            animation: "ds2-ripple 0.5s var(--ds-ease-out) both",
+          }}
+        />
+      )}
+      <svg width="18" height="18" viewBox="0 0 24 24" style={{ filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.6))" }}>
+        <path d="M5 3 L19 12 L12 13 L9 20 Z" fill="#F8FAFC" stroke="#0F172A" strokeWidth="1.4" />
+      </svg>
+    </div>
+  );
+}
+
+const demoPanelStyle = {
+  borderRadius: 10,
+  border: `1px solid ${BORDER_SOFT}`,
+  background: "rgba(2,6,23,0.72)",
+};
+
+// Scene 1 — pick a mission, SQL types itself, run, results + SPARK nudge
+function MissionDemo({ t }) {
+  const typed = MISSION_SQL.slice(0, Math.floor(seg(t, 0.12, 0.48) * MISSION_SQL.length));
+  const lessonActive = t > 0.07;
+  const ran = t > 0.58;
+  const toast = t > 0.78 && t < 0.97;
+  return (
+    <div style={{ position: "relative", display: "flex", height: "100%", fontFamily: SANS }}>
+      <DemoCursor
+        t={t}
+        waypoints={[
+          { at: 0, x: 32, y: 58 },
+          { at: 0.02, x: 12, y: 27 },
+          { at: 0.07, x: 12, y: 27, click: true },
+          { at: 0.13, x: 52, y: 42 },
+          { at: 0.5, x: 88, y: 26 },
+          { at: 0.56, x: 88, y: 26, click: true },
+          { at: 0.64, x: 58, y: 80 },
+        ]}
+      />
+      {/* Sidebar */}
+      <div className="ds2-demo-side" style={{ width: 168, borderRight: `1px solid ${BORDER_SOFT}`, padding: "12px 10px", flexShrink: 0 }}>
+        <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.18em", textTransform: "uppercase", color: DIM, padding: "0 6px 10px" }}>
+          SQL · Missions
+        </div>
+        {MISSION_LESSONS.map((l, i) => {
+          const active = i === 1 && lessonActive;
+          return (
+            <div
+              key={l}
+              style={{
+                padding: "8px 9px",
+                borderRadius: 8,
+                marginBottom: 3,
+                fontSize: 11.5,
+                color: active ? WHITE : "#64748B",
+                background: active ? "rgba(168,85,247,0.16)" : "transparent",
+                border: `1px solid ${active ? "rgba(168,85,247,0.4)" : "transparent"}`,
+                transition: "all 0.3s var(--ds-ease-out)",
+              }}
+            >
+              {l}
+            </div>
+          );
+        })}
+      </div>
+      {/* Main */}
+      <div style={{ flex: 1, padding: 14, display: "flex", flexDirection: "column", gap: 10, minWidth: 0 }}>
+        <div style={{ fontSize: 11.5, color: GRAY, padding: "7px 11px", ...demoPanelStyle, borderColor: "rgba(168,85,247,0.25)" }}>
+          <span style={{ color: PURPLE, fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.14em", marginRight: 8 }}>MISSION</span>
+          EMEA churn spiked 15% — find which segment drives it.
+        </div>
+        <div style={{ position: "relative", flex: 1, ...demoPanelStyle, padding: "10px 12px", overflow: "hidden" }}>
+          <button
+            style={{
+              position: "absolute",
+              top: 8,
+              right: 8,
+              border: "none",
+              borderRadius: 7,
+              padding: "5px 13px",
+              fontSize: 10.5,
+              fontWeight: 700,
+              fontFamily: SANS,
+              color: ran ? "#0B0314" : GRAY,
+              background: ran ? GRADIENT_TEXT : "rgba(255,255,255,0.06)",
+              transition: "all 0.3s",
+              pointerEvents: "none",
+            }}
+          >
+            ▶ Run
+          </button>
+          <pre style={{ margin: 0, fontFamily: MONO, fontSize: 11.5, lineHeight: 1.65, color: "#C7D2FE", whiteSpace: "pre-wrap" }}>
+            {typed}
+            {t > 0.12 && t < 0.5 && <span style={{ color: CYAN, animation: "ds2-blink 0.8s steps(1) infinite" }}>▍</span>}
+          </pre>
+        </div>
+        <div style={{ ...demoPanelStyle, padding: "10px 12px", minHeight: 92 }}>
+          <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.16em", textTransform: "uppercase", color: ran ? CYAN : "#1E293B", marginBottom: 8, transition: "color 0.4s" }}>
+            {ran ? "3 rows · 0.21s" : "results"}
+          </div>
+          {MISSION_ROWS.map((row, i) => {
+            const vis = seg(t, 0.6 + i * 0.05, 0.72 + i * 0.05);
+            return (
+              <div key={row.tier} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 5, opacity: vis }}>
+                <span style={{ width: 78, fontSize: 11, color: "#CBD5E1", flexShrink: 0 }}>{row.tier}</span>
+                <div style={{ flex: 1, height: 7, borderRadius: 99, background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${row.pct * vis}%`, borderRadius: 99, background: i === 0 ? "linear-gradient(90deg, #F87171, #FB923C)" : GRADIENT_TEXT }} />
+                </div>
+                <span style={{ width: 44, fontFamily: MONO, fontSize: 10.5, color: WHITE, textAlign: "right" }}>{row.n}</span>
+              </div>
+            );
+          })}
+        </div>
+        {toast && (
+          <div
+            style={{
+              position: "absolute",
+              right: 14,
+              bottom: 14,
+              maxWidth: 250,
+              padding: "10px 13px",
+              borderRadius: 11,
+              border: "1px solid rgba(168,85,247,0.45)",
+              background: "rgba(13,8,28,0.96)",
+              boxShadow: "0 12px 36px rgba(0,0,0,0.6), 0 0 24px rgba(168,85,247,0.2)",
+              fontSize: 11.5,
+              lineHeight: 1.55,
+              color: "#E2E8F0",
+              animation: "ds2-pop 0.4s var(--ds-ease-out) both",
+              zIndex: 4,
+            }}
+          >
+            <span style={{ color: PURPLE, fontWeight: 700 }}>✦ SPARK:</span> SMB drives 75% of it. Good. Now —{" "}
+            <em>why</em> SMB?
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Scene 2 — SPARK pushes back on your reasoning
+function TutorDemo({ t }) {
+  const typed1 = TUTOR_MSG_1.slice(0, Math.floor(seg(t, 0.03, 0.26) * TUTOR_MSG_1.length));
+  const chipsVisible = t > 0.28 && t < 0.46;
+  const answered = t > 0.46;
+  const typed2 = TUTOR_MSG_2.slice(0, Math.floor(seg(t, 0.52, 0.88) * TUTOR_MSG_2.length));
+  const bubble = (mine) => ({
+    alignSelf: mine ? "flex-end" : "flex-start",
+    maxWidth: "82%",
+    padding: "10px 14px",
+    borderRadius: mine ? "13px 13px 4px 13px" : "13px 13px 13px 4px",
+    background: mine ? "rgba(34,211,238,0.1)" : "rgba(168,85,247,0.08)",
+    border: `1px solid ${mine ? "rgba(34,211,238,0.3)" : "rgba(168,85,247,0.25)"}`,
+    fontSize: 12.5,
+    lineHeight: 1.6,
+    color: mine ? "#CFFAFE" : "#E2E8F0",
+    fontFamily: SANS,
+  });
+  return (
+    <div style={{ position: "relative", height: "100%", padding: 16, display: "flex", flexDirection: "column", gap: 10, boxSizing: "border-box" }}>
+      <DemoCursor
+        t={t}
+        waypoints={[
+          { at: 0, x: 78, y: 82 },
+          { at: 0.32, x: 30, y: 56 },
+          { at: 0.42, x: 30, y: 56, click: true },
+          { at: 0.52, x: 80, y: 86 },
+        ]}
+      />
+      <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 8, borderBottom: `1px solid ${BORDER_SOFT}` }}>
+        <span style={{ width: 7, height: 7, borderRadius: "50%", background: PURPLE, boxShadow: `0 0 8px ${PURPLE}` }} />
+        <span style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: "0.12em", color: GRAY }}>SPARK · pushing back on your hypothesis</span>
+      </div>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10, overflow: "hidden" }}>
+        {t > 0.03 && (
+          <div style={bubble(false)}>
+            {typed1}
+            {t < 0.26 && <span style={{ color: CYAN, animation: "ds2-blink 0.8s steps(1) infinite" }}>▍</span>}
+          </div>
+        )}
+        {chipsVisible && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {TUTOR_CHIPS.map((c, i) => (
+              <div
+                key={c}
+                style={{
+                  padding: "9px 13px",
+                  borderRadius: 10,
+                  border: `1px solid ${i === 0 && t > 0.4 ? "rgba(34,211,238,0.55)" : BORDER}`,
+                  background: i === 0 && t > 0.4 ? "rgba(34,211,238,0.08)" : "rgba(255,255,255,0.025)",
+                  fontSize: 12,
+                  color: WHITE,
+                  fontFamily: SANS,
+                  animation: `ds2-rise 0.35s var(--ds-ease-out) ${i * 0.07}s both`,
+                  transition: "all 0.25s",
+                }}
+              >
+                <span style={{ color: CYAN, fontFamily: MONO, fontSize: 10.5, marginRight: 8 }}>{"ABC"[i]}</span>
+                {c}
+              </div>
+            ))}
+          </div>
+        )}
+        {answered && <div style={{ ...bubble(true), animation: "ds2-rise 0.3s var(--ds-ease-out) both" }}>{TUTOR_CHIPS[0]}</div>}
+        {t > 0.52 && (
+          <div style={bubble(false)}>
+            {typed2}
+            {t < 0.88 && <span style={{ color: CYAN, animation: "ds2-blink 0.8s steps(1) infinite" }}>▍</span>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Scene 3 — the scorecard assembles itself, then gets shared
+function ScorecardDemo({ t }) {
+  const CIRC = 2 * Math.PI * 46;
+  const ringFill = 0.84 * seg(t, 0.06, 0.42);
+  const score = Math.round(84 * seg(t, 0.06, 0.42));
+  const badge = t > 0.6;
+  const copied = t > 0.82 && t < 0.98;
+  return (
+    <div style={{ position: "relative", height: "100%", padding: 18, display: "flex", gap: 18, alignItems: "center", boxSizing: "border-box", fontFamily: SANS }}>
+      <DemoCursor
+        t={t}
+        waypoints={[
+          { at: 0, x: 18, y: 18 },
+          { at: 0.66, x: 50, y: 86 },
+          { at: 0.76, x: 50, y: 86, click: true },
+          { at: 0.84, x: 68, y: 66 },
+        ]}
+      />
+      {/* Ring */}
+      <div style={{ position: "relative", width: 132, flexShrink: 0, textAlign: "center" }}>
+        <svg width="132" height="132" viewBox="0 0 110 110">
+          <circle cx="55" cy="55" r="46" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="7" />
+          <circle
+            cx="55"
+            cy="55"
+            r="46"
+            fill="none"
+            stroke="url(#ds2-ring-grad)"
+            strokeWidth="7"
+            strokeLinecap="round"
+            strokeDasharray={CIRC}
+            strokeDashoffset={CIRC * (1 - ringFill)}
+            transform="rotate(-90 55 55)"
+          />
+          <defs>
+            <linearGradient id="ds2-ring-grad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stopColor={PURPLE} />
+              <stop offset="100%" stopColor={CYAN} />
+            </linearGradient>
+          </defs>
+        </svg>
+        <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+          <span style={{ fontFamily: MONO, fontSize: 27, fontWeight: 700, color: WHITE, fontVariantNumeric: "tabular-nums" }}>{score}</span>
+          <span style={{ fontFamily: MONO, fontSize: 8.5, letterSpacing: "0.18em", color: DIM, textTransform: "uppercase" }}>readiness</span>
+        </div>
+        {badge && (
+          <div
+            style={{
+              marginTop: 10,
+              display: "inline-block",
+              padding: "5px 12px",
+              borderRadius: 999,
+              border: "1px solid rgba(34,211,238,0.45)",
+              background: "rgba(34,211,238,0.08)",
+              fontFamily: MONO,
+              fontSize: 9,
+              letterSpacing: "0.16em",
+              textTransform: "uppercase",
+              color: CYAN,
+              animation: "ds2-pop 0.45s var(--ds-ease-out) both",
+            }}
+          >
+            Interview ready
+          </div>
+        )}
+      </div>
+      {/* Bars + share */}
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 11 }}>
+        {SIM_SCORECARD.map((row, i) => {
+          const fill = seg(t, 0.18 + i * 0.09, 0.46 + i * 0.09);
+          return (
+            <div key={row.skill}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, color: GRAY, marginBottom: 4 }}>
+                {row.skill}
+                <span style={{ fontFamily: MONO, fontSize: 10.5, color: WHITE }}>{Math.round(row.pct * fill)}%</span>
+              </div>
+              <div style={{ height: 5, borderRadius: 99, background: "rgba(255,255,255,0.06)" }}>
+                <div style={{ height: "100%", width: `${row.pct * fill}%`, borderRadius: 99, background: GRADIENT_TEXT }} />
+              </div>
+            </div>
+          );
+        })}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}>
+          <button
+            style={{
+              border: "none",
+              borderRadius: 9,
+              padding: "9px 18px",
+              fontSize: 11.5,
+              fontWeight: 700,
+              fontFamily: SANS,
+              color: t > 0.76 ? "#0B0314" : WHITE,
+              background: t > 0.76 ? GRADIENT_TEXT : "rgba(255,255,255,0.07)",
+              transition: "all 0.3s",
+              pointerEvents: "none",
+            }}
+          >
+            Share scorecard
+          </button>
+          {copied && (
+            <span
+              style={{
+                fontFamily: MONO,
+                fontSize: 10.5,
+                color: CYAN,
+                animation: "ds2-pop 0.35s var(--ds-ease-out) both",
+              }}
+            >
+              ✓ link copied — send it to recruiters
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ShowcaseSection() {
+  const [ref, inView] = useInView(0.2);
+  const tilt = useTilt(3);
+  const [tab, setTab] = useState(0);
+  const autoRef = useRef(true);
+  const onLoop = useCallback(() => {
+    if (autoRef.current) setTab((v) => (v + 1) % DEMO_TABS.length);
+  }, []);
+  const t = useDemoLoop(DEMO_TABS[tab].dur, inView, onLoop);
+  const pickTab = (i) => {
+    autoRef.current = false; // user took the remote — stop auto-advancing
+    setTab(i);
+  };
+
+  return (
+    <section ref={ref} style={{ position: "relative", zIndex: 1, padding: "110px 24px", maxWidth: 1120, margin: "0 auto" }}>
+      <div
+        style={{
+          textAlign: "center",
+          marginBottom: 40,
+          opacity: inView ? 1 : 0,
+          transform: inView ? "none" : "translateY(24px)",
+          transition: "opacity 0.7s var(--ds-ease-out), transform 0.7s var(--ds-ease-out)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <SectionKicker>Inside the platform</SectionKicker>
+        </div>
+        <h2
+          style={{
+            margin: "16px 0 12px",
+            fontFamily: SANS,
+            fontWeight: 800,
+            fontSize: "clamp(28px, 4.5vw, 46px)",
+            letterSpacing: "-0.03em",
+            color: WHITE,
+            lineHeight: 1.1,
+          }}
+        >
+          See DataSpark <span className="ds2-shimmer">in action.</span>
+        </h2>
+        <p style={{ margin: "0 auto", fontFamily: SANS, fontSize: 16, color: GRAY, maxWidth: 540, lineHeight: 1.65 }}>
+          Auto-playing previews of the real product — missions, the SPARK agent, and
+          your live scorecard.
+        </p>
+      </div>
+
+      {/* Tab bar */}
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          justifyContent: "center",
+          gap: 8,
+          marginBottom: 22,
+          opacity: inView ? 1 : 0,
+          transition: "opacity 0.7s var(--ds-ease-out) 0.1s",
+        }}
+      >
+        {DEMO_TABS.map((d, i) => (
+          <button
+            key={d.id}
+            onClick={() => pickTab(i)}
+            style={{
+              position: "relative",
+              overflow: "hidden",
+              border: `1px solid ${i === tab ? "rgba(168,85,247,0.5)" : BORDER}`,
+              borderRadius: 10,
+              padding: "10px 18px",
+              background: i === tab ? "rgba(168,85,247,0.1)" : "rgba(255,255,255,0.02)",
+              color: i === tab ? WHITE : GRAY,
+              fontFamily: SANS,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            {d.label}
+            {i === tab && (
+              <span
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  bottom: 0,
+                  height: 2,
+                  width: `${t * 100}%`,
+                  background: GRADIENT_TEXT,
+                }}
+              />
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Browser frame */}
+      <div
+        style={{
+          opacity: inView ? 1 : 0,
+          transform: inView ? "none" : "translateY(32px)",
+          transition: "opacity 0.8s var(--ds-ease-out) 0.15s, transform 0.8s var(--ds-ease-out) 0.15s",
+        }}
+      >
+        <div
+          ref={tilt}
+          style={{
+            maxWidth: 860,
+            margin: "0 auto",
+            borderRadius: 16,
+            border: "1px solid transparent",
+            background:
+              `linear-gradient(rgba(8,10,20,0.96), rgba(8,10,20,0.96)) padding-box, ` +
+              `linear-gradient(150deg, rgba(168,85,247,0.45), rgba(34,211,238,0.45)) border-box`,
+            boxShadow: "0 30px 90px rgba(0,0,0,0.6), 0 0 70px rgba(168,85,247,0.1)",
+            overflow: "hidden",
+          }}
+        >
+          {/* Chrome bar */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "11px 16px",
+              borderBottom: `1px solid ${BORDER_SOFT}`,
+            }}
+          >
+            <span style={{ display: "flex", gap: 6 }}>
+              {["#F87171", "#FBBF24", "#34D399"].map((c) => (
+                <span key={c} style={{ width: 10, height: 10, borderRadius: "50%", background: c, opacity: 0.8 }} />
+              ))}
+            </span>
+            <span
+              style={{
+                flex: 1,
+                maxWidth: 320,
+                margin: "0 auto",
+                padding: "5px 14px",
+                borderRadius: 8,
+                background: "rgba(255,255,255,0.04)",
+                fontFamily: MONO,
+                fontSize: 10.5,
+                color: DIM,
+                textAlign: "center",
+              }}
+            >
+              dataspark-prep.com/platform
+            </span>
+            <span style={{ display: "flex", alignItems: "center", gap: 6, fontFamily: MONO, fontSize: 9.5, color: RED, letterSpacing: "0.14em" }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: RED, animation: "ds2-blink 1.4s steps(1) infinite" }} />
+              LIVE
+            </span>
+          </div>
+          {/* Scene viewport */}
+          <div style={{ height: 380, position: "relative" }}>
+            {tab === 0 && <MissionDemo t={t} />}
+            {tab === 1 && <TutorDemo t={t} />}
+            {tab === 2 && <ScorecardDemo t={t} />}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ── The Core Contrast — Code Grind vs Decision Lab ───────────────────────────
 function ContrastSection() {
   const [ref, inView] = useInView(0.2);
@@ -2152,6 +2725,14 @@ export default function LandingPageV2() {
         @keyframes ds2-sheen {
           to { background-position: -220% 0; }
         }
+        @keyframes ds2-ripple {
+          from { transform: scale(0.4); opacity: 1; }
+          to   { transform: scale(1.6); opacity: 0; }
+        }
+        @keyframes ds2-pop {
+          from { transform: scale(0.75) translateY(8px); opacity: 0; }
+          to   { transform: scale(1) translateY(0); opacity: 1; }
+        }
         @keyframes ds2-vs-pulse {
           0%, 100% { box-shadow: 0 0 30px rgba(0,0,0,0.8); }
           50% { box-shadow: 0 0 30px rgba(0,0,0,0.8), 0 0 24px rgba(168,85,247,0.35); }
@@ -2180,6 +2761,7 @@ export default function LandingPageV2() {
         .ds2-choice:hover { border-color: rgba(34,211,238,0.5) !important; background: rgba(34,211,238,0.06) !important; }
         @media (max-width: 760px) { .ds2-vs { display: none !important; } }
         @media (max-width: 1060px) { .ds2-frags { display: none !important; } }
+        @media (max-width: 640px) { .ds2-demo-side { display: none !important; } }
       `}</style>
 
       {/* Ambient depth stack — always in motion behind content */}
@@ -2201,6 +2783,7 @@ export default function LandingPageV2() {
       <Hero />
       <Ticker />
       <TransformSection />
+      <ShowcaseSection />
       <ContrastSection />
       <ChatSimulator />
       <FinalCTA />
