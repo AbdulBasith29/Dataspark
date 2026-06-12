@@ -2,9 +2,10 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 
 // ═══════════════════════════════════════════════════════════════════════════
-// DataSpark — Cinematic Landing v2
+// DataSpark — Cinematic Landing v2.1
 // "The Old Way vs. The DataSpark Way"
-// Single-file, no external animation/chart packages.
+// Persistent ambient motion: 3D canvas starfield, nebula drift, perspective
+// grid floor, mouse-parallax fragments, 3D card tilt. No external packages.
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── Palette ──────────────────────────────────────────────────────────────────
@@ -49,6 +50,17 @@ const CONTRAST_ROWS = [
     grind: "You can write queries",
     lab: "You can lead a data team",
   },
+];
+
+const TICKER_ITEMS = [
+  "System design",
+  "Root-cause drills",
+  "Executive narrative",
+  "A/B judgement calls",
+  "Metric trees",
+  "SQL under pressure",
+  "Case interviews",
+  "Stakeholder pushback",
 ];
 
 // ── Chat simulator script ────────────────────────────────────────────────────
@@ -136,6 +148,18 @@ const MISSION_NODES = [
 ];
 
 // ── Hooks ────────────────────────────────────────────────────────────────────
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduced(mq.matches);
+    const onChange = (e) => setReduced(e.matches);
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
+  }, []);
+  return reduced;
+}
+
 function useInView(threshold = 0.25) {
   const ref = useRef(null);
   const [inView, setInView] = useState(false);
@@ -175,6 +199,269 @@ function useCountUp(target, active, duration = 1700) {
     return () => cancelAnimationFrame(raf);
   }, [target, active, duration]);
   return value;
+}
+
+// 3D tilt — element rotates toward the cursor like a physical card
+function useTilt(max = 8) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const move = (e) => {
+      const r = el.getBoundingClientRect();
+      const px = (e.clientX - r.left) / r.width - 0.5;
+      const py = (e.clientY - r.top) / r.height - 0.5;
+      el.style.transition = "transform 0.08s linear";
+      el.style.transform = `perspective(950px) rotateX(${(-py * max).toFixed(2)}deg) rotateY(${(px * max).toFixed(2)}deg)`;
+    };
+    const leave = () => {
+      el.style.transition = "transform 0.6s var(--ds-ease-out)";
+      el.style.transform = "perspective(950px) rotateX(0deg) rotateY(0deg)";
+    };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerleave", leave);
+    return () => {
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerleave", leave);
+    };
+  }, [max]);
+  return ref;
+}
+
+// Sets --mx / --my (-1..1) on the element from pointer position — children
+// consume them at different multipliers for layered parallax depth.
+function useParallaxVars() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    const move = (e) => {
+      const r = el.getBoundingClientRect();
+      el.style.setProperty("--mx", ((e.clientX - r.left) / r.width - 0.5).toFixed(3));
+      el.style.setProperty("--my", ((e.clientY - r.top) / r.height - 0.5).toFixed(3));
+    };
+    el.addEventListener("pointermove", move);
+    return () => el.removeEventListener("pointermove", move);
+  }, []);
+  return ref;
+}
+
+// ── Ambient layer 1: 3D starfield canvas (always moving) ─────────────────────
+function CinematicBackground() {
+  const canvasRef = useRef(null);
+  const reduced = usePrefersReducedMotion();
+
+  useEffect(() => {
+    if (reduced) return undefined;
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+    const ctx = canvas.getContext("2d");
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let w = 0;
+    let h = 0;
+
+    const resize = () => {
+      w = canvas.clientWidth;
+      h = canvas.clientHeight;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    resize();
+    window.addEventListener("resize", resize);
+
+    const N = window.innerWidth < 760 ? 80 : 150;
+    const COLORS = [
+      [226, 232, 240], [226, 232, 240], [226, 232, 240], [226, 232, 240],
+      [168, 85, 247], [34, 211, 238],
+    ];
+    const stars = Array.from({ length: N }, () => ({
+      x: Math.random() * 2 - 1,
+      y: Math.random() * 2 - 1,
+      z: Math.random() * 0.9 + 0.1,
+      c: COLORS[Math.floor(Math.random() * COLORS.length)],
+      tw: 0.6 + Math.random() * 1.8, // twinkle speed
+      ph: Math.random() * Math.PI * 2,
+    }));
+
+    // camera eases toward the pointer for parallax depth
+    let mx = 0;
+    let my = 0;
+    let tx = 0;
+    let ty = 0;
+    const onMove = (e) => {
+      tx = e.clientX / w - 0.5;
+      ty = e.clientY / h - 0.5;
+    };
+    window.addEventListener("pointermove", onMove, { passive: true });
+
+    let raf;
+    let last = performance.now();
+    const pts = new Array(N);
+
+    const tick = (now) => {
+      const dt = Math.min(33, now - last) / 1000;
+      last = now;
+      mx += (tx - mx) * 0.035;
+      my += (ty - my) * 0.035;
+
+      ctx.clearRect(0, 0, w, h);
+      const cx = w / 2;
+      const cy = h / 2;
+
+      for (let i = 0; i < N; i += 1) {
+        const s = stars[i];
+        s.z -= dt * 0.022; // perpetual drift toward the viewer
+        if (s.z <= 0.08) {
+          s.z = 1;
+          s.x = Math.random() * 2 - 1;
+          s.y = Math.random() * 2 - 1;
+        }
+        const div = s.z * 1.6 + 0.25;
+        const px = cx + (s.x * w * 0.6) / div - mx * 46 * (1 - s.z);
+        const py = cy + (s.y * h * 0.6) / div - my * 46 * (1 - s.z);
+        if (px < -40 || px > w + 40 || py < -40 || py > h + 40) {
+          pts[i] = null;
+          continue;
+        }
+        const size = 1.9 * (1 - s.z) + 0.35;
+        const twinkle = 0.7 + 0.3 * Math.sin(now * 0.001 * s.tw + s.ph);
+        const a = clamp01((1 - s.z) * 1.05 + 0.06) * twinkle;
+        ctx.beginPath();
+        ctx.arc(px, py, size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${s.c[0]},${s.c[1]},${s.c[2]},${a.toFixed(3)})`;
+        ctx.fill();
+        pts[i] = { x: px, y: py, a, near: s.z < 0.55 };
+      }
+
+      // constellation lines between nearby foreground stars
+      ctx.lineWidth = 0.6;
+      for (let i = 0; i < N; i += 1) {
+        const p1 = pts[i];
+        if (!p1 || !p1.near) continue;
+        for (let j = i + 1; j < N; j += 1) {
+          const p2 = pts[j];
+          if (!p2 || !p2.near) continue;
+          const dx = p1.x - p2.x;
+          const dy = p1.y - p2.y;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < 8100) {
+            const alpha = (1 - Math.sqrt(d2) / 90) * 0.1;
+            ctx.strokeStyle = `rgba(148,163,255,${alpha.toFixed(3)})`;
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", resize);
+      window.removeEventListener("pointermove", onMove);
+    };
+  }, [reduced]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      aria-hidden
+      style={{ position: "fixed", inset: 0, width: "100%", height: "100%", zIndex: 0, pointerEvents: "none" }}
+    />
+  );
+}
+
+// ── Ambient layer 2: huge drifting nebula glows ──────────────────────────────
+function NebulaOrbs() {
+  const orb = (anim, size, gradient, blur = 90, opacity = 0.55) => ({
+    position: "fixed",
+    width: size,
+    height: size,
+    borderRadius: "50%",
+    background: gradient,
+    filter: `blur(${blur}px)`,
+    opacity,
+    pointerEvents: "none",
+    zIndex: 0,
+    animation: anim,
+    willChange: "transform",
+  });
+  return (
+    <div aria-hidden>
+      <div
+        style={{
+          ...orb(
+            "ds2-drift-a 34s ease-in-out infinite alternate",
+            "52vw",
+            "radial-gradient(circle, rgba(168,85,247,0.16), transparent 65%)"
+          ),
+          top: "-18vw",
+          right: "-14vw",
+        }}
+      />
+      <div
+        style={{
+          ...orb(
+            "ds2-drift-b 44s ease-in-out infinite alternate",
+            "46vw",
+            "radial-gradient(circle, rgba(34,211,238,0.10), transparent 65%)"
+          ),
+          top: "34vh",
+          left: "-16vw",
+        }}
+      />
+      <div
+        style={{
+          ...orb(
+            "ds2-drift-c 52s ease-in-out infinite alternate",
+            "40vw",
+            "radial-gradient(circle, rgba(99,102,241,0.12), transparent 65%)"
+          ),
+          bottom: "-14vw",
+          right: "8vw",
+        }}
+      />
+    </div>
+  );
+}
+
+// ── Hero floor: animated perspective grid (synth horizon) ────────────────────
+function GridFloor() {
+  return (
+    <div
+      aria-hidden
+      style={{
+        position: "absolute",
+        left: "-25%",
+        right: "-25%",
+        bottom: 0,
+        height: "36vh",
+        overflow: "hidden",
+        pointerEvents: "none",
+        maskImage: "linear-gradient(to bottom, transparent 0%, black 45%, black 80%, transparent 100%)",
+        WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, black 45%, black 80%, transparent 100%)",
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          inset: "-60% 0 0 0",
+          transform: "perspective(480px) rotateX(63deg)",
+          transformOrigin: "50% 100%",
+          backgroundImage:
+            "linear-gradient(rgba(168,85,247,0.22) 1px, transparent 1px)," +
+            "linear-gradient(90deg, rgba(34,211,238,0.16) 1px, transparent 1px)",
+          backgroundSize: "46px 46px",
+          animation: "ds2-grid 1.9s linear infinite",
+        }}
+      />
+    </div>
+  );
 }
 
 // ── Atoms ────────────────────────────────────────────────────────────────────
@@ -296,7 +583,7 @@ function EmailCapture({ compact = false }) {
         padding: compact ? 8 : 10,
         borderRadius: 16,
         border: `1px solid ${BORDER}`,
-        background: "rgba(255,255,255,0.03)",
+        background: "rgba(10,12,24,0.55)",
         backdropFilter: "blur(10px)",
         boxShadow: "0 18px 60px rgba(0,0,0,0.45)",
         maxWidth: 520,
@@ -423,146 +710,228 @@ function SectionKicker({ children, color = CYAN }) {
   );
 }
 
+// ── Hero floating fragments — glass UI shards drifting in 3D space ───────────
+function HeroFragments() {
+  const frag = (depth, float, extra) => ({
+    position: "absolute",
+    transform: `translate3d(calc(var(--mx, 0) * ${depth}px), calc(var(--my, 0) * ${Math.round(depth * 0.7)}px), 0)`,
+    willChange: "transform",
+    pointerEvents: "none",
+    ...extra,
+  });
+  const glass = {
+    borderRadius: 14,
+    border: `1px solid ${BORDER}`,
+    background: "rgba(10,14,28,0.62)",
+    backdropFilter: "blur(8px)",
+    boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
+  };
+  return (
+    <div className="ds2-frags" aria-hidden style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+      {/* EMEA churn alert card */}
+      <div style={frag(-34, 0, { top: "16%", right: "3%" })}>
+        <div style={{ animation: "ds2-float 7s ease-in-out infinite", ...glass, padding: "13px 16px", width: 215 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 9 }}>
+            <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.16em", color: DIM, textTransform: "uppercase" }}>
+              churn_by_region
+            </span>
+            <span style={{ fontFamily: MONO, fontSize: 10.5, fontWeight: 700, color: RED }}>+15.1%</span>
+          </div>
+          <svg width="183" height="46" viewBox="0 0 183 46">
+            <defs>
+              <linearGradient id="ds2-spark-fill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={RED} stopOpacity="0.35" />
+                <stop offset="100%" stopColor={RED} stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <path d="M0 34 L26 30 L52 32 L78 27 L104 29 L130 18 L156 12 L183 4 L183 46 L0 46 Z" fill="url(#ds2-spark-fill)" />
+            <path d="M0 34 L26 30 L52 32 L78 27 L104 29 L130 18 L156 12 L183 4" stroke={RED} strokeWidth="1.6" fill="none" />
+            <circle cx="183" cy="4" r="3" fill={RED}>
+              <animate attributeName="opacity" values="1;0.3;1" dur="1.6s" repeatCount="indefinite" />
+            </circle>
+          </svg>
+          <div style={{ marginTop: 7, fontFamily: SANS, fontSize: 11, color: GRAY }}>
+            EMEA · Q3 anomaly detected
+          </div>
+        </div>
+      </div>
+
+      {/* SPARK question bubble */}
+      <div style={frag(-56, 0, { top: "47%", right: "13%" })}>
+        <div style={{ animation: "ds2-float 9s ease-in-out 0.8s infinite", ...glass, padding: "11px 15px", width: 235, borderColor: "rgba(168,85,247,0.35)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: PURPLE, boxShadow: `0 0 8px ${PURPLE}` }} />
+            <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.16em", color: PURPLE, textTransform: "uppercase" }}>
+              spark · agent
+            </span>
+          </div>
+          <div style={{ fontFamily: SANS, fontSize: 12, color: "#E2E8F0", lineHeight: 1.55 }}>
+            “Why would pricing only hit EMEA? What would you segment by first?”
+          </div>
+        </div>
+      </div>
+
+      {/* Scorecard chip */}
+      <div style={frag(-22, 0, { top: "72%", right: "2%" })}>
+        <div style={{ animation: "ds2-float 8s ease-in-out 1.6s infinite", ...glass, padding: "11px 15px", width: 195, borderColor: "rgba(34,211,238,0.3)" }}>
+          <div style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.16em", color: CYAN, textTransform: "uppercase", marginBottom: 8 }}>
+            mission scorecard
+          </div>
+          {[
+            ["Hypothesis framing", 92],
+            ["Segmentation", 88],
+          ].map(([label, pct]) => (
+            <div key={label} style={{ marginBottom: 6 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontFamily: SANS, fontSize: 10.5, color: GRAY, marginBottom: 3 }}>
+                {label}
+                <span style={{ color: WHITE, fontFamily: MONO, fontSize: 9.5 }}>{pct}</span>
+              </div>
+              <div style={{ height: 3, borderRadius: 99, background: "rgba(255,255,255,0.07)" }}>
+                <div style={{ height: "100%", width: `${pct}%`, borderRadius: 99, background: GRADIENT_TEXT }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Hero ─────────────────────────────────────────────────────────────────────
 function Hero() {
+  const parallaxRef = useParallaxVars();
   return (
     <header
+      ref={parallaxRef}
       style={{
         position: "relative",
-        padding: "0 24px",
-        maxWidth: 1120,
-        margin: "0 auto",
-        minHeight: "92vh",
+        minHeight: "94vh",
         display: "flex",
         flexDirection: "column",
       }}
     >
-      {/* Nav */}
-      <nav
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "22px 0",
-          animation: "ds2-rise 0.5s var(--ds-ease-out) both",
-        }}
-      >
-        <Link
-          to="/"
+      <GridFloor />
+      <HeroFragments />
+
+      <div style={{ position: "relative", zIndex: 1, padding: "0 24px", maxWidth: 1120, margin: "0 auto", width: "100%", boxSizing: "border-box", flex: 1, display: "flex", flexDirection: "column" }}>
+        {/* Nav */}
+        <nav
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 10,
-            textDecoration: "none",
-            color: WHITE,
-            fontFamily: SANS,
-            fontWeight: 800,
-            fontSize: 17,
-            letterSpacing: "-0.02em",
+            justifyContent: "space-between",
+            padding: "22px 0",
+            animation: "ds2-rise 0.5s var(--ds-ease-out) both",
           }}
         >
-          <SparkMark />
-          DataSpark
-        </Link>
-        <span
-          style={{
-            fontFamily: MONO,
-            fontSize: 11.5,
-            color: DIM,
-            letterSpacing: "0.08em",
-          }}
-        >
-          dataspark-prep.com
-        </span>
-      </nav>
-
-      {/* Hero body */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 26, paddingBottom: 56 }}>
-        <div style={{ animation: "ds2-rise 0.55s var(--ds-ease-out) 0.08s both" }}>
+          <Link
+            to="/"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              textDecoration: "none",
+              color: WHITE,
+              fontFamily: SANS,
+              fontWeight: 800,
+              fontSize: 17,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            <SparkMark />
+            DataSpark
+          </Link>
           <span
             style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
               fontFamily: MONO,
               fontSize: 11.5,
-              letterSpacing: "0.18em",
-              textTransform: "uppercase",
-              color: CYAN,
-              border: `1px solid rgba(34,211,238,0.3)`,
-              background: "rgba(34,211,238,0.05)",
-              borderRadius: 999,
-              padding: "7px 16px",
+              color: DIM,
+              letterSpacing: "0.08em",
             }}
           >
+            dataspark-prep.com
+          </span>
+        </nav>
+
+        {/* Hero body */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 26, paddingBottom: 72 }}>
+          <div style={{ animation: "ds2-rise 0.55s var(--ds-ease-out) 0.08s both" }}>
             <span
               style={{
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: CYAN,
-                animation: "ds2-blink 1.6s ease-in-out infinite",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                fontFamily: MONO,
+                fontSize: 11.5,
+                letterSpacing: "0.18em",
+                textTransform: "uppercase",
+                color: CYAN,
+                border: `1px solid rgba(34,211,238,0.3)`,
+                background: "rgba(34,211,238,0.05)",
+                borderRadius: 999,
+                padding: "7px 16px",
               }}
-            />
-            Early access · Cohort 02 opening soon
-          </span>
-        </div>
+            >
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: CYAN,
+                  animation: "ds2-blink 1.6s ease-in-out infinite",
+                }}
+              />
+              Early access · Cohort 02 opening soon
+            </span>
+          </div>
 
-        <h1
-          style={{
-            margin: 0,
-            fontFamily: SANS,
-            fontWeight: 800,
-            fontSize: "clamp(40px, 7vw, 78px)",
-            lineHeight: 1.04,
-            letterSpacing: "-0.035em",
-            color: WHITE,
-            maxWidth: 880,
-            animation: "ds2-rise 0.6s var(--ds-ease-out) 0.16s both",
-          }}
-        >
-          Stop grinding questions.
-          <br />
-          <span
+          <h1
             style={{
-              background: GRADIENT_TEXT,
-              WebkitBackgroundClip: "text",
-              backgroundClip: "text",
-              color: "transparent",
+              margin: 0,
+              fontFamily: SANS,
+              fontWeight: 800,
+              fontSize: "clamp(40px, 7vw, 78px)",
+              lineHeight: 1.04,
+              letterSpacing: "-0.035em",
+              color: WHITE,
+              maxWidth: 880,
+              animation: "ds2-rise 0.6s var(--ds-ease-out) 0.16s both",
             }}
           >
-            Start solving systems.
-          </span>
-        </h1>
+            Stop grinding questions.
+            <br />
+            <span className="ds2-shimmer">Start solving systems.</span>
+          </h1>
 
-        <p
-          style={{
-            margin: 0,
-            fontFamily: SANS,
-            fontSize: "clamp(16px, 2vw, 19px)",
-            lineHeight: 1.65,
-            color: GRAY,
-            maxWidth: 620,
-            animation: "ds2-rise 0.6s var(--ds-ease-out) 0.24s both",
-          }}
-        >
-          Most platforms train you to solve isolated coding questions. Real
-          interviews ask you to{" "}
-          <strong style={{ color: WHITE, fontWeight: 600 }}>
-            investigate business problems
-          </strong>{" "}
-          and explain your thinking clearly.
-        </p>
-
-        <div style={{ animation: "ds2-rise 0.6s var(--ds-ease-out) 0.32s both" }}>
-          <EmailCapture />
-          <p style={{ margin: "10px 2px 0", fontFamily: MONO, fontSize: 11.5, color: DIM }}>
-            Free for early access · No credit card
+          <p
+            style={{
+              margin: 0,
+              fontFamily: SANS,
+              fontSize: "clamp(16px, 2vw, 19px)",
+              lineHeight: 1.65,
+              color: GRAY,
+              maxWidth: 620,
+              animation: "ds2-rise 0.6s var(--ds-ease-out) 0.24s both",
+            }}
+          >
+            Most platforms train you to solve isolated coding questions. Real
+            interviews ask you to{" "}
+            <strong style={{ color: WHITE, fontWeight: 600 }}>
+              investigate business problems
+            </strong>{" "}
+            and explain your thinking clearly.
           </p>
-        </div>
 
-        <div style={{ animation: "ds2-rise 0.6s var(--ds-ease-out) 0.42s both" }}>
-          <KineticBadge />
+          <div style={{ animation: "ds2-rise 0.6s var(--ds-ease-out) 0.32s both" }}>
+            <EmailCapture />
+            <p style={{ margin: "10px 2px 0", fontFamily: MONO, fontSize: 11.5, color: DIM }}>
+              Free for early access · No credit card
+            </p>
+          </div>
+
+          <div style={{ animation: "ds2-rise 0.6s var(--ds-ease-out) 0.42s both" }}>
+            <KineticBadge />
+          </div>
         </div>
       </div>
 
@@ -583,12 +952,55 @@ function Hero() {
           textTransform: "uppercase",
           color: DIM,
           animation: "ds2-rise 0.6s var(--ds-ease-out) 0.6s both",
+          zIndex: 1,
         }}
       >
         Scroll to see the difference
         <span style={{ animation: "ds2-bob 1.8s ease-in-out infinite", color: CYAN }}>↓</span>
       </div>
     </header>
+  );
+}
+
+// ── Skills ticker — perpetual marquee between sections ───────────────────────
+function Ticker() {
+  const row = TICKER_ITEMS.concat(TICKER_ITEMS);
+  return (
+    <div
+      style={{
+        position: "relative",
+        zIndex: 1,
+        borderTop: `1px solid ${BORDER_SOFT}`,
+        borderBottom: `1px solid ${BORDER_SOFT}`,
+        background: "rgba(8,10,22,0.5)",
+        overflow: "hidden",
+        padding: "15px 0",
+        maskImage: "linear-gradient(to right, transparent, black 12%, black 88%, transparent)",
+        WebkitMaskImage: "linear-gradient(to right, transparent, black 12%, black 88%, transparent)",
+      }}
+    >
+      <div style={{ display: "flex", gap: 52, width: "max-content", animation: "ds2-marquee 30s linear infinite" }}>
+        {row.map((item, i) => (
+          <span
+            key={i}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 52,
+              fontFamily: MONO,
+              fontSize: 12,
+              letterSpacing: "0.24em",
+              textTransform: "uppercase",
+              color: i % 2 ? DIM : GRAY,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {item}
+            <span style={{ color: i % 2 ? PURPLE : CYAN, fontSize: 10 }}>✦</span>
+          </span>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -626,9 +1038,10 @@ function TransformSection() {
   const mapIn = seg(p, 0.42, 0.72); // mind map materializes
   const cardIn = seg(p, 0.6, 0.88); // scorecard slides in
   const lineDraw = seg(p, 0.48, 0.82);
+  const stageTilt = lerp(9, 0, seg(p, 0, 0.35)); // stage levels out as you scroll
 
   return (
-    <section ref={wrapRef} style={{ position: "relative", height: "260vh" }}>
+    <section ref={wrapRef} style={{ position: "relative", height: "260vh", zIndex: 1 }}>
       <div
         style={{
           position: "sticky",
@@ -665,7 +1078,17 @@ function TransformSection() {
         </div>
 
         {/* Stage */}
-        <div style={{ position: "relative", width: "100%", maxWidth: 980, height: "min(54vh, 480px)" }}>
+        <div
+          style={{
+            position: "relative",
+            width: "100%",
+            maxWidth: 980,
+            height: "min(54vh, 480px)",
+            transform: `perspective(1100px) rotateX(${stageTilt}deg)`,
+            transformOrigin: "50% 100%",
+            willChange: "transform",
+          }}
+        >
           {/* Phase 1 — isolated code boxes */}
           {CODE_BOXES.map((box, i) => {
             const drift = boxesOut;
@@ -693,6 +1116,7 @@ function TransformSection() {
                   overflow: "hidden",
                   willChange: "transform, opacity",
                   pointerEvents: "none",
+                  animation: `ds2-float ${7 + i}s ease-in-out ${i * 0.7}s infinite`,
                 }}
               >
                 <div
@@ -904,9 +1328,11 @@ function TransformSection() {
 function ContrastSection() {
   const [ref, inView] = useInView(0.2);
   const [hovered, setHovered] = useState(-1);
+  const grindTilt = useTilt(5);
+  const labTilt = useTilt(7);
 
   return (
-    <section ref={ref} style={{ padding: "110px 24px", maxWidth: 1120, margin: "0 auto" }}>
+    <section ref={ref} style={{ position: "relative", zIndex: 1, padding: "110px 24px", maxWidth: 1120, margin: "0 auto" }}>
       <div style={{ textAlign: "center", marginBottom: 52 }}>
         <div style={{ display: "flex", justifyContent: "center" }}>
           <SectionKicker>Two ways to prepare</SectionKicker>
@@ -923,16 +1349,7 @@ function ContrastSection() {
           }}
         >
           One builds coders.{" "}
-          <span
-            style={{
-              background: GRADIENT_TEXT,
-              WebkitBackgroundClip: "text",
-              backgroundClip: "text",
-              color: "transparent",
-            }}
-          >
-            One builds leaders.
-          </span>
+          <span className="ds2-shimmer">One builds leaders.</span>
         </h2>
       </div>
 
@@ -967,6 +1384,7 @@ function ContrastSection() {
             fontWeight: 700,
             color: GRAY,
             boxShadow: "0 0 30px rgba(0,0,0,0.8)",
+            animation: "ds2-vs-pulse 3s ease-in-out infinite",
           }}
         >
           VS
@@ -975,155 +1393,165 @@ function ContrastSection() {
         {/* THE CODE GRIND */}
         <div
           style={{
-            borderRadius: 20,
-            border: `1px solid ${BORDER_SOFT}`,
-            background: "rgba(255,255,255,0.015)",
-            padding: "30px 28px",
             opacity: inView ? 1 : 0,
             transform: inView ? "none" : "translateY(28px)",
             transition: "opacity 0.7s var(--ds-ease-out), transform 0.7s var(--ds-ease-out)",
           }}
         >
           <div
+            ref={grindTilt}
             style={{
-              fontFamily: MONO,
-              fontSize: 11.5,
-              letterSpacing: "0.24em",
-              textTransform: "uppercase",
-              color: DIM,
-              marginBottom: 6,
+              borderRadius: 20,
+              border: `1px solid ${BORDER_SOFT}`,
+              background: "rgba(10,12,22,0.6)",
+              padding: "30px 28px",
+              height: "100%",
+              boxSizing: "border-box",
             }}
           >
-            The old way
-          </div>
-          <h3
-            style={{
-              margin: "0 0 24px",
-              fontFamily: SANS,
-              fontWeight: 800,
-              fontSize: 24,
-              letterSpacing: "-0.02em",
-              color: "#64748B",
-            }}
-          >
-            THE CODE GRIND
-          </h3>
-          {CONTRAST_ROWS.map((row, i) => (
             <div
-              key={row.label}
-              onMouseEnter={() => setHovered(i)}
-              onMouseLeave={() => setHovered(-1)}
               style={{
-                padding: "16px 14px",
-                borderRadius: 12,
+                fontFamily: MONO,
+                fontSize: 11.5,
+                letterSpacing: "0.24em",
+                textTransform: "uppercase",
+                color: DIM,
                 marginBottom: 6,
-                background: hovered === i ? "rgba(255,255,255,0.04)" : "transparent",
-                transition: "background 0.18s var(--ds-ease-out)",
-                opacity: inView ? 1 : 0,
-                transform: inView ? "none" : "translateY(14px)",
-                transitionDelay: `${0.1 + i * 0.08}s`,
-                cursor: "default",
               }}
             >
+              The old way
+            </div>
+            <h3
+              style={{
+                margin: "0 0 24px",
+                fontFamily: SANS,
+                fontWeight: 800,
+                fontSize: 24,
+                letterSpacing: "-0.02em",
+                color: "#64748B",
+              }}
+            >
+              THE CODE GRIND
+            </h3>
+            {CONTRAST_ROWS.map((row, i) => (
               <div
+                key={row.label}
+                onMouseEnter={() => setHovered(i)}
+                onMouseLeave={() => setHovered(-1)}
                 style={{
-                  fontFamily: MONO,
-                  fontSize: 10.5,
-                  letterSpacing: "0.16em",
-                  textTransform: "uppercase",
-                  color: "#334155",
-                  marginBottom: 5,
+                  padding: "16px 14px",
+                  borderRadius: 12,
+                  marginBottom: 6,
+                  background: hovered === i ? "rgba(255,255,255,0.04)" : "transparent",
+                  transition: "background 0.18s var(--ds-ease-out)",
+                  cursor: "default",
                 }}
               >
-                {row.label}
+                <div
+                  style={{
+                    fontFamily: MONO,
+                    fontSize: 10.5,
+                    letterSpacing: "0.16em",
+                    textTransform: "uppercase",
+                    color: "#334155",
+                    marginBottom: 5,
+                  }}
+                >
+                  {row.label}
+                </div>
+                <div style={{ fontFamily: SANS, fontSize: 15.5, color: "#7C8DA6", lineHeight: 1.5 }}>
+                  {row.grind}
+                </div>
               </div>
-              <div style={{ fontFamily: SANS, fontSize: 15.5, color: "#7C8DA6", lineHeight: 1.5 }}>
-                {row.grind}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         {/* THE DECISION LAB */}
         <div
           style={{
-            position: "relative",
-            borderRadius: 20,
-            border: "1px solid transparent",
-            background:
-              `linear-gradient(rgba(8,10,22,0.97), rgba(8,10,22,0.97)) padding-box, ` +
-              `linear-gradient(140deg, rgba(168,85,247,0.65), rgba(34,211,238,0.65)) border-box`,
-            padding: "30px 28px",
-            boxShadow: "0 0 60px rgba(168,85,247,0.12), 0 24px 70px rgba(0,0,0,0.5)",
             opacity: inView ? 1 : 0,
             transform: inView ? "none" : "translateY(28px)",
             transition: "opacity 0.7s var(--ds-ease-out) 0.12s, transform 0.7s var(--ds-ease-out) 0.12s",
           }}
         >
-          <Particles count={6} />
           <div
+            ref={labTilt}
             style={{
-              fontFamily: MONO,
-              fontSize: 11.5,
-              letterSpacing: "0.24em",
-              textTransform: "uppercase",
-              color: CYAN,
-              marginBottom: 6,
+              position: "relative",
+              borderRadius: 20,
+              border: "1px solid transparent",
+              background:
+                `linear-gradient(rgba(8,10,22,0.95), rgba(8,10,22,0.95)) padding-box, ` +
+                `linear-gradient(140deg, rgba(168,85,247,0.65), rgba(34,211,238,0.65)) border-box`,
+              padding: "30px 28px",
+              height: "100%",
+              boxSizing: "border-box",
+              boxShadow: "0 0 60px rgba(168,85,247,0.12), 0 24px 70px rgba(0,0,0,0.5)",
             }}
           >
-            The DataSpark way
-          </div>
-          <h3
-            style={{
-              margin: "0 0 24px",
-              fontFamily: SANS,
-              fontWeight: 800,
-              fontSize: 24,
-              letterSpacing: "-0.02em",
-              background: GRADIENT_TEXT,
-              WebkitBackgroundClip: "text",
-              backgroundClip: "text",
-              color: "transparent",
-            }}
-          >
-            THE DECISION LAB
-          </h3>
-          {CONTRAST_ROWS.map((row, i) => (
+            <Particles count={6} />
             <div
-              key={row.label}
-              onMouseEnter={() => setHovered(i)}
-              onMouseLeave={() => setHovered(-1)}
               style={{
-                position: "relative",
-                padding: "16px 14px",
-                borderRadius: 12,
+                fontFamily: MONO,
+                fontSize: 11.5,
+                letterSpacing: "0.24em",
+                textTransform: "uppercase",
+                color: CYAN,
                 marginBottom: 6,
-                background: hovered === i ? "rgba(168,85,247,0.08)" : "transparent",
-                outline: hovered === i ? "1px solid rgba(168,85,247,0.25)" : "1px solid transparent",
-                transition: "background 0.18s var(--ds-ease-out), outline-color 0.18s var(--ds-ease-out)",
-                opacity: inView ? 1 : 0,
-                transform: inView ? "none" : "translateY(14px)",
-                transitionDelay: `${0.18 + i * 0.08}s`,
-                cursor: "default",
               }}
             >
+              The DataSpark way
+            </div>
+            <h3
+              style={{
+                margin: "0 0 24px",
+                fontFamily: SANS,
+                fontWeight: 800,
+                fontSize: 24,
+                letterSpacing: "-0.02em",
+                background: GRADIENT_TEXT,
+                WebkitBackgroundClip: "text",
+                backgroundClip: "text",
+                color: "transparent",
+              }}
+            >
+              THE DECISION LAB
+            </h3>
+            {CONTRAST_ROWS.map((row, i) => (
               <div
+                key={row.label}
+                onMouseEnter={() => setHovered(i)}
+                onMouseLeave={() => setHovered(-1)}
                 style={{
-                  fontFamily: MONO,
-                  fontSize: 10.5,
-                  letterSpacing: "0.16em",
-                  textTransform: "uppercase",
-                  color: "rgba(34,211,238,0.6)",
-                  marginBottom: 5,
+                  position: "relative",
+                  padding: "16px 14px",
+                  borderRadius: 12,
+                  marginBottom: 6,
+                  background: hovered === i ? "rgba(168,85,247,0.08)" : "transparent",
+                  outline: hovered === i ? "1px solid rgba(168,85,247,0.25)" : "1px solid transparent",
+                  transition: "background 0.18s var(--ds-ease-out), outline-color 0.18s var(--ds-ease-out)",
+                  cursor: "default",
                 }}
               >
-                {row.label}
+                <div
+                  style={{
+                    fontFamily: MONO,
+                    fontSize: 10.5,
+                    letterSpacing: "0.16em",
+                    textTransform: "uppercase",
+                    color: "rgba(34,211,238,0.6)",
+                    marginBottom: 5,
+                  }}
+                >
+                  {row.label}
+                </div>
+                <div style={{ fontFamily: SANS, fontSize: 15.5, fontWeight: 600, color: WHITE, lineHeight: 1.5 }}>
+                  {row.lab}
+                </div>
               </div>
-              <div style={{ fontFamily: SANS, fontSize: 15.5, fontWeight: 600, color: WHITE, lineHeight: 1.5 }}>
-                {row.lab}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </section>
@@ -1133,11 +1561,12 @@ function ContrastSection() {
 // ── Interactive "AI Asks Why" simulator ──────────────────────────────────────
 function ChatSimulator() {
   const [secRef, inView] = useInView(0.15);
+  const dashTilt = useTilt(4);
   const [started, setStarted] = useState(false);
   const [messages, setMessages] = useState([]); // {role:'ai'|'user', text}
-  const [phase, setPhase] = useState("idle"); // idle | q1 | q2 | outro | done
+  const [phase, setPhase] = useState("idle"); // idle | q1 | q2 | done
   const [choicesOpen, setChoicesOpen] = useState(false);
-  const queueRef = useRef([]); // pending AI messages [{text, thenPhase, thenChoices}]
+  const queueRef = useRef([]); // pending AI messages [{text, phase}]
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -1202,7 +1631,7 @@ function ChatSimulator() {
   ];
 
   return (
-    <section ref={secRef} style={{ padding: "110px 24px", maxWidth: 1120, margin: "0 auto" }}>
+    <section ref={secRef} style={{ position: "relative", zIndex: 1, padding: "110px 24px", maxWidth: 1120, margin: "0 auto" }}>
       <div
         style={{
           marginBottom: 44,
@@ -1246,6 +1675,7 @@ function ChatSimulator() {
       >
         {/* Dashboard panel */}
         <div
+          ref={dashTilt}
           style={{
             borderRadius: 18,
             border: `1px solid ${BORDER}`,
@@ -1427,7 +1857,7 @@ function ChatSimulator() {
                   padding: "0 20px",
                 }}
               >
-                <div style={{ fontSize: 26, marginBottom: 10 }}>◎</div>
+                <div style={{ fontSize: 26, marginBottom: 10, animation: "ds2-bob 2.4s ease-in-out infinite" }}>◎</div>
                 Something in that dashboard is wrong.
                 <br />
                 <span style={{ color: GRAY }}>Click the anomaly to begin your investigation.</span>
@@ -1562,7 +1992,8 @@ function FinalCTA() {
       ref={ref}
       style={{
         position: "relative",
-        padding: "130px 24px 120px",
+        zIndex: 1,
+        padding: "150px 24px 130px",
         textAlign: "center",
         overflow: "hidden",
       }}
@@ -1582,6 +2013,27 @@ function FinalCTA() {
           pointerEvents: "none",
         }}
       />
+      {/* Slowly rotating orbit rings */}
+      <svg
+        aria-hidden
+        viewBox="0 0 600 600"
+        style={{
+          position: "absolute",
+          left: "50%",
+          top: "55%",
+          width: 620,
+          height: 620,
+          transform: "translate(-50%, -50%)",
+          pointerEvents: "none",
+          animation: "ds2-spin 70s linear infinite",
+          opacity: 0.5,
+        }}
+      >
+        <circle cx="300" cy="300" r="240" fill="none" stroke="rgba(168,85,247,0.22)" strokeWidth="1" strokeDasharray="3 14" />
+        <circle cx="300" cy="300" r="290" fill="none" stroke="rgba(34,211,238,0.14)" strokeWidth="1" strokeDasharray="2 18" />
+        <circle cx="300" cy="60" r="3" fill={PURPLE} />
+        <circle cx="540" cy="380" r="2.4" fill={CYAN} />
+      </svg>
       <Particles count={12} />
       <div
         style={{
@@ -1634,6 +2086,8 @@ function Footer() {
   return (
     <footer
       style={{
+        position: "relative",
+        zIndex: 1,
         borderTop: `1px solid ${BORDER_SOFT}`,
         padding: "26px 24px",
         display: "flex",
@@ -1673,6 +2127,10 @@ export default function LandingPageV2() {
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(5px); }
         }
+        @keyframes ds2-float {
+          0%, 100% { transform: translateY(0) rotate(-0.4deg); }
+          50% { transform: translateY(-11px) rotate(0.4deg); }
+        }
         @keyframes ds2-throb {
           0%, 100% { box-shadow: 0 0 18px rgba(248,113,113,0.25); }
           50% { box-shadow: 0 0 34px rgba(248,113,113,0.55); }
@@ -1681,25 +2139,67 @@ export default function LandingPageV2() {
           0%, 100% { opacity: 0; transform: translateY(0) scale(0.7); }
           50% { opacity: 0.85; transform: translateY(-14px) scale(1); }
         }
+        @keyframes ds2-grid {
+          from { background-position-y: 0; }
+          to   { background-position-y: 46px; }
+        }
+        @keyframes ds2-marquee {
+          to { transform: translateX(-50%); }
+        }
+        @keyframes ds2-spin {
+          to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        @keyframes ds2-sheen {
+          to { background-position: -220% 0; }
+        }
+        @keyframes ds2-vs-pulse {
+          0%, 100% { box-shadow: 0 0 30px rgba(0,0,0,0.8); }
+          50% { box-shadow: 0 0 30px rgba(0,0,0,0.8), 0 0 24px rgba(168,85,247,0.35); }
+        }
+        @keyframes ds2-drift-a {
+          from { transform: translate3d(0, 0, 0) scale(1); }
+          to   { transform: translate3d(-9vw, 12vh, 0) scale(1.15); }
+        }
+        @keyframes ds2-drift-b {
+          from { transform: translate3d(0, 0, 0) scale(1.1); }
+          to   { transform: translate3d(11vw, -9vh, 0) scale(0.95); }
+        }
+        @keyframes ds2-drift-c {
+          from { transform: translate3d(0, 0, 0) scale(0.95); }
+          to   { transform: translate3d(-7vw, -11vh, 0) scale(1.12); }
+        }
+        .ds2-shimmer {
+          background: linear-gradient(110deg, #A855F7 0%, #22D3EE 30%, #818CF8 55%, #A855F7 80%, #22D3EE 100%);
+          background-size: 220% 100%;
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          animation: ds2-sheen 6s linear infinite;
+        }
         .ds2-cta:hover { box-shadow: 0 0 40px rgba(168,85,247,0.7) !important; transform: translateY(-1px); }
         .ds2-choice:hover { border-color: rgba(34,211,238,0.5) !important; background: rgba(34,211,238,0.06) !important; }
         @media (max-width: 760px) { .ds2-vs { display: none !important; } }
+        @media (max-width: 1060px) { .ds2-frags { display: none !important; } }
       `}</style>
 
-      {/* Page-level atmosphere */}
+      {/* Ambient depth stack — always in motion behind content */}
+      <CinematicBackground />
+      <NebulaOrbs />
+
+      {/* Vignette to frame the scene like a lens */}
       <div
         aria-hidden
         style={{
           position: "fixed",
           inset: 0,
+          zIndex: 0,
           pointerEvents: "none",
-          background:
-            "radial-gradient(ellipse 800px 500px at 80% -10%, rgba(168,85,247,0.08), transparent 65%)," +
-            "radial-gradient(ellipse 700px 460px at 10% 30%, rgba(34,211,238,0.05), transparent 65%)",
+          background: "radial-gradient(ellipse 120% 90% at 50% 40%, transparent 55%, rgba(2,2,8,0.55) 100%)",
         }}
       />
 
       <Hero />
+      <Ticker />
       <TransformSection />
       <ContrastSection />
       <ChatSimulator />
