@@ -1,6 +1,5 @@
 import React, { Suspense, lazy } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import LandingPage from "./app/landing-page.jsx";
 import LandingPageV2 from "./app/landing-page-v2.jsx";
 import ContactPage from "./pages/ContactPage.jsx";
 import PrivacyPage from "./pages/PrivacyPage.jsx";
@@ -32,8 +31,7 @@ export default function App() {
         <AuthProvider>
           <AuthModal />
           <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/v2" element={<LandingPageV2 />} />
+            <Route path="/" element={<LandingPageV2 />} />
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/contact" element={<ContactPage />} />

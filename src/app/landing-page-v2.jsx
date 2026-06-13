@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { getSupabaseBrowserClient } from "../lib/supabaseClient.js";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DataSpark — Cinematic Landing v2.1
@@ -544,9 +545,28 @@ function SparkMark({ size = 26 }) {
 function EmailCapture({ compact = false }) {
   const [email, setEmail] = useState("");
   const [done, setDone] = useState(false);
-  const submit = (e) => {
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e) => {
     e.preventDefault();
     if (!email.trim() || !email.includes("@")) return;
+    setLoading(true);
+    setError("");
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { error: dbErr } = await supabase
+        .from("early_access_signups")
+        .insert({ email: email.trim().toLowerCase() });
+      if (dbErr && !dbErr.message?.includes("duplicate")) {
+        setError("Something went wrong — try again.");
+        setLoading(false);
+        return;
+      }
+    } catch {
+      // non-fatal — still show success
+    }
+    setLoading(false);
     setDone(true);
   };
   if (done) {
@@ -613,6 +633,7 @@ function EmailCapture({ compact = false }) {
       />
       <button
         type="submit"
+        disabled={loading}
         className="ds2-cta"
         style={{
           position: "relative",
@@ -624,14 +645,28 @@ function EmailCapture({ compact = false }) {
           fontWeight: 700,
           fontFamily: SANS,
           color: "#0B0314",
-          background: GRADIENT_TEXT,
-          cursor: "pointer",
+          background: loading ? "rgba(168,85,247,0.5)" : GRADIENT_TEXT,
+          cursor: loading ? "wait" : "pointer",
           whiteSpace: "nowrap",
           boxShadow: "0 0 28px rgba(168,85,247,0.45)",
+          opacity: loading ? 0.7 : 1,
         }}
       >
-        Secure Your Spot →
+        {loading ? "Saving…" : "Secure Your Spot →"}
       </button>
+      {error && (
+        <div style={{
+          width: "100%",
+          padding: "0 2px",
+          fontFamily: MONO,
+          fontSize: 11.5,
+          color: RED,
+          position: "relative",
+          zIndex: 1,
+        }}>
+          {error}
+        </div>
+      )}
     </form>
   );
 }
