@@ -264,7 +264,7 @@ export default function StatBootstrapViz() {
           </div>
 
           {/* CI and comparison */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8 }}>
+          <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8 }}>
             <div style={{ background: "rgba(139,92,246,0.1)", border: `1px solid rgba(139,92,246,0.35)`, borderRadius: 8, padding: "10px 12px" }}>
               <div style={{ fontSize: 10, color: DS.t3, ...MONO, marginBottom: 4 }}>Bootstrap 95% CI</div>
               <div style={{ fontSize: 13, fontWeight: 700, color: ACCENT, ...MONO }}>

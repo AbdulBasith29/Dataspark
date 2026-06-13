@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Check } from "lucide-react";
 import { DS, dsGlassCard } from "../../lib/ds-platform-tokens.js";
 
 const MONO = "var(--ds-mono), monospace";
@@ -198,8 +199,8 @@ export default function ProgressArtifactCard({
             <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
               {skills.map((skill) => (
                 <li key={skill} style={listItem}>
-                  <span aria-hidden="true" style={{ color: DS.grn }}>
-                    ✓
+                  <span aria-hidden="true" style={{ color: DS.grn, flexShrink: 0 }}>
+                    <Check size={14} strokeWidth={2.5} />
                   </span>
                   {skill}
                 </li>

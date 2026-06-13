@@ -167,7 +167,7 @@ ${recipe.lambda}`}
       </SectionFrame>
 
       <SectionFrame title="FOUR EQUIVALENT FORMS · pick the one a senior reviewer would">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
+        <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
           {recipe.equivs.map((e) => (
             <EquivCard key={e.kind} equiv={e} />
           ))}
@@ -263,7 +263,7 @@ function PipelineLabMode() {
 
   return (
     <div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+      <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
         <StagePicker
           label="STAGE 1 · filter (predicate)"
           options={FILTERS}
@@ -281,7 +281,7 @@ function PipelineLabMode() {
       </div>
 
       <SectionFrame title="TWO EQUIVALENT WRITINGS · same logic, different idiom" tone="neutral">
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8 }}>
+        <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 8 }}>
           <div style={{ padding: "10px 12px", borderRadius: 10, border: `1px solid rgba(52,211,153,0.30)`, background: "rgba(52,211,153,0.05)" }}>
             <div style={{ fontSize: 9, letterSpacing: 1.4, color: DS.grn, fontWeight: 700, marginBottom: 6, fontFamily: "var(--ds-mono), monospace" }}>
               COMPREHENSION · preferred

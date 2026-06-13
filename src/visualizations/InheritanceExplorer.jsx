@@ -152,7 +152,7 @@ function MROTracer() {
       </Card>
 
       {/* Controls */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+      <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         <Card>
           <SectionLabel>INSTANTIATE</SectionLabel>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -463,7 +463,7 @@ function PolymorphismDemo() {
 
       {/* Results grid */}
       {ran && (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           {results.map((t) => (
             <button key={t.name} type="button" onClick={() => setSelected(selected === t.name ? null : t.name)} style={{
               padding: "12px 14px", borderRadius: 14, cursor: "pointer", textAlign: "left",

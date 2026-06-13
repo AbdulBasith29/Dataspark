@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, ArrowRight, Check, MessageCircle } from "lucide-react";
 import { DS, dsGlassCard } from "../../lib/ds-platform-tokens.js";
 import { renderInlineMarkdown } from "../../lib/inline-markdown.jsx";
 import { SimpleMarkdown } from "../../lib/simple-markdown.jsx";
 import VizLabShell from "./VizLabShell.jsx";
+import SQLScratchpad from "../../visualizations/SQLScratchpad.jsx";
 import AsyncActionButton from "../AsyncActionButton.jsx";
 import ConfidenceMeter from "./ConfidenceMeter.jsx";
 import IntentLessonIntro from "./IntentLessonIntro.jsx";
@@ -15,7 +18,7 @@ import {
 } from "../../lib/analytics.js";
 
 const sectionLabel = {
-  fontSize: 10,
+  fontSize: 11,
   color: DS.dim,
   fontFamily: "var(--ds-mono), monospace",
   fontWeight: 700,
@@ -62,10 +65,47 @@ function buildDecisionArtifact({ graph, branchPath, clickedTargets, graphChoices
   };
 }
 
-function DecisionArtifactCard({ graph, branchPath, clickedTargets, graphChoices, lessonTitle, accent }) {
+function DecisionArtifactCard({ graph, branchPath, clickedTargets, graphChoices, lessonTitle, accent, lessonId, courseId }) {
   const artifact = buildDecisionArtifact({ graph, branchPath, clickedTargets, graphChoices, lessonTitle });
   const artifactJson = JSON.stringify(artifact, null, 2);
-  const downloadHref = `data:application/json;charset=utf-8,${encodeURIComponent(artifactJson)}`;
+  const filename = `${(lessonTitle || "dataspark").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-decision-artifact.json`;
+
+  const navigate = useNavigate();
+  const isCapstone = lessonId === "sql-capstone-01";
+  const [certName, setCertName] = useState("");
+
+  const handleGetCertificate = () => {
+    const name = certName.trim();
+    if (!name) return;
+    const certData = {
+      id: btoa(`${lessonId}-${Date.now()}`).slice(0, 16),
+      name,
+      title: "StreamCore Analytics Challenge",
+      course: courseId || "sql",
+      date: new Date().toISOString(),
+      dimensions: artifact.performanceMatrix.map(row => ({ label: row.dimension, result: row.result })),
+    };
+    const encoded = btoa(JSON.stringify(certData));
+    navigate(`/certificate/${encoded}`);
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([artifactJson], { type: "application/json" });
+    const canShareFile = typeof navigator !== "undefined" && "canShare" in navigator &&
+      navigator.canShare({ files: [new File([blob], filename, { type: "application/json" })] });
+    if (canShareFile) {
+      navigator.share({ files: [new File([blob], filename, { type: "application/json" })] });
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div style={{
@@ -89,10 +129,11 @@ function DecisionArtifactCard({ graph, branchPath, clickedTargets, graphChoices,
         {artifact.performanceMatrix.map((row) => (
           <div
             key={row.dimension}
+            className="ds-artifact-row"
             style={{
               display: "grid",
               gridTemplateColumns: "minmax(0, 1fr) auto",
-              gap: 12,
+              gap: 8,
               alignItems: "center",
               padding: "10px 12px",
               borderRadius: DS.radiusSm,
@@ -101,7 +142,7 @@ function DecisionArtifactCard({ graph, branchPath, clickedTargets, graphChoices,
             }}
           >
             <span style={{ color: DS.t2, fontSize: 13, lineHeight: 1.4 }}>{row.dimension}</span>
-            <span style={{
+            <span className="ds-artifact-tier" style={{
               color: row.result.includes("Recovery") ? "#FCD34D" : DS.grn,
               fontSize: 11,
               fontFamily: "var(--ds-mono), monospace",
@@ -114,29 +155,80 @@ function DecisionArtifactCard({ graph, branchPath, clickedTargets, graphChoices,
         ))}
       </div>
 
-      <a
-        href={downloadHref}
-        download={`${(lessonTitle || "dataspark").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-decision-artifact.json`}
+      <button
+        type="button"
+        onClick={handleDownload}
         style={{
           alignSelf: "flex-start",
           background: `${accent}22`,
           border: `1px solid ${accent}66`,
           borderRadius: DS.radiusSm,
-          padding: "10px 14px",
+          padding: "12px 18px",
           color: DS.t1,
           fontSize: 13,
           fontWeight: 700,
-          textDecoration: "none",
+          cursor: "pointer",
           fontFamily: "var(--ds-sans), sans-serif",
+          minHeight: 44,
+          width: "100%",
         }}
       >
-        Download artifact →
-      </a>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>Download artifact <ArrowRight size={13} /></span>
+      </button>
+
+      {isCapstone && (
+        <div style={{ borderTop: `1px solid ${DS.border}`, paddingTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ fontSize: 11, fontFamily: "var(--ds-mono), monospace", fontWeight: 700, letterSpacing: "0.12em", color: "#F59E0B", textTransform: "uppercase" }}>
+            Course Certificate
+          </div>
+          <p style={{ margin: 0, fontSize: 13, color: DS.t3, lineHeight: 1.5 }}>
+            Generate a shareable certificate you can add directly to your LinkedIn profile.
+          </p>
+          <input
+            type="text"
+            placeholder="Your name (for the certificate)"
+            value={certName}
+            onChange={(e) => setCertName(e.target.value)}
+            style={{
+              background: "rgba(255,255,255,0.04)",
+              border: `1px solid ${DS.border}`,
+              borderRadius: DS.radiusSm,
+              padding: "10px 14px",
+              color: DS.t1,
+              fontSize: 14,
+              fontFamily: "var(--ds-sans), sans-serif",
+              outline: "none",
+              width: "100%",
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleGetCertificate}
+            disabled={!certName.trim()}
+            style={{
+              background: certName.trim() ? "#F59E0B" : "rgba(245,158,11,0.2)",
+              border: "none",
+              borderRadius: DS.radiusSm,
+              padding: "13px 18px",
+              color: certName.trim() ? "#000" : DS.dim,
+              fontSize: 14,
+              fontWeight: 800,
+              cursor: certName.trim() ? "pointer" : "default",
+              fontFamily: "var(--ds-sans), sans-serif",
+              minHeight: 44,
+              width: "100%",
+              transition: "background 0.2s",
+            }}
+          >
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>Get my certificate <ArrowRight size={13} /></span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-function InterviewGraphStage({ graph, stage, branchPath, clickedTargets, graphChoices, selectedTarget, selectedChoice, onTargetClick, onChoiceSelect, accent, lessonTitle }) {
+function InterviewGraphStage({ graph, stage, branchPath, clickedTargets, graphChoices, selectedTarget, selectedChoice, onTargetClick, onChoiceSelect, accent, lessonTitle, lessonId, courseId }) {
   if (!graph || !stage) return null;
   const codeLines = parseTargetedCodeSnippet(stage.code_snippet);
   const choices = Array.isArray(stage.choices) ? stage.choices : [];
@@ -204,6 +296,7 @@ function InterviewGraphStage({ graph, stage, branchPath, clickedTargets, graphCh
                 type="button"
                 disabled={!clickable}
                 onClick={() => clickable && onTargetClick(targetId)}
+                className={clickable ? "ds-code-line ds-code-line--tap" : "ds-code-line"}
                 style={{
                   display: "grid",
                   gridTemplateColumns: "42px 1fr",
@@ -302,6 +395,8 @@ function InterviewGraphStage({ graph, stage, branchPath, clickedTargets, graphCh
           graphChoices={graphChoices}
           lessonTitle={lessonTitle}
           accent={accent}
+          lessonId={lessonId}
+          courseId={courseId}
         />
       )}
     </div>
@@ -417,8 +512,8 @@ export default function LessonModule({
   if (!moduleSpec) {
     return (
       <div style={{ maxWidth: 860, margin: "0 auto", padding: "0 clamp(16px, 4vw, 28px)" }}>
-        <button type="button" onClick={onBack} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>
-          {backLabel}
+        <button type="button" onClick={onBack} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5 }}>
+          <ArrowLeft size={14} />{backLabel}
         </button>
         <p style={{ color: DS.t3, fontSize: 14, marginTop: 40, textAlign: "center" }}>
           Module content is loading — please try again in a moment.
@@ -545,13 +640,16 @@ export default function LessonModule({
           padding: "20px 0 8px",
           fontFamily: "var(--ds-mono), monospace",
           fontWeight: 600,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 5,
         }}
       >
-        {backLabel}
+        <ArrowLeft size={14} />{backLabel}
       </button>
       <div style={{ marginBottom: 22 }}>
         <div style={{
-          fontSize: 10,
+          fontSize: 11,
           color: course.accent,
           fontFamily: "var(--ds-mono), monospace",
           textTransform: "uppercase",
@@ -567,7 +665,7 @@ export default function LessonModule({
           <span style={{ color: DS.border }}>|</span>
           <span style={{ color: DS.grn }}>Module · {durationBadge}</span>
         </div>
-        <h1 style={{ fontSize: "clamp(22px, 4vw, 30px)", fontWeight: 800, color: DS.t1, margin: 0, letterSpacing: "-0.02em" }}>
+        <h1 style={{ fontSize: "clamp(22px, 4vw, 30px)", fontWeight: 650, color: DS.t1, margin: 0, letterSpacing: "-0.03em" }}>
           {lesson.title}
         </h1>
         {moduleSpec.outcomes?.length > 0 && (
@@ -668,6 +766,34 @@ export default function LessonModule({
             No primary visualization is mapped for this lesson yet. Use the <strong style={{ color: DS.t1 }}>Practice</strong> tab and the tutor to run the same <strong style={{ color: course.accent }}>predict → verify</strong> loop.
           </p>
         )}
+        {course.id === "sql" && (
+          <div style={{ marginTop: VizComponent ? 28 : 8 }}>
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              marginBottom: 14,
+              paddingTop: VizComponent ? 24 : 0,
+              borderTop: VizComponent ? `1px solid ${DS.border}` : "none",
+            }}>
+              <span style={{
+                fontSize: 9,
+                fontFamily: "var(--ds-mono), monospace",
+                fontWeight: 700,
+                letterSpacing: "0.16em",
+                color: "#F59E0B",
+                textTransform: "uppercase",
+              }}>
+                SQL Scratchpad
+              </span>
+              <span style={{ flex: 1, height: 1, background: DS.border, opacity: 0.6 }} />
+              <span style={{ fontSize: 10, color: DS.dim, fontFamily: "var(--ds-mono), monospace" }}>
+                in-browser SQLite · no server
+              </span>
+            </div>
+            <SQLScratchpad lessonId={lesson.id} />
+          </div>
+        )}
       </SectionCard>
 
       <SectionCard
@@ -689,6 +815,8 @@ export default function LessonModule({
             onChoiceSelect={handleGraphChoiceSelect}
             accent={course.accent}
             lessonTitle={lesson.title}
+            lessonId={lesson.id}
+            courseId={course.id}
           />
         ) : checks.length === 0 ? (
           <p style={{ color: DS.t3, fontSize: 14, margin: 0 }}>No checks for this module yet.</p>
@@ -892,7 +1020,7 @@ export default function LessonModule({
               whiteSpace: "nowrap",
             }}
           >
-            Generate my drill →
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>Generate my drill <ArrowRight size={13} /></span>
           </button>
         </div>
       )}
@@ -950,9 +1078,9 @@ export default function LessonModule({
           disabled={!canMarkComplete}
           style={{ flex: 1, minWidth: 220 }}
           pendingLabel="Saving…"
-          successLabel="Done ✓"
+          successLabel="Done"
         >
-          Mark complete & continue →
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>Mark complete &amp; continue <ArrowRight size={13} /></span>
         </AsyncActionButton>
         <button
           type="button"
@@ -1001,13 +1129,18 @@ export default function LessonModule({
                     cursor: onOpenPractice ? "pointer" : "default",
                     fontFamily: "var(--ds-sans), sans-serif",
                     lineHeight: 1.5,
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 8,
                   }}
                 >
-                  <span style={{ fontFamily: "var(--ds-mono), monospace", color: DS.grn, marginRight: 8, fontSize: 12 }}>→</span>
-                  <strong style={{ color: DS.t1 }}>{title}</strong>
-                  {detail && (
-                    <span style={{ display: "block", color: DS.t3, fontSize: 13, marginTop: 4 }}>{detail}</span>
-                  )}
+                  <ArrowRight size={13} style={{ color: DS.grn, flexShrink: 0, marginTop: 3 }} />
+                  <span>
+                    <strong style={{ color: DS.t1 }}>{title}</strong>
+                    {detail && (
+                      <span style={{ display: "block", color: DS.t3, fontSize: 13, marginTop: 4 }}>{detail}</span>
+                    )}
+                  </span>
                 </button>
               );
             })}

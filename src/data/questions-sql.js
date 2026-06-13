@@ -279,4 +279,433 @@ WHERE id IN (
     tags: ["deduplication", "ROW_NUMBER", "data-quality"],
     commonMistakes: ["Deleting directly inside CTE (not supported in most dialects)", "Keeping the oldest record instead of newest", "Not verifying with a SELECT before running DELETE"],
   },
+
+  {
+    id: "sqq7", courseId: "sql", topicId: "sql-advanced",
+    title: "Top-N Per Group (Ranking Pattern)", difficulty: "Medium", type: "code", language: "sql", estimatedMinutes: 15,
+    company: "Airbnb",
+    prompt: "For each product category, return the top 3 products by total revenue. Include category, product_name, total_revenue, and rank. Break ties by product_id ascending.",
+    hints: [
+      "Aggregate revenue per product first, then rank within each category",
+      "ROW_NUMBER() OVER (PARTITION BY category ORDER BY total_revenue DESC) assigns unique ranks",
+      "Filter WHERE rank <= 3 in an outer query — window functions can't be in WHERE directly",
+    ],
+    modelAnswer: `WITH product_revenue AS (
+  SELECT
+    p.category,
+    p.product_id,
+    p.product_name,
+    SUM(o.amount) AS total_revenue
+  FROM order_items o
+  JOIN products p ON o.product_id = p.product_id
+  GROUP BY p.category, p.product_id, p.product_name
+),
+ranked AS (
+  SELECT
+    category,
+    product_name,
+    total_revenue,
+    ROW_NUMBER() OVER (
+      PARTITION BY category
+      ORDER BY total_revenue DESC, product_id ASC
+    ) AS rank
+  FROM product_revenue
+)
+SELECT category, product_name, total_revenue, rank
+FROM ranked
+WHERE rank <= 3
+ORDER BY category, rank;`,
+    rubric: [
+      "Aggregates revenue per product in a CTE before ranking",
+      "ROW_NUMBER partitioned by category, ordered by revenue DESC",
+      "Tie-breaking by product_id ASC included",
+      "Rank filter in outer query, not in the window function's WHERE",
+      "Output includes all four required columns",
+      "Results ordered by category then rank",
+    ],
+    tags: ["window-functions", "ranking", "top-N"],
+    commonMistakes: ["Using RANK() instead of ROW_NUMBER() — RANK() can return multiple rows with the same rank when revenue ties", "Trying to use WHERE rank <= 3 in the same query that defines the window function", "Forgetting to aggregate before ranking — ranking unaggregated rows gives wrong results"],
+  },
+  {
+    id: "sqq8", courseId: "sql", topicId: "sql-advanced",
+    title: "Session Gap Detection", difficulty: "Hard", type: "code", language: "sql", estimatedMinutes: 22,
+    company: "Spotify",
+    prompt: "Define a user session as a sequence of events where no gap between consecutive events exceeds 30 minutes. Given an events table (user_id, event_time), assign a session_id to each event and count total sessions per user.",
+    hints: [
+      "LAG(event_time) to find the previous event time for the same user",
+      "Flag a new session when the gap exceeds 30 minutes (or when it is the first event)",
+      "SUM() OVER (PARTITION BY user_id ORDER BY event_time) of the flag gives a monotonically increasing session counter",
+    ],
+    modelAnswer: `WITH event_gaps AS (
+  SELECT
+    user_id,
+    event_time,
+    LAG(event_time) OVER (
+      PARTITION BY user_id ORDER BY event_time
+    ) AS prev_event_time
+  FROM events
+),
+session_flags AS (
+  SELECT
+    user_id,
+    event_time,
+    CASE
+      WHEN prev_event_time IS NULL
+        OR EXTRACT(EPOCH FROM (event_time - prev_event_time)) / 60 > 30
+      THEN 1
+      ELSE 0
+    END AS is_new_session
+  FROM event_gaps
+),
+sessions AS (
+  SELECT
+    user_id,
+    event_time,
+    SUM(is_new_session) OVER (
+      PARTITION BY user_id ORDER BY event_time
+    ) AS session_id
+  FROM session_flags
+)
+SELECT user_id, COUNT(DISTINCT session_id) AS total_sessions
+FROM sessions
+GROUP BY user_id
+ORDER BY user_id;`,
+    rubric: [
+      "LAG window function retrieves previous event time per user",
+      "Gap threshold correctly checks > 30 minutes (not >=)",
+      "NULL prev_event_time handled to flag the very first event",
+      "Cumulative SUM of flags creates monotonically increasing session_id",
+      "Final aggregation counts DISTINCT session_ids per user",
+      "PARTITION BY user_id used throughout to isolate per-user logic",
+    ],
+    tags: ["window-functions", "sessionisation", "gap-and-island"],
+    commonMistakes: ["Not handling the NULL case for a user's first event", "Using minutes threshold incorrectly (DATEDIFF returns an integer in some dialects — check units)", "Counting sessions as COUNT(*) from session_flags instead of DISTINCT session_ids"],
+  },
+  {
+    id: "sqq9", courseId: "sql", topicId: "sql-advanced",
+    title: "Read and Diagnose an EXPLAIN Plan", difficulty: "Medium", type: "open-ended", estimatedMinutes: 18,
+    company: "Stripe",
+    prompt: "You run EXPLAIN ANALYZE on a query joining orders (50M rows) to customers (2M rows) on customer_id. The plan shows: Seq Scan on orders (cost=0..1842000 rows=50000000), Hash Join, Seq Scan on customers (cost=0..45000 rows=2000000). The query takes 42 seconds. Diagnose what is happening and give the exact steps to fix it.",
+    hints: [
+      "Seq Scan on a 50M-row table means no index is being used for the JOIN column",
+      "Hash Join is chosen because both tables are large — this is expected, not the problem",
+      "An index on orders.customer_id would convert the Seq Scan to an Index Scan and allow a Nested Loop for the common case",
+    ],
+    modelAnswer: `**Diagnosis:**
+
+The plan shows two sequential scans: the database is reading every row of both orders (50M) and customers (2M) into memory before performing the Hash Join. This is expensive because:
+1. No index on orders.customer_id — the engine cannot seek directly to matching rows
+2. With 50M rows, the sequential scan dominates query time
+3. Hash Join is the planner's best option given both tables are scanned — but the root cause is the missing index, not the join algorithm
+
+**Steps to fix:**
+
+1. **Add an index on the foreign key:**
+\`\`\`sql
+CREATE INDEX CONCURRENTLY idx_orders_customer_id ON orders(customer_id);
+\`\`\`
+Use CONCURRENTLY to avoid locking the table in production.
+
+2. **Re-run EXPLAIN ANALYZE** — expect the plan to change from Seq Scan → Index Scan, and Hash Join → Nested Loop (planner will switch when one side is indexed and the other is selective).
+
+3. **If the query also filters on order_date**, create a composite index:
+\`\`\`sql
+CREATE INDEX CONCURRENTLY idx_orders_customer_date ON orders(customer_id, order_date DESC);
+\`\`\`
+This allows an Index Only Scan for queries that filter on both columns.
+
+4. **Check statistics freshness** — if ANALYZE hasn't run recently, row estimates may be stale, causing the planner to choose a suboptimal join strategy:
+\`\`\`sql
+ANALYZE orders;
+\`\`\`
+
+**Expected improvement:** 42 seconds → 200–500ms for point lookups once the index is present and the planner switches to Nested Loop + Index Scan.`,
+    rubric: [
+      "Correctly identifies missing index on orders.customer_id as root cause",
+      "Explains why Seq Scan on 50M rows is expensive",
+      "Provides CREATE INDEX CONCURRENTLY to avoid production lock",
+      "Re-runs EXPLAIN ANALYZE after the fix to verify the plan changed",
+      "Mentions composite index if the query filters on additional columns",
+      "Mentions ANALYZE to refresh planner statistics",
+    ],
+    tags: ["EXPLAIN", "performance", "indexing"],
+    commonMistakes: ["Blaming the Hash Join algorithm instead of the missing index", "Using CREATE INDEX without CONCURRENTLY on a live table (causes table lock)", "Expecting the index to help when the query returns >15% of the table"],
+  },
+  {
+    id: "sqq10", courseId: "sql", topicId: "sql-advanced",
+    title: "Monthly Revenue Pivot by Product Line", difficulty: "Medium", type: "code", language: "sql", estimatedMinutes: 18,
+    company: "Amazon",
+    prompt: "Pivot monthly revenue into columns for each product line (Electronics, Clothing, Food). Output: year, month, electronics_revenue, clothing_revenue, food_revenue, total_revenue. Show only months with revenue > $0.",
+    hints: [
+      "SUM(CASE WHEN product_line = 'Electronics' THEN amount END) creates one pivot column",
+      "COALESCE the result to 0 — if a product line had no sales that month the CASE returns NULL",
+      "Total revenue is just SUM(amount) — no CASE needed",
+    ],
+    modelAnswer: `SELECT
+  EXTRACT(YEAR  FROM order_date)              AS year,
+  EXTRACT(MONTH FROM order_date)              AS month,
+  COALESCE(SUM(CASE WHEN product_line = 'Electronics'
+                    THEN amount END), 0)      AS electronics_revenue,
+  COALESCE(SUM(CASE WHEN product_line = 'Clothing'
+                    THEN amount END), 0)      AS clothing_revenue,
+  COALESCE(SUM(CASE WHEN product_line = 'Food'
+                    THEN amount END), 0)      AS food_revenue,
+  SUM(amount)                                AS total_revenue
+FROM orders
+JOIN products USING (product_id)
+WHERE status = 'completed'
+GROUP BY year, month
+HAVING SUM(amount) > 0
+ORDER BY year, month;`,
+    rubric: [
+      "SUM(CASE WHEN) pattern used — one expression per output column",
+      "COALESCE applied to handle months where a category had zero sales",
+      "Total revenue uses plain SUM(amount) without a CASE",
+      "GROUP BY year and month",
+      "HAVING SUM(amount) > 0 filters empty months",
+      "JOIN to products table to get product_line",
+    ],
+    tags: ["PIVOT", "conditional-aggregation", "reporting"],
+    commonMistakes: ["Forgetting COALESCE — leaves NULLs in pivot columns that break downstream summing", "Using COUNT instead of SUM for revenue", "Putting the revenue > 0 filter in WHERE instead of HAVING"],
+  },
+  {
+    id: "sqq11", courseId: "sql", topicId: "sql-design",
+    title: "Normalize an E-Commerce Schema to 3NF", difficulty: "Medium", type: "open-ended", estimatedMinutes: 20,
+    company: "Shopify",
+    prompt: "A legacy orders table has: order_id, customer_email, customer_name, customer_city, product_sku, product_name, product_category, unit_price, quantity, order_date. Identify every normalization violation and design a 3NF schema. List each new table with its columns and primary/foreign keys.",
+    hints: [
+      "1NF check: are all values atomic? Any repeating groups?",
+      "2NF: is the primary key composite? Do any non-key columns depend on only part of it?",
+      "3NF: do any non-key columns depend on another non-key column (transitive dependency)?",
+    ],
+    modelAnswer: `**Violations found:**
+
+**1NF:** No obvious violations — each cell holds one value.
+
+**2NF violations (partial dependencies on implied composite key order_id + product_sku):**
+- customer_email, customer_name, customer_city depend only on customer (not product)
+- product_name, product_category depend only on product_sku (not order)
+
+**3NF violations (transitive dependencies):**
+- customer_city might transitively depend on a customer_id → address relationship
+- product_category depends on product_sku → category (could itself have a category table if many products share categories)
+
+**3NF Schema:**
+
+\`\`\`sql
+-- Customers (customer_email is natural key; surrogate id added for FK efficiency)
+CREATE TABLE customers (
+  customer_id   SERIAL PRIMARY KEY,
+  email         TEXT UNIQUE NOT NULL,
+  name          TEXT NOT NULL,
+  city          TEXT
+);
+
+-- Categories (resolve transitive product → category dependency)
+CREATE TABLE categories (
+  category_id   SERIAL PRIMARY KEY,
+  name          TEXT UNIQUE NOT NULL
+);
+
+-- Products
+CREATE TABLE products (
+  product_id    SERIAL PRIMARY KEY,
+  sku           TEXT UNIQUE NOT NULL,
+  name          TEXT NOT NULL,
+  unit_price    NUMERIC(10,2) NOT NULL,
+  category_id   INT REFERENCES categories(category_id)
+);
+
+-- Orders (header — one row per order)
+CREATE TABLE orders (
+  order_id      SERIAL PRIMARY KEY,
+  customer_id   INT NOT NULL REFERENCES customers(customer_id),
+  order_date    DATE NOT NULL
+);
+
+-- Order line items (handles multiple products per order)
+CREATE TABLE order_items (
+  order_item_id SERIAL PRIMARY KEY,
+  order_id      INT NOT NULL REFERENCES orders(order_id),
+  product_id    INT NOT NULL REFERENCES products(product_id),
+  quantity      INT NOT NULL,
+  unit_price    NUMERIC(10,2) NOT NULL  -- snapshot price at time of order
+);
+\`\`\`
+
+**Note on unit_price:** stored in both products (current price) and order_items (price at time of purchase). This is intentional — order history must be immutable even if the product price changes.`,
+    rubric: [
+      "Correctly identifies partial dependency violations (2NF)",
+      "Correctly identifies transitive dependency violations (3NF)",
+      "Customers, Products, Orders, OrderItems tables created",
+      "All foreign keys defined correctly",
+      "order_items holds quantity and snapshot unit_price",
+      "Explains why unit_price is duplicated in order_items (immutable history)",
+    ],
+    tags: ["normalization", "schema-design", "3NF"],
+    commonMistakes: ["Missing the order_items table — creating a flat orders table that can't support multiple products per order", "Not snapshotting unit_price in order_items (price changes would corrupt historical order data)", "Putting customer_city directly on orders rather than normalising to a customers table"],
+  },
+  {
+    id: "sqq12", courseId: "sql", topicId: "sql-design",
+    title: "Design Indexes for a Slow Analytics Dashboard", difficulty: "Medium", type: "open-ended", estimatedMinutes: 18,
+    company: "Databricks",
+    prompt: "Three dashboard queries run on a 200M-row events table (user_id, event_type, created_at, session_id, device_type). Query A: filter by event_type + date range. Query B: filter by user_id + date range, ORDER BY created_at. Query C: COUNT(*) GROUP BY device_type over last 7 days. Design the minimum set of indexes needed.",
+    hints: [
+      "One index per common query pattern — avoid over-indexing (each index slows INSERTs)",
+      "Composite index column order: equality predicates first, then range, then ORDER BY columns",
+      "Query C's GROUP BY on low-cardinality device_type may be faster with a partial index",
+    ],
+    modelAnswer: `**Analysis:**
+
+Query A: WHERE event_type = ? AND created_at BETWEEN ? AND ?
+→ Equality on event_type + range on created_at
+→ Composite: (event_type, created_at)
+
+Query B: WHERE user_id = ? AND created_at >= ? ORDER BY created_at DESC
+→ Equality on user_id + range + sort
+→ Composite: (user_id, created_at DESC) — covers filter and sort, potential Index Only Scan if SELECT columns are also indexed
+
+Query C: WHERE created_at >= NOW() - INTERVAL '7 days' GROUP BY device_type
+→ Range-only scan with low-cardinality grouping — device_type has ~5 values
+→ Partial index or just (created_at) — a full index on device_type alone is low benefit because cardinality is low; the planner may choose a Seq Scan anyway for 7/200M days of data
+
+**Recommended indexes:**
+
+\`\`\`sql
+-- Query A
+CREATE INDEX idx_events_type_time
+  ON events(event_type, created_at);
+
+-- Query B (covering index includes common SELECT columns to enable Index Only Scan)
+CREATE INDEX idx_events_user_time
+  ON events(user_id, created_at DESC);
+
+-- Query C (partial index on recent data only — avoids indexing 200M historical rows)
+CREATE INDEX idx_events_recent_device
+  ON events(created_at, device_type)
+  WHERE created_at >= NOW() - INTERVAL '90 days';
+\`\`\`
+
+**Trade-offs:**
+- Each index adds ~20–40% INSERT overhead on this table
+- Partial index on Query C stays small (only 90 days of data) — refresh by recreating monthly
+- For Query C, if runtime is still slow, consider a pre-aggregated materialized view refreshed hourly`,
+    rubric: [
+      "Equality columns placed before range columns in each composite index",
+      "Query B index includes DESC to match ORDER BY direction",
+      "Partial index proposed for Query C to limit index size",
+      "Mentions INSERT overhead trade-off from multiple indexes",
+      "Suggests covering index or materialized view for Query C if needed",
+      "Three targeted indexes, not one catch-all index",
+    ],
+    tags: ["indexing", "query-optimization", "schema-design"],
+    commonMistakes: ["Putting range column before equality column in composite index (invalidates index prefix usage)", "Adding a separate index on device_type alone — low cardinality makes it useless for GROUP BY", "Not considering INSERT overhead — indexing every column degrades write performance"],
+  },
+  {
+    id: "sqq13", courseId: "sql", topicId: "sql-design",
+    title: "Design a Star Schema for Sales Reporting", difficulty: "Medium", type: "open-ended", estimatedMinutes: 20,
+    company: "Snowflake",
+    prompt: "A retail company needs an OLAP schema for a dashboard showing: daily sales by store, product, customer segment, and promotion. Design a star schema with a fact table and all necessary dimension tables. Justify key design decisions.",
+    hints: [
+      "The grain of the fact table = one row per transaction line item (store + product + day + customer)",
+      "Date dimension is almost always worth having — enables easy filtering on fiscal year, quarter, weekday",
+      "Degenerate dimensions (promo code) can live on the fact table if they have no attributes worth storing separately",
+    ],
+    modelAnswer: `**Star Schema Design:**
+
+**Fact Table — fact_sales (grain: one row per order line item)**
+\`\`\`
+fact_sales:
+  sale_id         BIGINT PK
+  date_key        INT FK → dim_date
+  store_key       INT FK → dim_store
+  product_key     INT FK → dim_product
+  customer_key    INT FK → dim_customer
+  promotion_key   INT FK → dim_promotion (nullable)
+  quantity        INT
+  unit_price      NUMERIC
+  discount_amount NUMERIC
+  net_revenue     NUMERIC  -- pre-computed: (unit_price - discount) * quantity
+\`\`\`
+
+**Dimension Tables:**
+\`\`\`
+dim_date:       date_key, full_date, year, quarter, month, week, day_of_week, is_holiday, fiscal_year
+dim_store:      store_key, store_id, store_name, city, region, store_type
+dim_product:    product_key, sku, product_name, category, subcategory, brand, unit_cost
+dim_customer:   customer_key, customer_id, segment, acquisition_channel, first_order_date
+dim_promotion:  promotion_key, promo_code, promo_type, discount_pct, start_date, end_date
+\`\`\`
+
+**Key design decisions:**
+1. **Pre-compute net_revenue** on the fact table — avoids repeated arithmetic in every query
+2. **Date dimension** — enables slice/dice by fiscal year, quarter, weekday without EXTRACT() calls that would prevent index use
+3. **Nullable promotion_key** — most sales have no promotion; FK nullable to avoid a dummy "No Promotion" row in dim_promotion (though a sentinel row is a valid alternative)
+4. **Customer segment in dim_customer** — not on the fact table, to keep the fact table narrow and allow segment changes to be tracked via SCD Type 2 if needed
+5. **Surrogate keys** everywhere — insulates the schema from source system key changes`,
+    rubric: [
+      "Fact table grain stated explicitly (one row per line item)",
+      "Date, store, product, customer dimensions all present",
+      "Measures (revenue, quantity) on fact table, attributes on dimensions",
+      "Pre-computed net_revenue justified",
+      "Nullable promotion_key or sentinel row approach justified",
+      "Surrogate keys mentioned",
+    ],
+    tags: ["star-schema", "data-warehouse", "dimensional-modeling"],
+    commonMistakes: ["Putting all attributes on the fact table (no dimension separation)", "Grain not stated — leads to double-counting when joining multiple dimensions", "Forgetting the date dimension — using raw dates makes time intelligence queries complex"],
+  },
+  {
+    id: "sqq14", courseId: "sql", topicId: "sql-design",
+    title: "Diagnose and Architect an OLTP/OLAP Separation", difficulty: "Hard", type: "open-ended", estimatedMinutes: 22,
+    company: "Confluent",
+    prompt: "Your team's OLTP PostgreSQL database (10M orders/day) is experiencing 5-10 second query spikes that degrade the checkout API. Investigation shows the spikes correlate with analyst queries running GROUP BY and window functions over 6 months of orders. Design a solution architecture that lets analysts query freely without impacting production.",
+    hints: [
+      "Read replicas solve contention but don't solve the query pattern mismatch (row-oriented vs columnar)",
+      "A streaming ETL (Kafka or Debezium) keeps the analytical store fresh without polling the primary",
+      "The right separation: transactional workloads stay on OLTP, aggregate workloads move to a columnar store",
+    ],
+    modelAnswer: `**Root cause:**
+Analysts are running full-table sequential scans on the primary OLTP database. PostgreSQL is row-oriented — scans of 6-month windows read every page of large tables, competing for I/O buffer pool with the transactional queries that the checkout API depends on.
+
+**Target architecture:**
+
+\`\`\`
+[App servers] → [PostgreSQL primary] → [WAL streaming]
+                        ↓                       ↓
+               [PG read replica]        [Debezium CDC]
+               (hot OLTP reads)               ↓
+                                      [Kafka topic: orders]
+                                               ↓
+                                     [Spark/Flink streaming]
+                                               ↓
+                                  [Columnar store: Snowflake / BigQuery / Redshift]
+                                       (analyst queries here)
+\`\`\`
+
+**Steps:**
+
+1. **Immediate relief:** Route analyst traffic to a PostgreSQL read replica. This stops I/O contention on the primary within hours. Read replicas lag by ~seconds, acceptable for analytical queries.
+
+2. **Medium-term fix:** Stand up a columnar analytical store (Snowflake, BigQuery, or Redshift). Use Debezium (or AWS DMS) to stream WAL changes from PostgreSQL into Kafka → transform → load into the columnar store. Analysts query the columnar store; the OLTP primary only handles transactional load.
+
+3. **Data freshness SLA:** With streaming CDC, the columnar store can be 1–5 minutes behind the OLTP primary — communicate this lag SLA to the analytics team. For reports that can tolerate daily lag, a nightly batch export is cheaper.
+
+4. **Guardrails:** Add a query timeout (e.g. 30 seconds) and a max-rows limit (5M) on the read replica to prevent runaway queries even as a short-term measure.
+
+**Trade-offs:**
+- Streaming CDC adds infrastructure cost and operational complexity
+- Columnar stores charge per-query or per-TB scanned — set up cost controls
+- The read replica alone doesn't solve the query pattern mismatch for very large scans (both will be slow on row-oriented data)`,
+    rubric: [
+      "Identifies I/O contention from sequential scans as root cause",
+      "Proposes read replica as immediate mitigation",
+      "Proposes columnar analytical store as long-term solution",
+      "Mentions CDC streaming (Debezium, Kafka) to keep analytical store fresh",
+      "Addresses freshness SLA for analyst data",
+      "Discusses trade-offs (cost, complexity, acceptable lag)",
+    ],
+    tags: ["OLTP-OLAP", "architecture", "performance"],
+    commonMistakes: ["Proposing only a read replica — it reduces contention but row-oriented scans are still slow", "Recommending adding more indexes to the primary — indexes help point lookups, not aggregate scans", "Not addressing data freshness — analysts need to know if data is 5 minutes or 24 hours old"],
+  },
+
 ];

@@ -2,30 +2,37 @@
 export const DS = {
   bg: "#020617",
   bgElev: "#080E1A",
-  cardGlass: "rgba(6,8,20,0.78)",
+  // Surface ladder: opaque steps, depth via luminance — not blur/shadow
+  cardGlass: "#0A0F1E",
   card: "rgba(255,255,255,0.02)",
-  border: "rgba(255,255,255,0.06)",
+  surface2: "#111726",
+  border: "rgba(255,255,255,0.07)",
+  borderHover: "rgba(255,255,255,0.13)",
   borderStrong: "rgba(129,140,248,0.22)",
   t1: "#F8FAFC",
-  t2: "#E2E8F0",
+  t2: "rgba(255,255,255,0.82)",
   t3: "#94A3B8",
-  dim: "#475569",
+  dim: "#5B6678",
   ind: "#818CF8",
   grn: "#34D399",
   indB: "#6366F1",
-  shadowCard: "0 32px 64px rgba(0,0,0,0.5)",
-  shadowCta: "0 6px 24px rgba(99,102,241,0.45)",
-  radiusLg: 18,
+  // Top-edge highlight is the elevation cue — no drop shadows in dark mode
+  shadowCard: "inset 0 1px 0 rgba(255,255,255,0.05)",
+  shadowCta: "inset 0 1px 0 rgba(255,255,255,0.10)",
+  radiusLg: 16,
   radiusMd: 12,
-  radiusSm: 10,
-  focusRing: "0 0 0 2px rgba(99,102,241,0.75)",
+  radiusSm: 8,
+  focusRing: "0 0 0 2px rgba(99,102,241,0.55)",
+  // Motion tokens — mirror the CSS vars in index.html for inline-style use
+  easeOut: "cubic-bezier(0.23, 1, 0.32, 1)",
+  easeInOut: "cubic-bezier(0.77, 0, 0.175, 1)",
+  durFast: "140ms",
+  durBase: "200ms",
 };
 
 export function dsGlassCard(extra = {}) {
   return {
     background: DS.cardGlass,
-    backdropFilter: "blur(28px)",
-    WebkitBackdropFilter: "blur(28px)",
     border: `1px solid ${DS.border}`,
     borderRadius: DS.radiusLg,
     boxShadow: DS.shadowCard,
@@ -37,7 +44,7 @@ export function dsGlassCard(extra = {}) {
 export function dsInteractiveButton(base = {}) {
   return {
     outline: "none",
-    transition: "box-shadow 0.15s ease, border-color 0.15s ease",
+    transition: `box-shadow ${DS.durBase} ${DS.easeOut}, border-color ${DS.durFast} ${DS.easeOut}`,
     ...base,
   };
 }

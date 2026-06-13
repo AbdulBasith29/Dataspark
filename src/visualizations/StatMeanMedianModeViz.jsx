@@ -156,7 +156,7 @@ export default function StatMeanMedianModeViz() {
             })}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
+          <div className="ds-g3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
             {[
               { label: "Mean", value: fmtK(mean), color: DS.ind, note: addOutlier ? "Heavily distorted" : "Close to median" },
               { label: "Median", value: fmtK(median), color: DS.grn, note: addOutlier ? "Stable — robust" : "Represents center well" },
@@ -180,7 +180,7 @@ export default function StatMeanMedianModeViz() {
 
       {activeTab === "skew" && (
         <div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+          <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             {[
               { label: "Symmetric distribution", data: SYM_DATASET, stats: symStats, color: DS.grn, note: "Mean ≈ Median — either works" },
               { label: "Right-skewed distribution", data: SKEW_DATASET, stats: skewStats, color: "#F87171", note: "Mean > Median — prefer median" },
@@ -221,7 +221,7 @@ export default function StatMeanMedianModeViz() {
                   <span style={{ fontSize: 16, fontWeight: 700, color, fontFamily: "var(--ds-mono), monospace", minWidth: 56 }}>{measure}</span>
                   <span style={{ fontSize: 12, color: DS.t3, fontFamily: "var(--ds-sans), sans-serif" }}>{example}</span>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                   <div>
                     <div style={{ fontSize: 10, color: DS.grn, fontFamily: "var(--ds-mono), monospace", marginBottom: 3 }}>USE WHEN</div>
                     <div style={{ fontSize: 12, color: DS.t2, fontFamily: "var(--ds-sans), sans-serif" }}>{use}</div>

@@ -124,7 +124,7 @@ export default function StatMultipleTestingViz() {
             </div>
 
             {/* Comparison row */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <div style={{ ...CARD }}>
                 <div style={{ fontSize: 10, color: DS.t3, ...MONO, marginBottom: 4 }}>Original α (per test)</div>
                 <div style={{ fontSize: 18, fontWeight: 700, color: DS.ind, ...MONO }}>0.050</div>
@@ -151,7 +151,7 @@ export default function StatMultipleTestingViz() {
               <div style={{ fontSize: 11, fontWeight: 700, color: DS.t2, ...SANS, marginBottom: 8 }}>
                 FWER vs FDR: when to use which
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 11, ...MONO }}>
+              <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 11, ...MONO }}>
                 <div>
                   <div style={{ color: "#8B5CF6", fontWeight: 700, marginBottom: 4 }}>Bonferroni (FWER)</div>
                   <div style={{ color: DS.t3, lineHeight: 1.6 }}>

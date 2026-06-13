@@ -390,7 +390,7 @@ export default function SQLCteExplorer() {
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             {[
               { label: "Non-recursive CTE", color: ACCENT, notes: ["Named intermediate results", "Referenced by later CTEs or final SELECT", "No self-reference", "May or may not be materialized (engine decides)"] },
               { label: "Recursive CTE", color: IND, notes: ["Base case (anchor) UNION ALL recursive step", "Recursive step references the CTE itself", "Terminates when recursive step returns 0 rows", "Requires WITH RECURSIVE keyword (Postgres, SQLite)"] },

@@ -901,6 +901,254 @@ Implement a row-wise baseline transform, profile it, rewrite with vectorized/bat
       { question: "What interview response best demonstrates optimization maturity?", options: ["Present before/after metrics, explain mechanism, and discuss tradeoffs.","Claim a big speedup without method.","Say optimization is unnecessary if code runs."], correctIndex: 0, explanation: "Evidence plus tradeoff clarity is the strongest signal." },
     ],
   },
+
+  "sql-capstone-01": {
+  durationLabel: "45 min",
+  outcomes: [
+    "Diagnose silent JOIN bugs that return zero rows by recognising INNER vs LEFT JOIN semantics under anti-join patterns.",
+    "Apply window functions with PARTITION BY correctly to produce per-group rankings without collapsing result sets.",
+    "Architect multi-step queries with chained CTEs for readability, maintainability, and clear debugging surfaces.",
+    "Select composite index strategies that match query filter column order to eliminate full-table scans.",
+  ],
+  learnMarkdown: `## StreamCore Analytics Challenge
+
+You have just been hired as StreamCore's first data analyst. StreamCore is a music streaming startup with 8 million users across 42 countries. The CEO has a board meeting in two hours and needs four data questions answered — now.
+
+This capstone does not teach new syntax. It tests whether you can apply what you know under pressure, in context, and explain your reasoning the way an interviewer will demand.
+
+## What this capstone assesses
+
+### 1 · JOIN and filtering accuracy
+
+Anti-join patterns — finding users who did NOT do something — are among the most common sources of silent data bugs. A wrong JOIN type returns zero rows with no error message. Interviewers test this because it surfaces understanding of set semantics, not just syntax recall.
+
+### 2 · Window function fluency
+
+Window functions let you compute per-group rankings without collapsing rows. The most common mistake is confusing PARTITION BY with GROUP BY, or applying RANK/ROW_NUMBER globally when the business question requires a per-dimension ranking (e.g. top-3 per country, not top-3 globally).
+
+### 3 · Query architecture
+
+As queries grow to three or more logical steps, nested subqueries become hard to read, test, and debug. Chained CTEs give each step a name and a clear interface to the next step. Interviewers use multi-step problems to distinguish engineers who can write SQL from those who can design it.
+
+### 4 · Performance and index instinct
+
+A composite index on (user_id, streamed_at) differs from an index on (streamed_at, user_id) in ways that directly affect whether the optimizer uses the index for your specific query. Interviewers at data-intensive companies expect you to explain index column order without needing to look it up.
+
+## What the final artifact represents
+
+Completing this capstone earns you four verified skill signals that map to real job-description requirements: anti-join correctness, window function design, CTE architecture, and index strategy. Together these cover the majority of SQL questions that appear in mid-to-senior data analyst and analytics engineer interviews.`,
+  video: null,
+  videoFallbackMarkdown: `## Applied SQL in real analyst roles
+
+The gap between knowing SQL syntax and doing analyst work is almost entirely a problem of query design under ambiguity. A real business question rarely maps cleanly to a single JOIN or aggregate. The analyst job is to translate a vague request into a precise, reproducible query sequence.
+
+### The four patterns that appear in almost every senior SQL interview
+
+**Anti-join correctness** is tested because it catches engineers who learned SQL by example rather than by set semantics. LEFT JOIN with IS NULL and NOT EXISTS are the two idiomatic forms, and you need to know when each is preferred.
+
+**Window functions** became mainstream in analytics after Redshift and BigQuery popularised them. ROW_NUMBER() OVER (PARTITION BY country ORDER BY total_streams DESC) immediately signals to an interviewer that the candidate has shipped production analytics.
+
+**CTE architecture** is the difference between SQL that works and SQL that can be reviewed, debugged, and extended by a team. If you cannot name each subquery step, the query is doing too much in one place.
+
+**Index instinct** matters at any company with more than a few million rows. Composite indexes are column-order sensitive because the B-tree is sorted left to right. Equality predicates lead, range predicates trail.`,
+  tryGuidance: "Work through four real StreamCore data challenges — each simulates a pressure question from a board-meeting prep session.",
+  interviewGraph: {
+    initialStageId: "cap_s1_join_bug",
+    artifactDimensions: [
+      { label: "JOIN & Filtering Accuracy", recoveryStageId: "cap_s1_recovery" },
+      { label: "Window Function Fluency", recoveryStageId: "cap_s2_recovery" },
+      { label: "Query Architecture", recoveryStageId: "cap_s3_recovery" },
+      { label: "Performance & Index Instinct", recoveryStageId: "cap_s4_recovery" },
+    ],
+    stages: {
+      cap_s1_join_bug: {
+        id: "cap_s1_join_bug",
+        type: "click_target",
+        badge: "Stage 1",
+        title: "Stage 1 · Find the JOIN bug",
+        prompt: "The head of growth asks: 'Which users signed up in the last 90 days but have never streamed a single song?' This query is supposed to answer that — but it returns 0 rows. Click the exact line that contains the bug.",
+        code_snippet: `SELECT
+  u.user_id,
+  u.email,
+  u.created_at
+FROM users u
+INNER JOIN streams s          -- ds-target:wrong_join_type
+  ON u.user_id = s.user_id
+WHERE u.created_at >= NOW() - INTERVAL '90 days'
+  AND s.user_id IS NULL;`,
+        validationCopy: {
+          wrong_join_type: "Correct. INNER JOIN only keeps rows where a match exists in both tables. Users who have never streamed have no matching row in streams, so INNER JOIN silently discards exactly the users you are looking for. Change this to LEFT JOIN.",
+        },
+        branches: {
+          wrong_join_type: "cap_s2_window",
+        },
+        rationale: "The LEFT JOIN anti-join pattern: keep all users even with no streams row (NULL in stream columns), then IS NULL filters to only non-streamers. INNER JOIN eliminates those rows before IS NULL can act — zero results, no error.",
+      },
+      cap_s1_recovery: {
+        id: "cap_s1_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · LEFT JOIN anti-join pattern",
+        prompt: "Anti-join pattern requires a specific structure. Which explanation correctly describes why LEFT JOIN is required here?",
+        code_snippet: `-- Anti-join pattern (correct):
+SELECT u.user_id
+FROM users u
+LEFT JOIN streams s ON u.user_id = s.user_id
+WHERE u.created_at >= NOW() - INTERVAL '90 days'
+  AND s.user_id IS NULL;`,
+        choices: [
+          { id: "a", label: "LEFT JOIN preserves non-matching rows", description: "LEFT JOIN keeps all users even if they have no streams row, placing NULL in stream columns — then IS NULL filters to only those users." },
+          { id: "b", label: "INNER JOIN also works with IS NULL", description: "INNER JOIN discards rows with no match before IS NULL can filter them — so zero rows result." },
+        ],
+        branches: { a: "cap_s2_window", b: "cap_s1_recovery" },
+        rationale: "INNER JOIN eliminates non-matching rows before IS NULL has any chance to act. LEFT JOIN keeps them, exposing the NULL you need to filter on.",
+      },
+      cap_s2_window: {
+        id: "cap_s2_window",
+        type: "scenario_choice",
+        badge: "Stage 2",
+        title: "Stage 2 · Top artists by country",
+        prompt: "The CEO wants the top 3 most-streamed artists in each country this month for the board deck. Which query design is correct and production-grade?",
+        code_snippet: `-- Table: streams(user_id, artist_id, country, streamed_at)
+-- Table: artists(artist_id, artist_name)
+-- Goal: top 3 artists per country by stream count, current month`,
+        choices: [
+          { id: "a", label: "ROW_NUMBER() OVER (PARTITION BY country)", description: "Aggregate streams per artist+country, rank within each country partition — keeps exactly 3 per country." },
+          { id: "b", label: "Correlated subquery with COUNT(*)", description: "Correct result but O(n²) on large tables — not production-grade." },
+          { id: "c", label: "GROUP BY country ORDER BY streams DESC LIMIT 3", description: "LIMIT 3 applies globally — returns 3 rows total, not 3 per country." },
+        ],
+        branches: { a: "cap_s3_cte", b: "cap_s2_recovery", c: "cap_s2_recovery" },
+        rationale: "ROW_NUMBER() OVER (PARTITION BY country ORDER BY total_streams DESC) assigns rank within each country independently. LIMIT 3 without partitioning caps the entire result set — the classic top-N-per-group mistake.",
+      },
+      cap_s2_recovery: {
+        id: "cap_s2_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · PARTITION BY vs GROUP BY",
+        prompt: "The key insight for per-group top-N is understanding what PARTITION BY does differently from GROUP BY.",
+        code_snippet: `WITH ranked AS (
+  SELECT
+    country, artist_id,
+    COUNT(*) AS total_streams,
+    ROW_NUMBER() OVER (
+      PARTITION BY country
+      ORDER BY COUNT(*) DESC
+    ) AS rn
+  FROM streams
+  WHERE streamed_at >= DATE_TRUNC('month', NOW())
+  GROUP BY country, artist_id
+)
+SELECT country, artist_id, total_streams
+FROM ranked WHERE rn <= 3;`,
+        choices: [
+          { id: "a", label: "Got it — move on →", description: "PARTITION BY divides rows into groups for window calculation without collapsing them. Each row keeps its rank within its partition." },
+          { id: "b", label: "PARTITION BY collapses rows like GROUP BY", description: "Incorrect — GROUP BY reduces N rows to M groups. PARTITION BY keeps all N rows and computes a window value per row." },
+        ],
+        branches: { a: "cap_s3_cte", b: "cap_s2_recovery" },
+        rationale: "GROUP BY reduces N rows to M groups. PARTITION BY keeps all N rows and annotates each one with a computation scoped to its group. Top-N per group requires the latter.",
+      },
+      cap_s3_cte: {
+        id: "cap_s3_cte",
+        type: "scenario_choice",
+        badge: "Stage 3",
+        title: "Stage 3 · Re-engagement query architecture",
+        prompt: "Find premium users who streamed more than 100 songs this month but have not streamed in the last 7 days — the re-engagement target list. Which architecture do you recommend?",
+        code_snippet: `-- Tables: users(user_id, plan_type)
+--         streams(user_id, song_id, streamed_at)
+-- Need: premium, >100 streams this month, 0 streams last 7 days`,
+        choices: [
+          { id: "a", label: "3-level nested subqueries", description: "Correct result but three levels of nesting is unreadable and nearly impossible to debug incrementally." },
+          { id: "b", label: "Two chained CTEs: active_month then recent_7d", description: "First CTE: monthly active premium users. Second CTE: recently active. Outer query anti-joins them. Each step is named and testable." },
+          { id: "c", label: "Single CTE filtering only >100 streams", description: "Cannot capture the no-streams-last-7-days exclusion cleanly in a single CTE." },
+        ],
+        branches: { a: "cap_s3_recovery", b: "cap_s4_index", c: "cap_s3_recovery" },
+        rationale: "Two chained CTEs give every logical step a name. You can SELECT * FROM each CTE independently to verify output before adding the next step — essential for a query this complex.",
+      },
+      cap_s3_recovery: {
+        id: "cap_s3_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · CTE architecture",
+        prompt: "Why are two chained CTEs preferred over deeply nested subqueries for multi-step filtering?",
+        code_snippet: `WITH active_this_month AS (
+  SELECT u.user_id
+  FROM users u
+  JOIN streams s ON u.user_id = s.user_id
+  WHERE u.plan_type = 'premium'
+    AND s.streamed_at >= DATE_TRUNC('month', NOW())
+  GROUP BY u.user_id HAVING COUNT(*) > 100
+),
+recent_streamers AS (
+  SELECT DISTINCT user_id FROM streams
+  WHERE streamed_at >= NOW() - INTERVAL '7 days'
+)
+SELECT a.user_id
+FROM active_this_month a
+LEFT JOIN recent_streamers r ON a.user_id = r.user_id
+WHERE r.user_id IS NULL;`,
+        choices: [
+          { id: "a", label: "Got it — move on →", description: "Each CTE has a single responsibility and a descriptive name — you can inspect any intermediate result to verify it before adding the next step." },
+          { id: "b", label: "Nested subqueries are equally readable", description: "Three levels of anonymous nesting makes debugging nearly impossible — you cannot inspect a middle step in isolation." },
+        ],
+        branches: { a: "cap_s4_index", b: "cap_s3_recovery" },
+        rationale: "CTEs trade a small amount of verbosity for large gains in readability and debuggability. Named steps communicate intent; anonymous subqueries force the reader to reverse-engineer it.",
+      },
+      cap_s4_index: {
+        id: "cap_s4_index",
+        type: "scenario_choice",
+        badge: "Stage 4",
+        title: "Stage 4 · Index strategy",
+        prompt: "The streams table has grown to 50 million rows. This query runs in 8 seconds: WHERE user_id = ? AND streamed_at > ?. What index do you recommend?",
+        code_snippet: `-- Table: streams (50M rows, no indexes except PK)
+SELECT song_id, streamed_at
+FROM streams
+WHERE user_id = 123456           -- equality filter
+  AND streamed_at > '2025-11-01'; -- range filter
+-- Runtime: 8.2 seconds (full table scan)`,
+        choices: [
+          { id: "a", label: "Composite index on (user_id, streamed_at)", description: "Leading equality column jumps directly to one user's rows, then range scan on streamed_at within that narrow subset." },
+          { id: "b", label: "Index on user_id only", description: "Reduces to one user's rows, but still scans all of that user's history for the date range." },
+          { id: "c", label: "Index on (streamed_at, user_id)", description: "Wrong column order — range on the leading column means scanning all dates across all users before applying user_id." },
+        ],
+        branches: { a: "cap_terminal", b: "cap_s4_recovery", c: "cap_s4_recovery" },
+        rationale: "Composite index (user_id, streamed_at): user_id is an equality filter on the leading column so the B-tree jumps precisely to that user's section, then range-scans only their streamed_at values. Rule: equality predicates lead, range predicates trail.",
+      },
+      cap_s4_recovery: {
+        id: "cap_s4_recovery",
+        type: "scenario_choice",
+        badge: "Recovery",
+        title: "Recovery · Composite index column order",
+        prompt: "Why does column order in a composite index matter for this query?",
+        code_snippet: `-- Index on (user_id, streamed_at):
+-- 1. Jump to leaf for user_id = 123456  → O(log n)
+-- 2. Range scan on streamed_at within that user's leaf section
+
+-- Index on (streamed_at, user_id):
+-- 1. Range scan ALL dates > '2025-11-01' across ALL users
+-- 2. Filter user_id = 123456 — massive initial scan`,
+        choices: [
+          { id: "a", label: "Got it — move on →", description: "Equality filters on the leading column give the B-tree a precise entry point. Range filters trail so they narrow within an already-selective subset." },
+          { id: "b", label: "Column order does not affect performance", description: "Incorrect — the B-tree is physically sorted by the leading column. Wrong order means the optimizer cannot use the index efficiently." },
+        ],
+        branches: { a: "cap_terminal", b: "cap_s4_recovery" },
+        rationale: "The rule is memorable: equality predicates lead, range predicates trail. This maximises selectivity at the first B-tree traversal step.",
+      },
+      cap_terminal: {
+        id: "cap_terminal",
+        type: "scenario_choice",
+        badge: "Complete",
+        title: "Complete · StreamCore Analytics Challenge",
+        prompt: "The board meeting starts in five minutes. You just answered four high-pressure analyst questions: the never-streamed subscriber cohort, country-level top-artist rankings, the re-engagement target list, and a concrete index recommendation that will cut query time from 8 seconds to under 200ms. These four skills — anti-join correctness, window function design, CTE architecture, and composite index strategy — appear together in the majority of analytics engineering and senior data analyst interviews. Generate your certificate and add it to your portfolio.",
+        choices: [],
+        branches: { default: "cap_terminal" },
+        terminal: true,
+        rationale: "Stage 1: JOIN semantics under anti-join patterns — the silent zero-row bug that catches candidates who learned SQL by imitation. Stage 2: window function partitioning — the per-group ranking that separates tutorial SQL from production analytics. Stage 3: CTE architecture — decomposing a multi-step problem into named, reviewable units. Stage 4: composite index instinct — the column-order rule that determines whether an index actually gets used.",
+      },
+    },
+  },
+  knowledgeCheck: [],
+},
+
 };
 
 /**
@@ -4725,18 +4973,60 @@ This module still ships a full **written** walkthrough and the mutability lab �
       "Fix alias-in-WHERE and HAVING misuse under interview pressure.",
       "Choose WHERE vs HAVING based on correctness and early-filter performance.",
     ],
-    learnMarkdown: `## Rapid revision: SQL does not execute top-to-bottom
+    learnMarkdown: `## SQL logical execution order
 
-Your eyes read SELECT, FROM, WHERE. The database reasons in a logical order: FROM/JOIN, WHERE, GROUP BY, HAVING, SELECT, then ORDER BY/LIMIT.
+Your eyes read SELECT first. The engine does not. SQL's logical processing order is:
 
-That is why a SELECT alias does not exist when WHERE runs. WHERE filters individual rows before SELECT creates aliases. HAVING filters grouped buckets after aggregation.
+**FROM → JOIN → WHERE → GROUP BY → HAVING → SELECT → DISTINCT → ORDER BY → LIMIT**
+
+This order controls what is available at each stage, which is the source of many bugs that appear subtle in interviews.
+
+## Why this matters in practice
+
+**Why SELECT aliases break in WHERE:**
+
+\`\`\`sql
+-- This fails: sale_month alias does not exist when WHERE runs
+SELECT DATE_TRUNC('month', order_date) AS sale_month, SUM(revenue) AS total
+FROM orders
+WHERE sale_month = '2024-01-01'  -- ERROR: column "sale_month" does not exist
+GROUP BY sale_month;
+
+-- Fix: repeat the expression, or use a CTE
+WITH monthly AS (
+  SELECT DATE_TRUNC('month', order_date) AS sale_month, SUM(revenue) AS total
+  FROM orders
+  GROUP BY 1
+)
+SELECT * FROM monthly WHERE sale_month = '2024-01-01';
+\`\`\`
+
+**Why HAVING is required for aggregate filters:**
+
+\`\`\`sql
+-- Wrong: WHERE cannot see aggregate results
+SELECT dept, AVG(salary)
+FROM employees
+WHERE AVG(salary) > 80000  -- ERROR: aggregate functions not allowed in WHERE
+GROUP BY dept;
+
+-- Correct: HAVING runs after GROUP BY
+SELECT dept, AVG(salary) AS avg_sal
+FROM employees
+GROUP BY dept
+HAVING AVG(salary) > 80000;
+\`\`\`
+
+## The ORDER BY / LIMIT optimization insight
+
+ORDER BY and LIMIT run last, which means the database must compute the entire intermediate result set before sorting and truncating. On large tables, a query like \`ORDER BY created_at DESC LIMIT 10\` scans the full table unless \`created_at\` is indexed. Adding an index on the sort column lets the engine read the 10 most-recent rows directly without a full scan.
 
 ## Interview muscle memory
 
-- Use WHERE for row-level filters before aggregation.
-- Use HAVING for aggregate filters after GROUP BY.
-- If you need a SELECT alias in a filter, wrap the query in a subquery/CTE or repeat the expression where the dialect permits it.
-- Prefer filtering early in WHERE when the predicate is row-level; it reduces rows before grouping and usually lowers compute cost.`,
+- \`WHERE\` filters rows before aggregation — no access to aggregate functions.
+- \`HAVING\` filters after \`GROUP BY\` — has access to aggregated values.
+- A \`SELECT\` alias is invisible to \`WHERE\`, \`GROUP BY\`, and \`HAVING\` in the same query. Repeat the expression or wrap in a CTE.
+- Filtering early in \`WHERE\` reduces rows before grouping and lowers compute cost — always prefer row-level filters in \`WHERE\` over equivalent \`HAVING\` clauses.`,
     video: null,
     videoFallbackMarkdown: `## 3-minute execution-order drill
 
@@ -4919,7 +5209,38 @@ HAVING status = 'completed' AND SUM(total_amount) > 1000;`,
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "In SQL's logical order of execution, which clause is evaluated first?",
+        options: [
+          "FROM — the engine resolves table sources before anything else",
+          "SELECT — you write it first so it runs first",
+          "WHERE — filtering must happen before columns are chosen",
+        ],
+        correctIndex: 0,
+        explanation: "FROM (and any JOINs) is resolved first — the engine needs to know which rows exist before it can filter, group, or project columns. SELECT runs sixth, which is why you cannot reference a SELECT alias in WHERE.",
+      },
+      {
+        question: "You alias a DATE_TRUNC expression as sale_month in SELECT and reference it in WHERE. Why does the query fail?",
+        options: [
+          "SELECT runs after WHERE, so the alias does not exist when WHERE is evaluated",
+          "DATE_TRUNC returns a timestamp and WHERE requires a string",
+          "Aliases must be upper-case to be visible in WHERE",
+        ],
+        correctIndex: 0,
+        explanation: "SELECT is evaluated after WHERE in logical order. The alias only exists in SELECT output — WHERE executes before SELECT runs and sees an unrecognised identifier. Use a CTE or subquery to reference the computed value in a filter.",
+      },
+      {
+        question: "Why does HAVING exist as a separate clause from WHERE?",
+        options: [
+          "WHERE runs before GROUP BY when no aggregate values exist yet; HAVING runs after GROUP BY against the grouped results",
+          "HAVING filters individual rows; WHERE filters aggregated groups",
+          "They are interchangeable — HAVING is just syntactic sugar for WHERE",
+        ],
+        correctIndex: 0,
+        explanation: "WHERE cannot reference aggregate functions like SUM or COUNT because aggregation has not happened yet. HAVING runs after GROUP BY, when groups and their aggregate values exist. Mixing them up is one of the most common SQL interview mistakes.",
+      },
+    ],
   },
 
   "sql-found-02": {
@@ -4929,11 +5250,57 @@ HAVING status = 'completed' AND SUM(total_amount) > 1000;`,
       "Avoid NOT IN traps when subqueries can emit NULL.",
       "Choose COALESCE, IFNULL, or CASE based on portability and semantic clarity.",
     ],
-    learnMarkdown: `## Rapid revision: NULL means unknown, not empty
+    learnMarkdown: `## NULL and three-valued logic
 
-SQL predicates can evaluate to TRUE, FALSE, or UNKNOWN. WHERE only keeps TRUE. This is why one hidden NULL inside a NOT IN subquery can make every comparison unknown and return zero rows.
+NULL does not mean zero, empty string, or false. NULL means *unknown*. SQL predicates evaluate to TRUE, FALSE, or **UNKNOWN** — and WHERE only passes rows where the predicate is TRUE. UNKNOWN is silently treated the same as FALSE.
 
-Use NOT EXISTS when checking absence against nullable subquery output. Use explicit CASE branches and ELSE clauses when NULL propagation would hide a business state.`,
+## The three-valued logic trap
+
+\`\`\`sql
+-- This looks like it should return all non-cancelled orders
+SELECT * FROM orders WHERE status != 'cancelled';
+
+-- But if status IS NULL, then NULL != 'cancelled' → UNKNOWN → row is excluded
+-- Fix: explicitly handle NULL
+SELECT * FROM orders
+WHERE status != 'cancelled'
+   OR status IS NULL;
+\`\`\`
+
+## The NOT IN + NULL disaster
+
+This is one of the most dangerous NULL traps in SQL interviews:
+
+\`\`\`sql
+-- Suppose cancelled_ids contains one NULL value
+SELECT * FROM orders
+WHERE order_id NOT IN (SELECT order_id FROM cancelled_orders);
+
+-- If any row in cancelled_orders has order_id = NULL:
+-- NOT IN becomes: NOT (x = 1 OR x = 2 OR x = NULL)
+--              → NOT (x = 1 OR x = 2 OR UNKNOWN)
+--              → UNKNOWN for every row
+-- Result: zero rows returned — silently!
+
+-- Safe alternative: NOT EXISTS
+SELECT * FROM orders o
+WHERE NOT EXISTS (
+  SELECT 1 FROM cancelled_orders c
+  WHERE c.order_id = o.order_id
+);
+-- NOT EXISTS treats NULL correctly — NULL rows in the subquery do not poison the result
+\`\`\`
+
+## Aggregate functions and NULL
+
+\`COUNT(column)\` skips NULL values. \`COUNT(*)\` counts all rows. \`SUM\`, \`AVG\`, \`MIN\`, \`MAX\` all ignore NULLs. This means \`AVG(score)\` on a column with NULLs computes the average of non-NULL rows only — potentially misleading if NULLs represent "zero" rather than "unknown."
+
+## NULL-safe patterns
+
+- Use \`IS NULL\` / \`IS NOT NULL\` — never \`= NULL\`
+- Use \`COALESCE(col, default)\` to substitute a default for NULL: \`COALESCE(discount, 0)\`
+- Use \`NULLIF(a, b)\` to prevent division-by-zero: \`revenue / NULLIF(units, 0)\`
+- Prefer \`NOT EXISTS\` over \`NOT IN\` when the subquery column is nullable`,
     video: null,
     videoFallbackMarkdown: `## Drill
 
@@ -5082,7 +5449,38 @@ END AS paid_flag`,
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "What does SELECT * FROM orders WHERE status != 'cancelled' return when a row has NULL in the status column?",
+        options: [
+          "The NULL row is excluded — NULL != 'cancelled' evaluates to UNKNOWN, not TRUE",
+          "The NULL row is included because NULL means not set",
+          "The query throws a runtime error on the NULL value",
+        ],
+        correctIndex: 0,
+        explanation: "WHERE only passes rows where the predicate evaluates to TRUE. NULL != 'cancelled' returns UNKNOWN, which is treated the same as FALSE. To include NULLs you must add OR status IS NULL explicitly.",
+      },
+      {
+        question: "Which predicate correctly matches rows where referral_code is NULL?",
+        options: [
+          "WHERE referral_code IS NULL",
+          "WHERE referral_code = NULL",
+          "WHERE referral_code == NULL",
+        ],
+        correctIndex: 0,
+        explanation: "NULL comparisons using = always return UNKNOWN, never TRUE. The only correct way to test for NULL is IS NULL. This is the three-valued logic rule: NULL = NULL evaluates to UNKNOWN, not TRUE.",
+      },
+      {
+        question: "A score column has 5 rows: 90, 85, NULL, 70, 95. What does SELECT COUNT(score) return?",
+        options: [
+          "4 — COUNT(column) ignores NULL values",
+          "5 — COUNT counts all rows including NULL",
+          "NULL — any aggregate on a column with NULLs returns NULL",
+        ],
+        correctIndex: 0,
+        explanation: "COUNT(column_name) counts only non-NULL values — the NULL row is skipped. COUNT(*) would return 5. This matters whenever you compute aggregates on nullable columns or check for data gaps.",
+      },
+    ],
   },
 
   "sql-found-03": {
@@ -5092,11 +5490,66 @@ END AS paid_flag`,
       "Explain COUNT(*), COUNT(1), and COUNT(column) under NULLs.",
       "Choose between raw-table aggregation and pre-grouped subqueries based on cost and grain clarity.",
     ],
-    learnMarkdown: `## Rapid revision: GROUP BY changes the row grain
+    learnMarkdown: `## GROUP BY and aggregation
 
-After GROUP BY, each output row represents a bucket. Non-aggregated selected columns must be part of that bucket definition in standard SQL.
+GROUP BY collapses multiple rows into a single bucket per unique combination of grouping columns. After GROUP BY, each output row represents a *group*, not an individual row. This is called the **grain** of the query.
 
-COUNT(*) and COUNT(1) count rows. COUNT(column) counts non-NULL values in that column. That single difference causes many interview mistakes.`,
+## Non-aggregated columns must be in GROUP BY
+
+\`\`\`sql
+-- This fails: product_name is not in GROUP BY
+SELECT category, product_name, SUM(revenue)
+FROM products
+GROUP BY category;
+-- ERROR: column "product_name" must appear in the GROUP BY clause
+-- or be used in an aggregate function
+
+-- Fix: add it to GROUP BY
+SELECT category, product_name, SUM(revenue)
+FROM products
+GROUP BY category, product_name;
+\`\`\`
+
+The rule exists because within a group, \`product_name\` could have multiple different values. The database has no rule for which one to show, so it raises an error (MySQL with default settings is a famous exception — it picks an arbitrary row, which is worse).
+
+## COUNT(*) vs COUNT(column)
+
+\`\`\`sql
+-- Table: scores(user_id, score)
+-- Data:  (1, 90), (2, NULL), (3, 85), (4, NULL), (5, 70)
+
+SELECT
+  COUNT(*)     AS total_rows,    -- 5: counts all rows
+  COUNT(score) AS non_null_scores -- 3: ignores NULL values
+FROM scores;
+\`\`\`
+
+\`COUNT(*)\` and \`COUNT(1)\` are identical — both count rows including NULLs. \`COUNT(column)\` counts only rows where that column is not NULL. In interviews, always clarify which you mean when counting nullable columns.
+
+## WHERE vs HAVING — the right filter at the right stage
+
+\`\`\`sql
+-- Filter rows BEFORE aggregation → WHERE
+SELECT dept, COUNT(*) AS headcount
+FROM employees
+WHERE status = 'active'           -- applied before grouping
+GROUP BY dept;
+
+-- Filter groups AFTER aggregation → HAVING
+SELECT dept, AVG(salary) AS avg_sal
+FROM employees
+GROUP BY dept
+HAVING AVG(salary) > 75000;       -- applied after grouping
+\`\`\`
+
+Putting a row-level filter in HAVING instead of WHERE is a performance anti-pattern — it groups all rows first, then discards groups. WHERE eliminates rows before grouping, reducing the work.
+
+## Interview muscle memory
+
+- Every non-aggregate SELECT column must be in GROUP BY.
+- \`COUNT(*)\` counts rows; \`COUNT(col)\` counts non-NULLs — different results on nullable columns.
+- Use WHERE for row-level filters (applied before grouping), HAVING for aggregate filters (applied after grouping).
+- Applying a row-level filter in HAVING instead of WHERE is a common interview mistake that signals poor understanding of execution order.`,
     video: null,
     videoFallbackMarkdown: `## Drill
 
@@ -5244,7 +5697,38 @@ COUNT(refund_amount) AS refund_count`,
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "Which columns can legally appear in SELECT without being inside an aggregate function?",
+        options: [
+          "Only columns listed in GROUP BY",
+          "Any column from any table in the FROM clause",
+          "Only columns that contain unique values",
+        ],
+        correctIndex: 0,
+        explanation: "After GROUP BY, each output row represents a group, not an individual row. A column not in GROUP BY could have multiple different values within that group — the database cannot pick one, so it raises an error. Every non-aggregate SELECT column must appear in GROUP BY.",
+      },
+      {
+        question: "What does GROUP BY dept HAVING AVG(salary) > 80000 do?",
+        options: [
+          "Returns only departments whose average salary exceeds 80000",
+          "Filters individual employees earning over 80000 before averaging",
+          "Returns all departments, showing 0 for those below the threshold",
+        ],
+        correctIndex: 0,
+        explanation: "HAVING filters on aggregate results after GROUP BY. It keeps only groups where the computed AVG(salary) > 80000. Using WHERE AVG(salary) > 80000 would fail because aggregates do not exist at the WHERE stage.",
+      },
+      {
+        question: "You GROUP BY user_id and date. What does each output row represent?",
+        options: [
+          "One unique combination of user_id + date — the same user appears multiple times, once per date",
+          "One transaction — GROUP BY does not change the number of rows",
+          "One user — GROUP BY user_id collapses all rows for a user",
+        ],
+        correctIndex: 0,
+        explanation: "Grain equals the combination of columns in your GROUP BY. Grouping by user_id and date means each output row is one user on one day. The same user_id appears multiple times if that user has activity on multiple dates.",
+      },
+    ],
   },
 
   "sql-found-04": {
@@ -5254,11 +5738,78 @@ COUNT(refund_amount) AS refund_count`,
       "Predict join fan-out when the right-hand side is one-to-many.",
       "Choose EXISTS vs INNER JOIN when verifying presence.",
     ],
-    learnMarkdown: `## Rapid revision: joins change row counts
+    learnMarkdown: `## Subqueries and JOIN semantics
 
-A correlated subquery in SELECT may execute conceptually once per outer row. Optimizers can sometimes decorrelate it, but you should not rely on magic when a simple grouped join expresses the intent clearly.
+A subquery is a query nested inside another query. Subqueries can appear in SELECT, FROM, WHERE, and HAVING. Understanding when a subquery runs — and how many times — is one of the most tested SQL concepts in data interviews.
 
-A LEFT JOIN does not guarantee one output row per left row. If the right table has multiple matches, it duplicates the left row.`,
+## Correlated vs non-correlated subqueries
+
+\`\`\`sql
+-- Non-correlated: runs ONCE, result reused for all outer rows
+SELECT order_id, amount
+FROM orders
+WHERE amount > (SELECT AVG(amount) FROM orders);
+
+-- Correlated: re-executes for EVERY outer row (O(n) inner queries)
+SELECT o.order_id, o.amount,
+       (SELECT COUNT(*) FROM order_items i
+        WHERE i.order_id = o.order_id) AS item_count  -- references outer o
+FROM orders o;
+\`\`\`
+
+The correlated subquery above executes once per row in \`orders\`. On a 10M-row table, that is 10M executions of the inner query. Modern optimizers can sometimes decorrelate these automatically, but you should not rely on it — express the intent as a JOIN.
+
+## The JOIN alternative for correlated subqueries
+
+\`\`\`sql
+-- Equivalent to the correlated subquery above, but efficient:
+SELECT o.order_id, o.amount, COUNT(i.item_id) AS item_count
+FROM orders o
+LEFT JOIN order_items i ON i.order_id = o.order_id
+GROUP BY o.order_id, o.amount;
+\`\`\`
+
+A single JOIN + GROUP BY replaces N correlated lookups with one pass through both tables.
+
+## LEFT JOIN row-multiplication trap
+
+LEFT JOIN does **not** guarantee one output row per left table row:
+
+\`\`\`sql
+-- orders: 3 rows (id=1, id=2, id=3)
+-- order_tags: tags for order 1 are ('urgent', 'vip') — two rows
+
+SELECT o.order_id, t.tag
+FROM orders o
+LEFT JOIN order_tags t ON t.order_id = o.order_id;
+
+-- Result: 4 rows (order 1 appears TWICE, once per tag)
+-- If you COUNT(*) after this join, you get the wrong count
+\`\`\`
+
+To avoid accidental row multiplication: know the cardinality of the right-hand table before joining. If you only need to check *existence*, use EXISTS or a deduplicating subquery instead of a JOIN.
+
+## EXISTS vs IN — use EXISTS for nullable subqueries
+
+\`\`\`sql
+-- IN with a nullable column can silently return zero rows (see NULL lesson)
+SELECT * FROM orders WHERE customer_id IN (SELECT id FROM vip_customers);
+
+-- EXISTS is NULL-safe and often more readable for existence checks
+SELECT o.*
+FROM orders o
+WHERE EXISTS (
+  SELECT 1 FROM vip_customers v
+  WHERE v.id = o.customer_id
+);
+\`\`\`
+
+## Interview muscle memory
+
+- Correlated subqueries run once per outer row — replace with JOIN + GROUP BY on large tables.
+- LEFT JOIN can multiply rows if the right table has multiple matches — always check cardinality.
+- Use EXISTS (not IN) when checking membership against a nullable column.
+- A subquery in SELECT that is not correlated runs once and is reused — safe for scalar lookups like \`(SELECT MAX(date) FROM ...)\`.`,
     video: null,
     videoFallbackMarkdown: `## Drill
 
@@ -5402,7 +5953,38 @@ LEFT JOIN user_devices d ON d.user_id = u.user_id;`,
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "What makes a correlated subquery different from a regular subquery?",
+        options: [
+          "A correlated subquery references a column from the outer query and re-executes once per outer row",
+          "A correlated subquery always runs faster because it filters data earlier",
+          "A correlated subquery can only be used in SELECT, not in WHERE",
+        ],
+        correctIndex: 0,
+        explanation: "A correlated subquery references a value from the outer query's current row, causing it to re-execute once per outer row. On large tables this creates O(n) inner queries — a performance trap. The fix is usually to replace the correlated scan with a JOIN.",
+      },
+      {
+        question: "An EXPLAIN plan shows loops=500000 on an inner scan. What does this reveal?",
+        options: [
+          "The inner query executed 500000 times — once for each outer row — a classic N+1 problem",
+          "The query is efficiently cached and re-used 500000 times",
+          "The table has 500000 indexed rows, making lookups fast",
+        ],
+        correctIndex: 0,
+        explanation: "loops=500000 means the inner plan node executed 500000 times — once per outer row. This is the N+1 anti-pattern. The fix is replacing the correlated subquery with a JOIN so the inner table is accessed once rather than once per outer row.",
+      },
+      {
+        question: "When is a subquery generally preferred over a JOIN?",
+        options: [
+          "When you only need to check existence or set membership and do not need columns from the inner table",
+          "Subqueries are always faster than JOINs on large tables",
+          "When the subquery references the same table as the outer query",
+        ],
+        correctIndex: 0,
+        explanation: "EXISTS and IN subqueries are natural for set membership tests — give me orders that have at least one return does not need columns from the returns table. JOINs are better when you need data from both tables. Forcing a JOIN where EXISTS would do often produces harder-to-read code.",
+      },
+    ],
   },
 
   "ml-f2": {
@@ -5511,7 +6093,56 @@ Without PARTITION BY the function ranks across the entire result set. Add \`PART
 
 ## Interview mental model
 
-Ask: "Do I need unique row IDs (ROW_NUMBER), honest gap-showing rank (RANK), or consecutive tier labels (DENSE_RANK)?" Then ask: "Does rank need to reset per group?" If yes, add PARTITION BY.`,
+Ask: "Do I need unique row IDs (ROW_NUMBER), honest gap-showing rank (RANK), or consecutive tier labels (DENSE_RANK)?" Then ask: "Does rank need to reset per group?" If yes, add PARTITION BY.
+
+## Worked example — tie behavior side by side
+
+\`\`\`sql
+-- Scores: Alice=95, Bob=95, Carol=87, Dave=80
+SELECT
+  name,
+  score,
+  ROW_NUMBER() OVER (ORDER BY score DESC) AS row_num,
+  RANK()       OVER (ORDER BY score DESC) AS rank,
+  DENSE_RANK() OVER (ORDER BY score DESC) AS dense_rank
+FROM scores;
+
+-- name   score  row_num  rank  dense_rank
+-- Alice    95      1       1       1
+-- Bob      95      2       1       1      ← same rank as Alice
+-- Carol    87      3       3       2      ← RANK skips 2; DENSE_RANK does not
+-- Dave     80      4       4       3
+\`\`\`
+
+## The deduplication pattern — ROW_NUMBER is the right tool
+
+\`\`\`sql
+-- Keep only the most recent order per customer
+WITH ranked AS (
+  SELECT
+    *,
+    ROW_NUMBER() OVER (
+      PARTITION BY customer_id
+      ORDER BY created_at DESC, order_id DESC  -- tie-break by order_id
+    ) AS rn
+  FROM orders
+)
+SELECT * FROM ranked WHERE rn = 1;
+\`\`\`
+
+Use \`ROW_NUMBER\` here, not \`RANK\` or \`DENSE_RANK\` — if two orders share the same \`created_at\`, RANK would return both with rn=1, giving you duplicate customers.
+
+## PARTITION BY resets the counter per group
+
+\`\`\`sql
+-- Without PARTITION BY: ranked 1→N across all rows globally
+ROW_NUMBER() OVER (ORDER BY score DESC)
+
+-- With PARTITION BY: restarts at 1 for each department
+ROW_NUMBER() OVER (PARTITION BY dept ORDER BY score DESC)
+\`\`\`
+
+**Interview muscle memory:** always confirm whether rank should be global or per-group before writing the window function.`,
     video: null,
     videoFallbackMarkdown: `## 3-minute ranking drill
 
@@ -5702,7 +6333,38 @@ FROM employees;
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "Four rows are tied for rank 1. ROW_NUMBER gives 1,2,3,4. RANK gives all four rank 1. What does DENSE_RANK give?",
+        options: [
+          "All four get 1, and the next distinct row gets rank 2 — no gaps",
+          "All four get 1, and the next distinct row gets rank 5 — like RANK",
+          "Each tied row gets NULL since the rank is ambiguous",
+        ],
+        correctIndex: 0,
+        explanation: "DENSE_RANK gives tied rows the same rank and continues with the next consecutive integer — no gaps. RANK also groups ties but skips subsequent ranks to account for them. ROW_NUMBER always assigns unique integers regardless of ties.",
+      },
+      {
+        question: "You want exactly one row per customer — the most recent order, breaking ties by order_id. Which window function is correct?",
+        options: [
+          "ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY created_at DESC, order_id DESC)",
+          "RANK() OVER (PARTITION BY customer_id ORDER BY created_at DESC)",
+          "DENSE_RANK() OVER (PARTITION BY customer_id ORDER BY created_at DESC)",
+        ],
+        correctIndex: 0,
+        explanation: "For deduplication you need exactly one row per group. ROW_NUMBER always produces unique integers, so WHERE rn = 1 guarantees one row. RANK and DENSE_RANK can return multiple rows with rank 1 when timestamps tie.",
+      },
+      {
+        question: "What does PARTITION BY do in a window function?",
+        options: [
+          "Divides rows into independent groups so the function resets and runs separately within each group",
+          "Sorts rows within the window — equivalent to ORDER BY",
+          "Limits the window to a fixed number of rows around the current row",
+        ],
+        correctIndex: 0,
+        explanation: "PARTITION BY is like GROUP BY but without collapsing rows. It divides the result set into partitions and the window function computes independently within each partition. Without PARTITION BY the function runs over the entire result set as one partition.",
+      },
+    ],
   },
 
   "sq-a2": {
@@ -5733,7 +6395,68 @@ LAG(revenue, 1) OVER (PARTITION BY region ORDER BY sale_date)
 
 ## Interview trap: early rows in a moving average
 
-When fewer than N rows precede the current row, the engine uses whatever rows exist. Row 1 averages over only itself. Explicitly handle or document this boundary behavior in your answer.`,
+When fewer than N rows precede the current row, the engine uses whatever rows exist. Row 1 averages over only itself. Explicitly handle or document this boundary behavior in your answer.
+
+## Worked example — LAG for month-over-month change
+
+\`\`\`sql
+SELECT
+  product_id,
+  sale_month,
+  revenue,
+  LAG(revenue, 1) OVER (
+    PARTITION BY product_id
+    ORDER BY sale_month
+  ) AS prev_month_revenue,
+  revenue - LAG(revenue, 1) OVER (
+    PARTITION BY product_id
+    ORDER BY sale_month
+  ) AS mom_change,
+  ROUND(
+    100.0 * (revenue - LAG(revenue, 1) OVER (PARTITION BY product_id ORDER BY sale_month))
+    / NULLIF(LAG(revenue, 1) OVER (PARTITION BY product_id ORDER BY sale_month), 0),
+    1
+  ) AS mom_pct_change
+FROM monthly_sales
+ORDER BY product_id, sale_month;
+\`\`\`
+
+Note: \`NULLIF(..., 0)\` prevents division by zero when the previous month had zero revenue.
+
+## Running total vs window aggregate — the frame default trap
+
+\`\`\`sql
+-- SUM without ORDER BY → grand total repeated on every row (entire partition as frame)
+SUM(revenue) OVER (PARTITION BY region)
+
+-- SUM with ORDER BY → running total (default frame: RANGE UNBOUNDED PRECEDING AND CURRENT ROW)
+SUM(revenue) OVER (PARTITION BY region ORDER BY sale_date)
+
+-- Explicit ROWS frame → avoids RANGE semantics surprises with duplicate dates
+SUM(revenue) OVER (
+  PARTITION BY region
+  ORDER BY sale_date
+  ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+)
+\`\`\`
+
+\`ROWS\` counts physical rows; \`RANGE\` groups rows with identical ORDER BY values into the same frame boundary. Use \`ROWS\` when dates or values can repeat and you want exact running totals.
+
+## LEAD for next-event lookahead
+
+\`\`\`sql
+-- Flag orders that will be followed by a return within 30 days
+SELECT
+  order_id,
+  customer_id,
+  order_date,
+  LEAD(order_date) OVER (PARTITION BY customer_id ORDER BY order_date) AS next_order_date,
+  CASE
+    WHEN LEAD(event_type) OVER (PARTITION BY customer_id ORDER BY order_date) = 'return'
+    THEN 1 ELSE 0
+  END AS followed_by_return
+FROM customer_events;
+\`\`\``,
     video: null,
     videoFallbackMarkdown: `## Quick frame drill
 
@@ -5919,7 +6642,38 @@ FROM daily_sales;`,
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "What does LAG(revenue, 1) OVER (PARTITION BY product ORDER BY month) return for each row?",
+        options: [
+          "The previous month's revenue for the same product",
+          "The next month's revenue for the same product",
+          "The difference between current and previous month revenue",
+        ],
+        correctIndex: 0,
+        explanation: "LAG looks backward: LAG(col, 1) returns the value from 1 row behind in the ORDER BY sequence. LEAD looks forward. LAG(revenue, 1) ORDER BY month gives last month's revenue, which you subtract from the current row to compute month-over-month change.",
+      },
+      {
+        question: "A window uses ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW. What does it calculate?",
+        options: [
+          "An aggregate from the first row of the partition up to the current row — a running cumulative total",
+          "An aggregate from the current row to the last row in the partition",
+          "Only the value of the current row — the frame contains a single row",
+        ],
+        correctIndex: 0,
+        explanation: "UNBOUNDED PRECEDING means start from the very first row of the partition. Combined with CURRENT ROW as the upper bound, the frame grows with each row. SUM() with this frame gives a running total — the canonical cumulative aggregate pattern.",
+      },
+      {
+        question: "You write SUM(sales) OVER (PARTITION BY region) with no ORDER BY. What does each row show?",
+        options: [
+          "The total sales for the entire region, repeated on every row in that region",
+          "A running total up to the current row within the region",
+          "An error — ORDER BY is required for all window functions",
+        ],
+        correctIndex: 0,
+        explanation: "Without ORDER BY, the default frame covers the entire partition — every row in the region. Every row gets the same value: the grand total for that region. Adding ORDER BY changes the default frame to RANGE UNBOUNDED PRECEDING AND CURRENT ROW, producing a running total instead.",
+      },
+    ],
   },
 
   "sq-a3": {
@@ -5953,7 +6707,67 @@ Common bugs: forgetting \`RECURSIVE\` keyword, missing base case, or a recursive
 
 ## Mental model
 
-A recursive CTE is like a loop: anchor runs once, recursive step runs until empty. If the recursive step can always find new rows, the engine hits a depth limit and errors.`,
+A recursive CTE is like a loop: anchor runs once, recursive step runs until empty. If the recursive step can always find new rows, the engine hits a depth limit and errors.
+
+## When CTEs actually help performance
+
+\`\`\`sql
+-- This CTE is referenced TWICE — the optimizer may materialize it (run once)
+WITH expensive_cohort AS (
+  SELECT customer_id, DATE_TRUNC('month', first_purchase) AS cohort_month
+  FROM customers
+  WHERE lifetime_value > 1000
+)
+SELECT c.cohort_month, COUNT(*) AS new_users
+FROM expensive_cohort c
+GROUP BY c.cohort_month
+
+UNION ALL
+
+SELECT c.cohort_month, AVG(o.amount) AS avg_order
+FROM expensive_cohort c
+JOIN orders o ON o.customer_id = c.customer_id
+GROUP BY c.cohort_month;
+
+-- Force materialization in PostgreSQL 12+ when you know it is expensive:
+WITH expensive_cohort AS MATERIALIZED ( ... )
+\`\`\`
+
+Without \`MATERIALIZED\`, PostgreSQL may inline and re-run the CTE twice. Use \`AS MATERIALIZED\` only when the subquery is genuinely expensive and you confirm it is referenced multiple times.
+
+## Chaining CTEs for readable multi-step pipelines
+
+\`\`\`sql
+-- Each CTE builds on the previous — far more readable than nested subqueries
+WITH
+daily_revenue AS (
+  SELECT DATE_TRUNC('day', created_at) AS day, SUM(amount) AS revenue
+  FROM orders WHERE status = 'completed'
+  GROUP BY 1
+),
+with_running_total AS (
+  SELECT day, revenue,
+    SUM(revenue) OVER (ORDER BY day) AS cumulative_revenue
+  FROM daily_revenue
+),
+with_target AS (
+  SELECT *, 0.8 * MAX(cumulative_revenue) OVER () AS target_80pct
+  FROM with_running_total
+)
+SELECT day, revenue, cumulative_revenue,
+  CASE WHEN cumulative_revenue >= target_80pct THEN 'above 80%' ELSE 'below' END AS vs_target
+FROM with_target
+ORDER BY day;
+\`\`\`
+
+## CTE vs subquery — when to use which
+
+| Use case | Prefer |
+|---|---|
+| Intermediate result referenced once | Subquery — simpler |
+| Intermediate result referenced 2+ times | CTE — avoids duplication |
+| Hierarchy / graph traversal | Recursive CTE — subqueries can't recurse |
+| Debugging step-by-step | CTE — each step is named and testable |`,
     video: null,
     videoFallbackMarkdown: `## Quick CTE drill
 
@@ -6162,7 +6976,38 @@ SELECT * FROM org;`,
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "What is the main readability advantage of a CTE over a deeply nested subquery?",
+        options: [
+          "A CTE is defined once at the top with a name, making complex multi-step logic easier to follow",
+          "CTEs always execute faster because the optimizer materializes them separately",
+          "CTEs are stored permanently in the database so subsequent queries can reuse them",
+        ],
+        correctIndex: 0,
+        explanation: "CTEs let you name an intermediate result and reference it by name instead of nesting query inside query. Whether a CTE performs better depends on the optimizer — it may inline the CTE making it identical to a subquery. Readability is the reliable win.",
+      },
+      {
+        question: "When would you choose a CTE over a subquery for performance reasons?",
+        options: [
+          "When you need to reference the same intermediate result more than once in the same query",
+          "Always — CTEs are optimized better by every major database engine",
+          "When the subquery contains a JOIN to a large table",
+        ],
+        correctIndex: 0,
+        explanation: "If a subquery would be repeated in two places, a CTE defines it once and the optimizer may materialize it — avoiding double computation. If referenced only once, the optimizer typically inlines the CTE making it identical to a subquery. Reuse is the main performance argument.",
+      },
+      {
+        question: "What makes a recursive CTE different from a regular CTE?",
+        options: [
+          "A recursive CTE references itself — each iteration's output feeds into the next, enabling hierarchy traversal",
+          "Recursive CTEs use indexes automatically, making them faster than regular CTEs",
+          "Recursive CTEs can reference tables from other databases in the same query",
+        ],
+        correctIndex: 0,
+        explanation: "A recursive CTE has two parts: an anchor member (starting rows) and a recursive member that joins the CTE back to itself. Each iteration expands the result until no rows qualify. Classic use cases: org hierarchies, bill-of-materials, graph path traversal.",
+      },
+    ],
   },
 
   "sq-a4": {
@@ -6202,7 +7047,51 @@ PIVOT (SUM(revenue) FOR product IN ([Widget], [Gadget])) AS pvt;
 
 - Default to CASE-based aggregation in cross-dialect interviews.
 - Both PIVOT and CASE require static column lists — dynamic value sets need dynamic SQL or a BI layer.
-- UNPIVOT (or UNION ALL with literals) reverses the operation: wide table back to narrow.`,
+- UNPIVOT (or UNION ALL with literals) reverses the operation: wide table back to narrow.
+
+## COALESCE to clean up NULL pivot cells
+
+\`\`\`sql
+-- Without COALESCE: months with no Gadget sales show NULL, not 0
+SELECT
+  month,
+  SUM(CASE WHEN product = 'Widget' THEN revenue END)          AS widget_rev,
+  SUM(CASE WHEN product = 'Gadget' THEN revenue END)          AS gadget_rev
+FROM sales GROUP BY month;
+
+-- With COALESCE: clean 0 instead of NULL (safer for downstream SUM or display)
+SELECT
+  month,
+  COALESCE(SUM(CASE WHEN product = 'Widget' THEN revenue END), 0) AS widget_rev,
+  COALESCE(SUM(CASE WHEN product = 'Gadget' THEN revenue END), 0) AS gadget_rev
+FROM sales GROUP BY month;
+\`\`\`
+
+## UNPIVOT — wide to long
+
+\`\`\`sql
+-- Wide table: (month, widget_rev, gadget_rev) → long: (month, product, revenue)
+-- Portable UNION ALL approach:
+SELECT month, 'Widget' AS product, widget_rev AS revenue FROM monthly_pivot
+UNION ALL
+SELECT month, 'Gadget' AS product, gadget_rev AS revenue FROM monthly_pivot
+ORDER BY month, product;
+\`\`\`
+
+## Real-world use case — attendance matrix
+
+\`\`\`sql
+-- Turn event log (user_id, event_date, attended) into a user × day matrix
+SELECT
+  user_id,
+  MAX(CASE WHEN event_date = '2024-01-01' THEN attended END) AS day_1,
+  MAX(CASE WHEN event_date = '2024-01-02' THEN attended END) AS day_2,
+  MAX(CASE WHEN event_date = '2024-01-03' THEN attended END) AS day_3
+FROM attendance
+GROUP BY user_id;
+\`\`\`
+
+Using \`MAX\` instead of \`SUM\` when the value is a flag (0/1) avoids summing multiple entries per cell if there are duplicates in the source data.`,
     video: null,
     videoFallbackMarkdown: `## 3-minute pivot drill
 
@@ -6372,7 +7261,38 @@ SELECT DISTINCT product FROM sales;
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "What does SUM(CASE WHEN category = 'Food' THEN amount ELSE 0 END) compute?",
+        options: [
+          "The total amount for Food rows, treating all other categories as 0",
+          "The count of rows in the Food category",
+          "The maximum amount found in the Food category",
+        ],
+        correctIndex: 0,
+        explanation: "CASE WHEN returns the amount only when the category matches — all other rows contribute 0. SUM adds those up, effectively isolating the Food total. This is the portable PIVOT pattern: one SUM(CASE WHEN) expression per output column you want to produce.",
+      },
+      {
+        question: "You have categories Food, Travel, and Tech. How many SUM(CASE WHEN) expressions are needed to pivot into one column per category?",
+        options: [
+          "3 — one expression per output column",
+          "1 — a single expression can generate all columns dynamically",
+          "It depends on the number of rows in the table",
+        ],
+        correctIndex: 0,
+        explanation: "Each target column requires its own SUM(CASE WHEN category = 'X' THEN amount END). With 3 categories you need 3 expressions. This is why dynamic pivoting is preferable when the set of categories is unknown at query-write time.",
+      },
+      {
+        question: "What does CASE WHEN x = 1 THEN 'yes' END return when x is not 1 and ELSE is omitted?",
+        options: [
+          "NULL — an omitted ELSE is equivalent to ELSE NULL",
+          "An empty string",
+          "A runtime error — ELSE is required in CASE expressions",
+        ],
+        correctIndex: 0,
+        explanation: "An omitted ELSE is equivalent to ELSE NULL. For SUM(CASE WHEN ... THEN amount END) this means non-matching rows return NULL — and SUM ignores NULLs — so the aggregate behaves the same as ELSE 0. Writing ELSE 0 explicitly is clearer intent.",
+      },
+    ],
   },
 
   "sq-a5": {
@@ -6402,7 +7322,65 @@ EXPLAIN SELECT * FROM orders WHERE customer_id = 'C42';
 
 - Always check EXPLAIN before assuming a query is slow.
 - Composite indexes work left-to-right: \`(customer_id, created_at)\` supports predicates on \`customer_id\` alone or on both columns, but NOT on \`created_at\` alone.
-- High estimated rows under a Seq Scan node = primary optimization target.`,
+- High estimated rows under a Seq Scan node = primary optimization target.
+
+## Reading a real EXPLAIN ANALYZE output
+
+\`\`\`sql
+EXPLAIN ANALYZE
+SELECT o.order_id, c.name
+FROM orders o
+JOIN customers c ON c.id = o.customer_id
+WHERE o.created_at > '2024-01-01';
+
+-- Sample output:
+-- Hash Join  (cost=1842.00..4201.00 rows=85000)
+--            (actual time=45.3..198.4 rows=82341 loops=1)
+--   Hash Cond: (o.customer_id = c.id)
+--   ->  Seq Scan on orders  (cost=0..3800 rows=180000)
+--                           (actual time=0.1..87.2 rows=182000 loops=1)
+--         Filter: (created_at > '2024-01-01')
+--         Rows Removed by Filter: 318000
+--   ->  Hash  (cost=980..980 rows=50000)
+--       ->  Seq Scan on customers  (cost=0..980 rows=50000)
+\`\`\`
+
+Reading this output:
+- **Seq Scan on orders** scans 500K rows to return 182K after the date filter — 318K rows discarded. An index on \`created_at\` would let the engine skip the full scan.
+- **loops=1** means this node ran once — normal. If loops > 1 on an inner node, you have an N+1 problem.
+- **actual vs estimated rows**: 82341 actual vs 85000 estimated — close. Large mismatches indicate stale statistics; run \`ANALYZE orders\`.
+
+## The composite index leftmost-prefix rule
+
+\`\`\`sql
+-- Index: CREATE INDEX idx ON orders(status, customer_id, created_at);
+
+-- Uses index (status is the leftmost column)
+WHERE status = 'completed'
+
+-- Uses index (leftmost + second column)
+WHERE status = 'completed' AND customer_id = 42
+
+-- Uses index fully
+WHERE status = 'completed' AND customer_id = 42 AND created_at > '2024-01-01'
+
+-- Does NOT use the index (skips the leftmost column)
+WHERE customer_id = 42
+
+-- Does NOT use the index (skips to the third column)
+WHERE created_at > '2024-01-01'
+\`\`\`
+
+Design composite indexes with equality columns first, then range columns last. The planner can use any leftmost prefix but stops at the first missing column.
+
+## Interview checklist when asked to optimize a slow query
+
+1. Run \`EXPLAIN ANALYZE\` — never guess without data
+2. Find the most expensive node (highest actual time or rows)
+3. Seq Scan on a large table → check if an index on the filter column would help
+4. \`loops > 1\` on an inner node → N+1 / correlated subquery; replace with a JOIN
+5. Rows estimated ≠ actual rows by 10×+ → run \`ANALYZE table\` to refresh statistics
+6. Re-run \`EXPLAIN ANALYZE\` after the fix to confirm the plan changed`,
     video: null,
     videoFallbackMarkdown: `## 3-minute plan drill
 
@@ -6578,7 +7556,38 @@ GROUP BY customer_id;`,
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "An EXPLAIN plan shows Seq Scan on orders (rows=500000). What does this mean?",
+        options: [
+          "The database is reading every row in the table — no index is being used",
+          "The query is using an index and efficiently scanning 500000 matching rows",
+          "The result set contains 500000 duplicate rows that need deduplication",
+        ],
+        correctIndex: 0,
+        explanation: "Seq Scan means a sequential full-table scan — the engine reads every page of the table. It appears when no suitable index exists for the WHERE predicate, or when the planner decides scanning the whole table is cheaper than random index lookups (e.g., when returning more than roughly 15% of rows).",
+      },
+      {
+        question: "An EXPLAIN plan shows Hash Join between two large tables. What typically triggers Hash Join over Nested Loop?",
+        options: [
+          "Both tables are large and an equi-join condition exists — Hash Join builds a hash table from the smaller side",
+          "One table has no indexes, so nested loops cannot proceed",
+          "The query has an ORDER BY referencing both tables",
+        ],
+        correctIndex: 0,
+        explanation: "The planner chooses Hash Join when both inputs are large. It builds an in-memory hash table from the smaller relation then probes it with the larger. Nested Loop is preferred when the outer set is small and the inner side has an index — the index lookup cost beats building a hash table.",
+      },
+      {
+        question: "EXPLAIN shows (actual rows=1 loops=500000) on an inner scan inside a Nested Loop. What does this reveal?",
+        options: [
+          "The inner query executed 500000 times — once per outer row — a classic N+1 problem",
+          "The query is efficiently cached across 500000 executions",
+          "The join produced 500000 matching pairs, which is expected for a many-to-many join",
+        ],
+        correctIndex: 0,
+        explanation: "loops=500000 means the inner plan node executed 500000 times — once per outer row. This is the N+1 anti-pattern from a correlated subquery or a Nested Loop with no index on the inner table. The fix is replacing the correlated scan with a JOIN so the inner table is accessed once.",
+      },
+    ],
   },
 
   "sq-d1": {
@@ -6612,7 +7621,71 @@ FIX: Move dept_head to a Departments table keyed by dept
 
 - Name the dependency, name the fix, name the table it moves to.
 - BCNF is stricter: every determinant must be a candidate key. Mention it if the interviewer pushes.
-- Normalization reduces write anomalies; star-schema denormalization improves analytics read speed. Both are valid — state the workload that drives the choice.`,
+- Normalization reduces write anomalies; star-schema denormalization improves analytics read speed. Both are valid — state the workload that drives the choice.
+
+## Worked example — normalize an orders table
+
+\`\`\`sql
+-- Unnormalized (violates 2NF and 3NF)
+CREATE TABLE orders_bad (
+  order_id      INT,
+  product_id    INT,
+  customer_name TEXT,   -- depends only on order_id (partial dep → 2NF violation)
+  product_name  TEXT,   -- depends only on product_id (partial dep → 2NF violation)
+  category_name TEXT,   -- depends on product_id → category_id → name (transitive → 3NF violation)
+  quantity      INT,
+  unit_price    NUMERIC
+);
+
+-- After normalization to 3NF
+CREATE TABLE customers (
+  customer_id   SERIAL PRIMARY KEY,
+  name          TEXT NOT NULL
+);
+
+CREATE TABLE categories (
+  category_id   SERIAL PRIMARY KEY,
+  name          TEXT NOT NULL
+);
+
+CREATE TABLE products (
+  product_id    SERIAL PRIMARY KEY,
+  name          TEXT NOT NULL,
+  unit_price    NUMERIC,
+  category_id   INT REFERENCES categories(category_id)
+);
+
+CREATE TABLE orders (
+  order_id      SERIAL PRIMARY KEY,
+  customer_id   INT REFERENCES customers(customer_id),
+  order_date    DATE
+);
+
+CREATE TABLE order_items (
+  order_item_id SERIAL PRIMARY KEY,
+  order_id      INT REFERENCES orders(order_id),
+  product_id    INT REFERENCES products(product_id),
+  quantity      INT,
+  unit_price    NUMERIC  -- snapshot at time of purchase
+);
+\`\`\`
+
+## Update anomaly — why normalization matters
+
+Without normalization, changing a product's name requires updating every row in \`orders_bad\` that references it. One missed row creates inconsistent data. With normalization, you update one row in \`products\` and every order automatically reflects the change.
+
+## BCNF — when 3NF is not enough
+
+A table is in **Boyce-Codd Normal Form** if every determinant is a candidate key. 3NF allows non-key determinants if the determined column is part of a candidate key — BCNF does not.
+
+\`\`\`sql
+-- Example: course_bookings(student, course, teacher)
+-- A teacher teaches only one course, so: teacher → course
+-- But teacher is not a key — this violates BCNF
+-- Fix: split into teachers(teacher, course) + bookings(student, teacher)
+\`\`\`
+
+BCNF violations are rare in practice but appear in advanced interviews. If asked, state: "3NF is usually sufficient for OLTP systems; BCNF resolves edge cases where a non-key column determines part of a candidate key."`,
     video: null,
     videoFallbackMarkdown: `## 3-minute normalization drill
 
@@ -6788,7 +7861,38 @@ Given table: Enrollment(student_id, course_id, student_name, instructor_id, inst
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "A table stores multiple phone numbers in one column as a comma-separated string. Which normal form does this violate?",
+        options: [
+          "1NF — values must be atomic and there must be no repeating groups within a cell",
+          "2NF — this creates a partial functional dependency on the primary key",
+          "3NF — phone numbers are transitively dependent on the user address",
+        ],
+        correctIndex: 0,
+        explanation: "1NF requires every column to hold atomic values and no repeating groups. Storing phone1,phone2,phone3 in a single cell violates atomicity. The fix is a separate PhoneNumbers table with a foreign key back to the parent entity.",
+      },
+      {
+        question: "An Orders table has (order_id, product_id, customer_name, product_name) where customer_name depends only on order_id and product_name only on product_id. Which normal form is violated?",
+        options: [
+          "2NF — non-key attributes depend on only part of the composite primary key",
+          "1NF — multiple names are stored in the same column",
+          "3NF — there is a transitive dependency between customer_name and product_name",
+        ],
+        correctIndex: 0,
+        explanation: "2NF requires every non-key attribute to depend on the whole primary key. Here the key is (order_id, product_id), but customer_name depends only on order_id and product_name only on product_id — both are partial dependencies. Fix: separate Customers and Products tables.",
+      },
+      {
+        question: "A table has (employee_id, department_id, department_location) where department_id determines department_location. Which normal form is violated?",
+        options: [
+          "3NF — department_location depends on a non-key attribute, creating a transitive dependency",
+          "2NF — department_location is only partially dependent on employee_id",
+          "1NF — department_location should be stored as an array",
+        ],
+        correctIndex: 0,
+        explanation: "3NF requires non-key attributes to depend only on the primary key. Here employee_id determines department_id which determines department_location — a transitive dependency. Fix: move department_location to a separate Departments table keyed on department_id.",
+      },
+    ],
   },
 
   "sq-d2": {
@@ -6826,7 +7930,65 @@ An index on multiple columns in a defined order: \`(email, created_at)\`.
 
 ## Interview muscle memory
 
-Always ask: what is the query shape? What is the cardinality? What is the write frequency?`,
+Always ask: what is the query shape? What is the cardinality? What is the write frequency?
+
+## Worked example — designing indexes for a dashboard
+
+\`\`\`sql
+-- Table: events(user_id, event_type, created_at, country, device)
+
+-- Query A: filter by event_type + date range (most common query)
+CREATE INDEX idx_events_type_time ON events(event_type, created_at);
+-- event_type first (equality), created_at second (range) — composite prefix rule
+
+-- Query B: filter by user_id + date range, sort by created_at
+CREATE INDEX idx_events_user_time ON events(user_id, created_at DESC);
+-- Covering the ORDER BY in the index avoids a separate sort step
+
+-- Query C: recent rows only — partial index keeps it small
+CREATE INDEX idx_events_recent ON events(created_at, event_type)
+WHERE created_at >= NOW() - INTERVAL '90 days';
+-- Partial index only on recent data — ~10% the size of a full index
+\`\`\`
+
+## Function-based indexes
+
+\`\`\`sql
+-- This query cannot use a standard index on email:
+SELECT * FROM users WHERE LOWER(email) = 'foo@bar.com';
+
+-- Fix: index the expression itself
+CREATE INDEX idx_users_email_lower ON users(LOWER(email));
+
+-- Now this works:
+SELECT * FROM users WHERE LOWER(email) = 'foo@bar.com';
+-- Also: store emails normalized to lowercase at insert time to avoid the issue entirely
+\`\`\`
+
+## Covering indexes — eliminate heap fetches
+
+\`\`\`sql
+-- Without covering index: Index Scan → fetch each row from the heap (table)
+SELECT user_id, created_at FROM events WHERE event_type = 'purchase';
+
+-- With covering index (INCLUDE adds columns without affecting sort order):
+CREATE INDEX idx_events_type_cover
+  ON events(event_type)
+  INCLUDE (user_id, created_at);
+-- Now the query is satisfied entirely from the index — Index Only Scan, no heap fetch
+\`\`\`
+
+## Index maintenance cost — the write trade-off
+
+Every INSERT/UPDATE/DELETE must update all indexes on the table. A table with 8 indexes pays 8× the index-maintenance overhead on every write. On high-write tables (>10K writes/sec), audit your indexes regularly with:
+
+\`\`\`sql
+-- PostgreSQL: find indexes that are never used
+SELECT schemaname, tablename, indexname, idx_scan
+FROM pg_stat_user_indexes
+WHERE idx_scan = 0 AND indexname NOT LIKE '%pkey%'
+ORDER BY tablename;
+\`\`\``,
     video: null,
     videoFallbackMarkdown: `## 3-minute indexing drill
 
@@ -7016,7 +8178,38 @@ LIMIT 20;`,
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "A query filters on WHERE UPPER(email) = 'FOO@BAR.COM' but an index exists on the raw email column. Will the index be used?",
+        options: [
+          "No — wrapping a column in a function prevents the database from using a standard index on that column",
+          "Yes — the database automatically applies the index to the function output",
+          "Only if the index is a composite index that includes the UPPER expression",
+        ],
+        correctIndex: 0,
+        explanation: "Indexes are built on stored column values. UPPER(email) produces a derived value the index does not know about — the engine must scan every row and apply the function. Fix: store email in normalized lowercase, or create a function-based index on UPPER(email).",
+      },
+      {
+        question: "You have a composite index on (country, city, zip). Which query makes full use of this index?",
+        options: [
+          "WHERE country = 'UK' AND city = 'London' — uses the leftmost prefix",
+          "WHERE city = 'London' — skips the leading column so cannot use the index",
+          "WHERE zip = '10001' — rightmost column only, cannot use the index",
+        ],
+        correctIndex: 0,
+        explanation: "Composite indexes work on a leftmost-prefix basis. A query must start from the leftmost column and cannot skip columns. WHERE country AND city uses two columns efficiently. WHERE zip alone cannot use the index because it bypasses country and city.",
+      },
+      {
+        question: "You add an index to a 50M-row table but the slow query shows no improvement. Which scenario explains this?",
+        options: [
+          "The query returns roughly 40% of all rows — at that selectivity a full scan is cheaper than random index lookups",
+          "The table is too large for indexes to be effective",
+          "Indexes require a manual rebuild before they take effect on existing rows",
+        ],
+        correctIndex: 0,
+        explanation: "Indexes are most effective at high selectivity — returning a tiny fraction of rows. When a query returns 10-20% or more of the table, the random I/O cost of following index pointers row-by-row exceeds the cost of a sequential scan. The planner ignores the index in this case.",
+      },
+    ],
   },
 
   "sq-d3": {
@@ -7056,7 +8249,68 @@ Use Snowflake when: dimension attributes change frequently (category renaming) o
 
 - **Type 1**: Overwrite — no history, just current value
 - **Type 2**: New row with effective/expiry date — full history preserved
-- **Type 3**: Add a previous-value column — one step of history`,
+- **Type 3**: Add a previous-value column — one step of history
+
+## Worked schema comparison
+
+\`\`\`sql
+-- STAR SCHEMA: dim_product is denormalized
+CREATE TABLE dim_product (
+  product_key   INT PRIMARY KEY,
+  sku           TEXT,
+  product_name  TEXT,
+  category      TEXT,    -- stored directly — no JOIN to a category table
+  subcategory   TEXT,
+  brand         TEXT
+);
+
+-- SNOWFLAKE SCHEMA: dim_product normalizes category
+CREATE TABLE dim_category (
+  category_key  INT PRIMARY KEY,
+  category      TEXT,
+  subcategory   TEXT
+);
+CREATE TABLE dim_product_sf (
+  product_key   INT PRIMARY KEY,
+  sku           TEXT,
+  product_name  TEXT,
+  brand         TEXT,
+  category_key  INT REFERENCES dim_category(category_key)  -- extra JOIN required
+);
+\`\`\`
+
+A "total sales by category" query on the star schema: \`JOIN fact_sales → dim_product\` (1 JOIN). On the snowflake schema: \`JOIN fact_sales → dim_product_sf → dim_category\` (2 JOINs). At 10 billion fact rows this difference compounds.
+
+## SCD Type 2 — full history in practice
+
+\`\`\`sql
+-- SCD Type 2: dim_customer tracks every address change
+CREATE TABLE dim_customer (
+  customer_key  SERIAL PRIMARY KEY,  -- surrogate key
+  customer_id   INT,                 -- natural key (same across versions)
+  name          TEXT,
+  city          TEXT,
+  effective_date DATE NOT NULL,
+  expiry_date    DATE,               -- NULL = current record
+  is_current     BOOLEAN DEFAULT TRUE
+);
+
+-- When a customer moves, insert a new row (don't update the old one):
+UPDATE dim_customer SET is_current = FALSE, expiry_date = CURRENT_DATE
+WHERE customer_id = 42 AND is_current = TRUE;
+
+INSERT INTO dim_customer(customer_id, name, city, effective_date, is_current)
+VALUES (42, 'Alice', 'London', CURRENT_DATE, TRUE);
+
+-- Query: what city was Alice in when she made her 2023-06 orders?
+SELECT o.*, c.city
+FROM fact_orders o
+JOIN dim_customer c
+  ON c.customer_id = o.customer_id
+  AND o.order_date BETWEEN c.effective_date AND COALESCE(c.expiry_date, '9999-12-31');
+\`\`\`
+
+SCD Type 2 is the most common type in real data warehouses. Type 1 (overwrite) is simpler but destroys history — avoid it for any attribute that might be queried historically.`,
     video: null,
     videoFallbackMarkdown: `## 3-minute schema drill
 
@@ -7243,7 +8497,38 @@ GROUP BY c.category_name;`,
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "In a star schema, dimension tables connect directly to which table?",
+        options: [
+          "The central fact table — each dimension has a foreign key pointing to the fact table",
+          "Each other, forming a ring around the fact table",
+          "A central aggregation layer that pre-computes summaries",
+        ],
+        correctIndex: 0,
+        explanation: "In a star schema the fact table holds foreign keys to every dimension table directly. Dimensions are denormalized — they do not connect to each other. This simpler structure minimizes JOINs in analytical queries at the cost of some data redundancy in the dimension tables.",
+      },
+      {
+        question: "A snowflake schema normalizes its dimension tables. What is the main trade-off vs a star schema?",
+        options: [
+          "Snowflake uses less storage but queries require more JOINs to traverse normalized dimension hierarchies",
+          "Snowflake uses more storage but queries are faster due to smaller dimension tables",
+          "Snowflake only works with columnar databases — star schemas work everywhere",
+        ],
+        correctIndex: 0,
+        explanation: "Normalization reduces redundancy and storage. But traversing a region to country to customer hierarchy in a snowflake requires multiple JOINs where a star schema needs one. In OLAP workloads on billions of fact rows, the extra JOIN overhead compounds significantly.",
+      },
+      {
+        question: "Your fact table has 10 billion rows. A query computes total sales by product category. Which schema makes this fastest?",
+        options: [
+          "Star schema with a denormalized product dimension — category lives directly in the dimension, only one JOIN needed",
+          "Snowflake schema — normalized dimensions reduce the size of each individual JOIN",
+          "3NF normalized schema — fewest redundant writes, best for large tables",
+        ],
+        correctIndex: 0,
+        explanation: "For analytical queries on large fact tables, minimizing JOINs is critical. A star schema stores category directly in the product dimension so the query needs only one JOIN. Snowflake would require product to subcategory to category, adding JOIN overhead multiplied across 10 billion rows.",
+      },
+    ],
   },
 
   "sq-d4": {
@@ -7282,7 +8567,59 @@ A \`SELECT SUM(revenue) FROM orders GROUP BY region\` on a 500 M row OLTP table:
 ## Data warehouse vs data lake
 
 - **Warehouse**: structured, schema-on-write, SQL query engine built-in, fast aggregations
-- **Data lake**: raw files (Parquet, ORC), schema-on-read, flexible, cheaper storage`,
+- **Data lake**: raw files (Parquet, ORC), schema-on-read, flexible, cheaper storage
+
+## Columnar storage — why it wins for aggregates
+
+\`\`\`sql
+-- Row store: to compute SUM(revenue), the engine reads every column of every row:
+-- [order_id | customer_id | product_id | status | revenue | created_at | ...]
+--     ↑ only revenue is needed but all columns are read per row
+
+-- Column store: revenue values are contiguous on disk:
+-- [100.0 | 250.5 | 75.0 | 899.0 | 42.0 | ...]
+--   ↑ single sequential scan of only the revenue column, nothing else
+
+-- Same query, different I/O:
+SELECT SUM(revenue) FROM orders WHERE region = 'APAC';
+-- Row store on 500M rows: reads ~40 bytes × 500M = 20 GB of data
+-- Column store on 500M rows: reads ~8 bytes × 500M = 4 GB (only revenue + region columns)
+-- Plus compression: columnar data compresses 5-10x → effectively ~400 MB scanned
+\`\`\`
+
+## Partitioning — the OLAP performance lever
+
+\`\`\`sql
+-- Partition a large fact table by month so queries skip irrelevant partitions
+CREATE TABLE fact_orders (
+  order_id    BIGINT,
+  order_date  DATE,
+  revenue     NUMERIC,
+  region      TEXT
+) PARTITION BY RANGE (order_date);
+
+CREATE TABLE fact_orders_2024_01 PARTITION OF fact_orders
+  FOR VALUES FROM ('2024-01-01') TO ('2024-02-01');
+
+CREATE TABLE fact_orders_2024_02 PARTITION OF fact_orders
+  FOR VALUES FROM ('2024-02-01') TO ('2024-03-01');
+
+-- Query with a date filter: planner reads ONLY the matching partition(s)
+SELECT SUM(revenue) FROM fact_orders
+WHERE order_date BETWEEN '2024-01-01' AND '2024-01-31';
+-- Scans ~1/12 of the table instead of all rows — "partition pruning"
+\`\`\`
+
+## Modern lakehouse architecture
+
+The data warehouse vs data lake distinction has blurred. Modern architectures use a **lakehouse** pattern:
+
+- Raw files stored in object storage (S3/GCS) in open formats: **Parquet** or **Delta Lake**
+- Query engines (Spark, DuckDB, Trino) read files directly — no proprietary format lock-in
+- Schema enforced at write time via Delta/Iceberg table format (adds ACID transactions)
+- OLAP engine (BigQuery, Redshift Spectrum) sits on top for SQL access
+
+The interview-relevant point: when asked "where would you store 5 years of click events for ad-hoc analysis?", answer with columnar format (Parquet) + partitioning by date + a query engine that supports partition pruning — not a row-oriented OLTP database.`,
     video: null,
     videoFallbackMarkdown: `## 3-minute OLTP vs OLAP drill
 
@@ -7472,7 +8809,38 @@ GROUP BY region;`,
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        question: "Which pattern characterizes OLTP vs OLAP workloads?",
+        options: [
+          "OLTP: fast read/write of individual rows; OLAP: scan millions of rows to compute aggregates",
+          "OLTP: scan millions of rows for reports; OLAP: fast point lookups for transactions",
+          "They are interchangeable — modern databases handle both equally well",
+        ],
+        correctIndex: 0,
+        explanation: "OLTP optimizes for low-latency single-row operations: order entries, balance updates, logins. OLAP optimizes for high-throughput scans across millions of rows to compute aggregates. These access patterns require different storage layouts and indexing strategies.",
+      },
+      {
+        question: "Why is columnar storage better for analytical queries than row storage?",
+        options: [
+          "Columnar stores each column's values contiguously — the engine reads only needed columns and compresses repetitive values efficiently",
+          "Columnar storage keeps rows in sorted order, making range scans faster",
+          "Columnar storage eliminates NULLs, which are expensive for aggregates",
+        ],
+        correctIndex: 0,
+        explanation: "Analytical queries typically read a few columns across many rows. Columnar storage puts all values of a column on contiguous pages — only relevant columns are read. High repetition in column values also enables aggressive compression such as run-length encoding and dictionary encoding.",
+      },
+      {
+        question: "An OLAP aggregate query is running directly on your production OLTP database. What is the primary risk?",
+        options: [
+          "Full-table scans compete for I/O and buffer pool with transactional queries, degrading response time for all users",
+          "OLAP queries silently return incorrect results when run on OLTP engines",
+          "The OLTP database automatically routes the query to a read replica",
+        ],
+        correctIndex: 0,
+        explanation: "Full-table scans needed for OLAP queries compete for I/O bandwidth, CPU, and buffer pool space with transactional queries. Long-running analytical scans can cause lock contention or cache thrashing. The solution is to replicate data to a separate analytical store and run reports there.",
+      },
+    ],
   },
 
   // ── injected from stat_foundations_lessons.js ──
@@ -16524,8 +17892,9 @@ Long-range information propagates through multiple layers (layer k can access in
     initialStageId: "f3_stage1",
     artifactDimensions: [
       { label: "Attention Mathematics", recoveryStageId: "f3_recovery1" },
+      { label: "Multi-Head Attention", recoveryStageId: "f3_mha_recovery" },
       { label: "KV Cache", recoveryStageId: "f3_recovery2" },
-      { label: "Positional Encodings", recoveryStageId: "f3_recovery1", passLabel: "Transformer Architecture Mastery" },
+      { label: "Flash Attention", recoveryStageId: "f3_flash_recovery", passLabel: "Transformer Expert" },
     ],
     stages: {
       f3_stage1: {
@@ -16539,17 +17908,18 @@ import torch.nn.functional as F
 
 def attention(Q, K, V, mask=None):
     # Q, K, V shapes: (batch, heads, seq_len, d_k)
-    d_k = Q.size(-1)  # head dimension
+    d_k = Q.size(-1)
 
     scores = torch.matmul(Q, K.transpose(-2, -1))  -- ds-target:f3_no_scale
-    
+    # BUG: missing division by math.sqrt(d_k)
+
     if mask is not None:
         scores = scores.masked_fill(mask == 0, float('-inf'))
-    
+
     weights = F.softmax(scores, dim=-1)
     return torch.matmul(weights, V)`,
         validationCopy: {
-          f3_no_scale: "Correct. The scores must be divided by √d_k before the softmax. Without this scaling, dot products grow with d_k (their variance scales as d_k for random Q, K). Large scores produce extreme softmax outputs near 0 or 1, causing near-zero gradients and training instability. The fix: scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(d_k). This is why the operation is called *scaled* dot-product attention.",
+          f3_no_scale: "Correct. Scores must be divided by sqrt(d_k) before softmax. Without scaling, dot products grow with d_k, pushing softmax into saturation — near-zero gradients and training instability. Fix: scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(d_k).",
         },
         branches: { f3_no_scale: "f3_stage2" },
       },
@@ -16563,49 +17933,125 @@ def attention(Q, K, V, mask=None):
 seq_len = 4096   # 4K context
 d_k = 128        # head dimension
 
-# Q · Kᵀ produces:
-attention_matrix_shape = (seq_len, seq_len)  # 4096 × 4096 = 16.7M entries
-# Memory per layer per head: 16.7M × 2 bytes (fp16) = 33.6MB
-
-# Scaling to 128K context:
-seq_len_128k = 131072
-attention_matrix_128k = seq_len_128k ** 2   # = 17.2 BILLION entries
-# Memory: 17.2B × 2 bytes = 34.4GB per head per layer (!!!)`,
+# Q @ K.T produces:
+attn_matrix = (seq_len, seq_len)  # 4096 x 4096 = 16.7M entries
+# Memory (fp16): 16.7M x 2 bytes = 33.5MB per layer
+# At 128K: 128K x 128K x 2 = 32GB for ONE layer`,
         choices: [
-          { id: "a", label: "O(n²) because the model must re-read the entire training corpus for each sequence; longer sequences require more passes.", description: "This confuses training data access with the attention computation. Attention operates over the current sequence at inference time, not the training corpus." },
-          { id: "b", label: "O(n²) because the Q · Kᵀ matrix multiplication produces an n×n attention matrix — every token must compute a score against every other token. Going from 4K to 128K context is a 1024× increase in attention compute and memory.", description: "Correct. The n×n attention matrix is the bottleneck. 128K tokens: 128K × 128K = 16.4B entries per head per layer. At fp16, that's 32.8GB just for one head in one layer — clearly requiring algorithmic innovations like FlashAttention's block-sparse or sliding window approaches." },
-          { id: "c", label: "O(n²) because each token requires n separate forward passes through the FFN layer.", description: "The FFN processes each token independently (position-wise) in O(n) total, not O(n²). The O(n²) bottleneck is specifically the attention operation." },
-          { id: "d", label: "O(n²) only applies to decoder models; encoder models like BERT are O(n log n).", description: "Both encoder and decoder models use standard scaled dot-product attention with O(n²) complexity. The decoder's causal mask makes half the attention matrix zero but doesn't change the asymptotic complexity." },
+          { id: "a", label: "O(n²) because the model re-reads the training corpus for each sequence", description: "Longer sequences require more passes over training data." },
+          { id: "b", label: "O(n²) because Q @ K.T produces an n×n matrix — every token scores against every other token", description: "4K to 128K context is a 1024× increase in attention compute and memory." },
+          { id: "c", label: "O(n²) because each token requires n separate FFN forward passes", description: "The FFN, not attention, is the compute bottleneck." },
+          { id: "d", label: "O(n²) only applies to decoders; BERT-style encoders are O(n log n)", description: "Encoders also use full self-attention and have the same O(n²) cost." },
         ],
-        branches: { a: "f3_recovery1", b: "f3_stage3", c: "f3_recovery1", d: "f3_recovery1" },
-        rationale: "The Q·Kᵀ product computes a score for every pair of tokens (i, j) — all n² pairs. This produces an n×n matrix that must be stored and operated on. For 4K tokens, this is manageable; for 128K tokens, it requires algorithmic solutions. FlashAttention avoids materializing the full matrix in HBM by tiling the computation to fit in faster SRAM. Sparse attention patterns (Longformer's sliding window, BigBird's random+global) reduce the number of pairs computed. These innovations are what make 128K context feasible.",
+        branches: { a: "f3_recovery1", b: "f3_mha", c: "f3_recovery1", d: "f3_recovery1" },
+        rationale: "The Q·Kᵀ product scores every token pair (i, j) — all n² pairs — producing an n×n matrix that must be stored and operated on. Going 4K→28K context is a 1024× increase in attention compute and memory. This is why efficient attention variants (Flash, sparse, linear) are an active research area.",
+      },
+      f3_mha: {
+        id: "f3_mha",
+        type: "scenario_choice",
+        badge: "Stage 3 · Multi-Head Attention",
+        title: "Stage 3 · Why multiple heads beat one wide head",
+        prompt: "A colleague proposes replacing 8 attention heads (d_k=64 each) with a single head at d_k=512. Parameter count is identical. What is the strongest argument against this?",
+        code_snippet: `# Current architecture: 8-head attention
+num_heads = 8
+d_k = 64          # per-head dimension
+d_model = 512     # total = num_heads * d_k
+
+# Proposed: 1-head attention
+num_heads_new = 1
+d_k_new = 512     # same total parameters
+
+# W_Q, W_K, W_V: (512, 512) either way
+# But each head learns a DIFFERENT projection matrix
+# Head 1: W_Q_1, W_K_1, W_V_1
+# Head 2: W_Q_2, W_K_2, W_V_2  (learns different relationships)
+# ...`,
+        choices: [
+          { id: "a", label: "Multi-head is slower due to head-split and concatenation overhead", description: "The overhead is negligible compared to the matrix multiplications." },
+          { id: "b", label: "Each head specializes in different relationship types simultaneously — syntax, coreference, positional — a single head must fit all patterns into one attention distribution", description: "Empirical interpretability research confirms this specialization." },
+          { id: "c", label: "Single-head attention cannot be parallelized across GPU cores", description: "Single-head attention is fully parallelizable." },
+          { id: "d", label: "The 1/sqrt(512) scaling causes worse gradients than 1/sqrt(64)", description: "The scaling factor compensates proportionally — gradient flow is not the main concern." },
+        ],
+        branches: { a: "f3_mha_recovery", b: "f3_stage3", c: "f3_mha_recovery", d: "f3_mha_recovery" },
+        rationale: "Multi-head attention's advantage is representational diversity. Different heads learn qualitatively different relationships: syntactic dependencies, coreference, positional proximity, semantic similarity. A single wide head produces one global attention pattern that must compromise between all relationship types. Interpretability research on BERT and GPT models has empirically confirmed this head specialization.",
       },
       f3_stage3: {
         id: "f3_stage3",
         type: "scenario_choice",
-        badge: "Stage 3 · KV Cache",
-        title: "Stage 3 · KV cache memory calculation",
-        prompt: "Your team is deploying a model with 32 transformer layers, 32 KV heads (after GQA), head dimension d_k=128, generating sequences of 2048 tokens at fp16. Approximately how much GPU memory does the KV cache use per active user request?",
+        badge: "Stage 4 · KV Cache",
+        title: "Stage 4 · KV cache memory calculation",
+        prompt: "Your team deploys a model with 32 transformer layers, 32 KV heads (after GQA), d_k=128, generating 2048-token sequences at fp16. Approximately how much GPU memory does the KV cache consume per active user request?",
         code_snippet: `# KV cache memory formula:
-# 2 (K and V) × num_layers × num_kv_heads × d_k × seq_len × bytes_per_elem
+# 2 (K and V) x layers x kv_heads x d_k x seq_len x bytes
 
-num_layers    = 32
-num_kv_heads  = 32   # after GQA (could be 8 for LLaMA-3-70B)
-d_k           = 128  # head dimension = d_model / num_q_heads
-seq_len       = 2048 # tokens generated
-bytes_fp16    = 2
+num_layers   = 32
+num_kv_heads = 32
+d_k          = 128
+seq_len      = 2048
+bytes_fp16   = 2
 
-kv_bytes = 2 * num_layers * num_kv_heads * d_k * seq_len * bytes_fp16
-# = 2 * 32 * 32 * 128 * 2048 * 2
-# = ?`,
+# 2 x 32 x 32 x 128 x 2048 x 2 = ?
+# At 1000 concurrent users, how much GPU RAM just for KV caches?`,
         choices: [
-          { id: "a", label: "~32MB per request", description: "Close but check the math: 2 × 32 × 32 × 128 × 2048 × 2 = 1,073,741,824 bytes = 1GB, not 32MB." },
-          { id: "b", label: "~512MB per request", description: "Off by ~2×. The correct calculation: 2 × 32 × 32 × 128 × 2048 × 2 = 1,073,741,824 bytes ≈ 1GB." },
-          { id: "c", label: "~1GB per request", description: "Correct. 2 × 32 × 32 × 128 × 2048 × 2 = 1,073,741,824 bytes ≈ 1GB. Supporting 40 simultaneous users at 2048 tokens would require 40GB for KV cache alone — before counting the model weights (typically 13–14GB for a 7B fp16 model)." },
-          { id: "d", label: "~16GB per request", description: "Off by 16×. This would require either a much larger model (512+ heads, or much longer sequences). The 1GB figure correctly accounts for 32 layers × 32 KV heads × 128 dim × 2048 tokens × fp16." },
+          { id: "a", label: "~32 MB per request", description: "2 x 32 x 32 x 128 x 2048 x 2 / 1e6 = 1073 MB, not 32 MB." },
+          { id: "b", label: "~512 MB per request", description: "Off by 2x — re-check the formula." },
+          { id: "c", label: "~1 GB per request", description: "2 x 32 x 32 x 128 x 2048 x 2 = 1,073,741,824 bytes ≈ 1 GB." },
+          { id: "d", label: "~16 GB per request", description: "That is closer to the full model weight size, not just the KV cache." },
         ],
-        branches: { a: "f3_recovery2", b: "f3_recovery2", c: "f3_terminal", d: "f3_recovery2" },
-        rationale: "KV cache = 2 × 32 × 32 × 128 × 2048 × 2 bytes = 1,073,741,824 bytes ≈ 1GB per request. This is a critical calculation for production capacity planning. A typical serving GPU (A100-80GB) holds 80GB total: ~14GB for 7B model weights (fp16) leaves ~66GB for KV cache, supporting ~66 simultaneous users at 2048 tokens. Real deployments use GQA (reducing num_kv_heads from 32 to 8, saving 4× KV memory) and PagedAttention (vLLM) for efficient KV cache management across variable-length sequences.",
+        branches: { a: "f3_recovery2", b: "f3_recovery2", c: "f3_flash", d: "f3_recovery2" },
+        rationale: "KV cache = 2 x 32 x 32 x 128 x 2048 x 2 bytes = 1,073,741,824 bytes ≈ 1 GB per user request. At 100 concurrent users: 100 GB just for KV caches, before model weights. This is why Grouped Query Attention (GQA) reduces num_kv_heads (e.g., LLaMA-3-70B uses 8 instead of 64), cutting KV cache memory by 8x.",
+      },
+      f3_flash: {
+        id: "f3_flash",
+        type: "scenario_choice",
+        badge: "Stage 5 · Flash Attention",
+        title: "Stage 5 · What problem does Flash Attention solve?",
+        prompt: "Your GPU profiler shows attention is 25% compute-utilized but pegging memory bandwidth at 100%. A colleague recommends Flash Attention. What is the core mechanism it uses?",
+        code_snippet: `# Standard attention: 3 HBM round-trips per layer
+scores  = Q @ K.T          # writes n x n matrix to slow HBM
+weights = softmax(scores)  # reads n x n from HBM, writes back
+output  = weights @ V      # reads n x n from HBM again
+
+# For n=2048: 3 x (2048^2) x 2 bytes = 48 MB of HBM traffic
+# just for intermediate results, per layer
+
+# Flash Attention: tile Q, K, V to fit in fast SRAM (20-40 MB)
+# Compute entire softmax-weighted output per tile
+# Never write the n x n matrix to HBM
+# Same result, ~16x less HBM traffic for n=2048`,
+        choices: [
+          { id: "a", label: "Flash Attention uses random sparse masks to reduce O(n²) to O(n log n)", description: "That describes Longformer / BigBird sparse attention, not Flash Attention." },
+          { id: "b", label: "Flash Attention tiles Q, K, V to stay in fast on-chip SRAM — it never writes the n×n attention matrix to HBM", description: "IO-bound problem, IO-focused solution." },
+          { id: "c", label: "Flash Attention quantizes Q, K, V to int8 to reduce memory bandwidth", description: "That is quantization — a separate technique." },
+          { id: "d", label: "Flash Attention replaces softmax with a linear approximation, avoiding the full n×n dot product", description: "That is linear attention (Performer, etc.) — mathematically different from Flash Attention." },
+        ],
+        branches: { a: "f3_flash_recovery", b: "f3_terminal", c: "f3_flash_recovery", d: "f3_flash_recovery" },
+        rationale: "Flash Attention's core insight: transformer attention is IO-bottlenecked, not compute-bottlenecked. Standard attention writes the n×n matrix to HBM 3 times per layer. Flash Attention tiles the computation so intermediates fit in fast SRAM, making a single pass through HBM. Same mathematical result, same model weights — just far fewer slow memory round-trips.",
+      },
+      f3_terminal: {
+        id: "f3_terminal",
+        type: "scenario_choice",
+        badge: "Stage 6 · Final Challenge",
+        title: "Stage 6 · What breaks without positional encodings?",
+        prompt: "An interviewer asks: 'If you removed positional encodings entirely from a transformer, what would and would not break?' What is the most accurate and complete answer?",
+        code_snippet: `# Transformer without positional encodings
+
+tokens_1 = ["The", "cat", "sat"]
+tokens_2 = ["sat", "cat", "The"]
+
+# Self-attention is permutation-equivariant:
+# attention(permute(X)) = permute(attention(X))
+# => both sequences produce IDENTICAL attention outputs
+# => word order is completely invisible to the model`,
+        choices: [
+          { id: "a", label: "Nothing breaks for short sentences — PEs only help beyond 512 tokens", description: "Order matters even in 3-word sentences (subject vs object)." },
+          { id: "b", label: "All permutations of the same words become identical — word order is invisible, breaking syntax, causality, and sequential understanding", description: "Bag-of-words tasks might partially survive; everything order-dependent fails." },
+          { id: "c", label: "Text generation breaks but classification survives", description: "Classification also depends on word order (subject/object/predicate distinctions)." },
+          { id: "d", label: "Only the first and last tokens are affected", description: "Self-attention is a set operation — it treats all tokens equally regardless of position." },
+        ],
+        branches: { a: "f3_terminal", b: "f3_terminal", c: "f3_terminal", d: "f3_terminal" },
+        terminal: true,
+        rationale: "Without positional encodings, self-attention is a pure set operation. 'The cat chased the dog' and 'The dog chased the cat' produce identical outputs. This breaks any task requiring sequential understanding: subject-verb agreement, dependency parsing, causal reasoning, and generation. Modern approaches: sinusoidal PE (original), learned absolute PE (BERT), relative PE (T5), rotary PE/RoPE (LLaMA/Mistral) — each with different long-context scaling properties.",
       },
       f3_recovery1: {
         id: "f3_recovery1",
@@ -16613,81 +18059,106 @@ kv_bytes = 2 * num_layers * num_kv_heads * d_k * seq_len * bytes_fp16
         badge: "Recovery · Attention Mathematics",
         title: "Recovery · The role of Q, K, V",
         prompt: "In self-attention, what is the conceptual role of the Query, Key, and Value projections?",
-        code_snippet: `# Self-attention projections
-# All inputs come from the SAME source X (self-attention)
+        code_snippet: `# Self-attention: all from the SAME input X
+Q = X @ W_Q  # What is each token looking for?
+K = X @ W_K  # What does each token advertise/offer?
+V = X @ W_V  # What content does each token contribute?
 
-Q = X @ W_Q  # "What is each token looking for?"
-K = X @ W_K  # "What does each token offer/advertise?"
-V = X @ W_V  # "What information does each token contribute if attended to?"
+# Score: how relevant is token j to query token i?
+score_ij = dot(Q[i], K[j]) / sqrt(d_k)
 
-# Attention score(i, j) = Q_i · K_j  / √d_k
-# = "How well does what token j offers match what token i seeks?"
-
-# Output[i] = Σ_j softmax(score(i,j)) × V_j
-# = weighted combination of all values, weighted by relevance`,
+# Output: weighted sum of values
+output_i = sum(softmax(scores_i) * V)`,
         choices: [
-          { id: "a", label: "Q, K, V are just three copies of the input with different weights to prevent gradient collapse.", description: "Q, K, V serve distinct semantic roles — they are not merely regularization copies. Each has a specific function in the attention computation." },
-          { id: "b", label: "Query is what each token seeks; Key is what each token advertises; Value is the content contributed when a token is attended to. The dot product of Q and K measures relevance, and the softmax-weighted average of V produces the output.", description: "Correct. This is the foundational intuition. Q asks a question about relevance; K is the token's answer to what it can offer; V is the actual content delivered. The Q·K dot product is the relevance score, and V is what you receive when you attend." },
-          { id: "c", label: "Q controls which layers are active; K controls attention head selection; V controls the output projection.", description: "None of these descriptions are accurate. Q, K, V all operate within a single attention layer and head — they do not control layer/head selection." },
-          { id: "d", label: "Q, K, and V are used only during training; at inference time, they are replaced by cached activations.", description: "Q, K, V are computed at every forward pass during both training and inference. The KV cache stores K and V for previously generated tokens to avoid recomputation — Q is always freshly computed for the current token." },
+          { id: "a", label: "Q, K, V are three identical copies of the input — used to prevent gradient collapse", description: "They serve distinct roles, not just different initialization." },
+          { id: "b", label: "Query = what a token seeks; Key = what it advertises; Value = content it contributes when attended to", description: "Q·K dot product measures relevance; softmax-weighted V produces output." },
+          { id: "c", label: "Q selects active layers; K selects attention heads; V controls the output projection", description: "These are not layer or head selection mechanisms." },
+          { id: "d", label: "Q, K, V are only computed during training; at inference they are replaced by cached activations", description: "Q must always be computed from the new token; K and V are what get cached." },
         ],
-        branches: { a: "f3_stage2", b: "f3_stage2", c: "f3_stage2", d: "f3_stage2" },
-        rationale: "The Q-K-V formulation is a learned soft retrieval mechanism. Each token generates a query (what am I looking for?), each token presents a key (here's what I have), and the dot product scores how well each key matches the query. The softmax normalizes these scores into attention weights. The value vectors are then combined according to those weights — tokens with high relevance contribute more to the output representation. Different attention heads learn different notions of relevance (syntactic, semantic, positional), producing a rich multi-perspective representation.",
+        branches: { a: "f3_mha", b: "f3_mha", c: "f3_mha", d: "f3_mha" },
+        rationale: "Q-K-V is a learned soft retrieval system. Each token queries for relevant context (Q), each token advertises what it can contribute (K), and each token's content is extracted when attended to (V). The Q·K dot product measures relevance; softmax converts scores to probabilities; the output is a weighted combination of V vectors. This is why K and V can be cached at inference (they depend only on past tokens) while Q must be computed fresh for each new token.",
+      },
+      f3_mha_recovery: {
+        id: "f3_mha_recovery",
+        type: "scenario_choice",
+        badge: "Recovery · Multi-Head Attention",
+        title: "Recovery · What each attention head captures",
+        prompt: "Interpretability research visualizes trained BERT attention heads: Head 1 strongly attends to the grammatical subject; Head 4 attends across sentence boundaries. What does this tell us?",
+        code_snippet: `# Observed specialization in a trained transformer (BERT-base)
+# Head 1:  syntactic subject tracking
+# Head 2:  tokens within the same noun phrase
+# Head 4:  long-range coreference across sentences
+# Head 7:  [SEP] token (sequence boundary signal)
+# Head 11: immediate previous token (local dependency)
+
+# Each head has independent weight matrices:
+# W_Q_i, W_K_i, W_V_i in R^(d_model x d_k)
+# Outputs: [h_1; h_2; ...; h_n] @ W_O  (concat + project)`,
+        choices: [
+          { id: "a", label: "Heads are redundant by design — training learns to prune most of them", description: "Redundancy exists but is an inefficiency, not a design goal." },
+          { id: "b", label: "Each head captures a different type of relationship — the model builds a richer multi-dimensional representation than any single head could", description: "This is the functional justification for multi-head attention." },
+          { id: "c", label: "Heads split the vocabulary — head 1 handles nouns, head 2 handles verbs", description: "Heads split the representation space (d_k dimensions), not the token vocabulary." },
+          { id: "d", label: "Multi-head specialization only occurs in multilingual models", description: "Specialization is observed in monolingual models too." },
+        ],
+        branches: { a: "f3_stage3", b: "f3_stage3", c: "f3_stage3", d: "f3_stage3" },
+        rationale: "Head specialization is empirical evidence for multi-head attention's value. Different heads learn qualitatively different relationships (syntax, coreference, positional, semantic). Concatenating these diverse representations before the output projection gives each token a richer context vector. A single head of the same total dimension would need to blend all relationship types into one global attention distribution.",
       },
       f3_recovery2: {
         id: "f3_recovery2",
         type: "scenario_choice",
         badge: "Recovery · KV Cache",
         title: "Recovery · KV cache purpose and trade-offs",
-        prompt: "Without a KV cache, generating 1000 tokens with a 32-layer transformer would be extremely slow. Why, and what does the KV cache do to fix it?",
-        code_snippet: `# Without KV cache: generating token 1000
-# Must compute K and V for tokens 1-999 AGAIN (redundant!)
-for token_idx in range(1000):
-    Q, K, V = project(all_tokens[:token_idx+1])  # full recompute
-    output = attention(Q, K, V)  # O(token_idx²) each step
+        prompt: "Without a KV cache, generating 1000 tokens with a 32-layer transformer is extremely slow. Why, and what does the KV cache fix?",
+        code_snippet: `# Without KV cache: generating token t requires recomputing
+# K and V for ALL tokens 0..t-1 from scratch
+for t in range(1000):
+    Q, K, V = project(all_tokens[:t+1])  # full O(t) recompute!
+    output = attention(Q, K, V)           # O(t^2) per step
 
-# Total cost: O(1²) + O(2²) + ... + O(1000²) ≈ O(n³)
+# Total cost: O(n^3) for n tokens
 
-# With KV cache: generating token 1000
-kv_cache = {}  # stores K, V for tokens 1-999
-Q_new, K_new, V_new = project(token_1000)  # only new token
-kv_cache[1000] = (K_new, V_new)
-K_all = concat(kv_cache.values(), K_new)
-output = attention(Q_new, K_all, V_all)  # O(n) per step, O(n²) total`,
+# With KV cache:
+for t in range(1000):
+    Q_t, K_t, V_t = project(token[t])  # only the new token
+    K_cache.append(K_t)
+    V_cache.append(V_t)
+    output = attention(Q_t, K_cache, V_cache)  # O(t) per step
+
+# Total cost: O(n^2) — saves the inner O(n) recompute`,
         choices: [
-          { id: "a", label: "The KV cache stores model weights to avoid reloading them from disk at each generation step.", description: "Model weights are loaded once into GPU memory before any generation begins. The KV cache stores intermediate activations (K and V tensors), not weights." },
-          { id: "b", label: "The KV cache stores K and V tensors for previously generated tokens so they don't need to be recomputed at each step, reducing per-step cost from O(n²) to O(n).", description: "Correct. Without the cache, generating each new token would require recomputing K and V for all prior tokens — redundant work. The cache stores these tensors and only computes K, V for the new token at each step, making generation O(n) per step instead of O(n²)." },
-          { id: "c", label: "The KV cache reduces memory usage by compressing attention weights using quantization.", description: "The KV cache increases memory usage (stores K, V tensors) but dramatically reduces compute. Quantization is a separate optimization that can be applied to KV cache tensors to reduce their size." },
-          { id: "d", label: "The KV cache allows batching multiple user requests together by sharing keys and values across users.", description: "KV cache is per-sequence — it stores the cached context for one generation sequence. Shared KV prefixes (prefix caching) is a related but distinct optimization for sharing common prefixes like system prompts across requests." },
+          { id: "a", label: "KV cache stores model weights to avoid reloading from disk", description: "Model weights are always in GPU memory — KV cache is separate." },
+          { id: "b", label: "KV cache stores K and V tensors for all past tokens — no recomputation needed, per-step cost drops from O(seq^2) to O(seq)", description: "This is the core inference optimization." },
+          { id: "c", label: "KV cache compresses attention weights via quantization", description: "KV quantization exists as a further optimization, but it is separate from the basic KV cache." },
+          { id: "d", label: "KV cache lets multiple users share K and V across requests", description: "That is prompt/prefix caching — a different technique." },
         ],
-        branches: { a: "f3_stage3", b: "f3_stage3", c: "f3_stage3", d: "f3_stage3" },
-        rationale: "The KV cache is the most important inference optimization in transformer-based LLMs. Without it, generating N tokens requires recomputing K and V for all previous tokens at each step — O(n²) per step, O(n³) total. With the cache, each step only computes K and V for the one new token (O(1) compute for the new keys/values, O(n) for the attention over all cached K/V). The cost is memory: the cache grows linearly with sequence length, and for long sequences with large models, it dominates GPU memory usage.",
+        branches: { a: "f3_flash", b: "f3_flash", c: "f3_flash", d: "f3_flash" },
+        rationale: "Without KV cache, generating token t requires recomputing K and V for all t-1 previous tokens — O(n³) total. With KV cache, each step only computes K, V for the new token and appends them; the model attends over the cached values. Total cost becomes O(n²). The tradeoff: KV cache memory grows linearly with sequence length (hence the 1 GB/request calculation in Stage 4).",
       },
-      f3_terminal: {
-        id: "f3_terminal",
+      f3_flash_recovery: {
+        id: "f3_flash_recovery",
         type: "scenario_choice",
-        badge: "Stage 4 · Final Challenge",
-        title: "Stage 4 · What breaks without positional encodings?",
-        prompt: "An interviewer asks: 'If you removed positional encodings entirely from a transformer, what would and would not break?' What is the most accurate and complete answer?",
-        code_snippet: `# Transformer without positional encodings
-# Each token embedding: only semantic content, no position signal
+        badge: "Recovery · Flash Attention",
+        title: "Recovery · IO-bound vs compute-bound",
+        prompt: "A profiler shows: compute units 25% utilized, HBM bandwidth 100% saturated. What is the correct optimization strategy?",
+        code_snippet: `# GPU profiling output
+compute_utilization  = 25%   # ALUs mostly idle
+memory_bandwidth     = 100%  # HBM fully saturated
 
-# Self-attention is permutation-invariant:
-tokens_1 = ["The", "cat", "sat", "on", "the", "mat"]
-tokens_2 = ["mat", "the", "on", "sat", "cat", "The"]  # shuffled
+# Standard attention intermediates (n=2048, fp16, 1 layer):
+n x n scores  = 2048 x 2048 x 2 bytes =  8 MB  (written to HBM)
+n x n weights = 2048 x 2048 x 2 bytes =  8 MB  (written to HBM)
+output        = 2048 x 128  x 2 bytes =  0.5 MB
 
-# Without positional encodings:
-# attention(tokens_1) == attention(tokens_2)
-# Output is identical regardless of word order!`,
+# 16 MB of HBM traffic to produce 0.5 MB of useful output
+# Roofline model: IO-bound, not compute-bound`,
         choices: [
-          { id: "a", label: "Nothing would break for short sentences; positional encodings only help for sequences longer than 512 tokens.", description: "Word order matters even for two-word sequences. 'Dog bites man' vs 'Man bites dog' have opposite meanings. Positional encodings are not a long-sequence optimization — they are fundamental to any sequence understanding." },
-          { id: "b", label: "The model would be unable to distinguish word order, treating all permutations of the same words as identical. Tasks requiring sequential understanding (subject-verb agreement, dependency parsing, causal reasoning) would fail completely. Bag-of-words style tasks (topic classification) might partially survive.", description: "Correct. Without positional encodings, attention is permutation-invariant — 'cat bites dog' and 'dog bites cat' produce the same representations. Any task where meaning depends on word order (syntax, semantics, most NLP tasks) would fail. Only tasks where word order doesn't matter (e.g., detecting that a document is about finance vs medicine) might partially work." },
-          { id: "c", label: "The model would lose the ability to generate text but could still classify documents correctly.", description: "Classification would also fail for order-dependent tasks. Subject-verb agreement, negation, causal relationships — all require positional awareness. And generation without positional encodings would produce word-order-incoherent output even for short sequences." },
-          { id: "d", label: "Only the first and last tokens would be affected; middle tokens would retain their positional information through the attention pattern.", description: "Without explicit positional signals, no token has any positional information. The attention pattern itself is the output of attention, not an input — it cannot provide positional information that wasn't in the Q and K projections." },
+          { id: "a", label: "Add more compute-intensive operations to keep ALUs busy", description: "Adding compute to an IO-bound workload does not improve throughput." },
+          { id: "b", label: "Fuse operations and keep intermediate results in fast on-chip SRAM — reduce HBM round-trips", description: "This is the Flash Attention approach: tile to SRAM, compute locally, write only the final output." },
+          { id: "c", label: "Switch to a smaller model — HBM bandwidth is proportional to parameter count", description: "The bottleneck is the n×n attention matrix, not parameter count." },
+          { id: "d", label: "Increase batch size to amortize HBM access cost per token", description: "Larger batches increase the n×n matrices, making the IO bottleneck worse." },
         ],
         branches: { a: "f3_terminal", b: "f3_terminal", c: "f3_terminal", d: "f3_terminal" },
-        rationale: "Positional encodings solve a fundamental structural problem: self-attention is a set operation that ignores order. Without them, 'I am not happy' and 'I am happy not' are indistinguishable. Nearly every NLP task — parsing, translation, QA, generation — depends on word order. The one exception is tasks where word order truly doesn't matter (keyword-based document classification), but these are rare in practice. Modern positional encodings (RoPE, ALiBi) are designed to be relative rather than absolute, which helps with length generalization beyond the training sequence length.",
-        terminal: true,
+        rationale: "An IO-bound workload requires reducing memory round-trips, not adding compute. Flash Attention tiles Q, K, V blocks to fit in fast on-chip SRAM (20-40 MB, 10-40x faster than HBM) and computes the attention output entirely within each tile. The n×n attention matrix is never written to HBM. Result: same output, same numerics, but 16x less HBM traffic for n=2048.",
       },
     },
   },
@@ -17083,113 +18554,157 @@ The assistant turn is your ground truth — your labeled data. Collecting 500–
 `,
   tryGuidance: "Use the interactive visualization to explore how the three strategies compare across real decision dimensions. Select a use case scenario and trace which strategy (or combination) best fits. Pay attention to the trade-off sliders — cost, freshness, consistency — and how they shift the optimal choice. Try the hybrid mode to see how RAG and fine-tuning complement each other in production architectures.",
   interviewGraph: {
-    initialStageId: "f4_stage1",
+    initialStageId: "f4_intro",
     artifactDimensions: [
       { label: "Strategy Selection", recoveryStageId: "f4_stage1_recovery" },
       { label: "Trade-off Analysis", recoveryStageId: "f4_stage2_recovery" },
-      { label: "Hybrid Architectures", recoveryStageId: "f4_stage3", passLabel: "Production Architect" },
+      { label: "Prompting Limits", recoveryStageId: "f4_prompting_recovery", passLabel: "LLM Architect" },
     ],
     stages: {
+      f4_intro: {
+        id: "f4_intro",
+        type: "click_target",
+        badge: "Stage 1 · Strategy Audit",
+        title: "Stage 1 · Spot the wrong strategy",
+        prompt: "A team filed this Architecture Decision Record for their AI customer support bot. One selected strategy will cause the system to give stale, incorrect answers within hours of deployment. Click it.",
+        code_snippet: `# Architecture Decision Record: AI Customer Support Bot
+# SaaS platform — 2M SKUs, pricing and plan limits updated hourly
+
+STRATEGY_DECISION = {
+  "problem": "Users ask about current pricing and plan feature limits",
+  "data_freshness": "Pricing changes daily; plan limits change hourly",
+
+  "selected": "Fine-tune GPT-4o on pricing docs — quarterly refresh",  -- ds-target:f4_wrong_finetune
+  "rejected": [
+    "RAG with live pricing database",       # 'too complex to build'
+    "Dynamic prompts with current context"  # 'context window too small'
+  ],
+  "rationale": "Fine-tuned weights eliminate retrieval latency"
+}`,
+        validationCopy: {
+          f4_wrong_finetune: "Correct. Fine-tuning encodes knowledge in static weights. With pricing changing hourly and a quarterly refresh schedule, the model is stale within hours and will confidently quote wrong prices. RAG backed by a live pricing database always reflects current state, provides citation provenance, and needs no retraining as data changes.",
+        },
+        branches: { f4_wrong_finetune: "f4_stage1" },
+      },
       f4_stage1: {
         id: "f4_stage1",
         type: "scenario_choice",
-        badge: "Stage 1",
-        title: "Stage 1 · Strategy Selection",
-        prompt: "A legal firm has 100,000 proprietary case documents. Lawyers need to find relevant precedents quickly — and new cases are filed every day. Which primary adaptation strategy do you recommend?",
+        badge: "Stage 2 · Strategy Selection",
+        title: "Stage 2 · Strategy Selection",
+        prompt: "A legal firm has 100,000 proprietary case documents. Lawyers need to find relevant precedents quickly, and new cases are filed every day. Which primary adaptation strategy do you recommend?",
         choices: [
-          { id: "a", label: "Prompting (few-shot)", description: "Give the model example case lookups in the system prompt and let it answer from its training data." },
-          { id: "b", label: "RAG", description: "Embed all case documents into a vector store; retrieve relevant cases at query time and inject them into context." },
-          { id: "c", label: "Fine-tuning on all documents", description: "Fine-tune the model on the full corpus of 100K cases so the knowledge is baked into the weights." },
-          { id: "d", label: "No LLM needed — use full-text search", description: "Build a traditional keyword search system over the document store." },
+          { id: "a", label: "Prompting (few-shot)", description: "Include example precedents directly in the prompt." },
+          { id: "b", label: "RAG", description: "Vector-index all 100K documents; retrieve relevant precedents at query time." },
+          { id: "c", label: "Fine-tuning on all documents", description: "Train the model on the full case corpus." },
+          { id: "d", label: "Full-text search only — no LLM", description: "Traditional BM25/TF-IDF is sufficient for legal research." },
         ],
-        branches: {
-          a: "f4_stage1_recovery",
-          b: "f4_stage2",
-          c: "f4_stage1_recovery",
-          d: "f4_stage1_recovery",
-        },
-        rationale: "RAG is the correct choice here. The corpus is large (100K documents — far exceeding any context window), new cases arrive daily (freshness is critical — fine-tuning would immediately go stale), and lawyers need citations pointing to specific source documents (RAG provides provenance; fine-tuning does not). Prompting alone cannot surface documents the model was never trained on. Traditional full-text search is useful as part of a hybrid retriever (BM25 + dense embeddings) but doesn't leverage the LLM's synthesis capability.",
-      },
-      f4_stage1_recovery: {
-        id: "f4_stage1_recovery",
-        type: "scenario_choice",
-        badge: "Stage 1 · Recovery",
-        title: "Stage 1 Recovery · Strategy Selection",
-        prompt: "Let's revisit. The firm has 100K documents updated daily, and lawyers need source citations. Prompting can't access unseen documents. Fine-tuning goes stale and loses provenance. Which strategy handles large, fresh, citable document collections?",
-        choices: [
-          { id: "a", label: "Prompting with a very large context window", description: "Use a 1M-token context model and stuff all documents in." },
-          { id: "b", label: "RAG with a vector store", description: "Embed documents, retrieve relevant chunks at inference time." },
-          { id: "c", label: "Fine-tuning quarterly", description: "Retrain on the full corpus every three months." },
-          { id: "d", label: "Rule-based retrieval only", description: "Use keyword matching without any LLM synthesis." },
-        ],
-        branches: {
-          a: "f4_stage2",
-          b: "f4_stage2",
-          c: "f4_stage2",
-          d: "f4_stage2",
-        },
-        rationale: "RAG is the right answer. Even with million-token context windows, stuffing 100K full documents is economically prohibitive (cost scales with tokens) and quality degrades with very long contexts (lost-in-the-middle problem). Quarterly fine-tuning is too slow for daily updates and loses provenance. RAG handles all three requirements: scale, freshness, and citations.",
+        branches: { a: "f4_stage1_recovery", b: "f4_stage2", c: "f4_stage1_recovery", d: "f4_stage1_recovery" },
+        rationale: "RAG is correct. The corpus is large (100K documents — exceeds any context window), new cases arrive daily (stale fine-tunes become wrong), and lawyers need source citations (fine-tuning loses provenance). RAG handles all three: live index, accurate retrieval, traceable sources, no retraining.",
       },
       f4_stage2: {
         id: "f4_stage2",
         type: "scenario_choice",
-        badge: "Stage 2",
-        title: "Stage 2 · Trade-off Analysis",
-        prompt: "A different problem: the LLM correctly understands legal concepts, but it consistently formats case citations incorrectly — writing 'Smith v. Jones 2020' instead of the required Bluebook format 'Smith v. Jones, 123 F.3d 456 (2d Cir. 2020)'. Which strategy most reliably fixes this?",
+        badge: "Stage 3 · Trade-off Analysis",
+        title: "Stage 3 · Trade-off Analysis",
+        prompt: "The LLM correctly understands legal concepts, but consistently formats citations wrong — 'Smith v. Jones 2020' instead of Bluebook format 'Smith v. Jones, 123 F.3d 456 (2d Cir. 2020)'. Which strategy most reliably fixes this?",
         choices: [
-          { id: "a", label: "RAG — retrieve correct citation formats", description: "Build a vector store of correctly formatted citations and retrieve them to guide the model." },
-          { id: "b", label: "Fine-tuning — train on correctly formatted examples", description: "Collect (input, correctly formatted output) pairs and fine-tune the model to internalize the citation format." },
-          { id: "c", label: "More detailed prompting only", description: "Add a thorough system prompt explaining Bluebook citation format with examples." },
-          { id: "d", label: "Post-processing regex", description: "Parse model output and reformat citations with a rule-based system." },
+          { id: "a", label: "RAG — retrieve correctly formatted citations", description: "Retrieval brings in examples but does not change how the model generates." },
+          { id: "b", label: "Fine-tuning — train on correctly formatted citation examples", description: "Directly teaches the generation behavior." },
+          { id: "c", label: "Longer system prompt with format instructions", description: "Prompting can help but degrades under long context." },
+          { id: "d", label: "Post-processing regex to reformat citations", description: "Brittle — any citation variant breaks the regex." },
         ],
-        branches: {
-          a: "f4_stage2_recovery",
-          b: "f4_stage3",
-          c: "f4_stage3",
-          d: "f4_stage2_recovery",
-        },
-        rationale: "Fine-tuning is the best primary fix for consistent output format. This is a behavior problem, not a knowledge problem — the model knows what Smith v. Jones means, it just formats it wrong. Fine-tuning on (input, correctly-formatted output) pairs bakes the format into the model's generation behavior. Detailed few-shot prompting is also a valid lightweight first attempt — it can work well for format consistency and has near-zero cost. RAG won't help here: the issue isn't missing knowledge, it's inconsistent formatting behavior. Post-processing regex is fragile and doesn't scale to the diversity of legal citation patterns.",
+        branches: { a: "f4_stage2_recovery", b: "f4_prompting", c: "f4_stage2_recovery", d: "f4_stage2_recovery" },
+        rationale: "Fine-tuning is the right lever for consistent output format. This is a behavior problem, not a knowledge gap — the model knows the cases, it just generates the wrong format. RAG retrieves data but does not change how the model writes; prompting drifts; fine-tuning directly shapes generation behavior.",
       },
-      f4_stage2_recovery: {
-        id: "f4_stage2_recovery",
+      f4_prompting: {
+        id: "f4_prompting",
         type: "scenario_choice",
-        badge: "Stage 2 · Recovery",
-        title: "Stage 2 Recovery · Trade-off Analysis",
-        prompt: "The citation format problem is a behavior issue, not a knowledge gap. The model knows the cases — it just doesn't format them right. RAG retrieves knowledge. Post-processing is brittle. Which lever directly changes how the model generates output format?",
+        badge: "Stage 4 · Prompting Limits",
+        title: "Stage 4 · When is prompting enough?",
+        prompt: "A startup needs the LLM to always respond in JSON with a fixed schema: {intent, entities, confidence}. They have 500 labeled examples and a standard GPT-4o API subscription. Most cost-effective first approach?",
+        code_snippet: `# Target output schema (every response must match)
+{
+  "intent": "book_flight",
+  "entities": [
+    {"type": "destination", "value": "Paris"},
+    {"type": "date",        "value": "2024-03-15"}
+  ],
+  "confidence": 0.87
+}
+
+# Available:
+# - 500 labeled (input, expected_output) pairs
+# - GPT-4o API with JSON mode / structured outputs
+# - No GPU for self-hosted fine-tuning`,
         choices: [
-          { id: "a", label: "Fine-tuning on format examples", description: "Train the model to produce correctly formatted citations every time." },
-          { id: "b", label: "RAG with format templates", description: "Retrieve citation format templates from a vector store." },
-          { id: "c", label: "Larger base model", description: "Upgrade to a bigger model — it'll know the format." },
-          { id: "d", label: "Hard-code all citations", description: "Build a lookup table for every known case citation." },
+          { id: "a", label: "Fine-tune GPT-4o-mini on all 500 examples immediately", description: "Upfront training + deployment overhead for a task prompting can handle." },
+          { id: "b", label: "Few-shot prompting with 5-10 examples + JSON mode (structured outputs) in the API", description: "Fastest to ship; enforces schema via grammar-constrained decoding." },
+          { id: "c", label: "RAG — retrieve similar past examples to guide output format", description: "Adding retrieval overhead for a pure-format constraint is over-engineering." },
+          { id: "d", label: "Build a rule-based NER pipeline — LLMs are overkill here", description: "Rule-based NER requires extensive hand-engineering and misses semantic cases." },
         ],
-        branches: {
-          a: "f4_stage3",
-          b: "f4_stage3",
-          c: "f4_stage3",
-          d: "f4_stage3",
-        },
-        rationale: "Fine-tuning (or detailed few-shot prompting) directly addresses consistent output format. RAG with templates is a creative approach but adds retrieval overhead for what is fundamentally a style problem — it's not the right tool. A larger model may happen to know Bluebook format better, but it doesn't guarantee consistency. The key insight: format/style = fine-tuning; knowledge/facts = RAG.",
+        branches: { a: "f4_prompting_recovery", b: "f4_stage3", c: "f4_prompting_recovery", d: "f4_prompting_recovery" },
+        rationale: "Prompting with JSON mode (structured outputs) is the right first choice. The task is a well-defined format constraint, not a knowledge gap. Modern APIs enforce schema compliance via grammar-constrained decoding — no fine-tuning needed. Fine-tune only when prompt approaches consistently fail after iteration, OR when per-token cost matters at very high volume (millions of requests/day where a smaller fine-tuned model pays back the training cost).",
       },
       f4_stage3: {
         id: "f4_stage3",
         type: "scenario_choice",
-        badge: "Stage 3",
-        title: "Stage 3 · Hybrid Architectures",
-        prompt: "A junior engineer proposes: 'Instead of building RAG infrastructure, let's just fine-tune the model on all 100K case documents. Then we have the knowledge in the weights and don't need a vector store.' What is the most complete and accurate rebuttal?",
+        badge: "Stage 5 · Hybrid Architecture",
+        title: "Stage 5 · Hybrid Architecture Challenge",
+        prompt: "A junior engineer proposes: 'Instead of RAG infrastructure, let's fine-tune on all 100K case documents. Then knowledge is in the weights and we skip the vector store.' What is the most complete and accurate rebuttal?",
         choices: [
-          { id: "a", label: "Fine-tuning doesn't scale — 100K documents is too many training examples", description: "The training dataset would be too large to process efficiently." },
-          { id: "b", label: "Fine-tuning on documents causes hallucination, loses freshness, and provides no provenance — RAG solves all three", description: "The model learns statistical patterns, not a queryable knowledge base; new documents require retraining; and there is no citation trail." },
-          { id: "c", label: "Fine-tuning is too expensive and RAG is cheaper", description: "The primary issue is cost, not correctness." },
-          { id: "d", label: "The model might forget other knowledge due to catastrophic forgetting", description: "Training on legal documents would overwrite general language understanding." },
+          { id: "a", label: "Fine-tuning cannot handle 100K training examples at that scale", description: "100K is actually a reasonable fine-tuning dataset size." },
+          { id: "b", label: "Fine-tuning on documents causes three compounding failures: knowledge goes stale, hallucinations increase, and source provenance disappears", description: "All three are real and serious for this use case." },
+          { id: "c", label: "Fine-tuning costs too much — that alone rules it out", description: "Cost matters but is not the primary or most complete argument." },
+          { id: "d", label: "Catastrophic forgetting would erase other legal knowledge", description: "A real concern, but not the most complete rebuttal." },
         ],
-        branches: {
-          a: "f4_stage3",
-          b: "f4_stage3",
-          c: "f4_stage3",
-          d: "f4_stage3",
-        },
+        branches: { a: "f4_stage3", b: "f4_stage3", c: "f4_stage3", d: "f4_stage3" },
         terminal: true,
-        rationale: "Option B is the most complete and accurate rebuttal, hitting all three critical failure modes: (1) Hallucination — fine-tuning on facts does not make the model reliably recall them; it learns surface statistical patterns and will confidently fabricate plausible-sounding citations. (2) No freshness — as new cases are filed, the fine-tuned model is immediately stale; RAG indexes updates in minutes while retraining takes days. (3) No provenance — regulated industries need to know which document produced an answer; fine-tuning buries knowledge diffusely across billions of weights with no audit trail. Cost (C) and catastrophic forgetting (D) are real concerns but secondary to the fundamental architectural mismatch. The correct mental model: fine-tuning teaches behavior, RAG provides knowledge.",
+        rationale: "Option B is the most complete rebuttal. (1) Staleness: new cases filed daily make the fine-tuned model wrong within days. (2) Hallucination: fine-tuning on documents teaches the model to sound like those documents, not to retrieve accurately — it invents citations. (3) Provenance: lawyers need 'this conclusion comes from case X, paragraph Y'; fine-tuned weights cannot provide this. RAG solves all three: live index, grounded retrieval, traceable citations.",
+      },
+      f4_stage1_recovery: {
+        id: "f4_stage1_recovery",
+        type: "scenario_choice",
+        badge: "Recovery · Strategy Selection",
+        title: "Recovery · Strategy Selection",
+        prompt: "Revisit: 100K documents updated daily, lawyers need citations. Prompting cannot access unseen documents. Fine-tuning goes stale and loses provenance. Which strategy handles large, fresh, citable corpora?",
+        choices: [
+          { id: "a", label: "Prompting with a very large context window", description: "Even 1M context windows cannot hold 100K full legal documents." },
+          { id: "b", label: "RAG with a vector store", description: "Index all documents; retrieve the relevant ones at query time." },
+          { id: "c", label: "Quarterly fine-tuning", description: "Stale within days; loses citation provenance." },
+          { id: "d", label: "Rule-based keyword retrieval", description: "Cannot handle semantic queries like 'precedents where defendant argued entrapment'." },
+        ],
+        branches: { a: "f4_stage2", b: "f4_stage2", c: "f4_stage2", d: "f4_stage2" },
+        rationale: "RAG. Even million-token context windows cannot hold 100K full documents economically. Fine-tuning goes stale (daily updates) and loses provenance. RAG retrieves only what is relevant from a live index, always current, with traceable citations — the right architecture for large, dynamic, citable document collections.",
+      },
+      f4_stage2_recovery: {
+        id: "f4_stage2_recovery",
+        type: "scenario_choice",
+        badge: "Recovery · Trade-off Analysis",
+        title: "Recovery · Behavior vs knowledge",
+        prompt: "The citation format problem is a behavior issue — the model knows the cases, it just formats them wrong. Which lever directly changes generation behavior?",
+        choices: [
+          { id: "a", label: "Fine-tuning on correctly formatted examples", description: "Teaches the generation behavior directly." },
+          { id: "b", label: "RAG with format templates", description: "Retrieves examples but does not change how the model generates." },
+          { id: "c", label: "Switch to a larger base model", description: "Larger models follow instructions better but do not guarantee a specific format." },
+          { id: "d", label: "Hard-code all citations after generation", description: "Brittle and requires maintaining a separate citation database." },
+        ],
+        branches: { a: "f4_prompting", b: "f4_prompting", c: "f4_prompting", d: "f4_prompting" },
+        rationale: "Fine-tuning directly shapes generation behavior. RAG retrieves data but the model still generates in its old style. Fine-tuning — or careful multi-shot prompting with format examples — is the correct lever when the problem is consistent output formatting rather than missing knowledge.",
+      },
+      f4_prompting_recovery: {
+        id: "f4_prompting_recovery",
+        type: "scenario_choice",
+        badge: "Recovery · Prompting Limits",
+        title: "Recovery · When volume flips the decision",
+        prompt: "Same startup, 6 months later: 10M requests/day, $50K/month on GPT-4o for JSON formatting. Fine-tuning GPT-4o-mini on 500 examples costs $200 upfront and 10x cheaper per token. Does this change the recommendation?",
+        choices: [
+          { id: "a", label: "Yes — at scale, a fine-tuned smaller model pays back its training cost within days", description: "Prompting is only cheaper below a request-volume threshold." },
+          { id: "b", label: "No — GPT-4o quality justifies the cost regardless of volume", description: "Cost optimization at 10M requests/day is a real engineering requirement." },
+          { id: "c", label: "Switch to regex — avoid LLMs entirely at that scale", description: "The task still requires language understanding for intent and entity extraction." },
+          { id: "d", label: "Add aggressive caching — most requests are duplicates", description: "Caching helps for repeated inputs but does not solve the unique-request cost." },
+        ],
+        branches: { a: "f4_stage3", b: "f4_stage3", c: "f4_stage3", d: "f4_stage3" },
+        rationale: "At high volume, fine-tuning a smaller model is the correct cost optimization. At 10M requests/day, even a 10x cost reduction ($5K vs $50K/month) pays back $200 training cost in hours. The decision framework: start with prompting (fast iteration), graduate to fine-tuning when (a) prompting fails consistently, or (b) per-token cost at scale makes a smaller fine-tuned model economically dominant.",
       },
     },
   },
@@ -21655,16 +23170,17 @@ The MCP runtime handles marshalling, schema generation, and protocol negotiation
     initialStageId: "ag1_schema_audit",
     artifactDimensions: [
       { label: "Tool Schema Design", recoveryStageId: "ag1_loop_recovery" },
-      { label: "Tool Safety", recoveryStageId: "ag1_privilege_recovery" },
-      { label: "Error Handling", recoveryStageId: "ag1_mcp_terminal", passLabel: "Production Readiness" },
+      { label: "Agentic Safety", recoveryStageId: "ag1_loop_recovery" },
+      { label: "Parallel Tool Calls", recoveryStageId: "ag1_parallel_recovery" },
+      { label: "Error Handling", recoveryStageId: "ag1_error_recovery", passLabel: "Agent Architect" },
     ],
     stages: {
       ag1_schema_audit: {
         id: "ag1_schema_audit",
         type: "click_target",
-        badge: "Stage 1",
+        badge: "Stage 1 · Schema Audit",
         title: "Stage 1 · Tool Schema Audit",
-        prompt: "Below is a tool definition for a data warehouse agent. One element will critically mislead the model and cause wrong tool selection. Click the part of the schema that is the highest-risk problem.",
+        prompt: "Below is a tool definition for a data warehouse agent. One element will critically mislead the model and cause wrong tool selection. Click the highest-risk problem.",
         code_snippet: `tools = [
   {
     "type": "function",
@@ -21674,26 +23190,25 @@ The MCP runtime handles marshalling, schema generation, and protocol negotiation
       "parameters": {
         "type": "object",
         "properties": {
-          "sql": {
+          "sql_query": {
             "type": "string",  -- ds-target:ag1_sql_param
-            "description": "SQL query to run"
+            "description": "The SQL query to execute"
           },
           "limit": {
             "type": "integer",  -- ds-target:ag1_limit_param
-            "description": "Max rows to return",
-            "default": 100
+            "description": "Maximum rows to return"
           }
         },
-        "required": ["sql"]  -- ds-target:ag1_required
+        "required": ["sql_query"]  -- ds-target:ag1_required
       }
     }
   }
 ]`,
         validationCopy: {
-          ag1_vague_description: "Correct. The description 'Query database.' is critically vague — the model has no signal about which database, what data it contains, when to use it vs. other tools, or what it returns. This causes wrong tool selection and hallucinated arguments. A production description should state: (1) what system it connects to, (2) what data it covers, (3) when to use it, (4) when NOT to use it with explicit alternatives, and (5) the return format.",
-          ag1_sql_param: "The SQL param type is fine — 'string' is correct. But the description 'SQL query to run' is also too vague (doesn't say read-only, doesn't say which SQL dialect). The bigger problem is the tool description itself, not a single parameter.",
-          ag1_limit_param: "The limit param is acceptable — a reasonable safety default. This isn't the highest-risk element. The tool description is the model's primary signal for tool selection, and that description is the critical failure point.",
-          ag1_required: "The required array is correct — sql should be required. This isn't the problem. The tool description 'Query database.' is what will cause the model to misuse this tool.",
+          ag1_vague_description: "Correct. The description field is the highest-leverage element. The LLM cannot inspect the implementation — it reads only the description to decide when to call this tool and how to construct arguments. 'Query database.' provides no schema, no scope, no read/write status. A good description: 'Query the production data warehouse (read-only). Tables available: orders, users, products, events. Scope: current fiscal year unless date range specified.'",
+          ag1_sql_param: "The sql_query param description is acceptable. The more dangerous issue is the vague top-level description — it prevents the model from knowing when or how to use this tool at all.",
+          ag1_limit_param: "The limit param is optional and typed correctly. The vague top-level description is the higher-risk element.",
+          ag1_required: "Making sql_query required is correct design. The vague description is the higher-risk issue.",
         },
         branches: {
           ag1_vague_description: "ag1_loop_scenario",
@@ -21701,108 +23216,202 @@ The MCP runtime handles marshalling, schema generation, and protocol negotiation
           ag1_limit_param: "ag1_loop_scenario",
           ag1_required: "ag1_loop_scenario",
         },
-        rationale: "The description field is the highest-leverage element in any tool schema. The model cannot inspect the underlying implementation — it uses only the name and description to decide when and how to call the tool. 'Query database.' provides zero guidance: the model doesn't know which database, what data lives there, when to prefer this tool over another, or what format the results come in. Good descriptions follow the 4-element pattern: what it does, when to use it, when NOT to use it, and what it returns.",
+        rationale: "The description field is the primary signal the LLM uses to decide (1) whether to call this tool and (2) how to construct its arguments. 'Query database.' is dangerously vague — the model has no idea what data is available, whether writes are permitted, or what the expected input looks like. A rich description prevents wrong tool selection and incorrect argument construction.",
       },
       ag1_loop_scenario: {
         id: "ag1_loop_scenario",
         type: "scenario_choice",
-        badge: "Stage 2",
+        badge: "Stage 2 · Runaway Tool Loop",
         title: "Stage 2 · Runaway Tool Loop",
-        prompt: "Your agent has a 'send_email' tool. During testing you observe it being called 3 times in a row for the same email. Each call returns: {\"status\": \"queued\", \"message\": \"Email added to queue\"}. The model interprets 'queued' as 'not yet sent' and retries. How do you fix this?",
+        prompt: "Your agent has a send_email tool. During testing it is called 3 times for the same email. Each call returns: {status: 'queued', message: 'Email added to queue'}. The model interprets 'queued' as 'not yet sent' and retries. How do you fix this?",
+        code_snippet: `# Observed: model calls send_email 3x for the same email
+# Tool response after each call:
+{
+  "status": "queued",            # model reads: "not done yet"
+  "message": "Email added to queue"
+}
+
+# Model chain-of-thought (simplified):
+# Call 1: "queued" => pending => retry
+# Call 2: "queued" => still pending => retry
+# Call 3: ...
+
+# The response is TECHNICALLY correct — but ambiguous to the model`,
         choices: [
-          { id: "a", label: "Add idempotency key + unambiguous status", description: "Add a unique message_id to each call. Return status: 'success' with a clear sent_at timestamp. Store sent message_ids server-side and deduplicate. Add loop detection: if the same tool is called with the same arguments 2+ times in a turn, abort and surface an error." },
-          { id: "b", label: "Change the tool name to 'send_email_now'", description: "Rename the tool to make it sound more immediate, so the model understands it fires synchronously." },
-          { id: "c", label: "Increase the model temperature", description: "Higher temperature will make the model less likely to repeat the same action because it will explore more diverse next steps." },
-          { id: "d", label: "Tell the model not to call tools multiple times in the system prompt", description: "Add a rule in the system prompt: 'Never call the same tool more than once per turn.'" },
+          { id: "a", label: "Return an unambiguous terminal state: {status: 'sent', email_id: 'abc123', sent_at: '...'}", description: "Clear completion signal with idempotency key." },
+          { id: "b", label: "Rename the tool to 'send_email_now' to signal immediacy", description: "Tool naming does not fix ambiguous response semantics." },
+          { id: "c", label: "Increase model temperature so it is less likely to retry", description: "Temperature does not change how the model interprets 'queued'." },
+          { id: "d", label: "Add 'do not call tools more than once' to the system prompt", description: "Prompt instructions are unreliable for preventing agentic loops." },
         ],
-        branches: {
-          a: "ag1_privilege_scenario",
-          b: "ag1_loop_recovery",
-          c: "ag1_loop_recovery",
-          d: "ag1_loop_recovery",
-        },
-        rationale: "The root cause is ambiguous tool response semantics — 'queued' is correctly interpreted by the model as 'not done yet.' The fix has three layers: (1) return unambiguous status ('success'/'failure', not 'queued'), (2) idempotency key so duplicate calls are deduplicated server-side even if the model does retry, and (3) loop detection in your agent harness as a last-resort circuit breaker. Renaming the tool does nothing to the response semantics. Temperature affects diversity, not repetition caused by misread responses. System prompt rules are fragile — the model will still retry if its reasoning concludes the email hasn't sent.",
+        branches: { a: "ag1_parallel", b: "ag1_loop_recovery", c: "ag1_loop_recovery", d: "ag1_loop_recovery" },
+        rationale: "Root cause: ambiguous tool response semantics. 'Queued' is a valid pending state that any model will interpret as 'not completed yet.' Fix: return a clear terminal status — 'sent' with a timestamp and email_id — so the model knows unambiguously that the action completed. Adding an idempotency_key parameter makes accidental duplicates safe even if the model does retry.",
       },
-      ag1_loop_recovery: {
-        id: "ag1_loop_recovery",
+      ag1_parallel: {
+        id: "ag1_parallel",
         type: "scenario_choice",
-        badge: "Stage 2 (Recovery)",
-        title: "Stage 2 · Loop Recovery",
-        prompt: "An agent tool returns {\"status\": \"queued\"} after sending an email. The model calls it 3 times because it thinks 'queued' means 'not sent'. What is the most important single fix?",
+        badge: "Stage 3 · Parallel Tool Calls",
+        title: "Stage 3 · Sequential vs Parallel Execution",
+        prompt: "Your research agent needs: (A) get user account info, (B) get last 30 orders, (C) look up current prices for those orders. A colleague wants all three sequential. What is the optimal execution pattern?",
+        code_snippet: `# Option 1: Sequential (naive)
+account = get_account(user_id)      # 200ms
+orders  = get_orders(user_id)       # 350ms
+prices  = get_prices(orders.ids)    # 280ms
+# Total: ~830ms
+
+# Option 2: Parallel A+B, then C
+account, orders = await asyncio.gather(
+    get_account(user_id),   # 200ms (independent)
+    get_orders(user_id),    # 350ms (independent, bottleneck)
+)
+prices = await get_prices(orders.ids)  # 280ms (depends on B)
+# Total: ~630ms  (25% faster)
+
+# Key insight: C depends on B's output — cannot parallelize C`,
         choices: [
-          { id: "a", label: "Return status: 'success' with a sent_at timestamp instead of 'queued'", description: "Change the tool response to use unambiguous terminal status that the model can reason about correctly." },
-          { id: "b", label: "Rate-limit the email tool to 1 call per session", description: "A hard rate limit prevents duplicate sends at the cost of preventing legitimate use." },
-          { id: "c", label: "Switch to a different LLM that doesn't retry", description: "Different models may behave differently, but this doesn't fix the root cause." },
-          { id: "d", label: "Remove the email tool entirely", description: "Removing the tool eliminates the problem but also the feature." },
+          { id: "a", label: "Always sequential — parallel calls can interleave responses incorrectly", description: "The latency cost of sequential is significant; parallelism is safe for independent calls." },
+          { id: "b", label: "A and B in parallel (independent), then C sequentially (depends on B's results)", description: "Minimizes wall-clock time while respecting data dependencies." },
+          { id: "c", label: "All three in parallel — modern LLM runtimes handle dependencies automatically", description: "C needs B's order IDs as input — calling C before B returns produces empty or wrong results." },
+          { id: "d", label: "Use a job queue — tools in the same turn should never share intermediate results", description: "Intra-turn data flow is a core feature of function-calling agents." },
         ],
-        branches: {
-          a: "ag1_privilege_scenario",
-          b: "ag1_privilege_scenario",
-          c: "ag1_privilege_scenario",
-          d: "ag1_privilege_scenario",
-        },
-        rationale: "The root cause is ambiguous response semantics. 'Queued' is correctly interpreted by the model as 'pending' — so it retries. Returning 'success' with a timestamp gives the model a definitive terminal state. This is the most important fix. Idempotency keys and loop detection are additional layers of defense, but they don't fix the reasoning confusion at the source.",
+        branches: { a: "ag1_parallel_recovery", b: "ag1_privilege_scenario", c: "ag1_parallel_recovery", d: "ag1_parallel_recovery" },
+        rationale: "The rule: identify data dependencies, then parallelize what is independent. A (account) and B (orders) both take user_id as input — independent, call simultaneously. C (prices) requires order IDs from B — call it after B returns. This captures the latency savings of parallelism without violating the data dependency that would produce incorrect results.",
       },
       ag1_privilege_scenario: {
         id: "ag1_privilege_scenario",
         type: "scenario_choice",
-        badge: "Stage 3",
-        title: "Stage 3 · Tool Privilege & Safety",
-        prompt: "Your LLM agent has a SQL tool with full read/write/delete permissions on the data warehouse. A user types: 'Clean up the old test data from Q1.' What is the likely failure mode and what is the correct design?",
+        badge: "Stage 4 · Tool Privilege",
+        title: "Stage 4 · Tool Privilege and Safety",
+        prompt: "Your LLM agent has a SQL tool with full read/write/delete permissions on the data warehouse. A user asks: 'Clean up the old test data from Q1.' What is the likely failure mode and the correct design?",
+        code_snippet: `# Current tool: full permissions (dangerous)
+tools = [{
+  "name": "execute_sql",
+  "description": "Execute any SQL query on the data warehouse",
+  "parameters": {"query": {"type": "string"}}
+}]
+
+# User: "Clean up the old test data from Q1"
+# Model generates:
+#   DELETE FROM events
+#   WHERE created_at < '2024-04-01' AND test_flag = true
+#
+# Result: 2.3M rows deleted. No dry-run. No confirmation.`,
         choices: [
-          { id: "a", label: "Read-only tool by default; separate privileged tool with human approval", description: "Give the agent a read-only query tool. Create a separate 'propose_deletion' tool that generates a preview and a proposal_id. Require explicit human approval before executing. Apply principle of least privilege." },
-          { id: "b", label: "Add 'be careful with deletes' to the system prompt", description: "Instruct the model in the system prompt to ask for confirmation before deleting data." },
-          { id: "c", label: "Only allow the agent to run DELETE with a WHERE clause", description: "Require WHERE clauses to prevent full-table deletes, but still allow autonomous deletion." },
-          { id: "d", label: "Log all DELETE statements so you can audit them later", description: "Logging lets you review what was deleted, but doesn't prevent the deletion from happening autonomously." },
+          { id: "a", label: "Read-only tool by default; separate write/delete tool with explicit human approval step", description: "Principle of least privilege enforced at the connection level." },
+          { id: "b", label: "Add 'be careful with DELETE statements' to the system prompt", description: "Prompt instructions can be overridden by user input or model error." },
+          { id: "c", label: "Only allow DELETE with a WHERE clause — prevent unbounded deletes", description: "WHERE clause constraint is insufficient — model can generate WHERE 1=1." },
+          { id: "d", label: "Log all DELETE statements so you can audit and restore later", description: "Logging aids recovery but does not prevent the data loss." },
         ],
-        branches: {
-          a: "ag1_mcp_terminal",
-          b: "ag1_privilege_recovery",
-          c: "ag1_privilege_recovery",
-          d: "ag1_privilege_recovery",
-        },
-        rationale: "This is a principle of least privilege problem. Giving the agent DELETE access 'just in case' is the same mistake as running your application database user as root. The correct design: (1) default tool is read-only enforced at the database connection level, not just in the description, (2) a separate privileged tool exists for mutations but it only proposes and previews — it does not execute, (3) execution requires an out-of-band human approval step. System prompt instructions are not security controls — they can be overridden by prompt injection or model errors. Logging is a detective control, not a preventive one.",
+        branches: { a: "ag1_error", b: "ag1_privilege_recovery", c: "ag1_privilege_recovery", d: "ag1_privilege_recovery" },
+        rationale: "Principle of least privilege: give the agent only the permissions it actually needs. For read-only data access, use a read-only database connection — not a prompt instruction, an actual connection-level constraint. For write/delete operations, require an explicit human approval step before execution. Security must be enforced at the infrastructure layer; prompt-based guardrails are always bypassable.",
       },
-      ag1_privilege_recovery: {
-        id: "ag1_privilege_recovery",
+      ag1_error: {
+        id: "ag1_error",
         type: "scenario_choice",
-        badge: "Stage 3 (Recovery)",
-        title: "Stage 3 · Privilege Recovery",
-        prompt: "An agent with DELETE permissions autonomously deletes rows when a user asks to 'clean up test data.' Which single design change would have prevented this?",
+        badge: "Stage 5 · Error Handling",
+        title: "Stage 5 · Tool Error Response Design",
+        prompt: "Your search_inventory tool fails because the database is temporarily down. Which error response best enables the model to handle this gracefully?",
+        code_snippet: `# Option A: bare error flag
+{"error": true}
+
+# Option B: raw exception dump
+{"error": "psycopg2.OperationalError: could not connect to server;
+  is the server on host db-prod-03 accepting TCP on port 5432?"}
+
+# Option C: structured recoverable error
+{
+  "success": false,
+  "error_code": "SERVICE_UNAVAILABLE",
+  "message": "Inventory database is temporarily unavailable.",
+  "retry_after_seconds": 30,
+  "fallback": "Use cached_inventory tool for approximate stock data"
+}
+
+# Option D: silent empty result
+{"results": [], "count": 0}`,
         choices: [
-          { id: "a", label: "Enforce read-only at the database connection level, not just in the tool description", description: "The database user the tool connects as should have no DELETE privilege — even if the model constructs a DELETE query, the DB will reject it." },
-          { id: "b", label: "Use a stronger model that is less likely to run DELETE", description: "More capable models may be more cautious, but this is not a reliable safety guarantee." },
-          { id: "c", label: "Add 'never delete data' to the tool description", description: "Tool descriptions influence behavior but are not security controls — the model can still generate DELETE statements." },
-          { id: "d", label: "Wrap all agent outputs in a content filter", description: "Content filters check for harmful text, not SQL semantics." },
+          { id: "a", label: "Option A — concise, unambiguous failure signal", description: "Too minimal: model does not know whether to retry, use a fallback, or stop." },
+          { id: "b", label: "Option B — full exception with maximum diagnostic detail", description: "Exposes internal infrastructure; model may hallucinate based on host/port details." },
+          { id: "c", label: "Option C — structured error with error_code, message, retry_after, and fallback suggestion", description: "Actionable without over-exposing internals." },
+          { id: "d", label: "Option D — empty results silently", description: "Model interprets empty as 'no inventory exists' and generates confidently wrong conclusions." },
         ],
-        branches: {
-          a: "ag1_mcp_terminal",
-          b: "ag1_mcp_terminal",
-          c: "ag1_mcp_terminal",
-          d: "ag1_mcp_terminal",
-        },
-        rationale: "Security must be enforced at the infrastructure layer, not the prompt layer. The database connection should use a read-only role — then even if the model generates a DELETE statement and the tool executes it, the database will reject the operation. Description-level instructions are soft constraints; database permissions are hard constraints.",
+        branches: { a: "ag1_error_recovery", b: "ag1_error_recovery", c: "ag1_mcp_terminal", d: "ag1_error_recovery" },
+        rationale: "Option C. Structured error responses give the model actionable information without over-exposing implementation details. 'error_code' enables programmatic handling; 'retry_after_seconds' tells the model when to retry; 'fallback' points to an alternative. Option D (silent empty result) is the most dangerous pattern in agentic systems — the model treats no results as ground truth and generates confidently wrong answers.",
       },
       ag1_mcp_terminal: {
         id: "ag1_mcp_terminal",
         type: "scenario_choice",
-        badge: "Stage 4",
-        title: "Stage 4 · MCP vs. Provider Function Calling",
-        prompt: "A colleague says: 'MCP (Model Context Protocol) is just OpenAI function calling with extra steps — we should stick to OpenAI's format since everyone uses it.' How do you respond?",
+        badge: "Stage 6 · Final Challenge",
+        title: "Stage 6 · MCP vs Provider Function Calling",
+        prompt: "A colleague says: 'MCP is just OpenAI function calling with extra steps — stick to OpenAI's format since everyone uses it.' How do you respond?",
         choices: [
-          { id: "a", label: "MCP is a provider-agnostic open protocol — tools defined once work across Claude, GPT-4, Gemini, and any MCP runtime", description: "OpenAI's format locks tool definitions to the OpenAI API. MCP separates tool definition from LLM provider. MCP also supports resources and prompts, not just function calls. If you want portability or are in a multi-model environment, MCP is the right investment." },
-          { id: "b", label: "MCP is better because Anthropic built it and Claude is more capable", description: "The argument for MCP is about protocol standardization and portability, not about model quality." },
-          { id: "c", label: "OpenAI format is better because it has wider adoption and more tooling", description: "While OpenAI's format is widely adopted today, betting on a provider-specific format creates lock-in. MCP is growing as the standard for multi-model, enterprise tool ecosystems." },
-          { id: "d", label: "They are equivalent — both produce the same JSON and execute the same way", description: "They are not equivalent. MCP is a full protocol with resources and prompts; OpenAI's format is a JSON schema convention. MCP enables reuse across providers; OpenAI's format does not." },
+          { id: "a", label: "MCP is a provider-agnostic open protocol — tools defined once work across Claude, GPT-4, Gemini, and any MCP runtime; it adds Resources and Prompts beyond functions", description: "Standardization enables portability across models and vendors." },
+          { id: "b", label: "MCP is better because Anthropic built it and Claude is stronger at tool use", description: "Protocol design and model capability are separate concerns." },
+          { id: "c", label: "OpenAI format is better — wider adoption and more existing tooling", description: "Adoption is a reasonable operational concern but misses the architectural argument." },
+          { id: "d", label: "They are equivalent — both produce the same JSON and execute the same way", description: "MCP adds Resources, Prompts, and a standardized transport layer beyond function schemas." },
         ],
-        branches: {
-          a: "ag1_mcp_terminal",
-          b: "ag1_mcp_terminal",
-          c: "ag1_mcp_terminal",
-          d: "ag1_mcp_terminal",
-        },
+        branches: { a: "ag1_mcp_terminal", b: "ag1_mcp_terminal", c: "ag1_mcp_terminal", d: "ag1_mcp_terminal" },
         terminal: true,
-        rationale: "MCP (Model Context Protocol) is a standardized, open protocol that decouples tool definitions from any specific LLM provider. Tools defined as MCP servers work with Claude, GPT-4, Gemini, and any MCP-compatible runtime without modification. OpenAI's function calling is a provider-specific JSON convention — well-designed and widely used, but tightly coupled to the OpenAI API. MCP also extends beyond function calls to support 'resources' (read-only data context like files and schemas) and 'prompts' (reusable prompt templates). For enterprise teams building on multiple models or wanting to future-proof their tooling, MCP is the correct investment. For a single-model prototype, OpenAI's format is fine — just understand the tradeoff.",
+        rationale: "MCP (Model Context Protocol) is a standardized open protocol that decouples tool definitions from any specific LLM provider. It defines three primitives: Tools (functions the model calls), Resources (data the model reads), and Prompts (reusable templates). Tools written in MCP work across Claude, GPT-4, Gemini, and any MCP-compatible runtime — no vendor lock-in. OpenAI's format is fine for single-provider use; MCP is the right choice for multi-provider or long-lived production systems.",
+      },
+      ag1_loop_recovery: {
+        id: "ag1_loop_recovery",
+        type: "scenario_choice",
+        badge: "Recovery · Runaway Tool Loop",
+        title: "Recovery · Fixing ambiguous tool responses",
+        prompt: "An agent tool returns {status: 'queued'} after sending an email. The model retries 3 times. What is the most important single fix?",
+        choices: [
+          { id: "a", label: "Return {status: 'sent', sent_at: '...', email_id: '...'} — unambiguous terminal state", description: "Clear terminal status with timestamp prevents retries." },
+          { id: "b", label: "Rate-limit the tool to 1 call per session", description: "Breaks legitimate multi-email workflows." },
+          { id: "c", label: "Switch to a model less likely to retry ambiguous statuses", description: "Any model will retry a 'pending' response — this is correct model behavior." },
+          { id: "d", label: "Remove the tool and use a different channel", description: "The problem is response design, not the existence of the tool." },
+        ],
+        branches: { a: "ag1_parallel", b: "ag1_parallel", c: "ag1_parallel", d: "ag1_parallel" },
+        rationale: "Root cause: 'queued' is an ambiguous pending state. Fix: return a clear terminal status ('sent') with a timestamp and unique email_id. This signals completion definitively. Adding an idempotency_key parameter makes duplicate calls safe even if they occur — both the server and the model treat duplicate calls as no-ops.",
+      },
+      ag1_parallel_recovery: {
+        id: "ag1_parallel_recovery",
+        type: "scenario_choice",
+        badge: "Recovery · Parallel Tool Calls",
+        title: "Recovery · Identifying safe parallelism",
+        prompt: "You need: (1) get customer profile, (2) get customer order history, (3) summarize orders with product names looked up. Which tools can run in parallel?",
+        choices: [
+          { id: "a", label: "All three simultaneously", description: "Step 3 depends on steps 1 and 2 — it needs both before it can run." },
+          { id: "b", label: "Steps 1 and 2 in parallel; step 3 after both complete", description: "1 and 2 are independent; 3 depends on their combined outputs." },
+          { id: "c", label: "All three sequentially — customer ID must be established first", description: "Customer ID is already known upfront; steps 1 and 2 can run concurrently." },
+          { id: "d", label: "Steps 1 and 3 in parallel; step 2 first", description: "Step 3 cannot run without the order history from step 2." },
+        ],
+        branches: { a: "ag1_privilege_scenario", b: "ag1_privilege_scenario", c: "ag1_privilege_scenario", d: "ag1_privilege_scenario" },
+        rationale: "Parallelism rule: identify data dependencies, parallelize what is independent. Steps 1 (profile) and 2 (orders) both take customer_id (available at start) — no dependency between them, run concurrently. Step 3 needs both the profile and the order list — run it after both complete. Never parallelize a call whose required input is the output of another call in the same batch.",
+      },
+      ag1_privilege_recovery: {
+        id: "ag1_privilege_recovery",
+        type: "scenario_choice",
+        badge: "Recovery · Tool Privilege",
+        title: "Recovery · Enforcing privilege at the right layer",
+        prompt: "An agent with DELETE permissions deletes rows when asked to 'clean up test data.' Which single change would have prevented this?",
+        choices: [
+          { id: "a", label: "Enforce read-only at the database connection level, not just in the tool description", description: "Connection-level enforcement cannot be bypassed by prompt injection or model error." },
+          { id: "b", label: "Use a stronger model — fewer erroneous DELETE queries", description: "Stronger models make fewer mistakes but cannot be relied upon as a security guarantee." },
+          { id: "c", label: "Add 'never delete data' to the tool description", description: "Prompt instructions can be overridden by user messages or jailbreaks." },
+          { id: "d", label: "Wrap outputs in a content filter before executing SQL", description: "Content filters miss semantic intent — 'remove old records' bypasses keyword filters." },
+        ],
+        branches: { a: "ag1_error", b: "ag1_error", c: "ag1_error", d: "ag1_error" },
+        rationale: "Security must be enforced at the infrastructure layer. A read-only database connection cannot execute DELETE regardless of what SQL the model generates — this is the only reliable guarantee. Prompts, content filters, and model quality are all bypassable. Principle of least privilege: give the agent only the database permissions it actually needs for its stated task.",
+      },
+      ag1_error_recovery: {
+        id: "ag1_error_recovery",
+        type: "scenario_choice",
+        badge: "Recovery · Error Handling",
+        title: "Recovery · Silent failures are the most dangerous",
+        prompt: "A payment_process tool fails and returns {result: []}. The model infers 'no payment needed' and ships the order without charging. What design principle would have prevented this?",
+        choices: [
+          { id: "a", label: "Never return empty success on failure — use explicit error codes and make success/failure unambiguous in every response", description: "The model must distinguish empty results from errors." },
+          { id: "b", label: "Always return HTTP 200 — let the application layer detect failures", description: "The model cannot see HTTP status codes — it only reads the JSON response body." },
+          { id: "c", label: "Auto-retry all failed calls — transient failures resolve themselves", description: "Silent failures should not be retried blindly — the model needs to understand what failed." },
+          { id: "d", label: "Log errors server-side — the model does not need to know about failures", description: "The model needs explicit failure signals to make correct downstream decisions." },
+        ],
+        branches: { a: "ag1_mcp_terminal", b: "ag1_mcp_terminal", c: "ag1_mcp_terminal", d: "ag1_mcp_terminal" },
+        rationale: "Silent failures ({result: []}) are the most dangerous tool error pattern. When an error looks like an empty result, the model correctly interprets it as 'no data' and makes catastrophically wrong decisions — in this case, shipping without charging. Every tool response must have an unambiguous success/failure signal: a boolean 'success' field, an error_code for programmatic handling, and a human-readable message the model can use to choose the correct recovery path.",
       },
     },
   },

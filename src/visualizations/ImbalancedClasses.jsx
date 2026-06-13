@@ -331,7 +331,7 @@ export default function ImbalancedClasses() {
           <Bar label="recall (minority caught)" value={m.rec} color={DS.grn} />
           <Bar label="F1" value={m.f1} color={DS.ind} />
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 12 }}>
+          <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 12 }}>
             <div style={cellStyle("52,211,153", m.tn, maxCell)}>
               <div style={{ fontSize: 16, fontWeight: 700, color: DS.t1 }}>{m.tn}</div>
               <div style={{ fontSize: 9, color: DS.t3 }}>TN</div>

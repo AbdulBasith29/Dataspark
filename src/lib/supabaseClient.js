@@ -16,9 +16,10 @@ export function getSupabaseBrowserClient() {
 
   cached = createClient(url, anonKey, {
     auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-      detectSessionInUrl: false,
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storageKey: "dataspark-auth",
     },
   });
 

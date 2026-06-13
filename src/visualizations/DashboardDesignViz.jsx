@@ -123,7 +123,7 @@ export default function DashboardDesignViz() {
         </div>
 
         {/* 6 cramped tiles */}
-        <div
+        <div className="ds-g3"
           style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr 1fr",

@@ -3,14 +3,123 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DataSpark</title>
+    <title>DataSpark — Data Science Interview Prep</title>
+    <meta name="description" content="Master data science interviews with 285+ scenario-based lessons in Python, SQL, Statistics, ML, and GenAI. Interactive coding challenges, AI feedback, and a shareable scorecard." />
+    <meta name="theme-color" content="#020617" />
+
+    <!-- Open Graph -->
+    <meta property="og:type"        content="website" />
+    <meta property="og:site_name"   content="DataSpark" />
+    <meta property="og:title"       content="DataSpark — Data Science Interview Prep" />
+    <meta property="og:description" content="Master data science interviews with 285+ scenario-based lessons in Python, SQL, Statistics, ML, and GenAI. Interactive coding challenges, AI feedback, and a shareable scorecard." />
+    <meta property="og:image"       content="https://dataspark-prep.com/og-image.png" />
+    <meta property="og:url"         content="https://dataspark-prep.com" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card"        content="summary_large_image" />
+    <meta name="twitter:title"       content="DataSpark — Data Science Interview Prep" />
+    <meta name="twitter:description" content="285+ scenario-based lessons. Interactive coding. AI feedback. Get interview-ready for data science roles." />
+    <meta name="twitter:image"       content="https://dataspark-prep.com/og-image.png" />
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://dataspark-prep.com" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+    />
     <style>
       :root {
         --ds-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         --ds-mono: "JetBrains Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+        /* Motion system — segment-standard curves (defaults are too weak) */
+        --ds-ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+        --ds-ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+        --ds-dur-fast: 140ms;
+        --ds-dur-base: 200ms;
+        --ds-dur-enter: 350ms;
       }
       html, body { margin: 0; background: #020617; }
-      body { font-family: var(--ds-sans); }
+      body {
+        font-family: var(--ds-sans);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+        font-feature-settings: "cv11", "ss01";
+      }
+      h1, h2, h3 { text-wrap: balance; }
+
+      /* ── Atmosphere: single indigo glow + noise so the canvas isn't a void ── */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background:
+          radial-gradient(ellipse 900px 480px at 50% -120px, rgba(99, 102, 241, 0.09), transparent 70%);
+      }
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        opacity: 0.025;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      }
+
+      /* ── Enter animations ── */
+      @keyframes ds-fade-up {
+        from { opacity: 0; transform: translateY(8px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      .ds-animate-in {
+        animation: ds-fade-up var(--ds-dur-enter) var(--ds-ease-out) both;
+      }
+      /* Staggered list/grid reveal — caps at 12 children, 40ms apart */
+      .ds-stagger > * { animation: ds-fade-up var(--ds-dur-enter) var(--ds-ease-out) both; }
+      .ds-stagger > *:nth-child(1)  { animation-delay: 0ms; }
+      .ds-stagger > *:nth-child(2)  { animation-delay: 40ms; }
+      .ds-stagger > *:nth-child(3)  { animation-delay: 80ms; }
+      .ds-stagger > *:nth-child(4)  { animation-delay: 120ms; }
+      .ds-stagger > *:nth-child(5)  { animation-delay: 160ms; }
+      .ds-stagger > *:nth-child(6)  { animation-delay: 200ms; }
+      .ds-stagger > *:nth-child(7)  { animation-delay: 240ms; }
+      .ds-stagger > *:nth-child(8)  { animation-delay: 280ms; }
+      .ds-stagger > *:nth-child(9)  { animation-delay: 320ms; }
+      .ds-stagger > *:nth-child(10) { animation-delay: 360ms; }
+      .ds-stagger > *:nth-child(11) { animation-delay: 400ms; }
+      .ds-stagger > *:nth-child(n+12) { animation-delay: 440ms; }
+
+      /* ── Interaction states ── */
+      button {
+        transition:
+          background-color var(--ds-dur-fast) var(--ds-ease-out),
+          border-color var(--ds-dur-fast) var(--ds-ease-out),
+          color var(--ds-dur-fast) var(--ds-ease-out),
+          transform var(--ds-dur-fast) var(--ds-ease-out),
+          box-shadow var(--ds-dur-base) var(--ds-ease-out);
+      }
+      @media (hover: hover) and (pointer: fine) {
+        button:active { transform: scale(0.97); }
+      }
+
+      /* Branded focus ring — replaces browser default */
+      :focus { outline: none; }
+      :focus-visible {
+        outline: 2px solid rgba(99, 102, 241, 0.55);
+        outline-offset: 2px;
+        border-radius: 4px;
+      }
+
+      ::selection { background: rgba(99, 102, 241, 0.35); }
+
       @media (prefers-reduced-motion: reduce) {
         *, *::before, *::after {
           animation-duration: 0.001ms !important;

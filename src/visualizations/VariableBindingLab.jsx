@@ -1,5 +1,16 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { DS } from "../lib/ds-platform-tokens.js";
+
+function useIsMobile() {
+  const [m, setM] = useState(() => typeof window !== "undefined" && window.innerWidth <= 640);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const h = (e) => setM(e.matches);
+    mq.addEventListener("change", h);
+    return () => mq.removeEventListener("change", h);
+  }, []);
+  return m;
+}
 
 const scenarios = {
   alias: {
@@ -68,6 +79,7 @@ function CodeBlock({ lines }) {
 }
 
 export default function VariableBindingLab() {
+  const isMobile = useIsMobile();
   const [active, setActive] = useState("alias");
   const scenario = scenarios[active];
   const objectLookup = useMemo(() => Object.fromEntries(scenario.objects.map((object) => [object.id, object])), [scenario.objects]);
@@ -112,11 +124,11 @@ export default function VariableBindingLab() {
         })}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 0.95fr) minmax(0, 1.35fr)", gap: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 0.95fr) minmax(0, 1.35fr)", gap: 14 }}>
         <CodeBlock lines={scenario.code} />
 
         <div style={{ border: `1px solid ${DS.border}`, borderRadius: 14, background: "rgba(15,23,42,0.42)", padding: 14 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(100px, 0.55fr) minmax(0, 1fr)", gap: 12, alignItems: "stretch" }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(100px, 0.55fr) minmax(0, 1fr)", gap: 12, alignItems: "stretch" }}>
             <div>
               <div style={{ fontSize: 9, color: DS.grn, letterSpacing: 1.4, fontFamily: "var(--ds-mono)", marginBottom: 8 }}>NAMES</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -150,7 +162,7 @@ export default function VariableBindingLab() {
         </div>
       </div>
 
-      <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 10 }}>
+      <div className="ds-g2" style={{ marginTop: 14, display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)", gap: 10 }}>
         <div style={{ border: "1px solid rgba(52,211,153,0.22)", background: "rgba(52,211,153,0.06)", borderRadius: 12, padding: "12px 14px", color: DS.t2, fontSize: 13, lineHeight: 1.55 }}>
           <strong style={{ color: DS.grn }}>Prediction check:</strong> {scenario.verdict}
         </div>

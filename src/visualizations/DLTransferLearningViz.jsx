@@ -216,7 +216,7 @@ function LayersTab() {
       </label>
 
       {/* Stats */}
-      <div style={{
+      <div className="ds-g3" style={{
         display: "grid",
         gridTemplateColumns: "1fr 1fr 1fr",
         gap: 10,
@@ -288,7 +288,7 @@ function StrategiesTab() {
 
               {/* Expanded content */}
               {isOpen && (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                   {[
                     { label: "When to use", value: s.whenToUse, color: DS.t2 },
                     { label: "Data requirement", value: s.dataReq, color: s.dataReqColor },
@@ -453,7 +453,7 @@ function LRTab() {
       </div>
 
       {/* Explanation cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+      <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
         {[
           {
             title: "Early layers",

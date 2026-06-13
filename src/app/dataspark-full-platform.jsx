@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { Check, ArrowLeft, LogOut, Shield } from "lucide-react";
+import { useAuth } from "../lib/authContext.jsx";
+import SecuritySettings from "../components/SecuritySettings.jsx";
 import AIChatbot from "../chatbot/AIChatbot.jsx";
 import SQLJoins from "../visualizations/SQLJoins.jsx";
 import TrainValTestSplit from "../visualizations/TrainValTestSplit.jsx";
@@ -126,14 +129,135 @@ import ProgressArtifactCard from "../components/platform/ProgressArtifactCard.js
 import LiveRegion from "../components/platform/LiveRegion.jsx";
 
 const PlatformLogo = () => (
-  <svg width="26" height="26" viewBox="0 0 40 40" fill="none" style={{ display: "block", flexShrink: 0 }}>
-    <circle cx="20" cy="8" r="4" fill={DS.ind} /><circle cx="10" cy="30" r="4" fill={DS.grn} />
-    <circle cx="30" cy="30" r="4" fill={DS.ind} /><circle cx="20" cy="20" r="4.5" fill={DS.t2} />
-    <line x1="20" y1="8" x2="20" y2="20" stroke={DS.ind} strokeWidth="2" opacity=".5" />
-    <line x1="10" y1="30" x2="20" y2="20" stroke={DS.grn} strokeWidth="2" opacity=".5" />
-    <line x1="30" y1="30" x2="20" y2="20" stroke={DS.ind} strokeWidth="2" opacity=".5" />
+  <svg width="26" height="26" viewBox="0 0 32 32" fill="none" style={{ display: "block", flexShrink: 0 }}>
+    <defs>
+      <radialGradient id="pl-bg" cx="40%" cy="25%" r="75%">
+        <stop offset="0%" stopColor="#1e1b4b" />
+        <stop offset="100%" stopColor="#07081a" />
+      </radialGradient>
+      <radialGradient id="pl-peak" cx="35%" cy="35%" r="65%">
+        <stop offset="0%" stopColor="#e0e7ff" />
+        <stop offset="100%" stopColor="#818CF8" />
+      </radialGradient>
+      <filter id="pl-glow" x="-100%" y="-100%" width="300%" height="300%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="2.2" result="blur" />
+        <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+      </filter>
+    </defs>
+    <rect width="32" height="32" rx="7.5" fill="url(#pl-bg)" />
+    <ellipse cx="16" cy="1.5" rx="12" ry="5" fill="rgba(129,140,248,0.1)" />
+    <rect x="0.5" y="0.5" width="31" height="31" rx="7" fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="1" />
+    <line x1="7.5" y1="24.5" x2="24.5" y2="9" stroke="rgba(129,140,248,0.28)" strokeWidth="1.5" strokeLinecap="round" />
+    <circle cx="7.5" cy="24.5" r="2" fill="#4F46E5" opacity="0.7" />
+    <circle cx="16" cy="16.75" r="2.5" fill="#6366F1" opacity="0.88" />
+    <circle cx="24.5" cy="9" r="5.5" fill="rgba(129,140,248,0.18)" filter="url(#pl-glow)" />
+    <circle cx="24.5" cy="9" r="3" fill="url(#pl-peak)" filter="url(#pl-glow)" />
+    <line x1="25.5" y1="3.5" x2="25.5" y2="6" stroke="rgba(224,231,255,0.85)" strokeWidth="1.2" strokeLinecap="round" />
+    <line x1="24.25" y1="4.75" x2="26.75" y2="4.75" stroke="rgba(224,231,255,0.85)" strokeWidth="1.2" strokeLinecap="round" />
+    <circle cx="25.5" cy="4.75" r="0.8" fill="white" />
   </svg>
 );
+
+function UserMenu() {
+  const { user, signOut } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [showSecurity, setShowSecurity] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  if (!user) return null;
+
+  const initials = (user.user_metadata?.display_name || user.email || "?")
+    .split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  const name = user.user_metadata?.display_name || user.email?.split("@")[0] || "Account";
+
+  return (
+    <>
+      <SecuritySettings open={showSecurity} onClose={() => setShowSecurity(false)} />
+      <div ref={menuRef} style={{ position: "relative", flexShrink: 0, marginLeft: 8 }}>
+        <button
+          type="button"
+          onClick={() => setOpen(v => !v)}
+          style={{
+            display: "flex", alignItems: "center", gap: 7,
+            background: open ? "rgba(255,255,255,0.07)" : "none",
+            border: `1px solid ${open ? DS.border : "transparent"}`,
+            borderRadius: 8, padding: "4px 8px 4px 4px",
+            cursor: "pointer", transition: "background 0.15s, border-color 0.15s",
+          }}
+          onMouseEnter={(e) => { if (!open) e.currentTarget.style.background = "rgba(255,255,255,0.05)"; }}
+          onMouseLeave={(e) => { if (!open) e.currentTarget.style.background = "none"; }}
+        >
+          <div style={{
+            width: 26, height: 26, borderRadius: "50%",
+            background: "linear-gradient(135deg, #6366F1, #818CF8)",
+            display: "grid", placeItems: "center",
+            fontSize: 10, fontWeight: 700, color: "#fff", flexShrink: 0,
+          }}>
+            {initials}
+          </div>
+          <span style={{ fontSize: 12, color: DS.t3, fontWeight: 500, maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {name}
+          </span>
+        </button>
+
+        {open && (
+          <div style={{
+            position: "absolute", top: "calc(100% + 8px)", right: 0,
+            background: "rgba(6,8,24,0.98)",
+            border: `1px solid ${DS.border}`,
+            borderRadius: 12, padding: "6px",
+            minWidth: 180, zIndex: 200,
+            boxShadow: "0 16px 40px rgba(0,0,0,0.5)",
+          }}>
+            <div style={{ padding: "8px 12px 10px", borderBottom: `1px solid ${DS.border}`, marginBottom: 4 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: DS.t1, marginBottom: 2 }}>{name}</div>
+              <div style={{ fontSize: 11, color: DS.dim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setOpen(false); setShowSecurity(true); }}
+              style={{
+                display: "flex", alignItems: "center", gap: 8, width: "100%",
+                background: "none", border: "none", cursor: "pointer",
+                padding: "9px 12px", borderRadius: 8, color: DS.t2, fontSize: 13,
+                transition: "background 0.15s",
+                fontFamily: "var(--ds-sans), sans-serif",
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.05)"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "none"}
+            >
+              <Shield size={14} />
+              Security
+            </button>
+            <button
+              type="button"
+              onClick={() => { setOpen(false); signOut(); }}
+              style={{
+                display: "flex", alignItems: "center", gap: 8, width: "100%",
+                background: "none", border: "none", cursor: "pointer",
+                padding: "9px 12px", borderRadius: 8, color: DS.t3, fontSize: 13,
+                transition: "background 0.15s",
+                fontFamily: "var(--ds-sans), sans-serif",
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.05)"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "none"}
+            >
+              <LogOut size={14} />
+              Sign out
+            </button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
 
 /** Monogram chip — consistent across OS/fonts (replaces emoji course icons). */
 function CourseMark({ color, mark, size = "lg" }) {
@@ -267,6 +391,13 @@ const CURRICULUM = [
           { id: "sq-d2", title: "Indexing Strategies", duration: "18 min", hasViz: true },
           { id: "sq-d3", title: "Star Schema vs Snowflake Schema", duration: "15 min", hasViz: true },
           { id: "sq-d4", title: "OLTP vs OLAP: Choosing the Right DB", duration: "12 min", hasViz: true },
+        ]
+      },
+      {
+        id: "sql-capstone",
+        title: "Capstone Assessment",
+        lessons: [
+          { id: "sql-capstone-01", title: "StreamCore Analytics Challenge", duration: "45 min", hasViz: false, isCapstone: true },
         ]
       }
     ],
@@ -1301,7 +1432,7 @@ export default function DataSparkPlatform() {
           fontWeight: 400,
         }}
         >
-          The DataSpark approach: <span style={{ color: DS.ind }}>systems thinking</span>
+          The DataSpark approach: <span style={{ color: DS.t1, fontWeight: 600 }}>systems thinking</span>
           {" "}over syntax drills. Learn visually, practice with context, and use the tutor when you are stuck.
         </p>
         <div style={{
@@ -1316,7 +1447,7 @@ export default function DataSparkPlatform() {
         >
           {[{ n: CURRICULUM.length, l: "Courses" }, { n: totalLessons, l: "Lessons" }, { n: totalQuestions, l: "Practice Qs" }, { n: completedLessons, l: "Completed" }].map((s, i) => (
             <div key={i} style={{ textAlign: "center" }}>
-              <div style={{ fontSize: "clamp(22px, 4vw, 28px)", fontWeight: 800, color: DS.t1, fontFamily: "var(--ds-sans), sans-serif" }}>{s.n}</div>
+              <div style={{ fontSize: "clamp(22px, 4vw, 28px)", fontWeight: 650, color: DS.t1, fontFamily: "var(--ds-sans), sans-serif", letterSpacing: "-0.02em" }}>{s.n}</div>
               <div style={{ fontSize: 10, color: DS.dim, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "var(--ds-mono), monospace" }}>{s.l}</div>
             </div>
           ))}
@@ -1361,10 +1492,10 @@ export default function DataSparkPlatform() {
             </div>
             {artifacts.unlockedSkills.length > 0 && (
               <div style={{ marginBottom: 8 }}>
-                <div style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Unlocked skills</div>
+                <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Unlocked skills</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {artifacts.unlockedSkills.map((skill) => (
-                    <span key={skill} style={{ fontSize: 10, padding: "4px 10px", borderRadius: 999, background: "rgba(59,130,246,0.12)", color: "#60A5FA", fontFamily: "var(--ds-mono), monospace", fontWeight: 600, border: "1px solid rgba(59,130,246,0.3)" }}>
+                    <span key={skill} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 999, background: "rgba(59,130,246,0.12)", color: "#60A5FA", fontFamily: "var(--ds-mono), monospace", fontWeight: 600, border: "1px solid rgba(59,130,246,0.3)" }}>
                       {skill}
                     </span>
                   ))}
@@ -1373,10 +1504,10 @@ export default function DataSparkPlatform() {
             )}
             {artifacts.readinessMilestones.length > 0 && (
               <div>
-                <div style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Milestones reached</div>
+                <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginBottom: 6 }}>Milestones reached</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {artifacts.readinessMilestones.map((m) => (
-                    <span key={m} style={{ fontSize: 10, padding: "4px 10px", borderRadius: 999, background: "rgba(52,211,153,0.12)", color: DS.grn, fontFamily: "var(--ds-mono), monospace", fontWeight: 600, border: "1px solid rgba(52,211,153,0.3)" }}>
+                    <span key={m} style={{ fontSize: 11, padding: "4px 10px", borderRadius: 999, background: "rgba(52,211,153,0.12)", color: DS.grn, fontFamily: "var(--ds-mono), monospace", fontWeight: 600, border: "1px solid rgba(52,211,153,0.3)" }}>
                       {m}
                     </span>
                   ))}
@@ -1385,10 +1516,10 @@ export default function DataSparkPlatform() {
             )}
             {clusterNarratives.length > 0 && (
               <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${DS.border}`, display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace" }}>You can now</div>
+                <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace" }}>You can now</div>
                 {clusterNarratives.map((c) => (
                   <div key={c.title} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                    <span aria-hidden="true" style={{ color: DS.grn, fontWeight: 700, lineHeight: 1.5 }}>✓</span>
+                    <span aria-hidden="true" style={{ color: DS.grn, lineHeight: 1.5, flexShrink: 0, marginTop: 2 }}><Check size={13} strokeWidth={2.5} /></span>
                     <span style={{ fontSize: 13, color: DS.t2, lineHeight: 1.5, fontFamily: "var(--ds-sans), sans-serif" }}>{c.completionStatement}</span>
                   </div>
                 ))}
@@ -1405,7 +1536,7 @@ export default function DataSparkPlatform() {
         );
       })()}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16, paddingBottom: 72 }}>
+      <div className="ds-stagger" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16, paddingBottom: 72 }}>
         {CURRICULUM.map((course) => {
           const lessonCount = course.topics.reduce((a, t) => a + t.lessons.length, 0);
           const doneCount = course.topics.reduce((a, t) => a + t.lessons.filter(l => progress[l.id] === "done").length, 0);
@@ -1419,39 +1550,39 @@ export default function DataSparkPlatform() {
               onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveCourse(course); setView("course"); setCourseTab("learn"); } }}
               onClick={() => { setActiveCourse(course); setView("course"); setCourseTab("learn"); }}
               style={{
-                ...dsGlassCard({ cursor: "pointer", transition: "transform 0.2s, box-shadow 0.2s, border-color 0.2s" }),
+                ...dsGlassCard({ cursor: "pointer", transition: `transform ${DS.durBase} ${DS.easeOut}, background ${DS.durBase} ${DS.easeOut}, border-color ${DS.durFast} ${DS.easeOut}` }),
                 padding: "22px 20px",
                 position: "relative",
                 overflow: "hidden",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = `${course.color}40`;
-                e.currentTarget.style.transform = "translateY(-3px)";
-                e.currentTarget.style.boxShadow = `${DS.shadowCard}, 0 0 40px ${course.color}12`;
+                e.currentTarget.style.borderColor = `${course.color}55`;
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.background = DS.surface2;
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.borderColor = DS.border;
                 e.currentTarget.style.transform = "none";
-                e.currentTarget.style.boxShadow = DS.shadowCard;
+                e.currentTarget.style.background = DS.cardGlass;
               }}
             >
-              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${course.color}, ${DS.ind}40, transparent)` }} />
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${course.color}, ${course.color}00)` }} />
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
                 <CourseMark color={course.color} mark={course.mark} size="lg" />
-                <span style={{ fontSize: 10, color: DS.dim, fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>{lessonCount} lessons · {course.questions.length} Qs</span>
+                <span style={{ fontSize: 11, color: DS.dim, fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>{lessonCount} lessons · {course.questions.length} Qs</span>
               </div>
               <div style={{ fontSize: 17, fontWeight: 700, color: DS.t1, fontFamily: "var(--ds-sans), sans-serif", marginBottom: 8 }}>{course.title}</div>
               <div style={{ fontSize: 13, color: DS.t3, lineHeight: 1.55, fontFamily: "var(--ds-sans), sans-serif", marginBottom: 14, minHeight: 44 }}>{course.description}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
                 {course.topics.slice(0, 3).map(t => (
-                  <span key={t.id} style={{ fontSize: 9, padding: "4px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: DS.t3, fontFamily: "var(--ds-mono), monospace", border: `1px solid ${DS.border}` }}>{t.title}</span>
+                  <span key={t.id} style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: DS.t3, fontFamily: "var(--ds-mono), monospace", border: `1px solid ${DS.border}` }}>{t.title}</span>
                 ))}
-                {course.topics.length > 3 && <span style={{ fontSize: 9, padding: "4px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: DS.dim, fontFamily: "var(--ds-mono), monospace", border: `1px solid ${DS.border}` }}>+{course.topics.length - 3}</span>}
+                {course.topics.length > 3 && <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: DS.dim, fontFamily: "var(--ds-mono), monospace", border: `1px solid ${DS.border}` }}>+{course.topics.length - 3}</span>}
               </div>
               <div style={{ background: "rgba(255,255,255,0.06)", borderRadius: 6, height: 4, overflow: "hidden" }}>
                 <div style={{ width: `${pct}%`, height: "100%", background: `linear-gradient(90deg, ${course.color}, ${course.accent})`, borderRadius: 6, transition: "width 0.4s" }} />
               </div>
-              <div style={{ fontSize: 10, color: DS.dim, marginTop: 6, fontFamily: "var(--ds-mono), monospace" }}>{pct}% complete</div>
+              <div style={{ fontSize: 11, color: DS.dim, marginTop: 6, fontFamily: "var(--ds-mono), monospace" }}>{pct}% complete</div>
             </div>
           );
         })}
@@ -1466,12 +1597,12 @@ export default function DataSparkPlatform() {
 
     return (
       <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 clamp(16px, 4vw, 28px)" }}>
-        <button type="button" onClick={() => setView("home")} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>← All courses</button>
+        <button type="button" onClick={() => setView("home")} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "20px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5 }}><ArrowLeft size={14} /> All courses</button>
 
         <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 8 }}>
           <CourseMark color={c.color} mark={c.mark} size="md" />
           <div>
-            <h1 style={{ fontSize: "clamp(22px, 4vw, 30px)", fontWeight: 800, color: DS.t1, margin: 0, letterSpacing: "-0.02em" }}>{c.title}</h1>
+            <h1 style={{ fontSize: "clamp(22px, 4vw, 30px)", fontWeight: 650, color: DS.t1, margin: 0, letterSpacing: "-0.03em" }}>{c.title}</h1>
             <p style={{ fontSize: 14, color: DS.t3, margin: "6px 0 0", fontWeight: 400, lineHeight: 1.55, maxWidth: 640 }}>{c.description}</p>
           </div>
         </div>
@@ -1496,7 +1627,7 @@ export default function DataSparkPlatform() {
             {c.topics.map(topic => (
               <div key={topic.id} style={{ marginBottom: 32 }}>
                 <h3 style={{ fontSize: 11, fontWeight: 700, color: c.accent, fontFamily: "var(--ds-mono), monospace", marginBottom: 12, paddingBottom: 8, borderBottom: `1px solid ${c.color}22`, letterSpacing: "0.14em", textTransform: "uppercase" }}>{topic.title}</h3>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div className="ds-stagger" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {topic.lessons.map((lesson, li) => {
                     const isDone = progress[lesson.id] === "done";
                     return (
@@ -1507,10 +1638,10 @@ export default function DataSparkPlatform() {
                         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveLesson(lesson); setView("lesson"); } }}
                         onClick={() => { setActiveLesson(lesson); setView("lesson"); }}
                         style={{
-                          ...dsGlassCard({ padding: "14px 16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", transition: "border-color 0.2s, box-shadow 0.2s" }),
+                          ...dsGlassCard({ padding: "14px 16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", transition: `border-color ${DS.durFast} ${DS.easeOut}, background ${DS.durBase} ${DS.easeOut}` }),
                         }}
-                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${c.color}40`; e.currentTarget.style.boxShadow = `${DS.shadowCard}, 0 0 24px ${c.color}10`; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = DS.border; e.currentTarget.style.boxShadow = DS.shadowCard; }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${c.color}55`; e.currentTarget.style.background = DS.surface2; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = DS.border; e.currentTarget.style.background = DS.cardGlass; }}
                       >
                         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                           <div style={{
@@ -1520,15 +1651,15 @@ export default function DataSparkPlatform() {
                             display: "flex", alignItems: "center", justifyContent: "center",
                             fontSize: 12, color: isDone ? DS.grn : DS.dim, fontWeight: 700, fontFamily: "var(--ds-mono), monospace",
                           }}>
-                            {isDone ? "✓" : li + 1}
+                            {isDone ? <Check size={13} strokeWidth={2.5} /> : li + 1}
                           </div>
                           <div>
                             <div style={{ fontSize: 14, fontWeight: 600, color: DS.t1 }}>{lesson.title}</div>
-                            <div style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginTop: 2 }}>{lesson.duration}</div>
+                            <div style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace", marginTop: 2 }}>{lesson.duration}</div>
                           </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          {lesson.hasViz && <span style={{ fontSize: 9, padding: "4px 8px", borderRadius: 6, background: `${c.color}18`, color: c.accent, fontFamily: "var(--ds-mono), monospace", fontWeight: 600, border: `1px solid ${c.color}30` }}>Interactive</span>}
+                          {lesson.hasViz && <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, background: `${c.color}18`, color: c.accent, fontFamily: "var(--ds-mono), monospace", fontWeight: 600, border: `1px solid ${c.color}30` }}>Interactive</span>}
                         </div>
                       </div>
                     );
@@ -1544,8 +1675,8 @@ export default function DataSparkPlatform() {
             <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
               {["All", "Easy", "Medium", "Hard"].map(d => (
                 <button key={d} type="button" onClick={() => setDiffFilter(d)} style={{
-                  background: diffFilter === d ? "rgba(99,102,241,0.12)" : "transparent", border: `1px solid ${diffFilter === d ? `${c.color}35` : DS.border}`,
-                  borderRadius: 8, padding: "6px 12px", color: diffFilter === d ? DS.t1 : DS.dim, fontSize: 11, cursor: "pointer", fontFamily: "var(--ds-mono), monospace", fontWeight: 600,
+                  background: diffFilter === d ? `${c.color}18` : "transparent", border: `1px solid ${diffFilter === d ? `${c.color}35` : DS.border}`,
+                  borderRadius: 8, padding: "6px 12px", color: diffFilter === d ? DS.t1 : DS.dim, fontSize: 12, cursor: "pointer", fontFamily: "var(--ds-mono), monospace", fontWeight: 600,
                 }}>{d}</button>
               ))}
             </div>
@@ -1568,11 +1699,11 @@ export default function DataSparkPlatform() {
                     <div>
                       <div style={{ fontSize: 15, fontWeight: 600, color: DS.t1, marginBottom: 6 }}>{q.title}</div>
                       <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                        {(q.tags || []).map(t => <span key={t} style={{ fontSize: 9, padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: DS.t3, fontFamily: "var(--ds-mono), monospace", border: `1px solid ${DS.border}` }}>{t}</span>)}
+                        {(q.tags || []).map(t => <span key={t} style={{ fontSize: 11, padding: "2px 7px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: DS.t3, fontFamily: "var(--ds-mono), monospace", border: `1px solid ${DS.border}` }}>{t}</span>)}
                       </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                      <span style={{ fontSize: 10, color: DS.t3, fontFamily: "var(--ds-mono), monospace" }}>{q.type === "code" ? "Coding" : "Open-ended"}</span>
+                      <span style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace" }}>{q.type === "code" ? "Coding" : "Open-ended"}</span>
                       {diffBadge(q.difficulty)}
                     </div>
                   </div>
@@ -1603,7 +1734,7 @@ export default function DataSparkPlatform() {
         VizComponent={VizComponent}
         vizComingSoon={!VizComponent && !!activeLesson.hasViz}
         onBack={() => setView("course")}
-        backLabel={`← Back to ${activeCourse.title}`}
+        backLabel={`Back to ${activeCourse.title}`}
         onMarkComplete={() => {
           try {
             trackLvsEvent({
@@ -1632,7 +1763,7 @@ export default function DataSparkPlatform() {
 
     return (
       <div style={{ padding: "0 clamp(8px, 2vw, 16px)" }}>
-        <button type="button" onClick={() => { setCourseTab("practice"); setView("course"); }} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "16px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600 }}>← Back to practice</button>
+        <button type="button" onClick={() => { setCourseTab("practice"); setView("course"); }} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "16px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5 }}><ArrowLeft size={14} /> Back to practice</button>
 
         <PracticeQuestion
           question={q}
@@ -1662,14 +1793,23 @@ export default function DataSparkPlatform() {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 3px; }
         input[type="range"] { height: 4px; }
+        @media (max-width: 640px) {
+          .ds-nav { flex-wrap: wrap !important; padding: 8px 16px 6px !important; gap: 6px !important; }
+          .ds-nav-right { max-width: 100% !important; width: 100%; padding-bottom: 4px; }
+          .ds-g2 { grid-template-columns: 1fr !important; }
+          .ds-g3 { grid-template-columns: 1fr !important; }
+          .ds-artifact-row { grid-template-columns: 1fr !important; }
+          .ds-artifact-tier { text-align: left !important; }
+          .ds-code-line--tap { min-height: 44px !important; align-items: center; }
+        }
       `}</style>
 
       <div style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none" }}>
-        <div style={{ position: "absolute", width: 720, height: 720, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.07) 0%, transparent 68%)", top: "-18%", left: "-10%" }} />
+        <div style={{ position: "absolute", width: 720, height: 720, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.04) 0%, transparent 68%)", top: "-18%", left: "-10%" }} />
         <div style={{ position: "absolute", width: 480, height: 480, borderRadius: "50%", background: "radial-gradient(circle, rgba(52,211,153,0.05) 0%, transparent 70%)", bottom: "0%", right: "-8%" }} />
       </div>
 
-      <nav style={{
+      <nav className="ds-nav" style={{
         borderBottom: `1px solid ${DS.border}`,
         padding: "12px clamp(16px, 3vw, 28px)",
         display: "flex",
@@ -1726,14 +1866,14 @@ export default function DataSparkPlatform() {
           </Link>
         </div>
 
-        <div style={{ display: "flex", gap: 4, overflowX: "auto", maxWidth: "min(68vw, 520px)", paddingBottom: 2 }}>
+        <div className="ds-nav-right" style={{ display: "flex", gap: 4, overflowX: "auto", maxWidth: "min(68vw, 520px)", paddingBottom: 2 }}>
           {CURRICULUM.slice(0, 6).map(c => (
             <button
               key={c.id}
               type="button"
               onClick={() => { setActiveCourse(c); setView("course"); setCourseTab("learn"); }}
               style={{
-                background: activeCourse?.id === c.id ? "rgba(99,102,241,0.12)" : "transparent",
+                background: activeCourse?.id === c.id ? `${c.color}18` : "transparent",
                 border: `1px solid ${activeCourse?.id === c.id ? `${c.color}35` : "transparent"}`,
                 borderRadius: 8,
                 padding: "4px 8px 4px 4px",
@@ -1754,13 +1894,15 @@ export default function DataSparkPlatform() {
             </button>
           ))}
         </div>
+
+        <UserMenu />
       </nav>
 
       <main style={{ paddingBottom: 72, position: "relative", zIndex: 1 }}>
-        {view === "home" && renderHome()}
-        {view === "course" && renderCourse()}
-        {view === "lesson" && renderLesson()}
-        {view === "question" && renderQuestion()}
+        {view === "home" && <div key="home" className="ds-animate-in">{renderHome()}</div>}
+        {view === "course" && <div key={`course-${activeCourse?.id}`} className="ds-animate-in">{renderCourse()}</div>}
+        {view === "lesson" && <div key={`lesson-${activeLesson?.id}`} className="ds-animate-in">{renderLesson()}</div>}
+        {view === "question" && <div key={`question-${activeQuestion?.id}`} className="ds-animate-in">{renderQuestion()}</div>}
       </main>
 
       {chatbotCourse && <AIChatbot course={chatbotCourse} seedInput={chatbotSeed} onClose={() => { setChatbotCourse(null); setChatbotSeed(""); }} />}

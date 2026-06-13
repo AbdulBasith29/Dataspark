@@ -473,7 +473,7 @@ function MergeTab() {
       </div>
 
       {/* Source tables */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+      <div className="ds-g2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
         {/* Orders */}
         <div>
           <div style={LABEL_STYLE}>ORDERS (left df)</div>

@@ -268,7 +268,7 @@ export default function StatPercentileIQRViz() {
               })}
             </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+          <div className="ds-g3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
             {[
               { label: "Lower fence", value: lowerFence.toFixed(1), color: "#F87171" },
               { label: "Upper fence", value: upperFence.toFixed(1), color: "#F87171" },
