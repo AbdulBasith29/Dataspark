@@ -805,7 +805,7 @@ function Hero() {
       ref={parallaxRef}
       style={{
         position: "relative",
-        minHeight: "94vh",
+        minHeight: "100vh",
         display: "flex",
         flexDirection: "column",
       }}
@@ -853,32 +853,33 @@ function Hero() {
           </span>
         </nav>
 
-        {/* Hero body */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 26, paddingBottom: 72 }}>
-          <div style={{ animation: "ds2-rise 0.55s var(--ds-ease-out) 0.08s both" }}>
+        {/* Hero body — centered-low: sky above, statement below */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 0, paddingBottom: 90 }}>
+          <div style={{ animation: "ds2-rise 0.55s var(--ds-ease-out) 0.08s both", marginBottom: 28 }}>
             <span
               style={{
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 8,
                 fontFamily: MONO,
-                fontSize: 11.5,
-                letterSpacing: "0.18em",
+                fontSize: 11,
+                letterSpacing: "0.2em",
                 textTransform: "uppercase",
                 color: CYAN,
-                border: `1px solid rgba(34,211,238,0.3)`,
-                background: "rgba(34,211,238,0.05)",
+                border: `1px solid rgba(34,211,238,0.25)`,
+                background: "rgba(34,211,238,0.04)",
                 borderRadius: 999,
-                padding: "7px 16px",
+                padding: "6px 14px",
               }}
             >
               <span
                 style={{
-                  width: 6,
-                  height: 6,
+                  width: 5,
+                  height: 5,
                   borderRadius: "50%",
                   background: CYAN,
                   animation: "ds2-blink 1.6s ease-in-out infinite",
+                  flexShrink: 0,
                 }}
               />
               Early access · Cohort 02 opening soon
@@ -887,49 +888,57 @@ function Hero() {
 
           <h1
             style={{
-              margin: 0,
+              margin: "0 0 22px",
               fontFamily: SANS,
               fontWeight: 800,
-              fontSize: "clamp(40px, 7vw, 78px)",
-              lineHeight: 1.04,
-              letterSpacing: "-0.035em",
+              fontSize: "clamp(52px, 9vw, 106px)",
+              lineHeight: 0.97,
+              letterSpacing: "-0.045em",
               color: WHITE,
-              maxWidth: 880,
-              animation: "ds2-rise 0.6s var(--ds-ease-out) 0.16s both",
+              maxWidth: 960,
+              animation: "ds2-rise 0.65s var(--ds-ease-out) 0.14s both",
             }}
           >
-            Stop grinding questions.
+            Stop grinding<br />
+            <span style={{ color: "rgba(248,250,252,0.45)" }}>questions.</span>
             <br />
-            <span className="ds2-shimmer">Start solving systems.</span>
+            <span style={{
+              background: `linear-gradient(110deg, ${WHITE} 0%, rgba(168,85,247,0.85) 55%, ${CYAN} 100%)`,
+              WebkitBackgroundClip: "text",
+              backgroundClip: "text",
+              color: "transparent",
+            }}>
+              Start solving systems.
+            </span>
           </h1>
 
           <p
             style={{
-              margin: 0,
+              margin: "0 0 32px",
               fontFamily: SANS,
-              fontSize: "clamp(16px, 2vw, 19px)",
-              lineHeight: 1.65,
-              color: GRAY,
-              maxWidth: 620,
-              animation: "ds2-rise 0.6s var(--ds-ease-out) 0.24s both",
+              fontSize: "clamp(15px, 1.6vw, 17px)",
+              lineHeight: 1.7,
+              color: "#64748B",
+              maxWidth: 500,
+              animation: "ds2-rise 0.6s var(--ds-ease-out) 0.26s both",
+              letterSpacing: "0.01em",
             }}
           >
-            Most platforms train you to solve isolated coding questions. Real
-            interviews ask you to{" "}
-            <strong style={{ color: WHITE, fontWeight: 600 }}>
-              investigate business problems
-            </strong>{" "}
-            and explain your thinking clearly.
+            Real interviews don't ask you to reverse a linked list.
+            They ask you to{" "}
+            <span style={{ color: GRAY }}>
+              investigate business problems and defend your reasoning.
+            </span>
           </p>
 
-          <div style={{ animation: "ds2-rise 0.6s var(--ds-ease-out) 0.32s both" }}>
+          <div style={{ animation: "ds2-rise 0.6s var(--ds-ease-out) 0.36s both", marginBottom: 24 }}>
             <EmailCapture />
-            <p style={{ margin: "10px 2px 0", fontFamily: MONO, fontSize: 11.5, color: DIM }}>
-              Free for early access · No credit card
+            <p style={{ margin: "10px 2px 0", fontFamily: MONO, fontSize: 10.5, color: "#334155" }}>
+              Free during early access · No credit card
             </p>
           </div>
 
-          <div style={{ animation: "ds2-rise 0.6s var(--ds-ease-out) 0.42s both" }}>
+          <div style={{ animation: "ds2-rise 0.6s var(--ds-ease-out) 0.46s both" }}>
             <KineticBadge />
           </div>
         </div>
@@ -1004,6 +1013,79 @@ function Ticker() {
   );
 }
 
+// ── Oversized metrics strip ───────────────────────────────────────────────────
+function MetricsStrip() {
+  const [ref, inView] = useInView(0.4);
+  const n1 = useCountUp(847, inView, 1400);
+  const n2 = useCountUp(285, inView, 1600);
+  const metrics = [
+    { num: n1, suffix: "", label: "professionals active" },
+    { num: n2, suffix: "+", label: "scenario missions" },
+    { num: 4, suffix: "", label: "domains · Python · SQL · ML · Stats" },
+  ];
+  return (
+    <div
+      ref={ref}
+      style={{
+        position: "relative",
+        zIndex: 1,
+        padding: "80px 24px 90px",
+        maxWidth: 1120,
+        margin: "0 auto",
+      }}
+    >
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: "0",
+          borderTop: `1px solid ${BORDER_SOFT}`,
+          borderBottom: `1px solid ${BORDER_SOFT}`,
+        }}
+      >
+        {metrics.map((m, i) => (
+          <div
+            key={m.label}
+            style={{
+              padding: "48px 32px",
+              borderLeft: i === 0 ? "none" : `1px solid ${BORDER_SOFT}`,
+              opacity: inView ? 1 : 0,
+              transform: inView ? "none" : "translateY(20px)",
+              transition: `opacity 0.7s var(--ds-ease-out) ${i * 0.1}s, transform 0.7s var(--ds-ease-out) ${i * 0.1}s`,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: MONO,
+                fontSize: "clamp(52px, 6vw, 80px)",
+                fontWeight: 700,
+                lineHeight: 1,
+                letterSpacing: "-0.04em",
+                color: WHITE,
+                fontVariantNumeric: "tabular-nums",
+                marginBottom: 12,
+              }}
+            >
+              {m.num.toLocaleString()}{m.suffix}
+            </div>
+            <div
+              style={{
+                fontFamily: MONO,
+                fontSize: 11,
+                letterSpacing: "0.18em",
+                textTransform: "uppercase",
+                color: DIM,
+              }}
+            >
+              {m.label}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Scroll-linked transformation ─────────────────────────────────────────────
 // Isolated code boxes warp into a system-design mind map + mission scorecard.
 function TransformSection() {
@@ -1064,10 +1146,10 @@ function TransformSection() {
               margin: "14px 0 0",
               fontFamily: SANS,
               fontWeight: 800,
-              fontSize: "clamp(26px, 4vw, 42px)",
-              letterSpacing: "-0.03em",
+              fontSize: "clamp(30px, 4.5vw, 52px)",
+              letterSpacing: "-0.04em",
               color: WHITE,
-              lineHeight: 1.12,
+              lineHeight: 1.06,
             }}
           >
             {boxesOut < 0.5 ? "This is what practice looks like today." : "This is what interviews actually test."}
@@ -1748,7 +1830,7 @@ function ShowcaseSection() {
   };
 
   return (
-    <section ref={ref} style={{ position: "relative", zIndex: 1, padding: "110px 24px", maxWidth: 1120, margin: "0 auto" }}>
+    <section ref={ref} style={{ position: "relative", zIndex: 1, padding: "130px 24px", maxWidth: 1120, margin: "0 auto" }}>
       <div
         style={{
           textAlign: "center",
@@ -1766,13 +1848,19 @@ function ShowcaseSection() {
             margin: "16px 0 12px",
             fontFamily: SANS,
             fontWeight: 800,
-            fontSize: "clamp(28px, 4.5vw, 46px)",
-            letterSpacing: "-0.03em",
+            fontSize: "clamp(32px, 5vw, 60px)",
+            letterSpacing: "-0.04em",
             color: WHITE,
-            lineHeight: 1.1,
+            lineHeight: 1.04,
           }}
         >
-          See DataSpark <span className="ds2-shimmer">in action.</span>
+          See DataSpark{" "}
+          <span style={{
+            background: `linear-gradient(110deg, ${WHITE} 0%, ${CYAN} 100%)`,
+            WebkitBackgroundClip: "text",
+            backgroundClip: "text",
+            color: "transparent",
+          }}>in action.</span>
         </h2>
         <p style={{ margin: "0 auto", fontFamily: SANS, fontSize: 16, color: GRAY, maxWidth: 540, lineHeight: 1.65 }}>
           Auto-playing previews of the real product — missions, the SPARK agent, and
@@ -1905,24 +1993,49 @@ function ContrastSection() {
   const labTilt = useTilt(7);
 
   return (
-    <section ref={ref} style={{ position: "relative", zIndex: 1, padding: "110px 24px", maxWidth: 1120, margin: "0 auto" }}>
-      <div style={{ textAlign: "center", marginBottom: 52 }}>
+    <section ref={ref} style={{ position: "relative", zIndex: 1, padding: "130px 24px", maxWidth: 1120, margin: "0 auto" }}>
+      {/* Second-read moment: massive background "VS" */}
+      <div aria-hidden style={{
+        position: "absolute",
+        left: "50%",
+        top: "50%",
+        transform: "translate(-50%, -44%)",
+        fontFamily: SANS,
+        fontWeight: 800,
+        fontSize: "clamp(180px, 24vw, 340px)",
+        letterSpacing: "-0.06em",
+        color: "rgba(255,255,255,0.018)",
+        userSelect: "none",
+        pointerEvents: "none",
+        lineHeight: 1,
+        whiteSpace: "nowrap",
+      }}>
+        VS
+      </div>
+
+      <div style={{ textAlign: "center", marginBottom: 56, position: "relative" }}>
         <div style={{ display: "flex", justifyContent: "center" }}>
           <SectionKicker>Two ways to prepare</SectionKicker>
         </div>
         <h2
           style={{
-            margin: "16px 0 0",
+            margin: "18px 0 0",
             fontFamily: SANS,
             fontWeight: 800,
-            fontSize: "clamp(28px, 4.5vw, 48px)",
-            letterSpacing: "-0.03em",
+            fontSize: "clamp(30px, 5vw, 58px)",
+            letterSpacing: "-0.04em",
             color: WHITE,
-            lineHeight: 1.1,
+            lineHeight: 1.04,
           }}
         >
-          One builds coders.{" "}
-          <span className="ds2-shimmer">One builds leaders.</span>
+          One builds coders.
+          <br />
+          <span style={{
+            background: `linear-gradient(110deg, ${WHITE} 0%, ${PURPLE} 50%, ${CYAN} 100%)`,
+            WebkitBackgroundClip: "text",
+            backgroundClip: "text",
+            color: "transparent",
+          }}>One builds leaders.</span>
         </h2>
       </div>
 
@@ -2204,7 +2317,7 @@ function ChatSimulator() {
   ];
 
   return (
-    <section ref={secRef} style={{ position: "relative", zIndex: 1, padding: "110px 24px", maxWidth: 1120, margin: "0 auto" }}>
+    <section ref={secRef} style={{ position: "relative", zIndex: 1, padding: "130px 24px", maxWidth: 1120, margin: "0 auto" }}>
       <div
         style={{
           marginBottom: 44,
@@ -2219,16 +2332,16 @@ function ChatSimulator() {
             margin: "16px 0 12px",
             fontFamily: SANS,
             fontWeight: 800,
-            fontSize: "clamp(28px, 4.5vw, 46px)",
-            letterSpacing: "-0.03em",
+            fontSize: "clamp(32px, 5vw, 58px)",
+            letterSpacing: "-0.04em",
             color: WHITE,
-            lineHeight: 1.1,
+            lineHeight: 1.04,
             maxWidth: 700,
           }}
         >
           The AI that doesn&rsquo;t give you answers.
           <br />
-          It asks you <span style={{ color: CYAN }}>why</span>.
+          It asks you <span style={{ color: CYAN, fontStyle: "italic" }}>why.</span>
         </h2>
         <p style={{ margin: 0, fontFamily: SANS, fontSize: 16, color: GRAY, maxWidth: 560, lineHeight: 1.65 }}>
           Try a 60-second slice of a real DataSpark mission. Something is wrong in this
@@ -2618,31 +2731,43 @@ function FinalCTA() {
           transition: "opacity 0.8s var(--ds-ease-out), transform 0.8s var(--ds-ease-out)",
         }}
       >
+        <p style={{
+          fontFamily: MONO,
+          fontSize: 11,
+          letterSpacing: "0.22em",
+          textTransform: "uppercase",
+          color: DIM,
+          marginBottom: 28,
+        }}>
+          — The only question that matters —
+        </p>
         <h2
           style={{
-            margin: 0,
+            margin: "0 0 10px",
             fontFamily: SANS,
             fontWeight: 800,
-            fontSize: "clamp(30px, 5vw, 54px)",
-            letterSpacing: "-0.035em",
-            lineHeight: 1.1,
+            fontSize: "clamp(34px, 5.5vw, 66px)",
+            letterSpacing: "-0.04em",
+            lineHeight: 1.02,
             color: WHITE,
+            maxWidth: 820,
           }}
         >
           Your next data role won&rsquo;t ask you to reverse a linked list.
         </h2>
         <p
           style={{
-            margin: "18px auto 36px",
+            margin: "22px auto 40px",
             fontFamily: SANS,
-            fontSize: "clamp(16px, 2vw, 19px)",
-            color: GRAY,
-            maxWidth: 580,
-            lineHeight: 1.65,
+            fontSize: "clamp(16px, 1.8vw, 18px)",
+            color: "#64748B",
+            maxWidth: 540,
+            lineHeight: 1.7,
+            letterSpacing: "0.01em",
           }}
         >
-          It will ask you why churn rose 15% in EMEA — and what you&rsquo;d do about it.{" "}
-          <span style={{ color: WHITE, fontWeight: 600 }}>Train for that.</span>
+          It will ask why churn rose 15% in EMEA — and what you&rsquo;d do about it.{" "}
+          <span style={{ color: GRAY }}>Train for that.</span>
         </p>
         <div style={{ display: "flex", justifyContent: "center" }}>
           <EmailCapture compact />
@@ -2750,12 +2875,12 @@ export default function LandingPageV2() {
           to   { transform: translate3d(-7vw, -11vh, 0) scale(1.12); }
         }
         .ds2-shimmer {
-          background: linear-gradient(110deg, #A855F7 0%, #22D3EE 30%, #818CF8 55%, #A855F7 80%, #22D3EE 100%);
-          background-size: 220% 100%;
+          background: linear-gradient(110deg, #F8FAFC 0%, #A855F7 40%, #22D3EE 75%, #F8FAFC 100%);
+          background-size: 240% 100%;
           -webkit-background-clip: text;
           background-clip: text;
           color: transparent;
-          animation: ds2-sheen 6s linear infinite;
+          animation: ds2-sheen 8s linear infinite;
         }
         .ds2-cta:hover { box-shadow: 0 0 40px rgba(168,85,247,0.7) !important; transform: translateY(-1px); }
         .ds2-choice:hover { border-color: rgba(34,211,238,0.5) !important; background: rgba(34,211,238,0.06) !important; }
@@ -2782,6 +2907,7 @@ export default function LandingPageV2() {
 
       <Hero />
       <Ticker />
+      <MetricsStrip />
       <TransformSection />
       <ShowcaseSection />
       <ContrastSection />
