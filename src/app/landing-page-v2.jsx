@@ -2815,6 +2815,14 @@ function FinalCTA() {
   );
 }
 
+const FOOTER_LINK = {
+  fontFamily: MONO,
+  fontSize: 11,
+  color: "#475569",
+  textDecoration: "none",
+  letterSpacing: "0.04em",
+};
+
 function Footer() {
   return (
     <footer
@@ -2823,22 +2831,24 @@ function Footer() {
         zIndex: 1,
         borderTop: `1px solid ${BORDER_SOFT}`,
         padding: "26px 24px",
-        display: "flex",
-        flexWrap: "wrap",
-        gap: 12,
-        alignItems: "center",
-        justifyContent: "space-between",
         maxWidth: 1120,
         margin: "0 auto",
       }}
     >
-      <span style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: SANS, fontSize: 13, fontWeight: 700, color: GRAY }}>
-        <SparkMark size={18} />
-        DataSpark
-      </span>
-      <span style={{ fontFamily: MONO, fontSize: 11, color: "#334155" }}>
-        © 2026 DataSpark · dataspark-prep.com
-      </span>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: SANS, fontSize: 13, fontWeight: 700, color: GRAY }}>
+          <SparkMark size={18} />
+          DataSpark
+        </span>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 20, alignItems: "center" }}>
+          <Link to="/privacy" style={FOOTER_LINK}>Privacy Policy</Link>
+          <Link to="/terms" style={FOOTER_LINK}>Terms of Service</Link>
+          <Link to="/contact" style={FOOTER_LINK}>Contact</Link>
+          <span style={{ fontFamily: MONO, fontSize: 11, color: "#334155" }}>
+            © 2026 DataSpark
+          </span>
+        </div>
+      </div>
     </footer>
   );
 }
