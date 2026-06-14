@@ -130,31 +130,10 @@ import LiveRegion from "../components/platform/LiveRegion.jsx";
 
 const PlatformLogo = () => (
   <svg width="26" height="26" viewBox="0 0 32 32" fill="none" style={{ display: "block", flexShrink: 0 }}>
-    <defs>
-      <radialGradient id="pl-bg" cx="40%" cy="25%" r="75%">
-        <stop offset="0%" stopColor="#1e1b4b" />
-        <stop offset="100%" stopColor="#07081a" />
-      </radialGradient>
-      <radialGradient id="pl-peak" cx="35%" cy="35%" r="65%">
-        <stop offset="0%" stopColor="#e0e7ff" />
-        <stop offset="100%" stopColor="#818CF8" />
-      </radialGradient>
-      <filter id="pl-glow" x="-100%" y="-100%" width="300%" height="300%">
-        <feGaussianBlur in="SourceGraphic" stdDeviation="2.2" result="blur" />
-        <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-      </filter>
-    </defs>
-    <rect width="32" height="32" rx="7.5" fill="url(#pl-bg)" />
-    <ellipse cx="16" cy="1.5" rx="12" ry="5" fill="rgba(129,140,248,0.1)" />
-    <rect x="0.5" y="0.5" width="31" height="31" rx="7" fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="1" />
-    <line x1="7.5" y1="24.5" x2="24.5" y2="9" stroke="rgba(129,140,248,0.28)" strokeWidth="1.5" strokeLinecap="round" />
-    <circle cx="7.5" cy="24.5" r="2" fill="#4F46E5" opacity="0.7" />
-    <circle cx="16" cy="16.75" r="2.5" fill="#6366F1" opacity="0.88" />
-    <circle cx="24.5" cy="9" r="5.5" fill="rgba(129,140,248,0.18)" filter="url(#pl-glow)" />
-    <circle cx="24.5" cy="9" r="3" fill="url(#pl-peak)" filter="url(#pl-glow)" />
-    <line x1="25.5" y1="3.5" x2="25.5" y2="6" stroke="rgba(224,231,255,0.85)" strokeWidth="1.2" strokeLinecap="round" />
-    <line x1="24.25" y1="4.75" x2="26.75" y2="4.75" stroke="rgba(224,231,255,0.85)" strokeWidth="1.2" strokeLinecap="round" />
-    <circle cx="25.5" cy="4.75" r="0.8" fill="white" />
+    <rect x="1" y="1" width="30" height="30" rx="8" fill="rgba(168,85,247,0.10)" stroke="rgba(168,85,247,0.45)" />
+    <path d="M8 22 L14 15 L19 18 L25 9" stroke="#22D3EE" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx="25" cy="9" r="3" fill="#A855F7" />
+    <circle cx="25" cy="9" r="5.5" stroke="#A855F7" strokeOpacity="0.35" />
   </svg>
 );
 
@@ -196,7 +175,7 @@ function UserMenu() {
         >
           <div style={{
             width: 26, height: 26, borderRadius: "50%",
-            background: "linear-gradient(135deg, #6366F1, #818CF8)",
+            background: "linear-gradient(135deg, #A855F7, #22D3EE)",
             display: "grid", placeItems: "center",
             fontSize: 10, fontWeight: 700, color: "#fff", flexShrink: 0,
           }}>
@@ -1787,7 +1766,7 @@ export default function DataSparkPlatform() {
         * { box-sizing: border-box; margin: 0; padding: 0; }
         @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.3 } }
         ::selection { background: rgba(99,102,241,.25); color: #fff; }
-        textarea:focus-visible, input:focus-visible, button:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(99,102,241,.35); border-color: ${DS.indB} !important; }
+        textarea:focus-visible, input:focus-visible, button:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(168,85,247,.35); border-color: ${DS.indB} !important; }
         textarea:focus, input:focus { border-color: ${DS.indB} !important; }
         ::-webkit-scrollbar { width: 5px; }
         ::-webkit-scrollbar-track { background: transparent; }
