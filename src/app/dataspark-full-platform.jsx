@@ -91,6 +91,23 @@ import DLTransferLearningViz from "../visualizations/DLTransferLearningViz.jsx";
 import ChunkingStrategyViz from "../visualizations/ChunkingStrategyViz.jsx";
 import RAGPipelineViz from "../visualizations/RAGPipelineViz.jsx";
 import AdvancedRAGViz from "../visualizations/AdvancedRAGViz.jsx";
+import LanguageModelMechanicsViz from "../visualizations/LanguageModelMechanicsViz.jsx";
+import LLMStrategyMapViz from "../visualizations/LLMStrategyMapViz.jsx";
+import EmbeddingSpaceViz from "../visualizations/EmbeddingSpaceViz.jsx";
+import VectorDBIndexViz from "../visualizations/VectorDBIndexViz.jsx";
+import HybridRetrievalViz from "../visualizations/HybridRetrievalViz.jsx";
+import PromptEngineeringViz from "../visualizations/PromptEngineeringViz.jsx";
+import AgenticFrameworksViz from "../visualizations/AgenticFrameworksViz.jsx";
+import ToolUseViz from "../visualizations/ToolUseViz.jsx";
+import ReasoningLoopsViz from "../visualizations/ReasoningLoopsViz.jsx";
+import MultiAgentCoordinationViz from "../visualizations/MultiAgentCoordinationViz.jsx";
+import LLMEvaluationViz from "../visualizations/LLMEvaluationViz.jsx";
+import LLMOptimizationViz from "../visualizations/LLMOptimizationViz.jsx";
+import LoRAFineTuningViz from "../visualizations/LoRAFineTuningViz.jsx";
+import HumanInTheLoopViz from "../visualizations/HumanInTheLoopViz.jsx";
+import LLMBiasHallucinationViz from "../visualizations/LLMBiasHallucinationViz.jsx";
+import LLMSecurityComplianceViz from "../visualizations/LLMSecurityComplianceViz.jsx";
+import PromptInjectionViz from "../visualizations/PromptInjectionViz.jsx";
 import MLDriftMonitorViz from "../visualizations/MLDriftMonitorViz.jsx";
 import AirflowDAGViz from "../visualizations/AirflowDAGViz.jsx";
 import CanaryDeploymentViz from "../visualizations/CanaryDeploymentViz.jsx";
@@ -534,19 +551,19 @@ const CURRICULUM = [
         id: "genai-foundations",
         title: "LLM Foundations",
         lessons: [
-          { id: "ga-f1", title: "How Language Models Actually Work", duration: "22 min", hasViz: false },
+          { id: "ga-f1", title: "How Language Models Actually Work", duration: "22 min", hasViz: true },
           { id: "ga-f2", title: "Tokenization & Embeddings", duration: "18 min", hasViz: true },
           { id: "ga-f3", title: "Attention Mechanism Deep Dive", duration: "25 min", hasViz: true },
-          { id: "ga-f4", title: "Fine-Tuning vs RAG vs Prompting: The Strategy Map", duration: "20 min", hasViz: false },
+          { id: "ga-f4", title: "Fine-Tuning vs RAG vs Prompting: The Strategy Map", duration: "20 min", hasViz: true },
         ]
       },
       {
         id: "genai-rag",
         title: "Retrieval & RAG",
         lessons: [
-          { id: "ga-r1", title: "Embeddings & Vector Representations", duration: "22 min", hasViz: false },
-          { id: "ga-r2", title: "Vector Databases: Storage, Indexing & ANN Search", duration: "25 min", hasViz: false },
-          { id: "ga-r3", title: "Semantic Search & Hybrid Retrieval", duration: "20 min", hasViz: false },
+          { id: "ga-r1", title: "Embeddings & Vector Representations", duration: "22 min", hasViz: true },
+          { id: "ga-r2", title: "Vector Databases: Storage, Indexing & ANN Search", duration: "25 min", hasViz: true },
+          { id: "ga-r3", title: "Semantic Search & Hybrid Retrieval", duration: "20 min", hasViz: true },
           { id: "ga-r4", title: "Chunking Strategies: From Fixed to Contextual", duration: "25 min", hasViz: true },
           { id: "ga-r5", title: "Naive RAG Pipeline: Ingest, Retrieve, Generate", duration: "25 min", hasViz: true },
           { id: "ga-r6", title: "Advanced RAG: Reranking, HyDE & Agentic Retrieval", duration: "30 min", hasViz: true },
@@ -556,30 +573,30 @@ const CURRICULUM = [
         id: "genai-agents",
         title: "Agents & Orchestration",
         lessons: [
-          { id: "ga-a1", title: "Prompt Engineering: CoT, Few-Shot & System Design", duration: "25 min", hasViz: false },
-          { id: "ga-a3", title: "Agentic Frameworks: LangGraph, AutoGen & CrewAI", duration: "25 min", hasViz: false },
-          { id: "ga-ag1", title: "Tool Use & Function Calling", duration: "22 min", hasViz: false },
-          { id: "ga-ag2", title: "Reasoning Loops: ReAct, ToT & Self-Reflection", duration: "22 min", hasViz: false },
-          { id: "ga-ag3", title: "Multi-Agent Workflows & Coordination Patterns", duration: "25 min", hasViz: false },
+          { id: "ga-a1", title: "Prompt Engineering: CoT, Few-Shot & System Design", duration: "25 min", hasViz: true },
+          { id: "ga-a3", title: "Agentic Frameworks: LangGraph, AutoGen & CrewAI", duration: "25 min", hasViz: true },
+          { id: "ga-ag1", title: "Tool Use & Function Calling", duration: "22 min", hasViz: true },
+          { id: "ga-ag2", title: "Reasoning Loops: ReAct, ToT & Self-Reflection", duration: "22 min", hasViz: true },
+          { id: "ga-ag3", title: "Multi-Agent Workflows & Coordination Patterns", duration: "25 min", hasViz: true },
         ]
       },
       {
         id: "genai-ops",
         title: "Ops & Evaluation",
         lessons: [
-          { id: "ga-a5", title: "LLM Evaluation: LLM-as-Judge, RAGAS & Benchmarks", duration: "20 min", hasViz: false },
-          { id: "ga-ops1", title: "Optimization: Latency, Caching & Prompt Compression", duration: "22 min", hasViz: false },
-          { id: "ga-ops2", title: "Fine-Tuning in Practice: LoRA, PEFT & When to Use It", duration: "25 min", hasViz: false },
-          { id: "ga-ops3", title: "Human-in-the-Loop & Product Thinking", duration: "18 min", hasViz: false },
+          { id: "ga-a5", title: "LLM Evaluation: LLM-as-Judge, RAGAS & Benchmarks", duration: "20 min", hasViz: true },
+          { id: "ga-ops1", title: "Optimization: Latency, Caching & Prompt Compression", duration: "22 min", hasViz: true },
+          { id: "ga-ops2", title: "Fine-Tuning in Practice: LoRA, PEFT & When to Use It", duration: "25 min", hasViz: true },
+          { id: "ga-ops3", title: "Human-in-the-Loop & Product Thinking", duration: "18 min", hasViz: true },
         ]
       },
       {
         id: "genai-safety",
         title: "Safety & Ethics",
         lessons: [
-          { id: "ga-s1", title: "Bias, Fairness & Hallucination in LLMs", duration: "20 min", hasViz: false },
-          { id: "ga-s2", title: "Security, Privacy & Compliance", duration: "18 min", hasViz: false },
-          { id: "ga-s3", title: "Prompt Injection & Red Teaming", duration: "22 min", hasViz: false },
+          { id: "ga-s1", title: "Bias, Fairness & Hallucination in LLMs", duration: "20 min", hasViz: true },
+          { id: "ga-s2", title: "Security, Privacy & Compliance", duration: "18 min", hasViz: true },
+          { id: "ga-s3", title: "Prompt Injection & Red Teaming", duration: "22 min", hasViz: true },
         ]
       },
     ],
@@ -1135,6 +1152,23 @@ const VISUALIZATIONS = {
   "ga-r4": ChunkingStrategyViz,
   "ga-r5": RAGPipelineViz,
   "ga-r6": AdvancedRAGViz,
+  "ga-f1": LanguageModelMechanicsViz,
+  "ga-f4": LLMStrategyMapViz,
+  "ga-r1": EmbeddingSpaceViz,
+  "ga-r2": VectorDBIndexViz,
+  "ga-r3": HybridRetrievalViz,
+  "ga-a1": PromptEngineeringViz,
+  "ga-a3": AgenticFrameworksViz,
+  "ga-ag1": ToolUseViz,
+  "ga-ag2": ReasoningLoopsViz,
+  "ga-ag3": MultiAgentCoordinationViz,
+  "ga-a5": LLMEvaluationViz,
+  "ga-ops1": LLMOptimizationViz,
+  "ga-ops2": LoRAFineTuningViz,
+  "ga-ops3": HumanInTheLoopViz,
+  "ga-s1": LLMBiasHallucinationViz,
+  "ga-s2": LLMSecurityComplianceViz,
+  "ga-s3": PromptInjectionViz,
   "ps-e1": ABTestSimulator,
   "ps-m4": FunnelAnalysis,
   "sp-t1": TimeSeriesDecomposition,
