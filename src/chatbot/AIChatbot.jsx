@@ -138,11 +138,42 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
   const [loading, setLoading] = useState(false);
   const [remaining, setRemaining] = useState(null);
   const [expanded, setExpanded] = useState(false);
+  const [userId, setUserId] = useState(null);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Load this course's saved conversation for the signed-in account.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const supabase = getSupabaseBrowserClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id || null;
+      if (cancelled || !uid) return;
+      setUserId(uid);
+
+      const { data } = await supabase
+        .from("chat_messages")
+        .select("role, content")
+        .eq("user_id", uid)
+        .eq("course_id", course.id)
+        .order("created_at", { ascending: true });
+      if (cancelled || !data || !data.length) return;
+      setMessages(data.map((m) => ({ role: m.role, content: m.content })));
+    })();
+    return () => { cancelled = true; };
+  }, [course.id]);
+
+  const persistMessage = (uid, role, content) => {
+    if (!uid) return;
+    getSupabaseBrowserClient()
+      .from("chat_messages")
+      .insert({ user_id: uid, course_id: course.id, role, content })
+      .then(() => {});
+  };
 
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
@@ -150,6 +181,7 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: userMsg }]);
     setLoading(true);
+    persistMessage(userId, "user", userMsg);
 
     try {
       const supabase = getSupabaseBrowserClient();
@@ -176,8 +208,6 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
         }),
       });
 
-      const data = await resp.json();
-
       if (resp.status === 401) {
         setMessages((prev) => [
           ...prev,
@@ -191,6 +221,7 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
       }
 
       if (resp.status === 429) {
+        const data = await resp.json().catch(() => null);
         setMessages((prev) => [
           ...prev,
           {
@@ -203,7 +234,8 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
         return;
       }
 
-      if (!resp.ok || !data?.text) {
+      if (!resp.ok || !resp.body) {
+        const data = await resp.json().catch(() => null);
         const details =
           data?.details?.message ||
           data?.details?.error?.message ||
@@ -220,8 +252,45 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
         return;
       }
 
-      if (typeof data.remaining === "number") setRemaining(data.remaining);
-      setMessages((prev) => [...prev, { role: "assistant", content: data.text }]);
+      // Stream the reply in as it's generated, like Claude/ChatGPT.
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let assistantText = "";
+      let finalRemaining = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let newlineIdx;
+        while ((newlineIdx = buffer.indexOf("\n")) !== -1) {
+          const line = buffer.slice(0, newlineIdx).trim();
+          buffer = buffer.slice(newlineIdx + 1);
+          if (!line) continue;
+          let evt;
+          try {
+            evt = JSON.parse(line);
+          } catch {
+            continue;
+          }
+          if (evt.delta) {
+            assistantText += evt.delta;
+            setMessages((prev) => {
+              const next = [...prev];
+              next[next.length - 1] = { role: "assistant", content: assistantText };
+              return next;
+            });
+          }
+          if (evt.done && typeof evt.remaining === "number") {
+            finalRemaining = evt.remaining;
+          }
+        }
+      }
+
+      if (finalRemaining !== null) setRemaining(finalRemaining);
+      if (assistantText) persistMessage(userId, "assistant", assistantText);
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -610,7 +679,7 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
             </div>
           </div>
         ))}
-        {loading && (
+        {loading && (messages[messages.length - 1]?.role !== "assistant" || !messages[messages.length - 1]?.content) && (
           <div style={{ display: "flex", gap: 4, padding: "10px 14px" }}>
             {[0, 1, 2].map((i) => (
               <div

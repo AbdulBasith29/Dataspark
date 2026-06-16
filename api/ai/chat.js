@@ -13,14 +13,44 @@ function cors(res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
-function extractAnthropicText(data) {
-  return data?.content?.map((b) => b?.text || "").join("") || "I couldn't generate a response. Please try again.";
-}
-
 function extractGeminiText(data) {
   const parts = data?.candidates?.[0]?.content?.parts;
   if (!Array.isArray(parts)) return "I couldn't generate a response. Please try again.";
   return parts.map((p) => p?.text || "").join("").trim() || "I couldn't generate a response. Please try again.";
+}
+
+// Reads Anthropic's SSE stream and invokes onDelta(text) for each text chunk.
+async function streamAnthropicText(body, onDelta) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let sep;
+    while ((sep = buffer.indexOf("\n\n")) !== -1) {
+      const block = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      for (const line of block.split("\n")) {
+        if (!line.startsWith("data:")) continue;
+        const raw = line.slice(5).trim();
+        if (!raw) continue;
+        try {
+          const evt = JSON.parse(raw);
+          if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") {
+            onDelta(evt.delta.text);
+          }
+        } catch {
+          // skip malformed chunk
+        }
+      }
+    }
+  }
+}
+
+function writeNdjson(res, obj) {
+  res.write(`${JSON.stringify(obj)}\n`);
 }
 
 function toGeminiContents(messages) {
@@ -131,13 +161,27 @@ export default async function handler(req, res) {
           max_tokens: typeof max_tokens === "number" ? max_tokens : 800,
           system,
           messages,
+          stream: true,
         }),
       });
-      const data = await upstream.json();
-      if (!upstream.ok) return res.status(upstream.status).json({ error: "anthropic_upstream_error", details: data?.error || data || null });
-      return res.status(200).json({ text: extractAnthropicText(data), remaining });
+
+      if (!upstream.ok) {
+        const data = await upstream.json().catch(() => null);
+        return res.status(upstream.status).json({ error: "anthropic_upstream_error", details: data?.error || data || null });
+      }
+
+      res.writeHead(200, {
+        "Content-Type": "application/x-ndjson; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        "X-Accel-Buffering": "no",
+      });
+      await streamAnthropicText(upstream.body, (text) => writeNdjson(res, { delta: text }));
+      writeNdjson(res, { done: true, remaining });
+      return res.end();
     }
 
+    // Gemini fallback has no streaming wired up — emit the full reply as a single chunk
+    // so the client's streaming reader handles both providers the same way.
     const geminiModel = typeof model === "string" && model.startsWith("gemini-") ? model : DEFAULT_GEMINI_MODEL;
     const upstream = await fetch(
       `${GEMINI_API_URL}/${geminiModel}:generateContent?key=${encodeURIComponent(geminiApiKey)}`,
@@ -153,8 +197,17 @@ export default async function handler(req, res) {
     );
     const data = await upstream.json();
     if (!upstream.ok) return res.status(upstream.status).json({ error: "gemini_upstream_error", details: data?.error || data || null });
-    return res.status(200).json({ text: extractGeminiText(data), remaining });
+
+    res.writeHead(200, {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
+    });
+    writeNdjson(res, { delta: extractGeminiText(data) });
+    writeNdjson(res, { done: true, remaining });
+    return res.end();
   } catch {
-    return res.status(500).json({ error: "chat_request_failed" });
+    if (!res.headersSent) return res.status(500).json({ error: "chat_request_failed" });
+    return res.end();
   }
 }

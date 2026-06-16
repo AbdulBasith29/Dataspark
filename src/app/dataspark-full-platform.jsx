@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Check, ArrowLeft, LogOut, Shield } from "lucide-react";
 import { useAuth } from "../lib/authContext.jsx";
+import { getSupabaseBrowserClient } from "../lib/supabaseClient.js";
 import SecuritySettings from "../components/SecuritySettings.jsx";
 import AIChatbot from "../chatbot/AIChatbot.jsx";
 import SQLJoins from "../visualizations/SQLJoins.jsx";
@@ -1293,6 +1294,23 @@ export default function DataSparkPlatform() {
   const [evalError, setEvalError] = useState(null);
   const [evalResult, setEvalResult] = useState(null);
   const { intent, setIntent } = useLearnerIntent();
+  const { user } = useAuth();
+
+  // Hydrate completed-lesson checkmarks from Supabase on login.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      const supabase = getSupabaseBrowserClient();
+      const { data } = await supabase
+        .from("lesson_progress")
+        .select("lesson_id")
+        .eq("user_id", user.id);
+      if (cancelled || !data) return;
+      setProgress((p) => ({ ...p, ...Object.fromEntries(data.map((r) => [r.lesson_id, "done"])) }));
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
 
   // Screen-reader announcement for the current view (DS-101 accessibility).
   const liveMessage =
@@ -1725,6 +1743,12 @@ export default function DataSparkPlatform() {
             // Never block UX on analytics failures.
           }
           setProgress((p) => ({ ...p, [activeLesson.id]: "done" }));
+          if (user) {
+            getSupabaseBrowserClient()
+              .from("lesson_progress")
+              .upsert({ user_id: user.id, lesson_id: activeLesson.id, status: "done" }, { onConflict: "user_id,lesson_id" })
+              .then(() => {});
+          }
           setView("course");
         }}
         onAskTutor={() => { setChatbotSeed(""); setChatbotCourse(activeCourse); }}
