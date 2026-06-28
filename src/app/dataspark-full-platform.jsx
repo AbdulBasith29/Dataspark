@@ -1,7 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Link } from "react-router-dom";
-import { Check, ArrowLeft, LogOut, Shield } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Check, ArrowLeft, LogOut, Shield, Lock, Zap } from "lucide-react";
 import { useAuth } from "../lib/authContext.jsx";
+import { openBillingPortal } from "../lib/billing.js";
+
+// Free users get the first N lessons of each course; the rest require Pro.
+// (Bump this number to widen the free tier — pricing-page copy says "2".)
+const FREE_LESSONS_PER_COURSE = 2;
 import { getSupabaseBrowserClient } from "../lib/supabaseClient.js";
 import SecuritySettings from "../components/SecuritySettings.jsx";
 import AIChatbot from "../chatbot/AIChatbot.jsx";
@@ -156,7 +161,8 @@ const PlatformLogo = () => (
 );
 
 function UserMenu() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, isPro } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [showSecurity, setShowSecurity] = useState(false);
   const menuRef = useRef(null);
@@ -202,6 +208,11 @@ function UserMenu() {
           <span style={{ fontSize: 12, color: DS.t3, fontWeight: 500, maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {name}
           </span>
+          {isPro && (
+            <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: "0.06em", color: "#0B0314", background: "linear-gradient(100deg, #A855F7, #22D3EE)", padding: "2px 6px", borderRadius: 5, fontFamily: "var(--ds-mono), monospace" }}>
+              PRO
+            </span>
+          )}
         </button>
 
         {open && (
@@ -217,6 +228,40 @@ function UserMenu() {
               <div style={{ fontSize: 12, fontWeight: 600, color: DS.t1, marginBottom: 2 }}>{name}</div>
               <div style={{ fontSize: 11, color: DS.dim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</div>
             </div>
+            {isPro ? (
+              <button
+                type="button"
+                onClick={() => { setOpen(false); openBillingPortal().catch(() => {}); }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8, width: "100%",
+                  background: "none", border: "none", cursor: "pointer",
+                  padding: "9px 12px", borderRadius: 8, color: DS.t2, fontSize: 13,
+                  transition: "background 0.15s",
+                  fontFamily: "var(--ds-sans), sans-serif",
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.05)"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "none"}
+              >
+                <Zap size={14} />
+                Manage billing
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setOpen(false); navigate("/pricing"); }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8, width: "100%",
+                  background: "linear-gradient(100deg, rgba(168,85,247,0.18), rgba(34,211,238,0.14))",
+                  border: "1px solid rgba(34,211,238,0.3)", cursor: "pointer",
+                  padding: "9px 12px", borderRadius: 8, color: "#22D3EE", fontSize: 13, fontWeight: 700,
+                  transition: "background 0.15s", marginBottom: 4,
+                  fontFamily: "var(--ds-sans), sans-serif",
+                }}
+              >
+                <Zap size={14} />
+                Upgrade to Pro
+              </button>
+            )}
             <button
               type="button"
               onClick={() => { setOpen(false); setShowSecurity(true); }}
@@ -1328,7 +1373,8 @@ export default function DataSparkPlatform() {
   const [evalError, setEvalError] = useState(null);
   const [evalResult, setEvalResult] = useState(null);
   const { intent, setIntent } = useLearnerIntent();
-  const { user } = useAuth();
+  const { user, isPro, refreshPlan } = useAuth();
+  const navigate = useNavigate();
 
   // Hydrate completed-lesson checkmarks from Supabase on login.
   useEffect(() => {
@@ -1345,6 +1391,18 @@ export default function DataSparkPlatform() {
     })();
     return () => { cancelled = true; };
   }, [user]);
+
+  // Returning from a successful Stripe checkout — the webhook may lag a moment
+  // behind the browser redirect, so re-check the plan a couple of times.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("upgraded") !== "1") return;
+    refreshPlan();
+    const t1 = setTimeout(() => refreshPlan(), 2500);
+    const t2 = setTimeout(() => refreshPlan(), 6000);
+    window.history.replaceState({}, "", "/platform");
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [refreshPlan]);
 
   // Screen-reader announcement for the current view (DS-101 accessibility).
   const liveMessage =
@@ -1653,7 +1711,12 @@ export default function DataSparkPlatform() {
           </button>
         </div>
 
-        {courseTab === "learn" && (
+        {courseTab === "learn" && (() => {
+          // First N lessons of the course are free; the rest need Pro.
+          const freeLessonIds = new Set(
+            c.topics.flatMap((t) => t.lessons).slice(0, FREE_LESSONS_PER_COURSE).map((l) => l.id)
+          );
+          return (
           <div>
             {c.topics.map(topic => (
               <div key={topic.id} style={{ marginBottom: 32 }}>
@@ -1661,15 +1724,22 @@ export default function DataSparkPlatform() {
                 <div className="ds-stagger" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {topic.lessons.map((lesson, li) => {
                     const isDone = progress[lesson.id] === "done";
+                    const locked = !isPro && !freeLessonIds.has(lesson.id);
+                    const openLesson = () => {
+                      if (locked) { navigate("/pricing"); return; }
+                      setActiveLesson(lesson); setView("lesson");
+                    };
                     return (
                       <div
                         key={lesson.id}
                         role="button"
                         tabIndex={0}
-                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveLesson(lesson); setView("lesson"); } }}
-                        onClick={() => { setActiveLesson(lesson); setView("lesson"); }}
+                        aria-label={locked ? `${lesson.title} — locked, upgrade to Pro` : lesson.title}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openLesson(); } }}
+                        onClick={openLesson}
                         style={{
                           ...dsGlassCard({ padding: "14px 16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", transition: `border-color ${DS.durFast} ${DS.easeOut}, background ${DS.durBase} ${DS.easeOut}` }),
+                          opacity: locked ? 0.62 : 1,
                         }}
                         onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${c.color}55`; e.currentTarget.style.background = DS.surface2; }}
                         onMouseLeave={(e) => { e.currentTarget.style.borderColor = DS.border; e.currentTarget.style.background = DS.cardGlass; }}
@@ -1682,7 +1752,7 @@ export default function DataSparkPlatform() {
                             display: "flex", alignItems: "center", justifyContent: "center",
                             fontSize: 12, color: isDone ? DS.grn : DS.dim, fontWeight: 700, fontFamily: "var(--ds-mono), monospace",
                           }}>
-                            {isDone ? <Check size={13} strokeWidth={2.5} /> : li + 1}
+                            {isDone ? <Check size={13} strokeWidth={2.5} /> : locked ? <Lock size={12} strokeWidth={2.5} /> : li + 1}
                           </div>
                           <div>
                             <div style={{ fontSize: 14, fontWeight: 600, color: DS.t1 }}>{lesson.title}</div>
@@ -1690,7 +1760,9 @@ export default function DataSparkPlatform() {
                           </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          {lesson.hasViz && <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, background: `${c.color}18`, color: c.accent, fontFamily: "var(--ds-mono), monospace", fontWeight: 600, border: `1px solid ${c.color}30` }}>Interactive</span>}
+                          {locked
+                            ? <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, background: `${c.accent}1A`, color: c.accent, fontFamily: "var(--ds-mono), monospace", fontWeight: 700, border: `1px solid ${c.color}40`, display: "inline-flex", alignItems: "center", gap: 4 }}><Lock size={10} strokeWidth={2.5} /> Pro</span>
+                            : lesson.hasViz && <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, background: `${c.color}18`, color: c.accent, fontFamily: "var(--ds-mono), monospace", fontWeight: 600, border: `1px solid ${c.color}30` }}>Interactive</span>}
                         </div>
                       </div>
                     );
@@ -1699,7 +1771,8 @@ export default function DataSparkPlatform() {
               </div>
             ))}
           </div>
-        )}
+          );
+        })()}
 
         {courseTab === "practice" && (
           <div>

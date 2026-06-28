@@ -5,7 +5,8 @@ const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
-const DAILY_LIMIT = 20; // messages per user per day
+const FREE_DAILY_LIMIT = 5; // AI tutor messages per day on the free plan
+const PRO_DAILY_LIMIT = 20; // ...and on Pro
 
 function cors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -84,8 +85,22 @@ async function authenticateRequest(req) {
   return { userId: user.id, error: null };
 }
 
+// Looks up the user's plan to pick their daily message allowance.
+async function getDailyLimit(userId) {
+  if (userId === "anonymous") return PRO_DAILY_LIMIT;
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return PRO_DAILY_LIMIT;
+  const { data } = await supabase
+    .from("user_subscriptions")
+    .select("plan, status")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const isPro = data?.plan === "pro" && ["active", "trialing"].includes(data?.status);
+  return isPro ? PRO_DAILY_LIMIT : FREE_DAILY_LIMIT;
+}
+
 // Returns { count, limited } after incrementing usage by 1
-async function checkAndIncrementUsage(userId) {
+async function checkAndIncrementUsage(userId, dailyLimit) {
   if (userId === "anonymous") return { count: 1, limited: false };
 
   const supabase = getSupabaseAdmin();
@@ -102,7 +117,7 @@ async function checkAndIncrementUsage(userId) {
     .maybeSingle();
 
   const current = data?.message_count ?? 0;
-  if (current >= DAILY_LIMIT) return { count: current, limited: true };
+  if (current >= dailyLimit) return { count: current, limited: true };
 
   // Increment
   await supabase.from("chatbot_usage").upsert(
@@ -128,13 +143,15 @@ export default async function handler(req, res) {
   const { userId, error: authError } = await authenticateRequest(req);
   if (authError) return res.status(authError.status).json(authError.body);
 
-  // ── Rate limit ──
-  const { count, limited } = await checkAndIncrementUsage(userId);
+  // ── Rate limit (plan-aware) ──
+  const dailyLimit = await getDailyLimit(userId);
+  const { count, limited } = await checkAndIncrementUsage(userId, dailyLimit);
   if (limited) {
+    const upsell = dailyLimit === FREE_DAILY_LIMIT ? " Upgrade to Pro for more." : "";
     return res.status(429).json({
       error: "rate_limit_exceeded",
-      message: `You've reached your ${DAILY_LIMIT} message daily limit. Come back tomorrow!`,
-      limit: DAILY_LIMIT,
+      message: `You've reached your ${dailyLimit} message daily limit.${upsell} Come back tomorrow!`,
+      limit: dailyLimit,
       used: count,
     });
   }
@@ -145,7 +162,7 @@ export default async function handler(req, res) {
   }
 
   // Include remaining count in response so UI can update
-  const remaining = DAILY_LIMIT - count;
+  const remaining = dailyLimit - count;
 
   try {
     if (anthropicApiKey) {
