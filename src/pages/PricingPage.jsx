@@ -17,9 +17,11 @@ const GRADIENT = `linear-gradient(100deg, ${PURPLE} 0%, ${CYAN} 100%)`;
 const SANS = "var(--ds-sans), sans-serif";
 const MONO = "var(--ds-mono), monospace";
 
-const MONTHLY_PRICE = 15;
-const ANNUAL_PRICE = 129; // ~$10.75/mo — ~28% off vs paying monthly
+const CURRENCY = "A$"; // prices are in AUD
+const MONTHLY_PRICE = 20;
+const ANNUAL_PRICE = 180; // A$15/mo equivalent — 25% off vs paying monthly
 const ANNUAL_MONTHLY_EQUIV = (ANNUAL_PRICE / 12).toFixed(0);
+const ANNUAL_SAVE_PCT = Math.round((1 - ANNUAL_PRICE / (MONTHLY_PRICE * 12)) * 100);
 
 const FREE_FEATURES = [
   "First 2 lessons of every course",
@@ -111,7 +113,7 @@ export default function PricingPage() {
           <div style={{ display: "inline-flex", background: "rgba(255,255,255,0.04)", border: `1px solid ${BORDER}`, borderRadius: 12, padding: 4 }}>
             {[
               { id: "monthly", label: "Monthly" },
-              { id: "annual", label: "Annual · save 28%" },
+              { id: "annual", label: `Annual · save ${ANNUAL_SAVE_PCT}%` },
             ].map((opt) => {
               const active = interval === opt.id;
               return (
@@ -144,7 +146,7 @@ export default function PricingPage() {
           <div style={{ border: `1px solid ${BORDER}`, borderRadius: 18, padding: "28px 26px", background: "rgba(255,255,255,0.02)" }}>
             <div style={{ fontFamily: MONO, fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase", color: GRAY }}>Free</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "14px 0 4px" }}>
-              <span style={{ fontSize: 44, fontWeight: 800, letterSpacing: "-0.03em" }}>$0</span>
+              <span style={{ fontSize: 44, fontWeight: 800, letterSpacing: "-0.03em" }}>{CURRENCY}0</span>
               <span style={{ color: DIM, fontSize: 15 }}>forever</span>
             </div>
             <p style={{ color: GRAY, fontSize: 14, margin: "0 0 20px" }}>Get a real feel for every course.</p>
@@ -171,12 +173,12 @@ export default function PricingPage() {
             <div style={{ fontFamily: MONO, fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase", color: CYAN }}>Pro</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 6, margin: "14px 0 4px" }}>
               <span style={{ fontSize: 44, fontWeight: 800, letterSpacing: "-0.03em" }}>
-                ${interval === "annual" ? ANNUAL_MONTHLY_EQUIV : MONTHLY_PRICE}
+                {CURRENCY}{interval === "annual" ? ANNUAL_MONTHLY_EQUIV : MONTHLY_PRICE}
               </span>
-              <span style={{ color: DIM, fontSize: 15 }}>/mo</span>
+              <span style={{ color: DIM, fontSize: 15 }}>/mo AUD</span>
             </div>
             <p style={{ color: GRAY, fontSize: 14, margin: "0 0 20px" }}>
-              {interval === "annual" ? `Billed $${ANNUAL_PRICE} once a year.` : "Billed monthly. Cancel anytime."}
+              {interval === "annual" ? `Billed ${CURRENCY}${ANNUAL_PRICE} AUD once a year.` : "Billed monthly. Cancel anytime."}
             </p>
             <button
               onClick={onPro}
