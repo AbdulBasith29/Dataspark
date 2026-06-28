@@ -17,8 +17,8 @@ const GRADIENT = `linear-gradient(100deg, ${PURPLE} 0%, ${CYAN} 100%)`;
 const SANS = "var(--ds-sans), sans-serif";
 const MONO = "var(--ds-mono), monospace";
 
-const MONTHLY_PRICE = 29;
-const ANNUAL_PRICE = 249; // ~$20.75/mo — a touch over 7 months free
+const MONTHLY_PRICE = 15;
+const ANNUAL_PRICE = 129; // ~$10.75/mo — ~28% off vs paying monthly
 const ANNUAL_MONTHLY_EQUIV = (ANNUAL_PRICE / 12).toFixed(0);
 
 const FREE_FEATURES = [
