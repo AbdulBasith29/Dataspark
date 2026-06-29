@@ -91,6 +91,11 @@ import StatPowerAnalysisViz from "../visualizations/StatPowerAnalysisViz.jsx";
 import StatMultipleTestingViz from "../visualizations/StatMultipleTestingViz.jsx";
 import StatBootstrapViz from "../visualizations/StatBootstrapViz.jsx";
 import StatBayesFrequentistViz from "../visualizations/StatBayesFrequentistViz.jsx";
+import StatTTestDepthViz from "../visualizations/StatTTestDepthViz.jsx";
+import StatAnovaViz from "../visualizations/StatAnovaViz.jsx";
+import StatNonParametricViz from "../visualizations/StatNonParametricViz.jsx";
+import StatEffectSizeViz from "../visualizations/StatEffectSizeViz.jsx";
+import StatRegressionInferenceViz from "../visualizations/StatRegressionInferenceViz.jsx";
 import DLRNNLSTMViz from "../visualizations/DLRNNLSTMViz.jsx";
 import DLTransferLearningViz from "../visualizations/DLTransferLearningViz.jsx";
 import ChunkingStrategyViz from "../visualizations/ChunkingStrategyViz.jsx";
@@ -483,6 +488,17 @@ const CURRICULUM = [
           { id: "st-i4", title: "Confidence Intervals: Precision of Estimates", duration: "15 min", hasViz: true },
           { id: "st-i5", title: "Type I & Type II Errors: The Tradeoff", duration: "15 min", hasViz: true },
           { id: "st-i6", title: "Power Analysis & Sample Size", duration: "18 min", hasViz: true },
+        ]
+      },
+      {
+        id: "stat-tests-depth",
+        title: "Statistical Tests in Depth",
+        lessons: [
+          { id: "st-t1", title: "t-Tests in Depth: One-Sample, Independent & Paired", duration: "22 min", hasViz: true },
+          { id: "st-t2", title: "ANOVA Deep Dive: One-Way, Factorial & Post-Hoc", duration: "24 min", hasViz: true },
+          { id: "st-t3", title: "Non-Parametric Tests: Mann-Whitney, Wilcoxon & Kruskal-Wallis", duration: "20 min", hasViz: true },
+          { id: "st-t4", title: "Effect Sizes & APA Reporting", duration: "18 min", hasViz: true },
+          { id: "st-t5", title: "Regression for Inference", duration: "22 min", hasViz: true },
         ]
       },
       {
@@ -1279,6 +1295,11 @@ const VISUALIZATIONS = {
   "st-a2": StatMultipleTestingViz,
   "st-a3": StatBootstrapViz,
   "st-a4": StatBayesFrequentistViz,
+  "st-t1": StatTTestDepthViz,
+  "st-t2": StatAnovaViz,
+  "st-t3": StatNonParametricViz,
+  "st-t4": StatEffectSizeViz,
+  "st-t5": StatRegressionInferenceViz,
   "mo-t1": GitWorkflowViz,
   "mo-t2": VenvCondaViz,
   "mo-t5": AWSDataScienceViz,

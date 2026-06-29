@@ -52887,6 +52887,1829 @@ accuracy = correct / len(expanded_labels)`,
 },
 
 
+  "st-t1": {
+    "durationLabel": "22 min",
+    "outcomes": [
+      "Choose the correct t-test (one-sample, independent, paired) from the study design rather than from the data alone.",
+      "State and check the three core assumptions — independence, normality, and homogeneity of variance — and know when n ≥ 30 rescues normality.",
+      "Apply Welch's correction for unequal variances and explain why paired beats independent for repeated measures."
+    ],
+    "learnMarkdown": "## One family, three designs\n\nA t-test asks one question: **is a difference in means larger than sampling noise would plausibly produce?** What changes between the three flavors is the *study design* that generated the means.\n\n| Type | Question | Design | Degrees of freedom |\n|------|----------|--------|--------------------|\n| One-sample | Is x̄ different from a known reference μ₀? | One group vs a fixed number | n − 1 |\n| Independent (two-sample) | Do two *separate* groups have the same mean? | Two unrelated groups | n₁ + n₂ − 2 (Student) |\n| Paired | Do two measurements on the *same* subjects differ? | Same people, two conditions | n_pairs − 1 |\n\nThe design decides the test. A psychology study that measures the **same** participants before and after therapy is *paired*. A study that compares a **treatment group** to a separate **control group** is *independent*.\n\n## The formulas\n\n```\nOne-sample:   t = (x̄ − μ₀) / (s / √n)\nIndependent:  t = (x̄₁ − x̄₂) / √(s₁²/n₁ + s₂²/n₂)\nPaired:       t = d̄ / (s_d / √n)      where d = before − after\n```\n\nIn every case the numerator is the **observed effect** and the denominator is the **standard error** — the noise we expect from sampling. A big t means the signal dwarfs the noise.\n\nNotice the paired formula collapses two columns into **one column of differences** (d̄, s_d). That is the whole trick: each subject becomes their own control.\n\n## The three assumptions\n\n1. **Independence** — observations don't influence each other. This is the assumption you can't fix with more data; it's a property of *how you sampled*. (Note: in a paired test the two measurements per subject are *deliberately* dependent — the independence requirement applies *across* pairs, i.e. one participant's difference shouldn't affect another's.)\n2. **Normality** — the sampling distribution of the mean is approximately normal. For small samples you need the underlying data roughly normal (check with a histogram, Q-Q plot, or Shapiro–Wilk). For **n ≥ 30** the Central Limit Theorem makes the test robust even to non-normal data, so the normality worry largely evaporates.\n3. **Homogeneity of variance** (independent test only) — the two groups have similar spread. Check with Levene's test or just compare the SDs. If it fails, don't panic — use Welch's t.\n\n## Welch's correction\n\nStudent's pooled t-test assumes equal variances and pools them into one estimate. When variances **or** sample sizes are unequal, that pooling is wrong and the test's error rate drifts.\n\n```\nWelch's t uses separate variances:\n  t = (x̄₁ − x̄₂) / √(s₁²/n₁ + s₂²/n₂)\n  df = Welch–Satterthwaite (fractional, smaller than n₁+n₂−2)\n```\n\nWelch's df is a fraction and is **smaller** than the pooled df, which makes the test slightly more conservative — exactly what you want when you're unsure. Modern advice (and R's `t.test()` default) is: **use Welch unless you have a strong reason not to.** It costs almost nothing when variances *are* equal and protects you when they aren't.\n\n## When paired beats independent\n\nIf your design is repeated-measures, the paired test is strictly better. By analyzing **within-subject differences**, it removes the between-subject variability (some people are just slow, some are just anxious) from the denominator. That shrinks the standard error and raises power. Running an independent-samples t-test on paired data throws away the pairing, inflates the SE, and also violates independence — a double mistake.\n\n## One-tailed vs two-tailed\n\nA **two-tailed** test asks \"is there *any* difference?\" and splits α across both tails (±1.96 at α = 0.05). A **one-tailed** test asks a *directional* question (\"is the treatment *better*?\") and puts all of α in one tail (1.645), making it easier to reach significance — but only valid if you committed to the direction *before* seeing the data. Defaulting to one-tailed to chase a p-value is a classic reviewer red flag.\n\n## Interview / Exam hook (answer like a researcher)\n\n\"You measured reaction time for 40 participants under a quiet condition and a noisy condition — same people in both. Which test?\"\n\nStrong answer: \"A **paired** t-test, because it's a within-subjects design — each participant is measured twice, so I analyze the differences (noisy − quiet). That uses each person as their own control and removes individual baseline differences from the error term, giving more power than an independent-samples test. With n = 40 the CLT covers the normality assumption, so I'd mainly check that the *differences* aren't wildly skewed. I'd report it as t(39) = …, p = …, two-tailed, alongside the mean difference and a confidence interval and an effect size like Cohen's d_z.\"",
+    "video": null,
+    "videoFallbackMarkdown": "## 5-minute t-test drill\n\nFor each scenario, name the test, the df expression, and one assumption you'd verify:\n\n1. A class scores a mean of 105 on an IQ test (population mean 100). Is the class above average?\n2. A drug group (n = 28) is compared to a placebo group (n = 22), and the two SDs differ noticeably.\n3. The same 25 patients rate their anxiety before and after an 8-week intervention.\n4. Two independent groups, equal n and near-identical SDs — do you reach for Student or Welch, and does it matter?\n5. You report \"t(39) = 2.7, p = 0.01, one-tailed.\" What must have been true *before* collecting the data for this to be legitimate?\n\nAnswers: (1) one-sample, df = n−1, check normality or rely on CLT if n≥30; (2) independent + Welch (unequal variances/ns), df = Welch–Satterthwaite; (3) paired, df = 24, check the *differences* are roughly normal; (4) either works, results nearly identical — Welch is the safe default; (5) you must have pre-registered the direction of the effect.",
+    "tryGuidance": "Open the t-Test Workbench, switch between One-sample, Independent, and Paired, and adjust the means, SDs, and n's to see how the t-statistic, df, and shaded rejection region respond. In the Independent case, toggle Student vs Welch with unequal SDs/ns and watch the degrees of freedom change.",
+    "interviewGraph": {
+      "initialStageId": "tt_design_choice",
+      "artifactDimensions": [
+        {
+          "label": "Design-Driven Test Selection",
+          "recoveryStageId": "tt_recovery_design"
+        },
+        {
+          "label": "Welch & Variance Assumption",
+          "recoveryStageId": "tt_recovery_welch"
+        },
+        {
+          "label": "Normality Assumption Reasoning",
+          "recoveryStageId": "tt_recovery_normality",
+          "passLabel": "t-Test Mastery"
+        }
+      ],
+      "stages": {
+        "tt_design_choice": {
+          "id": "tt_design_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 1",
+          "title": "Stage 1 · Which t-test for repeated measures?",
+          "prompt": "A researcher measures reaction time for the SAME 30 participants under a quiet condition and a noisy condition. Which t-test fits this design?",
+          "code_snippet": "Design:\n  30 participants\n  Each measured TWICE: quiet condition, then noisy condition\n  Outcome: reaction time (ms, continuous)\n\nQuestion: which t-test?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Paired t-test — same subjects measured twice",
+              "description": "Each participant is their own control. Analyze the within-subject differences (noisy − quiet); this removes between-person variability and raises power."
+            },
+            {
+              "id": "b",
+              "label": "Independent-samples t-test — two conditions",
+              "description": "This treats the two measurements as if they came from different people, ignoring the pairing — it loses power and violates independence."
+            },
+            {
+              "id": "c",
+              "label": "One-sample t-test vs a reference time",
+              "description": "There is no fixed reference value here; we are comparing two conditions on the same people."
+            },
+            {
+              "id": "d",
+              "label": "One-way ANOVA — comparing conditions",
+              "description": "ANOVA is for 3+ groups; with exactly two within-subject conditions, the paired t-test is the direct tool."
+            }
+          ],
+          "branches": {
+            "a": "tt_welch_choice",
+            "b": "tt_recovery_design",
+            "c": "tt_recovery_design",
+            "d": "tt_recovery_design"
+          },
+          "rationale": "Same subjects measured under two conditions is a within-subjects (repeated-measures) design → paired t-test. It analyzes each person's difference, eliminating individual baseline differences from the error term and substantially increasing power versus an independent test."
+        },
+        "tt_recovery_design": {
+          "id": "tt_recovery_design",
+          "type": "scenario_choice",
+          "badge": "Recovery 1",
+          "title": "Recovery · Reading the design, not the data",
+          "prompt": "Match each design to its t-test. Which row is fully correct?",
+          "code_snippet": "A. One class's mean score vs the national average of 100\nB. Drug group vs a SEPARATE placebo group\nC. Each patient's blood pressure before AND after a treatment",
+          "choices": [
+            {
+              "id": "a",
+              "label": "A → one-sample · B → independent · C → paired",
+              "description": "A compares a group to a fixed reference (one-sample); B compares two separate groups (independent); C measures the same patients twice (paired)."
+            },
+            {
+              "id": "b",
+              "label": "A → paired · B → one-sample · C → independent",
+              "description": "A has no second measurement (not paired); B has two separate groups (not one-sample); C is the same people twice (not independent)."
+            },
+            {
+              "id": "c",
+              "label": "All three are independent-samples t-tests",
+              "description": "Only B involves two separate groups; A is one group vs a reference and C is repeated measures."
+            },
+            {
+              "id": "d",
+              "label": "A → independent · B → paired · C → one-sample",
+              "description": "A has only one group; B's groups are unrelated (not paired); C measures the same subjects twice (not one-sample)."
+            }
+          ],
+          "branches": {
+            "a": "tt_welch_choice",
+            "b": "tt_recovery_design",
+            "c": "tt_recovery_design",
+            "d": "tt_recovery_design"
+          },
+          "rationale": "The design dictates the test: a single group vs a fixed number is one-sample; two unrelated groups is independent; the same subjects measured twice is paired."
+        },
+        "tt_welch_choice": {
+          "id": "tt_welch_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 2",
+          "title": "Stage 2 · Unequal variances between groups",
+          "prompt": "Two INDEPENDENT groups: treatment (n=28, SD≈6) and control (n=22, SD≈9). The SDs and sample sizes are clearly unequal. Which test is the safe choice?",
+          "code_snippet": "Treatment:  n₁ = 28,  s₁ ≈ 6\nControl:    n₂ = 22,  s₂ ≈ 9\n\nVariances unequal (s₂ ≈ 1.5 × s₁), n's unequal.\nWhich independent t-test variant?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Welch's t-test (separate variances, Welch–Satterthwaite df)",
+              "description": "Welch does not pool variances, so it stays valid when variances and sample sizes are unequal. Its fractional df is smaller, making it appropriately conservative."
+            },
+            {
+              "id": "b",
+              "label": "Student's pooled t-test",
+              "description": "Pooling assumes equal variances; with unequal variances AND unequal n's the pooled error rate drifts away from α."
+            },
+            {
+              "id": "c",
+              "label": "Paired t-test",
+              "description": "These are two separate, unrelated groups — there is no pairing to exploit."
+            },
+            {
+              "id": "d",
+              "label": "It doesn't matter; both give identical results",
+              "description": "They differ precisely when variances/n's are unequal, which is the case here."
+            }
+          ],
+          "branches": {
+            "a": "tt_assumption_click",
+            "b": "tt_recovery_welch",
+            "c": "tt_recovery_welch",
+            "d": "tt_recovery_welch"
+          },
+          "rationale": "When variances or sample sizes are unequal, Welch's t is the safe default: it estimates the standard error from separate variances and uses Welch–Satterthwaite degrees of freedom (a fraction, smaller than n₁+n₂−2), protecting the Type I error rate."
+        },
+        "tt_recovery_welch": {
+          "id": "tt_recovery_welch",
+          "type": "scenario_choice",
+          "badge": "Recovery 2",
+          "title": "Recovery · Why Welch over Student",
+          "prompt": "What does Welch's correction actually change relative to Student's pooled t-test?",
+          "code_snippet": "Student:  pools both variances into one estimate\n          df = n₁ + n₂ − 2\n\nWelch:    s₁²/n₁ + s₂²/n₂  (separate variances)\n          df = Welch–Satterthwaite (fractional)",
+          "choices": [
+            {
+              "id": "a",
+              "label": "It uses separate variances and a smaller, fractional df — robust to unequal spread",
+              "description": "By not pooling, Welch keeps the error rate near α when variances differ; its fractional df is smaller than the pooled df, making it slightly more conservative."
+            },
+            {
+              "id": "b",
+              "label": "It increases the degrees of freedom to gain power",
+              "description": "Welch–Satterthwaite df is smaller than n₁+n₂−2, not larger."
+            },
+            {
+              "id": "c",
+              "label": "It converts the data to a paired design",
+              "description": "Welch is still an independent-samples test; it changes only how the SE and df are computed."
+            },
+            {
+              "id": "d",
+              "label": "It only applies when sample sizes are equal",
+              "description": "Welch is most useful precisely when sample sizes (or variances) are UNequal."
+            }
+          ],
+          "branches": {
+            "a": "tt_assumption_click",
+            "b": "tt_recovery_welch",
+            "c": "tt_recovery_welch",
+            "d": "tt_recovery_welch"
+          },
+          "rationale": "Welch keeps the variances separate (s₁²/n₁ + s₂²/n₂) and computes a fractional Welch–Satterthwaite df that is smaller than the pooled df. This makes it robust to unequal variances and sample sizes, which is why it's the recommended default."
+        },
+        "tt_assumption_click": {
+          "id": "tt_assumption_click",
+          "type": "click_target",
+          "badge": "Stage 3 target",
+          "title": "Stage 3 · The shaky assumption claim",
+          "prompt": "A student justifies their t-test with the comments below. Click the line whose reasoning is WRONG.",
+          "code_snippet": "# n = 12 participants, heavily skewed scores\n# Justifications written by the student:\n\nindependent_observations = True   # one score per person, separate people\nsmall_n_skew_is_fine = True       # \"n<30 but skew won't matter\"  -- ds-target:skew_excuse\nwill_check_qq_plot = True         # plan to inspect a Q-Q plot\nreport_two_tailed = True          # no pre-registered direction",
+          "validationCopy": {
+            "skew_excuse": "Correct. With only n = 12 you CANNOT lean on the Central Limit Theorem — the n ≥ 30 rule of thumb doesn't apply. For a small, heavily skewed sample the normality assumption is genuinely at risk, so you'd check it (Q-Q plot / Shapiro–Wilk) and consider a transformation or a non-parametric alternative like the Wilcoxon test."
+          },
+          "branches": {
+            "skew_excuse": "tt_normality_choice"
+          }
+        },
+        "tt_normality_choice": {
+          "id": "tt_normality_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 4",
+          "title": "Stage 4 · Does normality even matter here?",
+          "prompt": "A reviewer worries your data isn't perfectly normal. Your independent-samples test has n₁ = 60 and n₂ = 55. How should you respond?",
+          "code_snippet": "n₁ = 60,  n₂ = 55  (both well above 30)\nRaw data: mildly non-normal (some skew)\n\nReviewer: \"Your data isn't normal — is the t-test valid?\"",
+          "choices": [
+            {
+              "id": "a",
+              "label": "With n's this large, the CLT makes the t-test robust to mild non-normality",
+              "description": "The t-test relies on the sampling distribution of the mean being normal. For n well above 30 the CLT delivers that even when raw data is skewed, so the test is robust."
+            },
+            {
+              "id": "b",
+              "label": "Non-normal data makes the t-test completely invalid regardless of n",
+              "description": "Normality of the raw data matters mainly for small samples; large n is exactly when it stops being a concern."
+            },
+            {
+              "id": "c",
+              "label": "Switch to a one-tailed test to fix the normality problem",
+              "description": "Tail choice has nothing to do with the normality assumption."
+            },
+            {
+              "id": "d",
+              "label": "Normality is never an assumption of the t-test",
+              "description": "It is an assumption — but one the CLT relaxes at large n; you can't dismiss it outright."
+            }
+          ],
+          "branches": {
+            "a": "tt_terminal",
+            "b": "tt_recovery_normality",
+            "c": "tt_recovery_normality",
+            "d": "tt_recovery_normality"
+          },
+          "rationale": "The t-test assumes the sampling distribution of the mean is approximately normal. With n₁ = 60 and n₂ = 55, the Central Limit Theorem makes that hold even for mildly skewed raw data, so the test is robust. Normality is the live concern mainly for small samples."
+        },
+        "tt_recovery_normality": {
+          "id": "tt_recovery_normality",
+          "type": "scenario_choice",
+          "badge": "Recovery 4",
+          "title": "Recovery · Normality vs sample size",
+          "prompt": "When is the normality assumption a genuine threat to a t-test, and when is it not?",
+          "code_snippet": "Assumption: sampling distribution of the mean ≈ normal\n\nCase A: n = 15, strongly skewed data\nCase B: n = 80, mildly skewed data\n\nWhen do you actually worry?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Worry in Case A (small n); Case B is fine — the CLT covers large n",
+              "description": "Normality of raw data matters most when n is small. For large n the CLT makes the mean's distribution normal regardless of modest skew."
+            },
+            {
+              "id": "b",
+              "label": "Worry equally in both — n is irrelevant to normality",
+              "description": "Sample size is exactly what determines whether the CLT rescues you; it is highly relevant."
+            },
+            {
+              "id": "c",
+              "label": "Worry only in Case B because more data exaggerates skew",
+              "description": "More data does the opposite: larger n makes the sampling distribution of the mean more normal, not less."
+            },
+            {
+              "id": "d",
+              "label": "Never worry — t-tests don't assume normality",
+              "description": "They do assume it; the CLT just relaxes it as n grows."
+            }
+          ],
+          "branches": {
+            "a": "tt_terminal",
+            "b": "tt_recovery_normality",
+            "c": "tt_recovery_normality",
+            "d": "tt_recovery_normality"
+          },
+          "rationale": "Normality is most threatening with small n. As n grows (rule of thumb n ≥ 30), the Central Limit Theorem makes the sampling distribution of the mean approximately normal even when the raw data is skewed, so the t-test becomes robust."
+        },
+        "tt_terminal": {
+          "id": "tt_terminal",
+          "type": "scenario_choice",
+          "badge": "Terminal",
+          "title": "Revision complete · Reporting a t-test",
+          "terminal": true,
+          "prompt": "You ran a paired t-test on 40 participants and want to report it like a researcher. Which write-up is best?",
+          "code_snippet": "Paired design, n = 40 participants\nMean difference (after − before) = 6.2 points\nResult: t = 2.71, df = 39, two-tailed p = 0.010",
+          "choices": [
+            {
+              "id": "a",
+              "label": "t(39) = 2.71, p = .010, two-tailed; report the mean difference, a 95% CI, and an effect size (Cohen's d_z)",
+              "description": "A complete report states the statistic with its df, the exact p and tail, plus effect size and a confidence interval so readers see magnitude and precision, not just significance."
+            },
+            {
+              "id": "b",
+              "label": "Just report 'p < 0.05, significant'",
+              "description": "A bare p-value hides the df, the effect direction and magnitude, and the precision — reviewers will push back."
+            },
+            {
+              "id": "c",
+              "label": "Report it as a one-tailed test to make p smaller",
+              "description": "Switching to one-tailed after the fact, with no pre-registered direction, is p-hacking."
+            },
+            {
+              "id": "d",
+              "label": "Report an independent-samples t-test instead — it's more standard",
+              "description": "The design is paired; using an independent test would ignore the pairing, lose power, and violate independence."
+            }
+          ],
+          "branches": {
+            "a": "tt_terminal",
+            "b": "tt_terminal",
+            "c": "tt_terminal",
+            "d": "tt_terminal"
+          },
+          "rationale": "A senior report is 't(39) = 2.71, p = .010, two-tailed' plus the mean difference, a confidence interval, and an effect size (Cohen's d_z for paired data). That communicates direction, magnitude, and precision — far more than a lone 'significant'."
+        }
+      }
+    },
+    "knowledgeCheck": [
+      {
+        "question": "A study measures cortisol in the SAME 25 people before and after a mindfulness program. Which t-test and degrees of freedom?",
+        "options": [
+          "Paired t-test, df = 24 (n_pairs − 1)",
+          "Independent-samples t-test, df = 48",
+          "One-sample t-test, df = 25",
+          "Welch's t-test, df = fractional"
+        ],
+        "correctIndex": 0,
+        "explanation": "Same subjects measured twice is a within-subjects design → paired t-test. It analyzes the 25 difference scores, so df = n_pairs − 1 = 24."
+      },
+      {
+        "question": "Two independent groups have clearly unequal variances and unequal sample sizes. Why prefer Welch's t-test over Student's pooled t-test?",
+        "options": [
+          "Welch uses separate variances and a smaller fractional df, staying valid when variances/n's are unequal",
+          "Welch increases the degrees of freedom and therefore the power",
+          "Welch converts the comparison into a paired analysis",
+          "Welch is only valid when the two sample sizes are equal"
+        ],
+        "correctIndex": 0,
+        "explanation": "Student's pooling assumes equal variances; when variances or n's are unequal that assumption fails. Welch keeps the variances separate (s₁²/n₁ + s₂²/n₂) and uses a smaller Welch–Satterthwaite df, protecting the Type I error rate."
+      },
+      {
+        "question": "Your raw data is mildly skewed but you have n₁ = 70 and n₂ = 65. Is the independent t-test's normality assumption a problem?",
+        "options": [
+          "No — with n well above 30 the Central Limit Theorem makes the test robust to mild non-normality",
+          "Yes — any skew invalidates the t-test no matter the sample size",
+          "Yes — large samples make skew worse for the t-test",
+          "The t-test has no normality assumption at all"
+        ],
+        "correctIndex": 0,
+        "explanation": "The t-test assumes the sampling distribution of the mean is approximately normal. With large n the CLT delivers that even for skewed raw data, so the test is robust. Normality is the live concern mainly for small samples."
+      },
+      {
+        "question": "A researcher reports 't(39) = 2.1, p = .021, one-tailed.' What must have been true for the one-tailed test to be legitimate?",
+        "options": [
+          "The direction of the effect was specified (pre-registered) before the data were collected",
+          "The sample size was at least 100",
+          "The variances of the two groups were equal",
+          "The p-value happened to be below 0.05"
+        ],
+        "correctIndex": 0,
+        "explanation": "A one-tailed test puts all of α in one tail, making significance easier to reach. That is only valid if the directional hypothesis was committed to before seeing the data; choosing one-tailed afterward to shrink p is p-hacking."
+      },
+      {
+        "question": "Which assumption is UNIQUE to the independent (two-sample) t-test and not the one-sample test?",
+        "options": [
+          "Homogeneity of variance between the two groups (or use Welch's correction)",
+          "Independence of observations",
+          "Approximate normality of the sampling distribution of the mean",
+          "That the data are continuous"
+        ],
+        "correctIndex": 0,
+        "explanation": "Independence, approximate normality, and continuous data apply to all t-tests. Homogeneity of variance is specific to comparing two groups; when it fails, Welch's t-test removes the equal-variance requirement."
+      }
+    ]
+  },
+  "st-t2": {
+    "durationLabel": "24 min",
+    "outcomes": [
+      "Decompose total variance into between-group and within-group components and compute F = MS_between / MS_within with its degrees of freedom.",
+      "Distinguish one-way, factorial, and repeated-measures ANOVA, and read a main-effects + interaction plot.",
+      "Choose and justify a post-hoc test (Tukey HSD vs Bonferroni) and report an η² effect size after a significant omnibus F."
+    ],
+    "learnMarkdown": "## Why ANOVA instead of many t-tests\n\nWith 3+ groups you could run every pairwise t-test, but each test at α = 0.05 carries its own 5% false-positive risk. Across many tests the **family-wise error rate** (probability of at least one false positive) balloons:\n\n```\nP(>= 1 false positive) = 1 - (1 - alpha)^m\n  3 groups -> m = 3 comparisons -> 1 - 0.95^3 = 14.3%\n  4 groups -> m = 6 comparisons -> 1 - 0.95^6 = 26.5%\n```\n\nANOVA replaces all of that with a single **omnibus test** under one null hypothesis: H0: μ1 = μ2 = ... = μk (all group means equal). H1: at least one mean differs.\n\n## Variance decomposition\n\nANOVA's name is literal — it analyzes *variance*. Total variability in the outcome splits into two additive pieces:\n\n```\nSS_total = SS_between + SS_within\n\nSS_between = n * SUM (group_mean - grand_mean)^2   (signal: separation of group means)\nSS_within  = SUM (n - 1) * group_variance          (noise: spread inside each group)\n```\n\n- **Between-group** captures how far each group's mean sits from the grand mean — the effect we care about.\n- **Within-group** captures the unexplained noise inside groups — the yardstick we measure the signal against.\n\n## F = MS_between / MS_within\n\nConvert each sum of squares to a *mean square* by dividing by its degrees of freedom, then take the ratio:\n\n```\nMS_between = SS_between / df_between    df_between = k - 1\nMS_within  = SS_within  / df_within     df_within  = N - k\n\nF = MS_between / MS_within\n```\n\nwhere k = number of groups and N = total sample size. Report it as **F(df_between, df_within)**, e.g. F(2, 57) = 18.4. A large F means the group means are spread far apart relative to within-group noise. Compare F to the critical value (or its p-value) to decide significance.\n\n## One-way ANOVA\n\nOne factor with 3+ levels (e.g. comparing reaction time across 3 caffeine doses). One omnibus F answers \"do any of these conditions differ?\" — nothing more.\n\n## Factorial ANOVA: main effects and interaction\n\nA **2×2 factorial** crosses two factors (e.g. Caffeine [Low/High] × Sleep [Rested/Deprived]). It yields three F-tests:\n\n- **Main effect of A** — does Factor A move the outcome, averaging over B?\n- **Main effect of B** — does Factor B move the outcome, averaging over A?\n- **A × B interaction** — does the effect of one factor *depend* on the level of the other?\n\nRead interaction from a two-line plot:\n\n```\nParallel lines  -> NO interaction (effects are additive; main effects interpretable)\nCrossing lines  -> interaction present (effect of B differs across levels of A)\n```\n\nWhen the interaction is significant, interpret it *first* — a main effect can be misleading because the factor helps in one condition and hurts in another.\n\n## Repeated-measures ANOVA\n\nWhen the *same subjects* are measured under every condition (within-subjects design), observations are correlated and the independence assumption of standard ANOVA is violated. **Repeated-measures ANOVA** partitions out between-subject variability, using each participant as their own control. This boosts power (analogous to a paired t-test generalized to 3+ conditions). It adds the **sphericity** assumption — equal variances of the differences between condition pairs — checked with Mauchly's test and corrected with Greenhouse-Geisser when violated.\n\n## Post-hoc tests: Tukey HSD vs Bonferroni\n\nA significant F is an existential claim: *at least one* pair differs. It does NOT tell you which. Run a post-hoc test that controls error across all pairwise comparisons:\n\n| Test | How it works | When |\n|------|--------------|------|\n| Tukey HSD | Single critical difference for all pairs via the studentized range | Balanced designs, all pairwise contrasts; good power |\n| Bonferroni | Divide α by the number of comparisons (α / m) | Any design, few planned contrasts; conservative, easy to explain |\n\n```\nTukey: pair differs if |mean_i - mean_j| > HSD critical difference\nBonferroni: use alpha' = alpha / m for each comparison\n```\n\n## Assumptions\n\n1. **Independence** of observations (within and across groups) — repeated measures needs the within-subjects variant.\n2. **Normality** of residuals within each group (robust for large n by the CLT; check with Q-Q plots / Shapiro-Wilk).\n3. **Homogeneity of variance** (homoscedasticity) — equal population variances. Check with Levene's test; if violated use Welch's ANOVA.\n\n## Eta-squared: effect size\n\nA p-value tells you *whether* there is an effect, not *how big*. Report **η²** alongside F:\n\n```\neta_squared = SS_between / SS_total   (proportion of total variance explained by group)\nRough benchmarks: 0.01 small, 0.06 medium, 0.14 large\n```\n\n(Partial η² is the analogous measure in factorial designs.)\n\n## Exam tip / Interview hook\n\n\"You compare task accuracy across 4 training methods and ANOVA gives F(3, 76) = 6.2, p = 0.001. What's your write-up?\"\n\nStrong answer: \"The omnibus F is significant, so at least one method differs — but it doesn't say which. I'd first confirm assumptions: independence, normality of residuals (Q-Q plot), and equal variances (Levene's). Then I'd run Tukey HSD to find which specific method pairs differ while controlling family-wise error, and report η² so the reader knows the effect's magnitude, not just that p < 0.05. If this were a within-subjects design — same participants in all four conditions — I'd use repeated-measures ANOVA and check sphericity.\"",
+    "video": null,
+    "videoFallbackMarkdown": "## ANOVA drill (5 minutes)\n\nAnswer each in one line:\n\n1. Write the F-ratio in words and give df_between and df_within for k = 4 groups, N = 60.\n2. A one-way ANOVA is significant (p = 0.003). State exactly what you can and cannot conclude.\n3. Two lines in a factorial plot are perfectly parallel. Is there an interaction? What about main effects?\n4. The same 30 participants are tested under 3 lighting conditions. Which ANOVA variant, and what extra assumption appears?\n5. You report F(2, 57) = 9.1, p < 0.001. Name the single most important number you should add to the write-up, and why.",
+    "tryGuidance": "Use the ANOVA Variance Decomposition Lab. In One-way mode, drag the group means apart and watch MS_between (signal) climb while the F-ratio crosses F_crit; then increase the spread to inflate MS_within (noise) and watch F fall. Read the Tukey HSD grid to see which pairs survive. Switch to Factorial (2×2) and toggle parallel vs crossing lines to feel the difference between additive main effects and a real interaction.",
+    "interviewGraph": {
+      "initialStageId": "an_decomp_choice",
+      "artifactDimensions": [
+        {
+          "label": "Variance Decomposition",
+          "recoveryStageId": "an_recovery_decomp"
+        },
+        {
+          "label": "Reading Interactions",
+          "recoveryStageId": "an_recovery_interaction"
+        },
+        {
+          "label": "Post-Hoc & Effect Size",
+          "recoveryStageId": "an_recovery_posthoc",
+          "passLabel": "ANOVA Mastery"
+        }
+      ],
+      "stages": {
+        "an_decomp_choice": {
+          "id": "an_decomp_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 1",
+          "title": "Stage 1 · What the F-ratio compares",
+          "prompt": "A one-way ANOVA compares reaction time across 3 caffeine doses. Conceptually, what does the F-ratio F = MS_between / MS_within measure?",
+          "code_snippet": "Groups: 0mg, 100mg, 200mg caffeine\nOutcome: reaction time (ms), continuous\n\nF = MS_between / MS_within\n  MS_between = SS_between / (k - 1)\n  MS_within  = SS_within  / (N - k)",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Separation of group means (signal) relative to within-group noise",
+              "description": "MS_between grows as group means spread from the grand mean; MS_within is the unexplained within-group variance. Their ratio is signal-to-noise."
+            },
+            {
+              "id": "b",
+              "label": "The difference between the largest and smallest raw scores",
+              "description": "ANOVA works on variance components, not on the raw range of individual scores."
+            },
+            {
+              "id": "c",
+              "label": "The correlation between the grouping variable and the outcome",
+              "description": "That is closer to η² (a proportion), not the F-ratio itself, which is a ratio of mean squares."
+            },
+            {
+              "id": "d",
+              "label": "The total number of pairwise comparisons among groups",
+              "description": "Pairwise comparisons are a post-hoc concern; F summarizes the overall variance decomposition."
+            }
+          ],
+          "branches": {
+            "a": "an_fratio_click",
+            "b": "an_recovery_decomp",
+            "c": "an_recovery_decomp",
+            "d": "an_recovery_decomp"
+          },
+          "rationale": "F is a signal-to-noise ratio: MS_between captures how far group means sit from the grand mean (the effect), MS_within captures unexplained within-group variability (the yardstick). A large F means the group separation is large relative to the noise."
+        },
+        "an_recovery_decomp": {
+          "id": "an_recovery_decomp",
+          "type": "scenario_choice",
+          "badge": "Recovery 1",
+          "title": "Recovery · Which SS is the signal?",
+          "prompt": "SS_total = SS_between + SS_within. If you spread the group means further apart while keeping within-group spread fixed, which quantity increases and what happens to F?",
+          "code_snippet": "SS_between = n * SUM (group_mean - grand_mean)^2\nSS_within  = SUM (n - 1) * group_variance\n\nMove group means apart, hold spread constant.",
+          "choices": [
+            {
+              "id": "a",
+              "label": "SS_between rises, so MS_between and F both increase",
+              "description": "Greater separation of means inflates SS_between (the signal); MS_within is unchanged, so F = MS_between / MS_within rises."
+            },
+            {
+              "id": "b",
+              "label": "SS_within rises and F falls",
+              "description": "Within-group spread was held fixed, so SS_within does not change; this option misattributes the change."
+            },
+            {
+              "id": "c",
+              "label": "Both change equally, leaving F unchanged",
+              "description": "Only the between-group term depends on the separation of means; F is not invariant here."
+            },
+            {
+              "id": "d",
+              "label": "Nothing changes; F depends only on sample size",
+              "description": "Sample size sets degrees of freedom, but F also depends directly on the variance components."
+            }
+          ],
+          "branches": {
+            "a": "an_fratio_click",
+            "b": "an_recovery_decomp",
+            "c": "an_recovery_decomp",
+            "d": "an_recovery_decomp"
+          },
+          "rationale": "Pulling group means apart increases SS_between (the signal) while SS_within (noise) stays fixed, so MS_between and therefore F increase. This is exactly the lever the visualization lets you pull."
+        },
+        "an_fratio_click": {
+          "id": "an_fratio_click",
+          "type": "click_target",
+          "badge": "Stage 2 target",
+          "title": "Stage 2 · Spot the degrees-of-freedom error",
+          "prompt": "An analyst runs a one-way ANOVA on k = 4 groups with N = 60 total observations and reports the result line below. Click the part that is computed incorrectly.",
+          "code_snippet": "k = 4 groups, N = 60 total observations\n\ndf_between = N - k = 56     -- ds-target:df_between_wrong\ndf_within  = N - k = 56     -- ds-target:df_within_ok\nF is then read as F(56, 56)  -- ds-target:f_label_wrong",
+          "validationCopy": {
+            "df_between_wrong": "Correct. df_between = k - 1 = 3, not N - k. The between-group degrees of freedom depend on the number of GROUPS minus one, not the total sample size.",
+            "df_within_ok": "df_within = N - k = 56 is actually the right formula for within-group df. The error is on the between-group line above.",
+            "f_label_wrong": "The F label inherits the upstream mistake, but the root error is df_between: it should be k - 1 = 3, giving F(3, 56), not F(56, 56)."
+          },
+          "branches": {
+            "df_between_wrong": "an_interaction_choice",
+            "df_within_ok": "an_fratio_click",
+            "f_label_wrong": "an_fratio_click"
+          }
+        },
+        "an_interaction_choice": {
+          "id": "an_interaction_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 3",
+          "title": "Stage 3 · Reading a factorial interaction",
+          "prompt": "In a 2×2 design (Caffeine × Sleep), the two lines on the interaction plot CROSS. What does that tell you?",
+          "code_snippet": "2x2 factorial: Caffeine [Low/High] x Sleep [Rested/Deprived]\n\nInteraction plot:\n  Line A1 goes UP from Low -> High\n  Line A2 goes DOWN from Low -> High   (lines cross)",
+          "choices": [
+            {
+              "id": "a",
+              "label": "There is an interaction; the effect of one factor depends on the other's level",
+              "description": "Crossing lines mean Caffeine helps in one Sleep condition but hurts in the other — interpret the interaction before any main effect."
+            },
+            {
+              "id": "b",
+              "label": "Both main effects are automatically significant",
+              "description": "A crossing interaction can actually cancel a main effect to near zero when averaging across levels; significance is not automatic."
+            },
+            {
+              "id": "c",
+              "label": "There is no interaction because both factors are present",
+              "description": "Presence of two factors does not imply additivity; crossing lines are the classic signature of an interaction."
+            },
+            {
+              "id": "d",
+              "label": "The design is invalid and should be re-run as two one-way ANOVAs",
+              "description": "Splitting into separate one-way tests discards the very interaction the factorial design is built to detect."
+            }
+          ],
+          "branches": {
+            "a": "an_posthoc_choice",
+            "b": "an_recovery_interaction",
+            "c": "an_recovery_interaction",
+            "d": "an_recovery_interaction"
+          },
+          "rationale": "Crossing lines are the hallmark of an interaction: the effect of Caffeine reverses across Sleep levels. When an interaction is significant you interpret it first, because main effects (averages across levels) can be misleading."
+        },
+        "an_recovery_interaction": {
+          "id": "an_recovery_interaction",
+          "type": "scenario_choice",
+          "badge": "Recovery 3",
+          "title": "Recovery · Parallel vs crossing lines",
+          "prompt": "On a factorial interaction plot, the two lines are exactly PARALLEL. What is the correct reading?",
+          "code_snippet": "Interaction plot:\n  Line A1 and Line A2 both rise by the SAME amount\n  from Factor B = Low to Factor B = High (parallel)",
+          "choices": [
+            {
+              "id": "a",
+              "label": "No interaction — effects are additive, so main effects are interpretable",
+              "description": "Parallel lines mean Factor B has the same effect at every level of A; you can read each main effect on its own."
+            },
+            {
+              "id": "b",
+              "label": "A strong interaction, because both lines move",
+              "description": "Both lines moving together (same slope) is additivity, not interaction; interaction requires the slopes to differ."
+            },
+            {
+              "id": "c",
+              "label": "The factors are perfectly correlated",
+              "description": "Parallelism describes additive effects on the outcome, not a correlation between the two factors."
+            },
+            {
+              "id": "d",
+              "label": "Neither factor has any effect",
+              "description": "Parallel but sloped/offset lines still show main effects; only flat, overlapping lines would mean no effect."
+            }
+          ],
+          "branches": {
+            "a": "an_posthoc_choice",
+            "b": "an_recovery_interaction",
+            "c": "an_recovery_interaction",
+            "d": "an_recovery_interaction"
+          },
+          "rationale": "Parallel lines = no interaction = additive effects. The gap between the lines is the main effect of A; their common slope is the main effect of B. Because effects are additive, each main effect can be interpreted independently."
+        },
+        "an_posthoc_choice": {
+          "id": "an_posthoc_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 4",
+          "title": "Stage 4 · After a significant omnibus F",
+          "prompt": "A one-way ANOVA across 4 training methods gives F(3, 76) = 6.2, p = 0.001. What is the correct next step AND what should you also report?",
+          "code_snippet": "ANOVA: F(3, 76) = 6.2, p = 0.001  -> reject H0\nGroups: Method W, X, Y, Z\nQuestion: which methods differ, and how big is the effect?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Run Tukey HSD to find which pairs differ, and report eta-squared for effect size",
+              "description": "The omnibus F only says >=1 pair differs; Tukey HSD identifies which while controlling family-wise error, and η² communicates magnitude."
+            },
+            {
+              "id": "b",
+              "label": "Conclude all four methods differ from each other",
+              "description": "A significant F is existential (at least one pair), not universal; a single strong group can drive it."
+            },
+            {
+              "id": "c",
+              "label": "Run 6 uncorrected pairwise t-tests",
+              "description": "6 comparisons at α=0.05 push the family-wise error rate to about 26%, the exact problem ANOVA avoided."
+            },
+            {
+              "id": "d",
+              "label": "Lower α to 0.01 and re-run the same ANOVA",
+              "description": "Changing α after seeing the result is p-hacking and still does not tell you which pairs differ."
+            }
+          ],
+          "branches": {
+            "a": "an_terminal",
+            "b": "an_recovery_posthoc",
+            "c": "an_recovery_posthoc",
+            "d": "an_recovery_posthoc"
+          },
+          "rationale": "A significant omnibus F is just the entry ticket: use a post-hoc test (Tukey HSD for all pairwise contrasts) to find which methods differ while controlling family-wise error, and report η² so readers know the effect's size, not only its existence."
+        },
+        "an_recovery_posthoc": {
+          "id": "an_recovery_posthoc",
+          "type": "scenario_choice",
+          "badge": "Recovery 4",
+          "title": "Recovery · Tukey HSD vs Bonferroni",
+          "prompt": "You need to compare ALL pairs of means after a significant one-way ANOVA on a balanced design. Which post-hoc choice is the standard one, and why?",
+          "code_snippet": "Balanced design, k groups, want every pairwise comparison.\n\nTukey HSD:    one critical difference for all pairs (studentized range)\nBonferroni:   alpha' = alpha / m for each comparison (conservative)",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Tukey HSD — built for all pairwise comparisons with good power on balanced designs",
+              "description": "Tukey controls family-wise error across every pair using the studentized range, retaining more power than Bonferroni for all-pairs testing."
+            },
+            {
+              "id": "b",
+              "label": "Bonferroni is always strictly better than Tukey",
+              "description": "Bonferroni is more conservative (lower power) for many comparisons; it shines for a few planned contrasts, not all pairs."
+            },
+            {
+              "id": "c",
+              "label": "No correction is needed once ANOVA is significant",
+              "description": "The omnibus F does not license uncorrected pairwise tests; that re-introduces multiple-comparison inflation."
+            },
+            {
+              "id": "d",
+              "label": "Report the ANOVA p-value as the pairwise result",
+              "description": "The single omnibus p-value says nothing about which specific pairs differ."
+            }
+          ],
+          "branches": {
+            "a": "an_terminal",
+            "b": "an_recovery_posthoc",
+            "c": "an_recovery_posthoc",
+            "d": "an_recovery_posthoc"
+          },
+          "rationale": "For all pairwise comparisons on a balanced design, Tukey HSD is the standard: it controls family-wise error with a single critical difference and keeps more power than the conservative Bonferroni (α / m), which is best reserved for a small number of planned contrasts."
+        },
+        "an_terminal": {
+          "id": "an_terminal",
+          "type": "scenario_choice",
+          "badge": "Terminal",
+          "title": "Revision complete · Reporting an ANOVA",
+          "terminal": true,
+          "prompt": "Same 40 participants are tested under 3 lighting conditions (within-subjects), and you must write up the analysis. Which approach is correct?",
+          "code_snippet": "Design: same 40 participants, 3 lighting conditions each\nOutcome: task accuracy (continuous)\n\nOptions:\n  A. Repeated-measures ANOVA; check sphericity; report eta-squared\n  B. One-way between-subjects ANOVA on the pooled data\n  C. Three independent-samples t-tests, uncorrected\n  D. Chi-squared test of independence",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Repeated-measures ANOVA; check sphericity; report effect size",
+              "description": "Same participants in every condition means observations are correlated. Repeated-measures ANOVA partitions out between-subject variance (more power), adds the sphericity assumption (Mauchly / Greenhouse-Geisser), and you still report η²."
+            },
+            {
+              "id": "b",
+              "label": "One-way between-subjects ANOVA",
+              "description": "That treats the three measurements per person as independent, violating independence and discarding the within-subject correlation that boosts power."
+            },
+            {
+              "id": "c",
+              "label": "Three uncorrected independent t-tests",
+              "description": "This ignores both the within-subjects design and multiple-comparison inflation."
+            },
+            {
+              "id": "d",
+              "label": "Chi-squared test of independence",
+              "description": "Chi-squared is for categorical frequencies; accuracy here is treated as a continuous mean."
+            }
+          ],
+          "branches": {
+            "a": "an_terminal",
+            "b": "an_terminal",
+            "c": "an_terminal",
+            "d": "an_terminal"
+          },
+          "rationale": "Because the same participants appear in every condition, use repeated-measures ANOVA: it removes between-subject variability for extra power, requires the sphericity assumption (checked by Mauchly, corrected with Greenhouse-Geisser), and you still report η² alongside F and follow up with corrected pairwise contrasts."
+        }
+      }
+    },
+    "knowledgeCheck": [
+      {
+        "question": "In a one-way ANOVA, what does a large F-ratio indicate?",
+        "options": [
+          "Between-group variance (separation of means) is large relative to within-group variance (noise)",
+          "The total sample size is large",
+          "The raw range of individual scores is wide",
+          "There are many pairwise comparisons to run"
+        ],
+        "correctIndex": 0,
+        "explanation": "F = MS_between / MS_within is a signal-to-noise ratio. A large F means the group means are spread far apart relative to the unexplained within-group variability, providing evidence against H0: all means equal."
+      },
+      {
+        "question": "A one-way ANOVA on k = 5 groups with N = 75 observations is reported. What are the correct degrees of freedom?",
+        "options": [
+          "F(4, 70): df_between = k - 1 = 4, df_within = N - k = 70",
+          "F(5, 75): df_between = k, df_within = N",
+          "F(74, 70): df_between = N - 1, df_within = N - k",
+          "F(70, 4): df_between = N - k, df_within = k - 1"
+        ],
+        "correctIndex": 0,
+        "explanation": "df_between = k - 1 = 4 (depends on number of groups), df_within = N - k = 75 - 5 = 70. The F-statistic is reported as F(df_between, df_within) = F(4, 70)."
+      },
+      {
+        "question": "On a 2×2 factorial interaction plot, the two lines cross. What is the correct interpretation?",
+        "options": [
+          "There is an interaction: the effect of one factor depends on the level of the other, so interpret the interaction before main effects",
+          "Both main effects are guaranteed to be significant",
+          "There is no interaction because both factors are present",
+          "The two factors are perfectly correlated with each other"
+        ],
+        "correctIndex": 0,
+        "explanation": "Crossing lines are the signature of an interaction — one factor's effect reverses across levels of the other. A crossing interaction can even cancel a main effect when averaging across levels, so the interaction is interpreted first."
+      },
+      {
+        "question": "A one-way ANOVA returns p = 0.002. What can you conclude, and what is the next step?",
+        "options": [
+          "At least one group mean differs; run a post-hoc test (e.g. Tukey HSD) to identify which pairs while controlling family-wise error",
+          "Every group mean differs from every other group mean",
+          "The two most extreme groups differ; no further testing is needed",
+          "You should lower α and re-run the same ANOVA"
+        ],
+        "correctIndex": 0,
+        "explanation": "ANOVA's H1 is existential: at least one pair differs. It does not say which or how many. Post-hoc tests (Tukey HSD for all pairwise comparisons) identify the specific differing pairs while controlling family-wise error."
+      },
+      {
+        "question": "Why should you report η² (eta-squared) alongside a significant F?",
+        "options": [
+          "η² = SS_between / SS_total gives the proportion of variance explained — the effect's magnitude, which the p-value alone does not convey",
+          "η² replaces the need to check ANOVA assumptions",
+          "η² is the probability that H0 is true",
+          "η² tells you exactly which pairs of groups differ"
+        ],
+        "correctIndex": 0,
+        "explanation": "A p-value indicates whether an effect exists, not how large it is. η² = SS_between / SS_total reports the proportion of total variance explained by group membership (≈0.01 small, 0.06 medium, 0.14 large), communicating practical significance."
+      }
+    ]
+  },
+  "st-t3": {
+    "durationLabel": "20 min",
+    "outcomes": [
+      "Recognize when parametric assumptions fail (non-normality, ordinal data, small n, heavy outliers) and a rank-based test is the safer choice.",
+      "Map each parametric test to its non-parametric counterpart and pick the right one for a given study design.",
+      "Explain the rank-based idea and the power tradeoff: what Mann-Whitney actually tests, and what you give up by going non-parametric."
+    ],
+    "learnMarkdown": "## When parametric assumptions fail\n\nt-tests and ANOVA are *parametric*: they assume the data come from a known distribution (usually normal) and they summarise groups by their **mean** and **variance**. That works beautifully when the assumptions hold. It breaks when they don't:\n\n- **Non-normality** — heavily skewed reaction times, income, or symptom counts. The sampling distribution of the mean is no longer well-behaved, especially at small n.\n- **Ordinal data** — Likert scales (\"Strongly disagree\" … \"Strongly agree\"). The *spacing* between categories is not equal, so a \"mean\" of 3.4 is not really meaningful. You only know the **order**.\n- **Outliers** — a single extreme value drags the mean and inflates the variance, which can flip a t-test's verdict in either direction.\n- **Small n** — with n = 8 per group you can't appeal to the Central Limit Theorem to rescue normality.\n\nWhen any of these bite, switch to a **non-parametric** (distribution-free) test.\n\n## The rank-based idea\n\nNon-parametric tests throw away the raw magnitudes and keep only the **order**. Pool all observations, sort them, and replace each value with its **rank** (ties share the average rank). Then ask: does one group sit systematically higher in the ranking than another?\n\n```\nRaw:    9  11  12  14  15  16  18  19  21  24\nRank:   1   2   3   4   5   6   7   8   9  10\n```\n\nBecause an outlier of 96 becomes \"just the top rank\" instead of a number 80 points away from the rest, rank-based tests are **robust**: no single value can dominate the result.\n\n## Mann-Whitney U — the independent t-test's counterpart\n\nThe **Mann-Whitney U** test (a.k.a. Wilcoxon rank-sum) compares **two independent groups**. Pool both groups, rank everything, sum the ranks in one group, and compute U:\n\n```\nU1 = R1 - n1(n1 + 1)/2\nU  = min(U1, U2)\n```\n\nA small U means one group's ranks cluster at the top. **Key subtlety for interviews:** Mann-Whitney does **not** test a difference in means. It tests whether one distribution is shifted relative to the other — under the common assumption of similar shapes, that's a difference in **medians**. Saying \"Mann-Whitney compares medians\" is only safe when the two distributions have the same shape.\n\n## Wilcoxon signed-rank ↔ paired t-test\n\nFor **paired / repeated-measures** data (same subjects, before vs after), use the **Wilcoxon signed-rank** test. Take each pair's difference, rank the **absolute** differences, then sum the ranks separately for positive and negative differences:\n\n```\nW = min(W+, W-)\n```\n\nIf improvements and worsenings were equally likely, W+ and W- would be similar. A lopsided split is evidence of a real shift — and one weird participant only contributes a rank, not a magnitude.\n\n## Kruskal-Wallis ↔ one-way ANOVA\n\n**Kruskal-Wallis** generalises Mann-Whitney to **three or more independent groups** — it is ANOVA performed on ranks. Rank all observations across every group, then test whether the rank sums differ more than chance:\n\n```\nH = [12 / (N(N+1))] * Σ (Rᵢ² / nᵢ) - 3(N+1)\n```\n\nA significant H says at least one group differs (just like a significant F in ANOVA). Follow up with Dunn's test for pairwise comparisons.\n\n## The mapping table\n\n| Parametric | Non-parametric | Design |\n|------------|----------------|--------|\n| Independent t-test | Mann-Whitney U | 2 independent groups |\n| Paired t-test | Wilcoxon signed-rank | Same subjects, 2 conditions |\n| One-way ANOVA | Kruskal-Wallis H | 3+ independent groups |\n| Pearson's r | Spearman's rho | Monotonic association |\n\n**Spearman's rho** is just Pearson's correlation computed on the ranks of the two variables. It captures any **monotonic** relationship (not only linear) and shrugs off outliers — handy for ordinal data or curved-but-increasing trends.\n\n## The power tradeoff\n\nRobustness is not free. When the parametric assumptions actually hold, rank-based tests have **lower statistical power** — they need a larger sample to detect the same true effect (the asymptotic relative efficiency of Mann-Whitney vs the t-test is about 0.95 for normal data, lower in some cases). So:\n\n- Assumptions met → prefer the parametric test (more power, gives you means and effect sizes).\n- Assumptions clearly violated (ordinal, skewed, tiny n, immovable outliers) → go non-parametric and accept the small power cost for valid inference.\n\n## Exam tip\n\nA common trap is to report that \"Mann-Whitney compares the means\" or to run a Pearson correlation on Likert ratings. State the *order* logic instead: rank-based tests use the relative ordering of observations, so they are valid for ordinal data and immune to outliers, at the cost of some power. If asked which test for \"satisfaction (1–5) before and after a workshop, n = 9 people,\" the answer is **Wilcoxon signed-rank** — ordinal data, paired design, small n — not a paired t-test.",
+    "video": null,
+    "videoFallbackMarkdown": "## Non-parametric drill (4 minutes)\n\nFor each scenario, name the non-parametric test and the one assumption that pushed you away from the parametric option:\n\n1. Comparing pain ratings (0–10 scale) between a drug group and a placebo group, n = 12 each.\n2. Comparing mood scores for the same 9 patients before and after therapy.\n3. Comparing reaction time (heavily right-skewed) across 4 sleep-deprivation conditions.\n4. Measuring the association between class rank and exam rank (both ordinal).\n5. Comparing average income between two cities where one sample contains a billionaire outlier.",
+    "tryGuidance": "Open the Non-Parametric Tests visualization. Toggle between Mann-Whitney U, Wilcoxon signed-rank, and Kruskal-Wallis to see each dataset converted to ranks and the statistic computed. Then flip 'Inject an outlier' and watch the parametric (t/ANOVA) verdict break while the rank-based verdict stays stable — that contrast is the whole point of going non-parametric.",
+    "interviewGraph": {
+      "initialStageId": "np_assumption_choice",
+      "artifactDimensions": [
+        {
+          "label": "Spotting Assumption Violations",
+          "recoveryStageId": "np_recovery_assumptions"
+        },
+        {
+          "label": "Choosing the Right Counterpart",
+          "recoveryStageId": "np_recovery_counterpart"
+        },
+        {
+          "label": "Interpreting Rank Tests",
+          "recoveryStageId": "np_recovery_interpret",
+          "passLabel": "Non-Parametric Mastery"
+        }
+      ],
+      "stages": {
+        "np_assumption_choice": {
+          "id": "np_assumption_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 1",
+          "title": "Stage 1 · When to abandon the t-test",
+          "prompt": "A psychology student wants to compare satisfaction ratings (a 1–5 Likert scale) between two small therapy groups, n = 8 each. They plan an independent-samples t-test. What's the strongest objection?",
+          "code_snippet": "Group A (n=8): 2, 3, 3, 4, 5, 4, 3, 2   # Likert 1-5\nGroup B (n=8): 1, 2, 2, 3, 2, 1, 3, 2   # Likert 1-5\n\nPlanned test: independent-samples t-test\nReports: mean(A) = 3.25, mean(B) = 2.00",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Likert data is ordinal and n is tiny — use Mann-Whitney U instead",
+              "description": "A 5-point scale has unequal spacing (ordinal), so means are not meaningful, and n=8 is too small to lean on the CLT. The rank-based Mann-Whitney U is the appropriate test."
+            },
+            {
+              "id": "b",
+              "label": "Nothing — a t-test is fine because both groups have the same n",
+              "description": "Equal sample sizes do not fix the ordinal-data or small-n problems; the t-test's assumptions are still violated."
+            },
+            {
+              "id": "c",
+              "label": "Use a chi-squared test because the ratings are categories",
+              "description": "Chi-squared would discard the ordering of the scale entirely; a rank-based test preserves order, which is the information that matters here."
+            },
+            {
+              "id": "d",
+              "label": "Increase α to 0.10 so the t-test can detect the difference",
+              "description": "Loosening α does not address the violated assumptions and inflates the false-positive rate — this is p-hacking, not a fix."
+            }
+          ],
+          "branches": {
+            "a": "np_counterpart_choice",
+            "b": "np_recovery_assumptions",
+            "c": "np_recovery_assumptions",
+            "d": "np_recovery_assumptions"
+          },
+          "rationale": "Likert ratings are ordinal (the gap between 'agree' and 'strongly agree' is not guaranteed equal to the gap between 'neutral' and 'agree'), so a mean is not well defined, and n=8 is too small for the CLT. Mann-Whitney U ranks the pooled scores and tests for a distribution shift — valid for ordinal, small-n data."
+        },
+        "np_recovery_assumptions": {
+          "id": "np_recovery_assumptions",
+          "type": "scenario_choice",
+          "badge": "Recovery 1",
+          "title": "Recovery · Which conditions break a parametric test?",
+          "prompt": "Which single set of conditions most clearly signals you should switch from a t-test to a non-parametric test?",
+          "code_snippet": "Checklist of red flags for parametric inference:\n  - distribution shape?\n  - measurement scale?\n  - sample size?\n  - extreme values?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Ordinal scale, heavy skew/outliers, or small n with non-normal data",
+              "description": "Any of these violates the normality / interval-scale assumptions that t-tests and ANOVA rely on, so a rank-based test is safer."
+            },
+            {
+              "id": "b",
+              "label": "Whenever the two groups have different sample sizes",
+              "description": "Unequal n is handled fine by Welch's t-test; it is not a reason to go non-parametric."
+            },
+            {
+              "id": "c",
+              "label": "Whenever the means are close together",
+              "description": "Closeness of means is about effect size, not about whether the test's assumptions hold."
+            },
+            {
+              "id": "d",
+              "label": "Only when the data are counts of categories",
+              "description": "Pure categorical counts call for chi-squared; ordinal and skewed continuous data are the typical non-parametric cases."
+            }
+          ],
+          "branches": {
+            "a": "np_counterpart_choice",
+            "b": "np_recovery_assumptions",
+            "c": "np_recovery_assumptions",
+            "d": "np_recovery_assumptions"
+          },
+          "rationale": "Parametric tests assume (approximate) normality and interval-scale data. Ordinal scales, heavy skew or outliers, and small non-normal samples each break those assumptions — that's when rank-based tests earn their keep."
+        },
+        "np_counterpart_choice": {
+          "id": "np_counterpart_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 2",
+          "title": "Stage 2 · Picking the right counterpart",
+          "prompt": "Same 9 patients rate their mood before and after a workshop (ordinal scale). The data are clearly non-normal. Which non-parametric test matches this design?",
+          "code_snippet": "Design: same 9 subjects measured twice (before, after)\nOutcome: mood rating, ordinal, non-normal\n\nCandidate tests:\n  Mann-Whitney U\n  Wilcoxon signed-rank\n  Kruskal-Wallis\n  Spearman's rho",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Wilcoxon signed-rank — the non-parametric paired t-test",
+              "description": "Same subjects measured twice is a paired design; Wilcoxon signed-rank ranks the within-subject differences, the rank-based counterpart of the paired t-test."
+            },
+            {
+              "id": "b",
+              "label": "Mann-Whitney U — two groups to compare",
+              "description": "Mann-Whitney is for two INDEPENDENT groups; here the two measurements come from the same people, so it would ignore the pairing."
+            },
+            {
+              "id": "c",
+              "label": "Kruskal-Wallis — comparing rankings",
+              "description": "Kruskal-Wallis is the rank-based ANOVA for 3+ independent groups, not a 2-condition paired design."
+            },
+            {
+              "id": "d",
+              "label": "Spearman's rho — it handles ordinal data",
+              "description": "Spearman measures monotonic association between two variables; it does not test whether the after scores shifted from the before scores."
+            }
+          ],
+          "branches": {
+            "a": "np_meaning_target",
+            "b": "np_recovery_counterpart",
+            "c": "np_recovery_counterpart",
+            "d": "np_recovery_counterpart"
+          },
+          "rationale": "Same subjects measured before and after is a paired design. The Wilcoxon signed-rank test ranks the absolute paired differences and compares the positive vs negative rank sums — the direct non-parametric counterpart of the paired t-test."
+        },
+        "np_recovery_counterpart": {
+          "id": "np_recovery_counterpart",
+          "type": "scenario_choice",
+          "badge": "Recovery 2",
+          "title": "Recovery · Mapping parametric to non-parametric",
+          "prompt": "Match each design to its correct non-parametric test.",
+          "code_snippet": "Design 1: 2 independent groups\nDesign 2: same subjects, before vs after\nDesign 3: 4 independent groups",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Mann-Whitney U / Wilcoxon signed-rank / Kruskal-Wallis",
+              "description": "Two independent groups → Mann-Whitney; same-subject paired → Wilcoxon signed-rank; 3+ independent groups → Kruskal-Wallis."
+            },
+            {
+              "id": "b",
+              "label": "Wilcoxon signed-rank / Mann-Whitney U / Spearman's rho",
+              "description": "This swaps the independent and paired designs and uses a correlation test where a group comparison is needed."
+            },
+            {
+              "id": "c",
+              "label": "Kruskal-Wallis / Mann-Whitney U / Wilcoxon signed-rank",
+              "description": "Kruskal-Wallis is for 3+ groups, not 2; the assignments are misordered."
+            },
+            {
+              "id": "d",
+              "label": "Spearman's rho / Kruskal-Wallis / Mann-Whitney U",
+              "description": "Spearman measures association, not a 2-group difference; the mapping is wrong throughout."
+            }
+          ],
+          "branches": {
+            "a": "np_meaning_target",
+            "b": "np_recovery_counterpart",
+            "c": "np_recovery_counterpart",
+            "d": "np_recovery_counterpart"
+          },
+          "rationale": "Two independent groups → Mann-Whitney U (≈ independent t-test); same subjects before/after → Wilcoxon signed-rank (≈ paired t-test); three or more independent groups → Kruskal-Wallis (≈ one-way ANOVA)."
+        },
+        "np_meaning_target": {
+          "id": "np_meaning_target",
+          "type": "click_target",
+          "badge": "Stage 3 target",
+          "title": "Stage 3 · What does Mann-Whitney actually test?",
+          "prompt": "A researcher writes up their Mann-Whitney result. Click the line that states the conclusion incorrectly.",
+          "code_snippet": "# Mann-Whitney U test, Group A vs Group B\nU, p = mann_whitney_u(group_a, group_b)   # U = 14, p = 0.03\n\n# Write-up:\nprint(\"Result: the two groups differ in their score distributions (p = 0.03)\")\nprint(\"Therefore the MEAN score of Group A is significantly higher\")  -- ds-target:mean_claim",
+          "validationCopy": {
+            "mean_claim": "Correct. Mann-Whitney U does not test the mean — it ranks the pooled values and tests whether one distribution is shifted relative to the other. Only if you additionally assume the two distributions have the same shape can you phrase the result as a difference in medians. Claiming a difference in means overstates what the rank-based test established."
+          },
+          "branches": {
+            "mean_claim": "np_power_choice"
+          }
+        },
+        "np_power_choice": {
+          "id": "np_power_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 4",
+          "title": "Stage 4 · The power tradeoff",
+          "prompt": "Your data are normally distributed with no outliers, but a reviewer suggests using Mann-Whitney 'just to be safe.' What is the correct response?",
+          "code_snippet": "Data: roughly normal, no outliers, n = 60 per group\nReviewer: \"Use a non-parametric test to be safe.\"\n\nQuestion: is that good advice here?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "No — when assumptions hold, the t-test has more power; non-parametric tests cost sensitivity",
+              "description": "Rank-based tests discard magnitude information, so when normality holds they need a larger sample to detect the same effect. With clean normal data, the t-test is the more powerful, appropriate choice."
+            },
+            {
+              "id": "b",
+              "label": "Yes — non-parametric tests are always the safer default",
+              "description": "Defaulting to non-parametric throws away power whenever assumptions actually hold; 'always safer' is a myth."
+            },
+            {
+              "id": "c",
+              "label": "Yes — non-parametric tests have more statistical power",
+              "description": "It's the reverse: rank-based tests generally have less power than their parametric counterparts when the parametric assumptions are met."
+            },
+            {
+              "id": "d",
+              "label": "It doesn't matter — both tests always give the same p-value",
+              "description": "They use different information (magnitudes vs ranks) and can give different p-values, especially near the significance threshold."
+            }
+          ],
+          "branches": {
+            "a": "np_terminal",
+            "b": "np_recovery_interpret",
+            "c": "np_recovery_interpret",
+            "d": "np_recovery_interpret"
+          },
+          "rationale": "Non-parametric tests trade power for robustness. With clean, normal, outlier-free data the t-test detects a true effect with fewer subjects, so switching 'just to be safe' needlessly reduces sensitivity. Use rank-based tests when assumptions are genuinely violated, not as a blanket default."
+        },
+        "np_recovery_interpret": {
+          "id": "np_recovery_interpret",
+          "type": "scenario_choice",
+          "badge": "Recovery 4",
+          "title": "Recovery · The cost of going non-parametric",
+          "prompt": "What do you give up by choosing a rank-based test when the parametric assumptions actually hold?",
+          "code_snippet": "Tradeoff:\n  Robustness gained: immune to outliers, valid for ordinal data\n  Cost when assumptions hold: ?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Statistical power — you need a larger sample to detect the same true effect",
+              "description": "Ranks discard magnitude, so when the data really are normal the rank test is less efficient and needs more data for equivalent power."
+            },
+            {
+              "id": "b",
+              "label": "Nothing — rank-based tests dominate parametric tests in every situation",
+              "description": "If that were true nobody would use t-tests; rank tests lose power exactly when the parametric assumptions hold."
+            },
+            {
+              "id": "c",
+              "label": "The ability to compute a p-value at all",
+              "description": "Non-parametric tests absolutely produce p-values; that is not what you sacrifice."
+            },
+            {
+              "id": "d",
+              "label": "The need to check any assumptions ever again",
+              "description": "Non-parametric tests still have assumptions (e.g. independence, and similar shapes for a median interpretation)."
+            }
+          ],
+          "branches": {
+            "a": "np_terminal",
+            "b": "np_recovery_interpret",
+            "c": "np_recovery_interpret",
+            "d": "np_recovery_interpret"
+          },
+          "rationale": "The price of robustness is power. When the parametric assumptions hold, a t-test or ANOVA extracts more information from the magnitudes and detects a true effect with a smaller sample than the corresponding rank-based test."
+        },
+        "np_terminal": {
+          "id": "np_terminal",
+          "type": "scenario_choice",
+          "badge": "Terminal",
+          "title": "Revision complete · Choosing a test under outliers",
+          "terminal": true,
+          "prompt": "Comparing reaction times (heavily right-skewed, with one extreme outlier) across 3 independent conditions. Which test and why?",
+          "code_snippet": "Study design:\n  3 independent groups, reaction time (ms)\n  Distribution: strongly right-skewed, one extreme outlier\n\nOptions:\n  A. One-way ANOVA\n  B. Kruskal-Wallis\n  C. Three Mann-Whitney tests, no correction\n  D. Paired t-test",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Kruskal-Wallis — rank-based ANOVA, robust to skew and the outlier",
+              "description": "Three independent groups with heavy skew and an outlier: Kruskal-Wallis ranks all observations so the outlier only contributes the top rank, giving a valid omnibus test. Follow up with Dunn's test if significant."
+            },
+            {
+              "id": "b",
+              "label": "One-way ANOVA — it compares 3 group means",
+              "description": "ANOVA's F-ratio is built on squared deviations, so the skew and the extreme value inflate within-group variance and distort the result."
+            },
+            {
+              "id": "c",
+              "label": "Three Mann-Whitney tests with no correction",
+              "description": "Running every pairwise rank test without correction inflates the family-wise error rate, just like multiple t-tests would."
+            },
+            {
+              "id": "d",
+              "label": "Paired t-test — comparing the conditions",
+              "description": "These are independent groups, not repeated measures on the same subjects, so a paired test does not apply — and a t-test is sensitive to the outlier anyway."
+            }
+          ],
+          "branches": {
+            "a": "np_terminal",
+            "b": "np_terminal",
+            "c": "np_terminal",
+            "d": "np_terminal"
+          },
+          "rationale": "Three independent groups + heavy skew + an outlier points to Kruskal-Wallis, the rank-based counterpart of one-way ANOVA. Ranking neutralises the outlier and the skew, giving a valid omnibus test; a significant H is then followed by Dunn's pairwise tests with correction."
+        }
+      }
+    },
+    "knowledgeCheck": [
+      {
+        "question": "A study measures customer satisfaction on a 1–5 Likert scale for two independent groups, n = 10 each. Which test is most appropriate?",
+        "options": [
+          "Mann-Whitney U — the data are ordinal and the sample is small, so rank-based comparison is valid",
+          "Independent-samples t-test — it always works for two groups",
+          "Chi-squared goodness of fit",
+          "Paired t-test"
+        ],
+        "correctIndex": 0,
+        "explanation": "Likert ratings are ordinal (unequal spacing between categories) and n=10 is too small to lean on the CLT, so the mean is not a sound summary. Mann-Whitney U ranks the pooled scores and tests for a distribution shift between the two independent groups."
+      },
+      {
+        "question": "What is the correct non-parametric counterpart to the paired (repeated-measures) t-test?",
+        "options": [
+          "Wilcoxon signed-rank test",
+          "Mann-Whitney U test",
+          "Kruskal-Wallis test",
+          "Spearman's rho"
+        ],
+        "correctIndex": 0,
+        "explanation": "The Wilcoxon signed-rank test ranks the absolute within-subject differences and compares positive vs negative rank sums — the direct rank-based analogue of the paired t-test. Mann-Whitney is for independent groups, Kruskal-Wallis for 3+ groups, and Spearman's rho measures association."
+      },
+      {
+        "question": "A Mann-Whitney U test is significant (p = 0.02). What can you correctly conclude?",
+        "options": [
+          "One group's scores tend to rank higher — its distribution is shifted relative to the other",
+          "The two group means are significantly different",
+          "The two groups have different variances",
+          "Exactly half of one group exceeds the other group's median"
+        ],
+        "correctIndex": 0,
+        "explanation": "Mann-Whitney tests whether one distribution is stochastically shifted relative to the other based on ranks. It does not directly test means; you can phrase it as a median difference only if you also assume the two distributions share the same shape."
+      },
+      {
+        "question": "Your data are approximately normal with no outliers. Why would a t-test usually be preferred over Mann-Whitney here?",
+        "options": [
+          "When assumptions hold, the parametric test has greater statistical power for a given sample size",
+          "Mann-Whitney cannot be computed for normal data",
+          "The t-test is the only test that produces a p-value",
+          "Non-parametric tests require the data to be categorical"
+        ],
+        "correctIndex": 0,
+        "explanation": "Rank-based tests discard magnitude information, so when the parametric assumptions actually hold they have lower power and need a larger sample to detect the same true effect. With clean normal data the t-test is the more efficient, appropriate choice."
+      },
+      {
+        "question": "Which scenario is the best fit for Kruskal-Wallis rather than one-way ANOVA?",
+        "options": [
+          "Comparing a strongly right-skewed outcome with an outlier across 4 independent groups",
+          "Comparing two independent normally distributed groups",
+          "Measuring the monotonic association between two ordinal variables",
+          "Comparing the same subjects' scores before and after an intervention"
+        ],
+        "correctIndex": 0,
+        "explanation": "Kruskal-Wallis is the rank-based counterpart of one-way ANOVA for 3+ independent groups. Heavy skew and an outlier violate ANOVA's normality and equal-variance assumptions, so ranking the observations gives a robust omnibus test. The other options call for a t-test, Spearman's rho, and Wilcoxon signed-rank respectively."
+      }
+    ]
+  },
+  "st-t4": {
+    "durationLabel": "18 min",
+    "outcomes": [
+      "Explain why statistical significance (p) does not imply practical importance, especially at large n.",
+      "Compute and interpret Cohen's d, eta-squared, and r, and convert between them.",
+      "Write a complete APA-style results sentence that pairs a test statistic with an effect size and confidence interval."
+    ],
+    "learnMarkdown": "## Why a p-value is not practical importance\n\nA p-value answers one narrow question: *if the null were true, how surprising is data this extreme?* It says nothing about **how big** the effect is. Two studies can both report p = .001 while one finds a life-changing difference and the other a difference no one would ever notice.\n\nThe culprit is sample size. The test statistic for comparing two means is roughly:\n\n```\nt = d * sqrt(n / 2)\n```\n\nHold the effect (d) fixed and let n grow: t climbs, p shrinks. With n = 50,000 per group, a difference of half a millisecond in load time can be \"highly significant.\" Significance measures **detectability**, not **importance**. Effect size measures importance.\n\n## Cohen's d and the pooled SD\n\n**Cohen's d** standardizes a mean difference by the spread of the data:\n\n```\nd = (mean_1 - mean_2) / SD_pooled\n```\n\nThe pooled standard deviation combines the two groups' spreads:\n\n```\nSD_pooled = sqrt( ((n1 - 1)*s1^2 + (n2 - 1)*s2^2) / (n1 + n2 - 2) )\n```\n\nBecause the difference is expressed in standard-deviation units, d is unitless: you can compare a d from a reaction-time study to a d from a depression-score study. A d of 0.5 means the two group means sit half a standard deviation apart, and the distributions overlap heavily.\n\n## Interpretation benchmarks\n\nCohen's rough conventions (treat as guides, not laws):\n\n| d | Magnitude | Rough overlap |\n|------|-----------|---------------|\n| 0.2 | small | ~85% |\n| 0.5 | medium | ~67% |\n| 0.8 | large | ~53% |\n\nThese benchmarks are field-dependent. In a mature literature a d of 0.2 might be a meaningful, replicable effect; in another context it may be noise. Always anchor to prior effects in the same domain.\n\n## Eta-squared and partial eta-squared (ANOVA)\n\nFor ANOVA, where you compare 3+ groups, the natural effect size is **eta-squared** — the proportion of total variance explained by the grouping factor:\n\n```\neta^2 = SS_effect / SS_total\n```\n\nWith multiple factors, **partial eta-squared** removes the variance attributable to the *other* factors from the denominator:\n\n```\npartial eta^2 = SS_effect / (SS_effect + SS_error)\n```\n\nBenchmarks: .01 small, .06 medium, .14 large. Note that partial eta-squared values across factors can sum to more than 1, so do not read them as a clean variance budget.\n\n## r as an effect size\n\nThe correlation coefficient **r** is itself an effect size on a -1..1 scale: benchmarks .1 / .3 / .5 for small / medium / large. Squaring it gives r^2, the proportion of variance shared — the same idea as eta-squared. For a two-group comparison, the point-biserial r and eta-squared are directly related (eta^2 = r^2).\n\n## Converting between measures\n\nThe measures are different views of the same standardized signal:\n\n```\nd  ->  r:    r = d / sqrt(d^2 + 4)      (equal group sizes)\nr  ->  d:    d = 2r / sqrt(1 - r^2)\nr  -> eta^2: eta^2 = r^2  (two-group case)\n```\n\nPick the metric your audience expects: d for a two-group mean difference, eta-squared (or partial) for ANOVA, r for correlational designs.\n\n## APA reporting format with worked examples\n\nAPA style pairs the inferential statistic with an effect size. The shape is *statistic(df) = value, p = value, effect = value*:\n\n```\nt-test:  t(48) = 2.31, p = .025, d = 0.67, 95% CI [0.08, 1.25]\nANOVA:   F(2, 117) = 9.84, p < .001, eta^2 = .14\ncorr:    r(98) = .32, p = .001, 95% CI [.13, .49]\n```\n\nAPA conventions: drop the leading zero on quantities that cannot exceed 1 (p, r), so write p = .025 not p = 0.025; report p < .001 rather than p = .000; italicize statistic symbols (t, F, p, r, d).\n\n## Confidence intervals on effect sizes\n\nA point estimate of d hides its uncertainty. Reporting a **95% CI on the effect size** tells the reader the range of effects compatible with the data. A d of 0.67 with CI [0.08, 1.25] is consistent with anything from a barely-there to a large effect — useful humility a bare point estimate erases. If the CI for a difference includes 0, you have not ruled out \"no effect,\" regardless of the p-value.\n\n## Exam tip\n\nSince the replication crisis, reviewers expect effect sizes and confidence intervals as standard, not as an afterthought. The senior move in any interview or write-up: report the test result **and** the effect size **and** its CI, then interpret practical importance relative to prior work — never let a small p-value stand alone as if it proved the effect mattered.",
+    "video": null,
+    "videoFallbackMarkdown": "## Effect-size drill (5 minutes)\n\nFor each line, state the magnitude and whether reporting is complete:\n\n1. \"t(98) = 2.10, p = .038\" — what is missing for APA reporting?\n2. Two groups: means 102 and 100, pooled SD = 4. Compute Cohen's d and name its magnitude.\n3. An ANOVA reports eta^2 = .02. Small, medium, or large?\n4. r = .45. Convert to d. Is the effect small, medium, or large on each scale?\n5. n = 40,000 per group, d = 0.03, p < .001. Write one sentence explaining why this should not excite anyone.",
+    "tryGuidance": "Use the Effect Size Explorer. Slide the mean difference and pooled SD apart and watch Cohen's d rise as the distribution overlap shrinks. Toggle between d, eta-squared, and r to see the same signal in three scales. Then crank n per group up to 2000 with a small mean difference and watch the APA sentence's p-value collapse below .001 while d stays trivial.",
+    "interviewGraph": {
+      "initialStageId": "es_p_vs_effect",
+      "artifactDimensions": [
+        {
+          "label": "p-value vs Effect Size",
+          "recoveryStageId": "es_recovery_pvalue"
+        },
+        {
+          "label": "Choosing the Right Metric",
+          "recoveryStageId": "es_recovery_metric"
+        },
+        {
+          "label": "APA Reporting Standard",
+          "recoveryStageId": "es_recovery_apa",
+          "passLabel": "Effect Size & APA Mastery"
+        }
+      ],
+      "stages": {
+        "es_p_vs_effect": {
+          "id": "es_p_vs_effect",
+          "type": "scenario_choice",
+          "badge": "Stage 1",
+          "title": "Stage 1 · Significant but trivial",
+          "prompt": "A product test on 50,000 users per arm finds a 'highly significant' difference in time-on-page: t = 6.2, p < .001, but d = 0.04. A teammate wants to ship the change as a clear win. What is the correct read?",
+          "code_snippet": "Group A (n = 50,000): mean = 60.0s\nGroup B (n = 50,000): mean = 60.3s\npooled SD = 7.5s\n\nt(99998) = 6.2,  p < .001\nCohen's d = 0.3 / 7.5 = 0.04",
+          "choices": [
+            {
+              "id": "a",
+              "label": "The effect is real but trivial; the tiny p reflects huge n, not importance",
+              "description": "With n this large, t = d * sqrt(n/2) makes even a 0.04 SD difference 'significant.' d = 0.04 is negligible."
+            },
+            {
+              "id": "b",
+              "label": "p < .001 proves a large, important effect — ship it",
+              "description": "p measures detectability, not magnitude. A vanishing p with a tiny d is the classic large-n trap."
+            },
+            {
+              "id": "c",
+              "label": "The test is invalid because n is too large",
+              "description": "Large n does not invalidate the test; it just makes trivial effects detectable. The fix is to report effect size, not discard the test."
+            },
+            {
+              "id": "d",
+              "label": "You must lower alpha to .001 to fix this",
+              "description": "Changing alpha does not change the effect size; d = 0.04 is trivial at any alpha."
+            }
+          ],
+          "branches": {
+            "a": "es_metric_choice",
+            "b": "es_recovery_pvalue",
+            "c": "es_recovery_pvalue",
+            "d": "es_recovery_pvalue"
+          },
+          "rationale": "Significance and importance are different questions. Because t = d * sqrt(n/2), a giant sample drives p toward 0 even for a trivial d. Report the effect size (d = 0.04, negligible) so the team does not mistake detectability for value."
+        },
+        "es_recovery_pvalue": {
+          "id": "es_recovery_pvalue",
+          "type": "scenario_choice",
+          "badge": "Recovery 1",
+          "title": "Recovery · What p actually measures",
+          "prompt": "Two studies of the same intervention both report p = .001. Study 1 has n = 30 per group; Study 2 has n = 20,000 per group. What can you conclude about the effect sizes?",
+          "code_snippet": "Study 1: n = 30/group,    p = .001\nStudy 2: n = 20,000/group, p = .001\n\nSame p-value. Same effect size?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Study 1 almost certainly has the larger effect; matching p at much larger n implies a smaller d",
+              "description": "To reach p = .001 with only n = 30, the standardized effect must be large. The same p at n = 20,000 can come from a small d."
+            },
+            {
+              "id": "b",
+              "label": "The effect sizes must be identical because the p-values match",
+              "description": "Equal p-values do not imply equal effect sizes; p depends on both effect size and n."
+            },
+            {
+              "id": "c",
+              "label": "Study 2 has the larger effect because it has more data",
+              "description": "More data raises power, not effect size. Larger n reaches the same p with a smaller true effect."
+            },
+            {
+              "id": "d",
+              "label": "You cannot say anything without the raw data",
+              "description": "You can reason from p and n: a fixed p at much larger n implies a smaller standardized effect."
+            }
+          ],
+          "branches": {
+            "a": "es_metric_choice",
+            "b": "es_recovery_pvalue",
+            "c": "es_recovery_pvalue",
+            "d": "es_recovery_pvalue"
+          },
+          "rationale": "p is a function of effect size and sample size together. Achieving p = .001 with n = 30 requires a large standardized effect; the same p at n = 20,000 is compatible with a small one. This is why effect size must be reported alongside p."
+        },
+        "es_metric_choice": {
+          "id": "es_metric_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 2",
+          "title": "Stage 2 · Choosing the right effect-size metric",
+          "prompt": "You ran a one-way ANOVA comparing mean recall across 4 teaching methods and it was significant. Which effect size should accompany the F statistic in your write-up?",
+          "code_snippet": "Design: one-way ANOVA, 4 groups\nOutcome: recall score (continuous)\nResult: F(3, 156) = 7.4, p < .001\n\nCandidate effect sizes: Cohen's d, eta-squared, r",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Eta-squared (or partial eta-squared)",
+              "description": "ANOVA's natural effect size is the proportion of variance explained by the factor: eta^2 = SS_effect / SS_total."
+            },
+            {
+              "id": "b",
+              "label": "Cohen's d",
+              "description": "Cohen's d is for a single two-group mean difference, not an omnibus 4-group comparison."
+            },
+            {
+              "id": "c",
+              "label": "A single Pearson r between method and score",
+              "description": "Method is a 4-level categorical factor; a single r does not summarize a 4-group ANOVA."
+            },
+            {
+              "id": "d",
+              "label": "No effect size is needed because F already has one",
+              "description": "F is a test statistic, not an effect size; APA requires a separate effect-size estimate."
+            }
+          ],
+          "branches": {
+            "a": "es_apa_click",
+            "b": "es_recovery_metric",
+            "c": "es_recovery_metric",
+            "d": "es_recovery_metric"
+          },
+          "rationale": "Match the metric to the design: d for a two-group mean difference, eta-squared (or partial eta-squared) for ANOVA's variance-explained, r for correlational designs. A significant F should be reported with eta-squared."
+        },
+        "es_recovery_metric": {
+          "id": "es_recovery_metric",
+          "type": "scenario_choice",
+          "badge": "Recovery 2",
+          "title": "Recovery · Matching metric to design",
+          "prompt": "Match each design to its standard effect-size metric.",
+          "code_snippet": "Design 1: two independent groups, mean difference\nDesign 2: 3+ groups, ANOVA, variance explained\nDesign 3: two continuous variables, linear association",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Cohen's d / eta-squared / r",
+              "description": "d for a two-group mean difference, eta-squared for ANOVA variance explained, r for a correlation between two continuous variables."
+            },
+            {
+              "id": "b",
+              "label": "eta-squared / r / Cohen's d",
+              "description": "This swaps the metrics: a two-group difference is d, not eta-squared."
+            },
+            {
+              "id": "c",
+              "label": "r / Cohen's d / eta-squared",
+              "description": "A two-group mean difference is d, and a correlation is r — this ordering is shuffled."
+            },
+            {
+              "id": "d",
+              "label": "Cohen's d / r / eta-squared",
+              "description": "ANOVA's standard metric is eta-squared, and a correlation is r — these two are swapped here."
+            }
+          ],
+          "branches": {
+            "a": "es_apa_click",
+            "b": "es_recovery_metric",
+            "c": "es_recovery_metric",
+            "d": "es_recovery_metric"
+          },
+          "rationale": "Two-group mean difference -> Cohen's d; 3+ group ANOVA -> eta-squared (variance explained); two continuous variables -> r. Each metric is the standardized signal viewed on the scale your audience expects."
+        },
+        "es_apa_click": {
+          "id": "es_apa_click",
+          "type": "click_target",
+          "badge": "Stage 3 target",
+          "title": "Stage 3 · The non-APA results line",
+          "prompt": "A student drafts a results section. Click the line that violates APA reporting standards.",
+          "code_snippet": "# Drafted results lines:\nt(48) = 2.31, p = .025, d = 0.67, 95% CI [0.08, 1.25]\nF(2, 117) = 9.84, p < .001, eta^2 = .14\nt(60) = 3.10, p = 0.000  -- ds-target:bad_line\nr(98) = .32, p = .001, 95% CI [.13, .49]",
+          "validationCopy": {
+            "bad_line": "Correct. This line breaks APA on two counts: p is written as 'p = 0.000' (should be 'p < .001', and the leading zero is dropped for quantities bounded by 1), and it reports no effect size or confidence interval. A test statistic must never stand alone."
+          },
+          "branches": {
+            "bad_line": "es_apa_choice"
+          }
+        },
+        "es_apa_choice": {
+          "id": "es_apa_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 4",
+          "title": "Stage 4 · Why reviewers require effect sizes and CIs",
+          "prompt": "A reviewer returns your manuscript asking for effect sizes with confidence intervals on every primary test, even the significant ones. What is the strongest justification for this standard?",
+          "code_snippet": "Reviewer note:\n\"Please report a standardized effect size and a 95% CI\n for each primary comparison, including significant results.\"\n\nYour reported line was:\nt(48) = 2.31, p = .025",
+          "choices": [
+            {
+              "id": "a",
+              "label": "p alone hides magnitude and uncertainty; effect size + CI show how big and how precise the effect is",
+              "description": "Post-replication-crisis standards demand magnitude and its uncertainty, enabling meta-analysis and honest interpretation. A CI on d shows the range of effects compatible with the data."
+            },
+            {
+              "id": "b",
+              "label": "It is a formatting preference with no real impact",
+              "description": "Effect sizes and CIs change interpretation and enable meta-analysis; they are substantive, not cosmetic."
+            },
+            {
+              "id": "c",
+              "label": "Reporting CIs lets you drop the p-value entirely",
+              "description": "CIs complement rather than replace the test report; APA expects both the statistic and the effect size."
+            },
+            {
+              "id": "d",
+              "label": "Only non-significant results need effect sizes",
+              "description": "Significant results need effect sizes too — significance does not establish magnitude."
+            }
+          ],
+          "branches": {
+            "a": "es_terminal",
+            "b": "es_recovery_apa",
+            "c": "es_recovery_apa",
+            "d": "es_recovery_apa"
+          },
+          "rationale": "A p-value reports detectability, not magnitude or precision. Effect sizes give the standardized magnitude and confidence intervals give its uncertainty, which is what lets readers judge practical importance and what makes results usable in meta-analysis — the core post-replication-crisis reporting standard."
+        },
+        "es_recovery_apa": {
+          "id": "es_recovery_apa",
+          "type": "scenario_choice",
+          "badge": "Recovery 4",
+          "title": "Recovery · Fixing an APA line",
+          "prompt": "Which version of this t-test result is correctly APA-formatted and complete?",
+          "code_snippet": "Raw values:\ndf = 48, t = 2.31, two-sided p = 0.0247, d = 0.67, CI = [0.08, 1.25]",
+          "choices": [
+            {
+              "id": "a",
+              "label": "t(48) = 2.31, p = .025, d = 0.67, 95% CI [0.08, 1.25]",
+              "description": "Drops the leading zero on p, rounds to three decimals, and reports the effect size with its confidence interval."
+            },
+            {
+              "id": "b",
+              "label": "t(48) = 2.31, p = 0.0247",
+              "description": "Keeps a leading zero on p, over-reports decimals, and omits the required effect size and CI."
+            },
+            {
+              "id": "c",
+              "label": "t = 2.31, significant, large effect",
+              "description": "Missing df, exact p, the numeric effect size, and the CI; 'large' is also wrong for d = 0.67 (medium)."
+            },
+            {
+              "id": "d",
+              "label": "p = .025, so the effect is important",
+              "description": "p does not establish importance; this omits the statistic, df, effect size, and CI entirely."
+            }
+          ],
+          "branches": {
+            "a": "es_terminal",
+            "b": "es_recovery_apa",
+            "c": "es_recovery_apa",
+            "d": "es_recovery_apa"
+          },
+          "rationale": "APA: t(df) = value, p = value (no leading zero, p < .001 when tiny), plus a standardized effect size and its 95% CI. d = 0.67 is a medium effect, and the CI communicates the uncertainty around it."
+        },
+        "es_terminal": {
+          "id": "es_terminal",
+          "type": "scenario_choice",
+          "badge": "Terminal",
+          "title": "Revision complete · Reporting a result end to end",
+          "terminal": true,
+          "prompt": "Final check: you ran a two-group study, n = 25 per group, and obtained t(48) = 2.31, p = .025, d = 0.67. How do you report and interpret it like a senior researcher?",
+          "code_snippet": "Two-group study, n = 25 per group\nt(48) = 2.31, p = .025\nCohen's d = 0.67, 95% CI [0.08, 1.25]\n\nHow do you report and interpret this?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Report statistic + p + d + CI, call d = 0.67 a medium effect, and note the CI spans small-to-large",
+              "description": "This is the complete, honest report: detectability (p), magnitude (d, medium), and uncertainty (CI ranging from small to large)."
+            },
+            {
+              "id": "b",
+              "label": "Just say p = .025, so the result is significant and done",
+              "description": "Significance alone hides magnitude and uncertainty — the exact gap modern standards exist to close."
+            },
+            {
+              "id": "c",
+              "label": "Report d = 0.67 as a large effect and drop the p-value",
+              "description": "d = 0.67 is medium, not large, and the test statistic should still be reported."
+            },
+            {
+              "id": "d",
+              "label": "Increase n until p < .001 before reporting anything",
+              "description": "Chasing a smaller p does not change the effect size and edges toward p-hacking."
+            }
+          ],
+          "branches": {
+            "a": "es_terminal",
+            "b": "es_terminal",
+            "c": "es_terminal",
+            "d": "es_terminal"
+          },
+          "rationale": "The senior report pairs the test (t(48) = 2.31, p = .025) with a standardized effect size (d = 0.67, medium) and its 95% CI [0.08, 1.25], then interprets practical importance. The wide CI honestly signals the effect could be anywhere from small to large."
+        }
+      }
+    },
+    "knowledgeCheck": [
+      {
+        "question": "A study with n = 80,000 per group reports p < .001 but d = 0.02. What is the best interpretation?",
+        "options": [
+          "The effect is statistically detectable but practically negligible; the tiny p reflects the huge sample, not importance",
+          "The effect is large and important because p < .001",
+          "The test is invalid because the sample is too large",
+          "You should lower alpha to .001 to correct the result"
+        ],
+        "correctIndex": 0,
+        "explanation": "Because t = d * sqrt(n/2), an enormous n drives p toward 0 even for a trivial effect. d = 0.02 is negligible regardless of how small p is — significance measures detectability, not importance."
+      },
+      {
+        "question": "How is Cohen's d defined for a two-group comparison?",
+        "options": [
+          "The difference in group means divided by the pooled standard deviation",
+          "The difference in group means divided by the sample size",
+          "The p-value multiplied by the sample size",
+          "The proportion of variance explained by the grouping factor"
+        ],
+        "correctIndex": 0,
+        "explanation": "d = (mean_1 - mean_2) / SD_pooled. Standardizing by the pooled SD makes d unitless and comparable across studies. (Variance explained describes eta-squared, not d.)"
+      },
+      {
+        "question": "You ran a one-way ANOVA across 4 groups and it was significant. Which effect size belongs in the report?",
+        "options": [
+          "Eta-squared (or partial eta-squared), the proportion of variance explained",
+          "Cohen's d between the two extreme groups only",
+          "The F statistic itself, which already is an effect size",
+          "No effect size is needed for ANOVA"
+        ],
+        "correctIndex": 0,
+        "explanation": "ANOVA's standard effect size is eta-squared = SS_effect / SS_total (or partial eta-squared with multiple factors). F is a test statistic, not an effect size, and d is for a single two-group difference."
+      },
+      {
+        "question": "Which line follows APA 7th-edition reporting conventions?",
+        "options": [
+          "t(48) = 2.31, p = .025, d = 0.67, 95% CI [0.08, 1.25]",
+          "t(48) = 2.31, p = 0.025",
+          "t(48) = 2.31, p = 0.000",
+          "t = 2.31, significant, large effect"
+        ],
+        "correctIndex": 0,
+        "explanation": "APA drops the leading zero on p (p = .025), writes p < .001 rather than p = .000, and pairs the statistic with an effect size and its confidence interval. The other options omit the effect size, mis-format p, or both."
+      },
+      {
+        "question": "Why do journals now require a confidence interval on the effect size, not just a point estimate?",
+        "options": [
+          "The CI shows the range of effects compatible with the data, communicating the precision the point estimate hides",
+          "The CI lets you remove the p-value from the report",
+          "A CI proves the effect is large",
+          "CIs are only needed when the result is non-significant"
+        ],
+        "correctIndex": 0,
+        "explanation": "A point estimate like d = 0.67 hides its uncertainty. A 95% CI such as [0.08, 1.25] reveals the effect could be anywhere from small to large, which is essential for honest interpretation and meta-analysis after the replication crisis."
+      }
+    ]
+  },
+  "st-t5": {
+    "durationLabel": "22 min",
+    "outcomes": [
+      "Interpret a regression slope β as the change in Y per one-unit change in X, holding other predictors constant.",
+      "Distinguish a statistically significant coefficient (p-value on β) from a practically large or important one.",
+      "Explain R² vs adjusted R², the regression assumptions, and how regression extends correlation for inference."
+    ],
+    "learnMarkdown": "## Regression for explanation vs prediction\n\nA regression line, `Ŷ = β₀ + β₁X`, can be used two ways:\n\n- **Prediction**: plug in X, get an estimated Y. You care about accuracy on new data.\n- **Inference (explanation)**: you care about *the coefficients themselves* — their sign, size, and whether they are reliably different from zero. This is the dominant use in psychology and social-science research.\n\nThis lesson is about **inference**: what does β *mean*, and how confident are we in it?\n\n## Interpreting the slope β\n\n```\nŶ = β₀ + β₁ · X\nβ₁ = \"for every +1 unit of X, Y changes by β₁ units, on average\"\n```\n\nIf you regress wellbeing on hours of sleep and get **β₁ = 4.8**, you read it as: *each additional hour of sleep is associated with a 4.8-point higher wellbeing score, on average.* The sign tells you direction; the magnitude tells you effect size in real units.\n\n> \"Associated with,\" not \"causes.\" Regression on observational data describes association. Causal claims need a design (randomisation) or strong assumptions.\n\n## The intercept β₀\n\nβ₀ is the predicted Y when **every** predictor equals 0. Sometimes meaningful (Y at baseline), often not — if X = 0 is outside the data range (e.g. 0 hours of sleep), the intercept is just where the line crosses the axis and should not be over-interpreted.\n\n## R² and adjusted R²\n\n```\nR² = 1 − (SS_residual / SS_total)\n   = proportion of variance in Y explained by the model\n```\n\nR² ranges 0–1. R² = 0.62 means the predictors explain 62% of the variance in Y.\n\n**Problem:** R² *never decreases* when you add a predictor — even a useless random one. So it rewards bloated models.\n\n```\nAdjusted R² = 1 − (1 − R²) · (n − 1) / (n − k − 1)\n   where k = number of predictors\n```\n\nAdjusted R² penalises each added predictor. It *can* fall when a predictor pulls its weight less than chance. Use adjusted R² to compare models with different numbers of predictors.\n\n## Testing the significance of a coefficient\n\nEach β has a **standard error** (its sampling uncertainty). The test statistic is:\n\n```\nt = β̂ / SE(β̂)     →     p-value (two-sided)\nH₀: β = 0  (this predictor has no linear effect)\n```\n\nA small p-value (say p < 0.05) means: *if the true coefficient were zero, a slope this far from zero would be unlikely.* You reject H₀ and call the predictor \"statistically significant.\"\n\n**Significant ≠ large.** With a big sample, a tiny, trivial β can be highly significant. With a small sample, a large, important β can fail to reach significance. Always report β *and* its p-value, and judge importance from the magnitude in real units (and a confidence interval), not the p-value alone.\n\n## Multiple regression and \"controlling for\"\n\n```\nŶ = β₀ + β₁X₁ + β₂X₂ + …\n```\n\nIn multiple regression, **β₁ is the effect of X₁ holding the other predictors constant** — the slope *among people who share the same value of X₂*. This is what \"controlling for X₂\" or \"adjusting for X₂\" means: you compare like with like.\n\nIf X₁ and X₂ are correlated and you omit X₂, then β₁ absorbs part of X₂'s effect — **omitted-variable bias**. Adding the right controls is how observational research approximates \"all else equal.\"\n\n## Assumptions (LINE)\n\n| Assumption | What it means | Check |\n|------------|---------------|-------|\n| **L**inearity | the X–Y relationship is a straight line | residuals vs fitted (no curve) |\n| **I**ndependence | observations don't influence each other | study design |\n| Homoscedasticity | residual variance is constant across X | residuals vs fitted (even band) |\n| **N**ormal residuals | residuals ~ normal (for inference / CIs) | Q–Q plot, histogram |\n\nViolations mainly threaten the *standard errors and p-values* — i.e. the inference — more than the point estimate of β.\n\n## How regression extends correlation\n\nPearson **r** measures the strength of a single linear association, with no units and no direction of effect. Regression goes further:\n\n- gives a slope **in real units** (β₁), not a unitless −1…1 number;\n- for a single predictor, **R² = r²** — the two are tightly linked;\n- handles **multiple predictors at once**, letting you isolate each effect while controlling for the others — something a simple correlation cannot do.\n\n## Exam tip\n\nWhen reading a regression output table, go column by column: **β** (direction + size in units), **SE** (uncertainty), **t = β/SE**, and **p** (is it distinguishable from zero?). State the slope in plain language with \"holding the others constant,\" separate significance from importance, and never read the intercept as meaningful when X = 0 lies outside the data.",
+    "video": null,
+    "videoFallbackMarkdown": "## Regression-reading drill (5 minutes)\n\nA study regresses exam anxiety (Y, 0–100) on hours of sleep (X₁) and hours of revision (X₂). Output:\n\n```\nTerm         β       SE     t       p\nIntercept   71.0    6.2    11.5   <0.001\nSleep (X₁)  -4.8    1.1    -4.4   <0.001\nRevision(X₂) 0.3    0.9     0.3    0.74\nR² = 0.41   Adj R² = 0.39\n```\n\nAnswer each:\n\n1. Interpret the sleep coefficient in plain language (include \"holding revision constant\").\n2. Is the revision coefficient significant? What does its p-value tell you?\n3. The intercept is 71 — is that a meaningful baseline? Why or why not?\n4. R² = 0.41: what does that mean, and why report adjusted R² too?\n5. Could \"sleep reduces anxiety\" be a causal claim from this design?",
+    "tryGuidance": "Use the Regression for Inference explorer. Start in 'Adjust the line yourself' mode and drag slope β₁ and intercept β₀ to minimise the residual sum of squares — then switch to 'Show least-squares fit' to see the optimum. Toggle residuals and the confidence band, and watch the β, SE, t, p, R² and adjusted R² update. Finally tick 'Add a second predictor' to see how β₁ is read as the effect of X₁ holding X₂ constant.",
+    "interviewGraph": {
+      "initialStageId": "rg_interpret_slope",
+      "artifactDimensions": [
+        {
+          "label": "Coefficient Interpretation",
+          "recoveryStageId": "rg_recovery_interpret"
+        },
+        {
+          "label": "Significance vs Importance",
+          "recoveryStageId": "rg_recovery_significance"
+        },
+        {
+          "label": "Controlling For a Variable",
+          "recoveryStageId": "rg_recovery_control",
+          "passLabel": "Regression Inference Mastery"
+        }
+      ],
+      "stages": {
+        "rg_interpret_slope": {
+          "id": "rg_interpret_slope",
+          "type": "scenario_choice",
+          "badge": "Stage 1",
+          "title": "Stage 1 · Reading the slope",
+          "prompt": "A study regresses wellbeing score on hours of sleep and reports β₁ = 4.8 (SE 1.1, p < 0.001). How should you interpret β₁?",
+          "code_snippet": "Model:  Ŷ = 35.0 + 4.8 · (hours of sleep)\n\nTerm          β      SE     t      p\nIntercept   35.0    3.9    9.0   <0.001\nSleep       4.8     1.1    4.4   <0.001",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Each extra hour of sleep is associated with a 4.8-point higher wellbeing score, on average",
+              "description": "Correct unit interpretation: the slope is the average change in Y per one-unit change in X."
+            },
+            {
+              "id": "b",
+              "label": "Sleep explains 4.8% of the variance in wellbeing",
+              "description": "Variance explained is R², not the slope. β₁ is a change in Y per unit X, in Y's units."
+            },
+            {
+              "id": "c",
+              "label": "Wellbeing is 4.8 times higher for people who sleep more",
+              "description": "β₁ is an additive change per unit, not a multiplicative ratio between groups."
+            },
+            {
+              "id": "d",
+              "label": "4.8 is the wellbeing score predicted when sleep = 0",
+              "description": "That is the intercept (β₀ = 35.0), not the slope."
+            }
+          ],
+          "branches": {
+            "a": "rg_significance_choice",
+            "b": "rg_recovery_interpret",
+            "c": "rg_recovery_interpret",
+            "d": "rg_recovery_interpret"
+          },
+          "rationale": "β₁ is the average change in Y per one-unit increase in X. Here, +1 hour of sleep is associated with +4.8 wellbeing points. Sign = direction, magnitude = effect size in real units. 'Associated with', not 'causes', for observational data."
+        },
+        "rg_recovery_interpret": {
+          "id": "rg_recovery_interpret",
+          "type": "scenario_choice",
+          "badge": "Recovery 1",
+          "title": "Recovery · Slope vs intercept vs R²",
+          "prompt": "Match each output number to what it tells you: Ŷ = 35.0 + 4.8·X, R² = 0.62.",
+          "code_snippet": "Ŷ = 35.0 + 4.8 · X\nR² = 0.62\n\nWhich statement is correct?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "4.8 = change in Y per +1 X; 35.0 = Y at X = 0; 0.62 = share of Y's variance explained",
+              "description": "Slope is the per-unit effect, intercept is the value at X = 0, R² is variance explained."
+            },
+            {
+              "id": "b",
+              "label": "35.0 is the slope and 4.8 is the intercept",
+              "description": "Reversed — β₀ (the constant) is the intercept, β₁ (the X coefficient) is the slope."
+            },
+            {
+              "id": "c",
+              "label": "R² = 0.62 means the slope is significant",
+              "description": "R² is variance explained; significance of the slope comes from its t-statistic and p-value."
+            },
+            {
+              "id": "d",
+              "label": "4.8 means Y is 4.8 on average",
+              "description": "4.8 is a rate of change, not the mean of Y."
+            }
+          ],
+          "branches": {
+            "a": "rg_significance_choice",
+            "b": "rg_recovery_interpret",
+            "c": "rg_recovery_interpret",
+            "d": "rg_recovery_interpret"
+          },
+          "rationale": "Slope β₁ = change in Y per one-unit change in X (4.8). Intercept β₀ = predicted Y when X = 0 (35.0). R² = proportion of variance in Y the model explains (0.62). Significance of β₁ is a separate question answered by t = β/SE and its p-value."
+        },
+        "rg_significance_choice": {
+          "id": "rg_significance_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 2",
+          "title": "Stage 2 · Significant vs important",
+          "prompt": "With n = 50,000, a predictor has β = 0.02 points per unit (SE 0.004, p < 0.001). The outcome ranges 0–100. What is the right read?",
+          "code_snippet": "n = 50,000\nTerm      β       SE      t      p\nX        0.02    0.004   5.0   <0.001\n\nOutcome scale: 0–100",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Statistically significant but practically tiny — the effect is real but negligible in size",
+              "description": "A huge sample makes a trivial 0.02-point effect significant. Significance ≠ importance; judge magnitude in real units."
+            },
+            {
+              "id": "b",
+              "label": "Significant, therefore an important and large effect",
+              "description": "A small p-value does not mean a large effect; it means the effect is distinguishable from zero."
+            },
+            {
+              "id": "c",
+              "label": "Not significant because the coefficient is small",
+              "description": "p < 0.001 means it is significant; magnitude and significance are different things."
+            },
+            {
+              "id": "d",
+              "label": "The coefficient must be wrong because it is so small",
+              "description": "A small but precisely-estimated coefficient is perfectly valid — its SE is also small."
+            }
+          ],
+          "branches": {
+            "a": "rg_control_click",
+            "b": "rg_recovery_significance",
+            "c": "rg_recovery_significance",
+            "d": "rg_recovery_significance"
+          },
+          "rationale": "p-value answers 'is β distinguishable from zero?', not 'is β large?'. With n = 50,000 even a 0.02-point effect is significant. Always report the magnitude (and a CI) and judge practical importance separately from significance."
+        },
+        "rg_recovery_significance": {
+          "id": "rg_recovery_significance",
+          "type": "scenario_choice",
+          "badge": "Recovery 2",
+          "title": "Recovery · What the p-value on β means",
+          "prompt": "A coefficient's p-value is 0.002. Which statement is the correct interpretation?",
+          "code_snippet": "H₀: β = 0  (no linear effect of this predictor)\nt = β / SE(β)\np = 0.002",
+          "choices": [
+            {
+              "id": "a",
+              "label": "If the true β were 0, a slope this extreme would be unlikely — so we reject H₀; it says nothing about effect size",
+              "description": "The p-value tests β = 0; it measures distinguishability from zero, not magnitude or importance."
+            },
+            {
+              "id": "b",
+              "label": "There is a 99.8% chance the effect is large",
+              "description": "p does not give the probability the effect is large, nor that it is true."
+            },
+            {
+              "id": "c",
+              "label": "The predictor explains 99.8% of the variance",
+              "description": "Variance explained is R²; the p-value is unrelated to it."
+            },
+            {
+              "id": "d",
+              "label": "The coefficient equals 0.002",
+              "description": "0.002 is the p-value, not the coefficient."
+            }
+          ],
+          "branches": {
+            "a": "rg_control_click",
+            "b": "rg_recovery_significance",
+            "c": "rg_recovery_significance",
+            "d": "rg_recovery_significance"
+          },
+          "rationale": "p = 0.002 means: assuming β = 0, a slope at least this extreme would occur only 0.2% of the time — so β is distinguishable from zero. It does not tell you the effect is large or important; that comes from the magnitude of β in real units."
+        },
+        "rg_control_click": {
+          "id": "rg_control_click",
+          "type": "click_target",
+          "badge": "Stage 3 target",
+          "title": "Stage 3 · Where 'holding constant' lives",
+          "prompt": "A researcher writes up a multiple regression. Click the coefficient whose interpretation requires the phrase 'holding the other predictor constant'.",
+          "code_snippet": "# Multiple regression: wellbeing ~ sleep + exercise\nŶ = 30.0 + 4.1·sleep + 3.1·exercise\n\nintercept = 30.0          -- ds-target:intercept\nbeta_sleep = 4.1          -- ds-target:beta_sleep\nr_squared = 0.66          -- ds-target:r2",
+          "validationCopy": {
+            "beta_sleep": "Correct. In multiple regression, β_sleep = 4.1 is the effect of an extra hour of sleep among people with the SAME exercise level — i.e. holding exercise constant. That 'all else equal' reading is exactly what controlling for a covariate buys you.",
+            "intercept": "The intercept is the predicted Y when both sleep AND exercise are 0 — it isn't the 'holding constant' coefficient. The slope on a predictor is what carries the partial-effect interpretation.",
+            "r2": "R² = 0.66 is the share of variance the whole model explains; it is not a per-predictor effect and does not carry a 'holding constant' interpretation. Look at a slope coefficient instead."
+          },
+          "branches": {
+            "beta_sleep": "rg_omitted_choice",
+            "intercept": "rg_control_click",
+            "r2": "rg_control_click"
+          }
+        },
+        "rg_omitted_choice": {
+          "id": "rg_omitted_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 4",
+          "title": "Stage 4 · Why add the control variable?",
+          "prompt": "Sleep and exercise are positively correlated. If you regress wellbeing on sleep ALONE and omit exercise, what happens to the sleep coefficient?",
+          "code_snippet": "Simple:    Ŷ = β₀ + β_sleep · sleep\nMultiple:  Ŷ = β₀ + β_sleep · sleep + β_ex · exercise\n\nNote: sleep and exercise are positively correlated,\nand exercise also raises wellbeing.",
+          "choices": [
+            {
+              "id": "a",
+              "label": "β_sleep is biased upward — it absorbs part of exercise's effect (omitted-variable bias)",
+              "description": "Omitting a correlated, relevant predictor lets the included coefficient soak up the omitted variable's effect, biasing it."
+            },
+            {
+              "id": "b",
+              "label": "Nothing changes — coefficients are independent of which other variables are in the model",
+              "description": "Coefficients are partial effects; they generally change as you add or drop correlated predictors."
+            },
+            {
+              "id": "c",
+              "label": "β_sleep becomes exactly zero",
+              "description": "Omitting a control does not zero out a coefficient; it typically biases it."
+            },
+            {
+              "id": "d",
+              "label": "R² increases when you remove exercise",
+              "description": "Removing a useful predictor lowers (or leaves) R²; it does not raise it."
+            }
+          ],
+          "branches": {
+            "a": "rg_terminal",
+            "b": "rg_recovery_control",
+            "c": "rg_recovery_control",
+            "d": "rg_recovery_control"
+          },
+          "rationale": "When an omitted variable (exercise) is correlated with the included one (sleep) and also affects Y, the included coefficient absorbs part of its effect — omitted-variable bias. Adding exercise as a control gives the partial effect of sleep 'holding exercise constant'."
+        },
+        "rg_recovery_control": {
+          "id": "rg_recovery_control",
+          "type": "scenario_choice",
+          "badge": "Recovery 4",
+          "title": "Recovery · What 'controlling for X₂' means",
+          "prompt": "In a multiple regression of Y on X₁ and X₂, what is the precise meaning of the coefficient β₁ on X₁?",
+          "code_snippet": "Ŷ = β₀ + β₁·X₁ + β₂·X₂\n\nWhat does β₁ represent?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "The change in Y per +1 X₁ among observations with the SAME X₂ — the effect holding X₂ constant",
+              "description": "A coefficient in multiple regression is a partial effect: the slope of X₁ comparing units that share the same X₂."
+            },
+            {
+              "id": "b",
+              "label": "The total correlation between X₁ and Y, ignoring X₂",
+              "description": "That is the simple (zero-order) association; the multiple-regression β₁ adjusts for X₂."
+            },
+            {
+              "id": "c",
+              "label": "The variance in Y explained by X₁",
+              "description": "Variance explained is an R²-type quantity, not the slope coefficient."
+            },
+            {
+              "id": "d",
+              "label": "The predicted Y when X₁ = 0",
+              "description": "That involves the intercept and X₂, not the meaning of the X₁ slope."
+            }
+          ],
+          "branches": {
+            "a": "rg_terminal",
+            "b": "rg_recovery_control",
+            "c": "rg_recovery_control",
+            "d": "rg_recovery_control"
+          },
+          "rationale": "β₁ in multiple regression is a partial effect: the change in Y per one-unit increase in X₁ among observations that share the same value of X₂. That is exactly what 'controlling for / holding X₂ constant' means — comparing like with like."
+        },
+        "rg_terminal": {
+          "id": "rg_terminal",
+          "type": "scenario_choice",
+          "badge": "Terminal",
+          "title": "Revision complete · Reading a regression for inference",
+          "terminal": true,
+          "prompt": "Final check: you report β_sleep = -4.8 (SE 1.1, p < 0.001) for anxiety ~ sleep + revision, R² = 0.41, adjusted R² = 0.39. What is the cleanest one-line write-up?",
+          "code_snippet": "anxiety ~ sleep + revision\nβ_sleep = -4.8, SE 1.1, p < 0.001\nR² = 0.41,  Adjusted R² = 0.39",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Each extra hour of sleep is associated with a 4.8-point lower anxiety score, holding revision constant; effect is reliably non-zero (p < 0.001)",
+              "description": "Reports magnitude in units, the 'holding constant' clause, and separates significance from the size of the effect."
+            },
+            {
+              "id": "b",
+              "label": "Sleep explains 4.8% of anxiety variance",
+              "description": "Confuses the slope with R²; 4.8 is a per-hour change in score, not a percent of variance."
+            },
+            {
+              "id": "c",
+              "label": "Because p < 0.001, sleep has a very large effect on anxiety",
+              "description": "A small p-value shows the effect is distinguishable from zero, not that it is large."
+            },
+            {
+              "id": "d",
+              "label": "The intercept proves sleep causes lower anxiety",
+              "description": "The intercept is Y at X = 0; causation needs design, not an intercept."
+            }
+          ],
+          "branches": {
+            "a": "rg_terminal",
+            "b": "rg_terminal",
+            "c": "rg_terminal",
+            "d": "rg_terminal"
+          },
+          "rationale": "A strong inferential write-up states the slope in real units, adds 'holding the other predictors constant', reports the SE and p-value to convey precision, and keeps significance ('distinguishable from zero') separate from practical importance ('how large'). It avoids causal language for observational data."
+        }
+      }
+    },
+    "knowledgeCheck": [
+      {
+        "question": "In the model Ŷ = 35 + 4.8·X (X = hours of sleep, Y = wellbeing 0–100), what does the 4.8 mean?",
+        "options": [
+          "Each additional hour of sleep is associated with a 4.8-point higher wellbeing score, on average",
+          "Sleep explains 4.8% of the variance in wellbeing",
+          "Wellbeing is 4.8 when sleep is 0",
+          "People who sleep more have 4.8 times higher wellbeing"
+        ],
+        "correctIndex": 0,
+        "explanation": "The slope β₁ is the average change in Y per one-unit change in X, in Y's own units. Here +1 hour of sleep is associated with +4.8 wellbeing points. Variance explained is R²; the value at X = 0 is the intercept (35)."
+      },
+      {
+        "question": "With n = 50,000 a coefficient is β = 0.02 (p < 0.001) on a 0–100 outcome. What is the correct interpretation?",
+        "options": [
+          "The effect is statistically significant but practically negligible — significance is not the same as importance",
+          "The effect is significant, so it must be large and important",
+          "The result is invalid because the coefficient is too small",
+          "The predictor explains 99.8% of the variance"
+        ],
+        "correctIndex": 0,
+        "explanation": "A very large sample makes even a trivial 0.02-point effect significant. The p-value answers 'is β distinguishable from zero?', not 'is β large?'. Judge importance from the magnitude (and a confidence interval), not the p-value."
+      },
+      {
+        "question": "Why prefer adjusted R² over R² when comparing models with different numbers of predictors?",
+        "options": [
+          "R² never decreases when predictors are added, even useless ones; adjusted R² penalises extra predictors so it can fall",
+          "Adjusted R² is always larger than R²",
+          "R² cannot be computed for multiple regression",
+          "Adjusted R² measures statistical significance of the model"
+        ],
+        "correctIndex": 0,
+        "explanation": "Adding any predictor can only hold or raise R², so R² rewards bloated models. Adjusted R² = 1 − (1−R²)(n−1)/(n−k−1) penalises each predictor and can decrease, making it the fair tool for comparing models of different size."
+      },
+      {
+        "question": "In a multiple regression Ŷ = β₀ + β₁X₁ + β₂X₂, what does 'controlling for X₂' mean for β₁?",
+        "options": [
+          "β₁ is the effect of X₁ among observations with the same value of X₂ — the partial effect holding X₂ constant",
+          "β₁ is the simple correlation between X₁ and Y, ignoring X₂",
+          "β₁ is the variance in Y explained by X₁ alone",
+          "β₁ is the predicted value of Y when X₁ equals zero"
+        ],
+        "correctIndex": 0,
+        "explanation": "A coefficient in multiple regression is a partial effect: the change in Y per one-unit increase in X₁ among units that share the same X₂. Omitting a correlated, relevant X₂ would bias β₁ (omitted-variable bias) by letting it absorb part of X₂'s effect."
+      },
+      {
+        "question": "Which is a correct statement about how regression relates to correlation and its assumptions?",
+        "options": [
+          "For one predictor R² = r², but regression adds a slope in real units and can hold other predictors constant; valid inference assumes linearity, independence, constant residual variance, and roughly normal residuals",
+          "Regression and correlation are identical and interchangeable in every way",
+          "Regression requires no assumptions because it always minimises squared error",
+          "A significant slope proves the relationship is causal"
+        ],
+        "correctIndex": 0,
+        "explanation": "Pearson r is a unitless −1…1 association; regression gives a slope in real units and, with multiple predictors, isolates each effect. For one predictor R² = r². Trustworthy p-values and CIs rely on the LINE assumptions (linearity, independence, homoscedasticity, normal residuals); significance is not causation."
+      }
+    ]
+  },
 };
 
 
