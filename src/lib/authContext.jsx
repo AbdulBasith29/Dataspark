@@ -9,6 +9,26 @@ export function AuthProvider({ children }) {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [authTab, setAuthTab] = useState("signup");
   const [mfaFactorId, setMfaFactorId] = useState(null);
+  const [plan, setPlan] = useState("free"); // "free" | "pro" — synced from user_subscriptions
+
+  // Load the current user's plan from Supabase. Defaults to "free" for any
+  // user without an active subscription row.
+  const refreshPlan = useCallback(async (currentUser) => {
+    const u = currentUser ?? user;
+    if (!u) { setPlan("free"); return; }
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { data } = await supabase
+        .from("user_subscriptions")
+        .select("plan, status")
+        .eq("user_id", u.id)
+        .maybeSingle();
+      const active = data?.plan === "pro" && ["active", "trialing"].includes(data?.status);
+      setPlan(active ? "pro" : "free");
+    } catch {
+      setPlan("free");
+    }
+  }, [user]);
 
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
@@ -69,6 +89,12 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Keep plan in sync with whoever is signed in.
+  useEffect(() => {
+    if (user === undefined) return; // still loading
+    refreshPlan(user);
+  }, [user, refreshPlan]);
+
   const openAuthModal = useCallback((tab = "signup") => {
     setAuthTab(tab);
     setIsAuthOpen(true);
@@ -98,6 +124,9 @@ export function AuthProvider({ children }) {
       isAuthOpen,
       authTab,
       mfaFactorId,
+      plan,
+      isPro: plan === "pro",
+      refreshPlan,
       openAuthModal,
       closeAuthModal,
       refreshUser,

@@ -4,12 +4,12 @@ import PageShell from "./PageShell.jsx";
 const P = {
   card: "rgba(255,255,255,0.03)",
   border: "rgba(255,255,255,0.1)",
-  borderHi: "rgba(99,102,241,0.35)",
+  borderHi: "rgba(168,85,247,0.35)",
   t1: "#F8FAFC",
   t2: "#E2E8F0",
   t3: "#94A3B8",
-  ind: "#818CF8",
-  indB: "#6366F1",
+  ind: "#A855F7",
+  cyan: "#22D3EE",
   inputBg: "rgba(6,8,20,0.85)",
 };
 
@@ -23,7 +23,7 @@ function inputStyle(focusError) {
     border: `1px solid ${focusError ? "rgba(239,68,68,0.5)" : "rgba(255,255,255,0.12)"}`,
     background: P.inputBg,
     color: P.t1,
-    fontFamily: "var(--sans)",
+    fontFamily: "var(--ds-sans), sans-serif",
     fontSize: 14,
     outline: "none",
     transition: "border-color 0.2s",
@@ -68,7 +68,7 @@ export default function ContactPage() {
           maxWidth: 520,
           borderRadius: 16,
           border: `1px solid ${P.borderHi}`,
-          background: `linear-gradient(145deg, ${P.card}, rgba(99,102,241,0.04))`,
+          background: `linear-gradient(145deg, ${P.card}, rgba(168,85,247,0.05))`,
           boxShadow: "0 24px 48px rgba(0,0,0,0.35)",
           overflow: "hidden",
         }}
@@ -77,10 +77,10 @@ export default function ContactPage() {
           style={{
             padding: "20px 22px",
             borderBottom: `1px solid ${P.border}`,
-            background: "rgba(99,102,241,0.08)",
+            background: "rgba(168,85,247,0.08)",
           }}
         >
-          <div style={{ fontSize: 11, fontFamily: "var(--mono)", letterSpacing: 1.4, color: P.ind, marginBottom: 6 }}>
+          <div style={{ fontSize: 11, fontFamily: "var(--ds-mono), monospace", letterSpacing: 1.4, color: P.ind, marginBottom: 6 }}>
             PRIMARY INBOX
           </div>
           <a
@@ -153,9 +153,9 @@ export default function ContactPage() {
               fontWeight: 700,
               fontSize: 14,
               cursor: "pointer",
-              background: P.indB,
+              background: `linear-gradient(110deg, ${P.ind}, ${P.cyan})`,
               color: "#fff",
-              boxShadow: "0 8px 24px rgba(99,102,241,0.35)",
+              boxShadow: "0 8px 24px rgba(168,85,247,0.3)",
             }}
           >
             Open email draft

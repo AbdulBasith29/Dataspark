@@ -43,6 +43,84 @@ ${topics}
 ${formattingAndScope}`;
 };
 
+// Code block with language label + copy button — Claude/ChatGPT style.
+function CodeBlock({ lang, code }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
+  return (
+    <div
+      style={{
+        margin: "12px 0",
+        background: "#0B1120",
+        border: "1px solid #233047",
+        borderRadius: 10,
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          background: "#111c30",
+          padding: "6px 10px 6px 12px",
+          borderBottom: "1px solid #233047",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "var(--ds-mono), monospace",
+            fontSize: 11,
+            color: "#7C8BA5",
+            letterSpacing: "0.03em",
+          }}
+        >
+          {lang || "code"}
+        </span>
+        <button
+          onClick={copy}
+          style={{
+            background: "none",
+            border: "none",
+            color: copied ? "#34D399" : "#7C8BA5",
+            fontSize: 11,
+            fontFamily: "var(--ds-mono), monospace",
+            cursor: "pointer",
+            padding: "2px 6px",
+            borderRadius: 5,
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+          }}
+        >
+          {copied ? "✓ Copied" : "⧉ Copy"}
+        </button>
+      </div>
+      <pre
+        style={{
+          margin: 0,
+          padding: "12px 14px",
+          overflowX: "auto",
+          fontFamily: "var(--ds-mono), monospace",
+          color: "#E2E8F0",
+          fontSize: 12.5,
+          lineHeight: 1.6,
+        }}
+      >
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
 const AIChatbot = ({ course, onClose, seedInput }) => {
   const [messages, setMessages] = useState(() => {
     const cfg = CHATBOT_CONFIG[course.id] || {};
@@ -59,11 +137,43 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
   );
   const [loading, setLoading] = useState(false);
   const [remaining, setRemaining] = useState(null);
+  const [expanded, setExpanded] = useState(false);
+  const [userId, setUserId] = useState(null);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Load this course's saved conversation for the signed-in account.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const supabase = getSupabaseBrowserClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id || null;
+      if (cancelled || !uid) return;
+      setUserId(uid);
+
+      const { data } = await supabase
+        .from("chat_messages")
+        .select("role, content")
+        .eq("user_id", uid)
+        .eq("course_id", course.id)
+        .order("created_at", { ascending: true });
+      if (cancelled || !data || !data.length) return;
+      setMessages(data.map((m) => ({ role: m.role, content: m.content })));
+    })();
+    return () => { cancelled = true; };
+  }, [course.id]);
+
+  const persistMessage = (uid, role, content) => {
+    if (!uid) return;
+    getSupabaseBrowserClient()
+      .from("chat_messages")
+      .insert({ user_id: uid, course_id: course.id, role, content })
+      .then(() => {});
+  };
 
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
@@ -71,6 +181,7 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
     setInput("");
     setMessages((prev) => [...prev, { role: "user", content: userMsg }]);
     setLoading(true);
+    persistMessage(userId, "user", userMsg);
 
     try {
       const supabase = getSupabaseBrowserClient();
@@ -97,8 +208,6 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
         }),
       });
 
-      const data = await resp.json();
-
       if (resp.status === 401) {
         setMessages((prev) => [
           ...prev,
@@ -112,6 +221,7 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
       }
 
       if (resp.status === 429) {
+        const data = await resp.json().catch(() => null);
         setMessages((prev) => [
           ...prev,
           {
@@ -124,7 +234,8 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
         return;
       }
 
-      if (!resp.ok || !data?.text) {
+      if (!resp.ok || !resp.body) {
+        const data = await resp.json().catch(() => null);
         const details =
           data?.details?.message ||
           data?.details?.error?.message ||
@@ -141,8 +252,45 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
         return;
       }
 
-      if (typeof data.remaining === "number") setRemaining(data.remaining);
-      setMessages((prev) => [...prev, { role: "assistant", content: data.text }]);
+      // Stream the reply in as it's generated, like Claude/ChatGPT.
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let assistantText = "";
+      let finalRemaining = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let newlineIdx;
+        while ((newlineIdx = buffer.indexOf("\n")) !== -1) {
+          const line = buffer.slice(0, newlineIdx).trim();
+          buffer = buffer.slice(newlineIdx + 1);
+          if (!line) continue;
+          let evt;
+          try {
+            evt = JSON.parse(line);
+          } catch {
+            continue;
+          }
+          if (evt.delta) {
+            assistantText += evt.delta;
+            setMessages((prev) => {
+              const next = [...prev];
+              next[next.length - 1] = { role: "assistant", content: assistantText };
+              return next;
+            });
+          }
+          if (evt.done && typeof evt.remaining === "number") {
+            finalRemaining = evt.remaining;
+          }
+        }
+      }
+
+      if (finalRemaining !== null) setRemaining(finalRemaining);
+      if (assistantText) persistMessage(userId, "assistant", assistantText);
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -220,82 +368,138 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
     return nodes;
   };
 
-  const renderMessageContent = (text) => {
-    const nodes = [];
-    const fenceRegex = /```(\w+)?\n([\s\S]*?)```/g;
-    let lastIndex = 0;
-    let fenceIdx = 0;
-    let segmentIdx = 0;
-
-    const pushPlainText = (plain, idx) => {
-      const lines = plain.split("\n");
-      lines.forEach((line, lineIdx) => {
-        const lineNodes = renderInlineText(line, `seg-${idx}-${lineIdx}`);
-        nodes.push(
-          <span key={`seg-${idx}-${lineIdx}`} style={{ whiteSpace: "pre-wrap" }}>
-            {lineNodes}
-          </span>
-        );
-        if (lineIdx < lines.length - 1) nodes.push(<br key={`br-${idx}-${lineIdx}`} />);
-      });
+  // Parse a non-code chunk of markdown into headings, lists, and paragraphs.
+  const renderMarkdownBlocks = (text, keyBase) => {
+    const lines = text.split("\n");
+    const blocks = [];
+    let para = [];
+    const flushPara = () => {
+      if (para.length) {
+        blocks.push({ kind: "p", lines: para.slice() });
+        para = [];
+      }
     };
 
-    let match;
-    while ((match = fenceRegex.exec(text)) !== null) {
-      const start = match.index;
-      const before = text.slice(lastIndex, start);
-      if (before) pushPlainText(before, segmentIdx);
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i];
+      const heading = /^(#{1,4})\s+(.*)$/.exec(line);
+      if (heading) {
+        flushPara();
+        blocks.push({ kind: "h", level: heading[1].length, text: heading[2] });
+        i += 1;
+        continue;
+      }
+      if (/^\s*[-*]\s+/.test(line)) {
+        flushPara();
+        const items = [];
+        while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
+          items.push(lines[i].replace(/^\s*[-*]\s+/, ""));
+          i += 1;
+        }
+        blocks.push({ kind: "ul", items });
+        continue;
+      }
+      if (/^\s*\d+\.\s+/.test(line)) {
+        flushPara();
+        const items = [];
+        while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
+          items.push(lines[i].replace(/^\s*\d+\.\s+/, ""));
+          i += 1;
+        }
+        blocks.push({ kind: "ol", items });
+        continue;
+      }
+      if (line.trim() === "") {
+        flushPara();
+        i += 1;
+        continue;
+      }
+      para.push(line);
+      i += 1;
+    }
+    flushPara();
 
-      const lang = (match[1] || "").trim();
-      const code = match[2] ?? "";
-
-      nodes.push(
-        <div
-          key={`fence-${fenceIdx}`}
-          style={{
-            margin: "10px 0",
-            background: "#0F172A",
-            border: "1px solid #1E293B",
-            borderRadius: 12,
-            overflow: "hidden",
-          }}
-        >
-          {lang ? (
-            <div
-              style={{
-                background: "#1E293B",
-                color: "#CBD5E1",
-                fontFamily: "var(--ds-mono), monospace",
-                fontSize: 11,
-                padding: "6px 10px",
-              }}
-            >
-              {lang}
-            </div>
-          ) : null}
-          <pre
+    return blocks.map((b, bi) => {
+      const key = `${keyBase}-b${bi}`;
+      if (b.kind === "h") {
+        const size = b.level <= 1 ? 16 : b.level === 2 ? 14.5 : 13.5;
+        return (
+          <div
+            key={key}
             style={{
-              margin: 0,
-              padding: "12px 14px",
-              overflowX: "auto",
-              fontFamily: "var(--ds-mono), monospace",
-              color: "#E2E8F0",
-              fontSize: 12,
-              lineHeight: 1.55,
+              fontSize: size,
+              fontWeight: 700,
+              color: "#F1F5F9",
+              margin: bi === 0 ? "0 0 6px" : "14px 0 6px",
+              lineHeight: 1.4,
+              fontFamily: "var(--ds-sans), sans-serif",
             }}
           >
-            <code>{code}</code>
-          </pre>
+            {renderInlineText(b.text, key)}
+          </div>
+        );
+      }
+      if (b.kind === "ul" || b.kind === "ol") {
+        return (
+          <div key={key} style={{ margin: "6px 0", display: "flex", flexDirection: "column", gap: 6 }}>
+            {b.items.map((it, ii) => (
+              <div key={`${key}-i${ii}`} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <span
+                  style={{
+                    flexShrink: 0,
+                    color: course.accent,
+                    fontFamily: "var(--ds-mono), monospace",
+                    fontSize: 12.5,
+                    lineHeight: 1.65,
+                    minWidth: b.kind === "ol" ? 18 : "auto",
+                  }}
+                >
+                  {b.kind === "ol" ? `${ii + 1}.` : "•"}
+                </span>
+                <span style={{ flex: 1 }}>{renderInlineText(it, `${key}-i${ii}`)}</span>
+              </div>
+            ))}
+          </div>
+        );
+      }
+      // paragraph
+      return (
+        <div key={key} style={{ margin: bi === 0 ? 0 : "8px 0 0", whiteSpace: "pre-wrap" }}>
+          {b.lines.map((ln, li) => (
+            <span key={`${key}-l${li}`}>
+              {renderInlineText(ln, `${key}-l${li}`)}
+              {li < b.lines.length - 1 ? <br /> : null}
+            </span>
+          ))}
         </div>
       );
+    });
+  };
 
-      lastIndex = start + match[0].length;
-      fenceIdx += 1;
-      segmentIdx += 1;
+  const renderMessageContent = (text) => {
+    const nodes = [];
+    const fenceRegex = /```(\w+)?\n?([\s\S]*?)```/g;
+    let lastIndex = 0;
+    let idx = 0;
+    let match;
+
+    while ((match = fenceRegex.exec(text)) !== null) {
+      const before = text.slice(lastIndex, match.index);
+      if (before.trim()) {
+        nodes.push(<div key={`seg-${idx}`}>{renderMarkdownBlocks(before, `seg-${idx}`)}</div>);
+      }
+      const lang = (match[1] || "").trim();
+      const code = (match[2] ?? "").replace(/\n$/, "");
+      nodes.push(<CodeBlock key={`code-${idx}`} lang={lang} code={code} />);
+      lastIndex = match.index + match[0].length;
+      idx += 1;
     }
 
     const rest = text.slice(lastIndex);
-    if (rest) pushPlainText(rest, segmentIdx);
+    if (rest.trim()) {
+      nodes.push(<div key={`seg-${idx}`}>{renderMarkdownBlocks(rest, `seg-${idx}`)}</div>);
+    }
 
     return nodes;
   };
@@ -310,18 +514,31 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
     <div
       style={{
         position: "fixed",
-        bottom: 0,
-        right: 0,
-        width: "100%",
-        maxWidth: 440,
-        height: "70vh",
         background: "#0B1120",
         border: "1px solid #1E293B",
-        borderRadius: "16px 16px 0 0",
         display: "flex",
         flexDirection: "column",
         zIndex: 1000,
         boxShadow: "0 -8px 40px rgba(0,0,0,0.5)",
+        transition: "width 220ms ease, height 220ms ease",
+        ...(expanded
+          ? {
+              top: "2.5vh",
+              bottom: "2.5vh",
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: "min(940px, 95vw)",
+              height: "95vh",
+              borderRadius: 16,
+            }
+          : {
+              bottom: 0,
+              right: 0,
+              width: "100%",
+              maxWidth: 440,
+              height: "70vh",
+              borderRadius: "16px 16px 0 0",
+            }),
       }}
     >
       {/* Header */}
@@ -383,19 +600,37 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
             </div>
           </div>
         </div>
-        <button
-          onClick={onClose}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#64748B",
-            fontSize: 20,
-            cursor: "pointer",
-            padding: 4,
-          }}
-        >
-          ✕
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            title={expanded ? "Minimize" : "Expand"}
+            aria-label={expanded ? "Minimize chat window" : "Expand chat window"}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#64748B",
+              fontSize: 17,
+              cursor: "pointer",
+              padding: 4,
+              lineHeight: 1,
+            }}
+          >
+            {expanded ? "🗗" : "⛶"}
+          </button>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              color: "#64748B",
+              fontSize: 20,
+              cursor: "pointer",
+              padding: 4,
+            }}
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
@@ -419,7 +654,9 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
           >
             <div
               style={{
-                maxWidth: "85%",
+                maxWidth:
+                  m.role === "user" ? "85%" : expanded ? "94%" : "90%",
+                width: m.role === "assistant" && expanded ? "100%" : "auto",
                 padding: "10px 14px",
                 borderRadius: 12,
                 background:
@@ -442,7 +679,7 @@ const AIChatbot = ({ course, onClose, seedInput }) => {
             </div>
           </div>
         ))}
-        {loading && (
+        {loading && (messages[messages.length - 1]?.role !== "assistant" || !messages[messages.length - 1]?.content) && (
           <div style={{ display: "flex", gap: 4, padding: "10px 14px" }}>
             {[0, 1, 2].map((i) => (
               <div

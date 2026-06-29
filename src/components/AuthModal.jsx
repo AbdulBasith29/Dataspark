@@ -360,9 +360,7 @@ export default function AuthModal() {
         {/* Social buttons — only on signin/signup */}
         {showSocialAndTabs && (
           <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
-            <SocialBtn provider="google"   icon={<GoogleIcon />}   label="Google"   onClick={() => handleOAuth("google")} />
-            <SocialBtn provider="facebook" icon={<FacebookIcon />} label="Facebook" onClick={() => handleOAuth("facebook")} />
-            <SocialBtn provider="twitter"  icon={<XIcon />}        label="X"        onClick={() => handleOAuth("twitter")} />
+            <SocialBtn provider="google" icon={<GoogleIcon />} label="Continue with Google" onClick={() => handleOAuth("google")} />
           </div>
         )}
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { getSupabaseBrowserClient } from "../lib/supabaseClient.js";
+import { useAuth } from "../lib/authContext.jsx";
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DataSpark — Cinematic Landing v2.1
@@ -541,6 +542,62 @@ function SparkMark({ size = 26 }) {
   );
 }
 
+// Primary CTA — "Try Now" opens signup, then drops the user into the product.
+function TryNow({ compact = false }) {
+  const { user, openAuthModal } = useAuth();
+  const navigate = useNavigate();
+  const [intent, setIntent] = useState(false);
+
+  // If the user signs in after clicking Try Now, send them to the platform.
+  useEffect(() => {
+    if (intent && user) navigate("/platform");
+  }, [intent, user, navigate]);
+
+  const go = () => {
+    if (user) { navigate("/platform"); return; }
+    setIntent(true);
+    openAuthModal("signup");
+  };
+
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
+      <button
+        onClick={go}
+        className="ds2-cta"
+        style={{
+          border: "none",
+          borderRadius: 12,
+          padding: compact ? "13px 24px" : "16px 30px",
+          fontSize: compact ? 14.5 : 16,
+          fontWeight: 800,
+          fontFamily: SANS,
+          color: "#0B0314",
+          background: GRADIENT_TEXT,
+          cursor: "pointer",
+          whiteSpace: "nowrap",
+          boxShadow: "0 0 32px rgba(168,85,247,0.45)",
+        }}
+      >
+        {user ? "Go to platform →" : "Try Now — it’s free →"}
+      </button>
+      <Link
+        to="/pricing"
+        style={{
+          color: GRAY,
+          textDecoration: "none",
+          fontFamily: MONO,
+          fontSize: 13.5,
+          fontWeight: 600,
+          borderBottom: `1px solid ${BORDER}`,
+          paddingBottom: 2,
+        }}
+      >
+        See plans
+      </Link>
+    </div>
+  );
+}
+
 // Email capture — the "Secure Your Spot" card
 function EmailCapture({ compact = false }) {
   const [email, setEmail] = useState("");
@@ -967,9 +1024,9 @@ function Hero() {
           </p>
 
           <div style={{ animation: "ds2-rise 0.6s var(--ds-ease-out) 0.36s both", marginBottom: 24 }}>
-            <EmailCapture />
+            <TryNow />
             <p style={{ margin: "10px 2px 0", fontFamily: MONO, fontSize: 10.5, color: "#334155" }}>
-              Free during early access · No credit card
+              Free to start · No credit card
             </p>
           </div>
 
@@ -2805,7 +2862,7 @@ function FinalCTA() {
           <span style={{ color: GRAY }}>Train for that.</span>
         </p>
         <div style={{ display: "flex", justifyContent: "center" }}>
-          <EmailCapture compact />
+          <TryNow compact />
         </div>
         <p style={{ margin: "14px 0 0", fontFamily: MONO, fontSize: 11.5, color: DIM }}>
           Early access · Cohort 02 · Limited seats
@@ -2815,6 +2872,14 @@ function FinalCTA() {
   );
 }
 
+const FOOTER_LINK = {
+  fontFamily: MONO,
+  fontSize: 11,
+  color: "#475569",
+  textDecoration: "none",
+  letterSpacing: "0.04em",
+};
+
 function Footer() {
   return (
     <footer
@@ -2823,22 +2888,24 @@ function Footer() {
         zIndex: 1,
         borderTop: `1px solid ${BORDER_SOFT}`,
         padding: "26px 24px",
-        display: "flex",
-        flexWrap: "wrap",
-        gap: 12,
-        alignItems: "center",
-        justifyContent: "space-between",
         maxWidth: 1120,
         margin: "0 auto",
       }}
     >
-      <span style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: SANS, fontSize: 13, fontWeight: 700, color: GRAY }}>
-        <SparkMark size={18} />
-        DataSpark
-      </span>
-      <span style={{ fontFamily: MONO, fontSize: 11, color: "#334155" }}>
-        © 2026 DataSpark · dataspark-prep.com
-      </span>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: SANS, fontSize: 13, fontWeight: 700, color: GRAY }}>
+          <SparkMark size={18} />
+          DataSpark
+        </span>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 20, alignItems: "center" }}>
+          <Link to="/privacy" style={FOOTER_LINK}>Privacy Policy</Link>
+          <Link to="/terms" style={FOOTER_LINK}>Terms of Service</Link>
+          <Link to="/contact" style={FOOTER_LINK}>Contact</Link>
+          <span style={{ fontFamily: MONO, fontSize: 11, color: "#334155" }}>
+            © 2026 DataSpark
+          </span>
+        </div>
+      </div>
     </footer>
   );
 }

@@ -1,7 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Link } from "react-router-dom";
-import { Check, ArrowLeft, LogOut, Shield } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { Check, ArrowLeft, LogOut, Shield, Lock, Zap } from "lucide-react";
 import { useAuth } from "../lib/authContext.jsx";
+import { openBillingPortal } from "../lib/billing.js";
+
+// Free users get the first N lessons of each course; the rest require Pro.
+// (Bump this number to widen the free tier — pricing-page copy says "2".)
+const FREE_LESSONS_PER_COURSE = 2;
+import { getSupabaseBrowserClient } from "../lib/supabaseClient.js";
 import SecuritySettings from "../components/SecuritySettings.jsx";
 import AIChatbot from "../chatbot/AIChatbot.jsx";
 import SQLJoins from "../visualizations/SQLJoins.jsx";
@@ -90,6 +96,23 @@ import DLTransferLearningViz from "../visualizations/DLTransferLearningViz.jsx";
 import ChunkingStrategyViz from "../visualizations/ChunkingStrategyViz.jsx";
 import RAGPipelineViz from "../visualizations/RAGPipelineViz.jsx";
 import AdvancedRAGViz from "../visualizations/AdvancedRAGViz.jsx";
+import LanguageModelMechanicsViz from "../visualizations/LanguageModelMechanicsViz.jsx";
+import LLMStrategyMapViz from "../visualizations/LLMStrategyMapViz.jsx";
+import EmbeddingSpaceViz from "../visualizations/EmbeddingSpaceViz.jsx";
+import VectorDBIndexViz from "../visualizations/VectorDBIndexViz.jsx";
+import HybridRetrievalViz from "../visualizations/HybridRetrievalViz.jsx";
+import PromptEngineeringViz from "../visualizations/PromptEngineeringViz.jsx";
+import AgenticFrameworksViz from "../visualizations/AgenticFrameworksViz.jsx";
+import ToolUseViz from "../visualizations/ToolUseViz.jsx";
+import ReasoningLoopsViz from "../visualizations/ReasoningLoopsViz.jsx";
+import MultiAgentCoordinationViz from "../visualizations/MultiAgentCoordinationViz.jsx";
+import LLMEvaluationViz from "../visualizations/LLMEvaluationViz.jsx";
+import LLMOptimizationViz from "../visualizations/LLMOptimizationViz.jsx";
+import LoRAFineTuningViz from "../visualizations/LoRAFineTuningViz.jsx";
+import HumanInTheLoopViz from "../visualizations/HumanInTheLoopViz.jsx";
+import LLMBiasHallucinationViz from "../visualizations/LLMBiasHallucinationViz.jsx";
+import LLMSecurityComplianceViz from "../visualizations/LLMSecurityComplianceViz.jsx";
+import PromptInjectionViz from "../visualizations/PromptInjectionViz.jsx";
 import MLDriftMonitorViz from "../visualizations/MLDriftMonitorViz.jsx";
 import AirflowDAGViz from "../visualizations/AirflowDAGViz.jsx";
 import CanaryDeploymentViz from "../visualizations/CanaryDeploymentViz.jsx";
@@ -130,36 +153,16 @@ import LiveRegion from "../components/platform/LiveRegion.jsx";
 
 const PlatformLogo = () => (
   <svg width="26" height="26" viewBox="0 0 32 32" fill="none" style={{ display: "block", flexShrink: 0 }}>
-    <defs>
-      <radialGradient id="pl-bg" cx="40%" cy="25%" r="75%">
-        <stop offset="0%" stopColor="#1e1b4b" />
-        <stop offset="100%" stopColor="#07081a" />
-      </radialGradient>
-      <radialGradient id="pl-peak" cx="35%" cy="35%" r="65%">
-        <stop offset="0%" stopColor="#e0e7ff" />
-        <stop offset="100%" stopColor="#818CF8" />
-      </radialGradient>
-      <filter id="pl-glow" x="-100%" y="-100%" width="300%" height="300%">
-        <feGaussianBlur in="SourceGraphic" stdDeviation="2.2" result="blur" />
-        <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-      </filter>
-    </defs>
-    <rect width="32" height="32" rx="7.5" fill="url(#pl-bg)" />
-    <ellipse cx="16" cy="1.5" rx="12" ry="5" fill="rgba(129,140,248,0.1)" />
-    <rect x="0.5" y="0.5" width="31" height="31" rx="7" fill="none" stroke="rgba(255,255,255,0.09)" strokeWidth="1" />
-    <line x1="7.5" y1="24.5" x2="24.5" y2="9" stroke="rgba(129,140,248,0.28)" strokeWidth="1.5" strokeLinecap="round" />
-    <circle cx="7.5" cy="24.5" r="2" fill="#4F46E5" opacity="0.7" />
-    <circle cx="16" cy="16.75" r="2.5" fill="#6366F1" opacity="0.88" />
-    <circle cx="24.5" cy="9" r="5.5" fill="rgba(129,140,248,0.18)" filter="url(#pl-glow)" />
-    <circle cx="24.5" cy="9" r="3" fill="url(#pl-peak)" filter="url(#pl-glow)" />
-    <line x1="25.5" y1="3.5" x2="25.5" y2="6" stroke="rgba(224,231,255,0.85)" strokeWidth="1.2" strokeLinecap="round" />
-    <line x1="24.25" y1="4.75" x2="26.75" y2="4.75" stroke="rgba(224,231,255,0.85)" strokeWidth="1.2" strokeLinecap="round" />
-    <circle cx="25.5" cy="4.75" r="0.8" fill="white" />
+    <rect x="1" y="1" width="30" height="30" rx="8" fill="rgba(168,85,247,0.10)" stroke="rgba(168,85,247,0.45)" />
+    <path d="M8 22 L14 15 L19 18 L25 9" stroke="#22D3EE" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx="25" cy="9" r="3" fill="#A855F7" />
+    <circle cx="25" cy="9" r="5.5" stroke="#A855F7" strokeOpacity="0.35" />
   </svg>
 );
 
 function UserMenu() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, isPro } = useAuth();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [showSecurity, setShowSecurity] = useState(false);
   const menuRef = useRef(null);
@@ -196,7 +199,7 @@ function UserMenu() {
         >
           <div style={{
             width: 26, height: 26, borderRadius: "50%",
-            background: "linear-gradient(135deg, #6366F1, #818CF8)",
+            background: "linear-gradient(135deg, #A855F7, #22D3EE)",
             display: "grid", placeItems: "center",
             fontSize: 10, fontWeight: 700, color: "#fff", flexShrink: 0,
           }}>
@@ -205,6 +208,11 @@ function UserMenu() {
           <span style={{ fontSize: 12, color: DS.t3, fontWeight: 500, maxWidth: 80, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {name}
           </span>
+          {isPro && (
+            <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: "0.06em", color: "#0B0314", background: "linear-gradient(100deg, #A855F7, #22D3EE)", padding: "2px 6px", borderRadius: 5, fontFamily: "var(--ds-mono), monospace" }}>
+              PRO
+            </span>
+          )}
         </button>
 
         {open && (
@@ -220,6 +228,40 @@ function UserMenu() {
               <div style={{ fontSize: 12, fontWeight: 600, color: DS.t1, marginBottom: 2 }}>{name}</div>
               <div style={{ fontSize: 11, color: DS.dim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</div>
             </div>
+            {isPro ? (
+              <button
+                type="button"
+                onClick={() => { setOpen(false); openBillingPortal().catch(() => {}); }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8, width: "100%",
+                  background: "none", border: "none", cursor: "pointer",
+                  padding: "9px 12px", borderRadius: 8, color: DS.t2, fontSize: 13,
+                  transition: "background 0.15s",
+                  fontFamily: "var(--ds-sans), sans-serif",
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.05)"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "none"}
+              >
+                <Zap size={14} />
+                Manage billing
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setOpen(false); navigate("/pricing"); }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 8, width: "100%",
+                  background: "linear-gradient(100deg, rgba(168,85,247,0.18), rgba(34,211,238,0.14))",
+                  border: "1px solid rgba(34,211,238,0.3)", cursor: "pointer",
+                  padding: "9px 12px", borderRadius: 8, color: "#22D3EE", fontSize: 13, fontWeight: 700,
+                  transition: "background 0.15s", marginBottom: 4,
+                  fontFamily: "var(--ds-sans), sans-serif",
+                }}
+              >
+                <Zap size={14} />
+                Upgrade to Pro
+              </button>
+            )}
             <button
               type="button"
               onClick={() => { setOpen(false); setShowSecurity(true); }}
@@ -554,19 +596,19 @@ const CURRICULUM = [
         id: "genai-foundations",
         title: "LLM Foundations",
         lessons: [
-          { id: "ga-f1", title: "How Language Models Actually Work", duration: "22 min", hasViz: false },
+          { id: "ga-f1", title: "How Language Models Actually Work", duration: "22 min", hasViz: true },
           { id: "ga-f2", title: "Tokenization & Embeddings", duration: "18 min", hasViz: true },
           { id: "ga-f3", title: "Attention Mechanism Deep Dive", duration: "25 min", hasViz: true },
-          { id: "ga-f4", title: "Fine-Tuning vs RAG vs Prompting: The Strategy Map", duration: "20 min", hasViz: false },
+          { id: "ga-f4", title: "Fine-Tuning vs RAG vs Prompting: The Strategy Map", duration: "20 min", hasViz: true },
         ]
       },
       {
         id: "genai-rag",
         title: "Retrieval & RAG",
         lessons: [
-          { id: "ga-r1", title: "Embeddings & Vector Representations", duration: "22 min", hasViz: false },
-          { id: "ga-r2", title: "Vector Databases: Storage, Indexing & ANN Search", duration: "25 min", hasViz: false },
-          { id: "ga-r3", title: "Semantic Search & Hybrid Retrieval", duration: "20 min", hasViz: false },
+          { id: "ga-r1", title: "Embeddings & Vector Representations", duration: "22 min", hasViz: true },
+          { id: "ga-r2", title: "Vector Databases: Storage, Indexing & ANN Search", duration: "25 min", hasViz: true },
+          { id: "ga-r3", title: "Semantic Search & Hybrid Retrieval", duration: "20 min", hasViz: true },
           { id: "ga-r4", title: "Chunking Strategies: From Fixed to Contextual", duration: "25 min", hasViz: true },
           { id: "ga-r5", title: "Naive RAG Pipeline: Ingest, Retrieve, Generate", duration: "25 min", hasViz: true },
           { id: "ga-r6", title: "Advanced RAG: Reranking, HyDE & Agentic Retrieval", duration: "30 min", hasViz: true },
@@ -576,30 +618,30 @@ const CURRICULUM = [
         id: "genai-agents",
         title: "Agents & Orchestration",
         lessons: [
-          { id: "ga-a1", title: "Prompt Engineering: CoT, Few-Shot & System Design", duration: "25 min", hasViz: false },
-          { id: "ga-a3", title: "Agentic Frameworks: LangGraph, AutoGen & CrewAI", duration: "25 min", hasViz: false },
-          { id: "ga-ag1", title: "Tool Use & Function Calling", duration: "22 min", hasViz: false },
-          { id: "ga-ag2", title: "Reasoning Loops: ReAct, ToT & Self-Reflection", duration: "22 min", hasViz: false },
-          { id: "ga-ag3", title: "Multi-Agent Workflows & Coordination Patterns", duration: "25 min", hasViz: false },
+          { id: "ga-a1", title: "Prompt Engineering: CoT, Few-Shot & System Design", duration: "25 min", hasViz: true },
+          { id: "ga-a3", title: "Agentic Frameworks: LangGraph, AutoGen & CrewAI", duration: "25 min", hasViz: true },
+          { id: "ga-ag1", title: "Tool Use & Function Calling", duration: "22 min", hasViz: true },
+          { id: "ga-ag2", title: "Reasoning Loops: ReAct, ToT & Self-Reflection", duration: "22 min", hasViz: true },
+          { id: "ga-ag3", title: "Multi-Agent Workflows & Coordination Patterns", duration: "25 min", hasViz: true },
         ]
       },
       {
         id: "genai-ops",
         title: "Ops & Evaluation",
         lessons: [
-          { id: "ga-a5", title: "LLM Evaluation: LLM-as-Judge, RAGAS & Benchmarks", duration: "20 min", hasViz: false },
-          { id: "ga-ops1", title: "Optimization: Latency, Caching & Prompt Compression", duration: "22 min", hasViz: false },
-          { id: "ga-ops2", title: "Fine-Tuning in Practice: LoRA, PEFT & When to Use It", duration: "25 min", hasViz: false },
-          { id: "ga-ops3", title: "Human-in-the-Loop & Product Thinking", duration: "18 min", hasViz: false },
+          { id: "ga-a5", title: "LLM Evaluation: LLM-as-Judge, RAGAS & Benchmarks", duration: "20 min", hasViz: true },
+          { id: "ga-ops1", title: "Optimization: Latency, Caching & Prompt Compression", duration: "22 min", hasViz: true },
+          { id: "ga-ops2", title: "Fine-Tuning in Practice: LoRA, PEFT & When to Use It", duration: "25 min", hasViz: true },
+          { id: "ga-ops3", title: "Human-in-the-Loop & Product Thinking", duration: "18 min", hasViz: true },
         ]
       },
       {
         id: "genai-safety",
         title: "Safety & Ethics",
         lessons: [
-          { id: "ga-s1", title: "Bias, Fairness & Hallucination in LLMs", duration: "20 min", hasViz: false },
-          { id: "ga-s2", title: "Security, Privacy & Compliance", duration: "18 min", hasViz: false },
-          { id: "ga-s3", title: "Prompt Injection & Red Teaming", duration: "22 min", hasViz: false },
+          { id: "ga-s1", title: "Bias, Fairness & Hallucination in LLMs", duration: "20 min", hasViz: true },
+          { id: "ga-s2", title: "Security, Privacy & Compliance", duration: "18 min", hasViz: true },
+          { id: "ga-s3", title: "Prompt Injection & Red Teaming", duration: "22 min", hasViz: true },
         ]
       },
     ],
@@ -1155,6 +1197,23 @@ const VISUALIZATIONS = {
   "ga-r4": ChunkingStrategyViz,
   "ga-r5": RAGPipelineViz,
   "ga-r6": AdvancedRAGViz,
+  "ga-f1": LanguageModelMechanicsViz,
+  "ga-f4": LLMStrategyMapViz,
+  "ga-r1": EmbeddingSpaceViz,
+  "ga-r2": VectorDBIndexViz,
+  "ga-r3": HybridRetrievalViz,
+  "ga-a1": PromptEngineeringViz,
+  "ga-a3": AgenticFrameworksViz,
+  "ga-ag1": ToolUseViz,
+  "ga-ag2": ReasoningLoopsViz,
+  "ga-ag3": MultiAgentCoordinationViz,
+  "ga-a5": LLMEvaluationViz,
+  "ga-ops1": LLMOptimizationViz,
+  "ga-ops2": LoRAFineTuningViz,
+  "ga-ops3": HumanInTheLoopViz,
+  "ga-s1": LLMBiasHallucinationViz,
+  "ga-s2": LLMSecurityComplianceViz,
+  "ga-s3": PromptInjectionViz,
   "ps-e1": ABTestSimulator,
   "ps-m4": FunnelAnalysis,
   "sp-t1": TimeSeriesDecomposition,
@@ -1314,6 +1373,36 @@ export default function DataSparkPlatform() {
   const [evalError, setEvalError] = useState(null);
   const [evalResult, setEvalResult] = useState(null);
   const { intent, setIntent } = useLearnerIntent();
+  const { user, isPro, refreshPlan } = useAuth();
+  const navigate = useNavigate();
+
+  // Hydrate completed-lesson checkmarks from Supabase on login.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      const supabase = getSupabaseBrowserClient();
+      const { data } = await supabase
+        .from("lesson_progress")
+        .select("lesson_id")
+        .eq("user_id", user.id);
+      if (cancelled || !data) return;
+      setProgress((p) => ({ ...p, ...Object.fromEntries(data.map((r) => [r.lesson_id, "done"])) }));
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
+
+  // Returning from a successful Stripe checkout — the webhook may lag a moment
+  // behind the browser redirect, so re-check the plan a couple of times.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("upgraded") !== "1") return;
+    refreshPlan();
+    const t1 = setTimeout(() => refreshPlan(), 2500);
+    const t2 = setTimeout(() => refreshPlan(), 6000);
+    window.history.replaceState({}, "", "/platform");
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [refreshPlan]);
 
   // Screen-reader announcement for the current view (DS-101 accessibility).
   const liveMessage =
@@ -1622,7 +1711,12 @@ export default function DataSparkPlatform() {
           </button>
         </div>
 
-        {courseTab === "learn" && (
+        {courseTab === "learn" && (() => {
+          // First N lessons of the course are free; the rest need Pro.
+          const freeLessonIds = new Set(
+            c.topics.flatMap((t) => t.lessons).slice(0, FREE_LESSONS_PER_COURSE).map((l) => l.id)
+          );
+          return (
           <div>
             {c.topics.map(topic => (
               <div key={topic.id} style={{ marginBottom: 32 }}>
@@ -1630,15 +1724,22 @@ export default function DataSparkPlatform() {
                 <div className="ds-stagger" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {topic.lessons.map((lesson, li) => {
                     const isDone = progress[lesson.id] === "done";
+                    const locked = !isPro && !freeLessonIds.has(lesson.id);
+                    const openLesson = () => {
+                      if (locked) { navigate("/pricing"); return; }
+                      setActiveLesson(lesson); setView("lesson");
+                    };
                     return (
                       <div
                         key={lesson.id}
                         role="button"
                         tabIndex={0}
-                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveLesson(lesson); setView("lesson"); } }}
-                        onClick={() => { setActiveLesson(lesson); setView("lesson"); }}
+                        aria-label={locked ? `${lesson.title} — locked, upgrade to Pro` : lesson.title}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openLesson(); } }}
+                        onClick={openLesson}
                         style={{
                           ...dsGlassCard({ padding: "14px 16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", transition: `border-color ${DS.durFast} ${DS.easeOut}, background ${DS.durBase} ${DS.easeOut}` }),
+                          opacity: locked ? 0.62 : 1,
                         }}
                         onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${c.color}55`; e.currentTarget.style.background = DS.surface2; }}
                         onMouseLeave={(e) => { e.currentTarget.style.borderColor = DS.border; e.currentTarget.style.background = DS.cardGlass; }}
@@ -1651,7 +1752,7 @@ export default function DataSparkPlatform() {
                             display: "flex", alignItems: "center", justifyContent: "center",
                             fontSize: 12, color: isDone ? DS.grn : DS.dim, fontWeight: 700, fontFamily: "var(--ds-mono), monospace",
                           }}>
-                            {isDone ? <Check size={13} strokeWidth={2.5} /> : li + 1}
+                            {isDone ? <Check size={13} strokeWidth={2.5} /> : locked ? <Lock size={12} strokeWidth={2.5} /> : li + 1}
                           </div>
                           <div>
                             <div style={{ fontSize: 14, fontWeight: 600, color: DS.t1 }}>{lesson.title}</div>
@@ -1659,7 +1760,9 @@ export default function DataSparkPlatform() {
                           </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          {lesson.hasViz && <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, background: `${c.color}18`, color: c.accent, fontFamily: "var(--ds-mono), monospace", fontWeight: 600, border: `1px solid ${c.color}30` }}>Interactive</span>}
+                          {locked
+                            ? <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, background: `${c.accent}1A`, color: c.accent, fontFamily: "var(--ds-mono), monospace", fontWeight: 700, border: `1px solid ${c.color}40`, display: "inline-flex", alignItems: "center", gap: 4 }}><Lock size={10} strokeWidth={2.5} /> Pro</span>
+                            : lesson.hasViz && <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 6, background: `${c.color}18`, color: c.accent, fontFamily: "var(--ds-mono), monospace", fontWeight: 600, border: `1px solid ${c.color}30` }}>Interactive</span>}
                         </div>
                       </div>
                     );
@@ -1668,7 +1771,8 @@ export default function DataSparkPlatform() {
               </div>
             ))}
           </div>
-        )}
+          );
+        })()}
 
         {courseTab === "practice" && (
           <div>
@@ -1746,6 +1850,12 @@ export default function DataSparkPlatform() {
             // Never block UX on analytics failures.
           }
           setProgress((p) => ({ ...p, [activeLesson.id]: "done" }));
+          if (user) {
+            getSupabaseBrowserClient()
+              .from("lesson_progress")
+              .upsert({ user_id: user.id, lesson_id: activeLesson.id, status: "done" }, { onConflict: "user_id,lesson_id" })
+              .then(() => {});
+          }
           setView("course");
         }}
         onAskTutor={() => { setChatbotSeed(""); setChatbotCourse(activeCourse); }}
@@ -1787,7 +1897,7 @@ export default function DataSparkPlatform() {
         * { box-sizing: border-box; margin: 0; padding: 0; }
         @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:0.3 } }
         ::selection { background: rgba(99,102,241,.25); color: #fff; }
-        textarea:focus-visible, input:focus-visible, button:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(99,102,241,.35); border-color: ${DS.indB} !important; }
+        textarea:focus-visible, input:focus-visible, button:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(168,85,247,.35); border-color: ${DS.indB} !important; }
         textarea:focus, input:focus { border-color: ${DS.indB} !important; }
         ::-webkit-scrollbar { width: 5px; }
         ::-webkit-scrollbar-track { background: transparent; }

@@ -6,6 +6,7 @@ import PrivacyPage from "./pages/PrivacyPage.jsx";
 import TermsPage from "./pages/TermsPage.jsx";
 import ThankYouPage from "./pages/ThankYouPage.jsx";
 import PreviewPage from "./pages/PreviewPage.jsx";
+import PricingPage from "./pages/PricingPage.jsx";
 import CertificatePage from "./pages/CertificatePage.jsx";
 import { DS, dsGlassCard } from "./lib/ds-platform-tokens.js";
 import AppErrorBoundary from "./components/AppErrorBoundary.jsx";
@@ -37,6 +38,7 @@ export default function App() {
             <Route path="/contact" element={<ContactPage />} />
             <Route path="/thank-you" element={<ThankYouPage />} />
             <Route path="/preview" element={<PreviewPage />} />
+            <Route path="/pricing" element={<PricingPage />} />
             <Route
               path="/platform"
               element={(

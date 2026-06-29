@@ -187,7 +187,271 @@ Watch the clip, then run this 10-minute audit on one class from your code:
         explanation: "Diagnose and separate concerns first; latency fixes without design fixes usually regress.",
       },
     ],
-  },
+  
+    interviewGraph: {
+      "initialStageId": "o1_init_click",
+      "artifactDimensions": [
+        {
+          "label": "Constructor Hygiene",
+          "recoveryStageId": "o1_recovery_constructor"
+        },
+        {
+          "label": "Dependency Injection",
+          "recoveryStageId": "o1_recovery_dependency"
+        },
+        {
+          "label": "Lifecycle Design",
+          "recoveryStageId": "o1_recovery_lifecycle",
+          "passLabel": "Constructor Mastery"
+        }
+      ],
+      "stages": {
+        "o1_init_click": {
+          "id": "o1_init_click",
+          "type": "click_target",
+          "badge": "Stage 1",
+          "title": "Stage 1 · Find the god constructor",
+          "prompt": "A feature-store client class times out intermittently during incident response. Click the line inside __init__ that is most directly responsible for flaky, slow object creation.",
+          "code_snippet": "import requests\n\nclass FeatureStoreClient:\n    def __init__(self, host, port, api_key):\n        if not api_key:\n            raise ValueError(\"api_key is required\")  # ds-target:validation_line\n        self.host = host\n        self.port = port\n        self.api_key = api_key\n        self.schema = self._fetch_schema()  # ds-target:remote_call_in_init\n        self.connection_pool = self._open_pool()  # ds-target:pool_in_init\n        self._start_heartbeat_thread()  # ds-target:thread_in_init\n\n    def _fetch_schema(self):\n        resp = requests.get(f\"http://{self.host}:{self.port}/schema\", timeout=5)\n        resp.raise_for_status()\n        return resp.json()",
+          "validationCopy": {
+            "validation_line": "This is a healthy line — validating api_key during construction is exactly what __init__ should do. The flakiness comes from elsewhere.",
+            "remote_call_in_init": "Correct target. _fetch_schema() makes a blocking network call during object creation. Any feature-store latency or outage now makes plain instantiation fail, and every test that wants a FeatureStoreClient instance must mock the network.",
+            "pool_in_init": "This is also a side effect that shouldn't be in __init__, but the schema fetch is the more direct timeout cause described in the prompt — keep looking for the network call.",
+            "thread_in_init": "Starting a background thread in the constructor is risky, but it's not what causes 'half of object creations timeout' — that symptom points to a synchronous blocking network call."
+          },
+          "branches": {
+            "validation_line": "o1_recovery_constructor",
+            "remote_call_in_init": "o1_god_constructor_choice",
+            "pool_in_init": "o1_recovery_constructor",
+            "thread_in_init": "o1_recovery_constructor",
+            "default": "o1_recovery_constructor"
+          }
+        },
+        "o1_god_constructor_choice": {
+          "id": "o1_god_constructor_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 2",
+          "title": "Stage 2 · Refactor the god constructor",
+          "prompt": "You confirmed the schema fetch blocks construction. The on-call engineer wants a fix shipped today without breaking the existing `client = FeatureStoreClient(host, port, key)` call sites. What is the right refactor?",
+          "code_snippet": "class FeatureStoreClient:\n    def __init__(self, host, port, api_key):\n        ...\n        self.schema = self._fetch_schema()  # blocking network call\n        self.connection_pool = self._open_pool()\n        self._start_heartbeat_thread()",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Move side effects to an explicit warmup()/connect() method",
+              "description": "Keep __init__ to assignment and validation only. Require callers to invoke client.connect() before first use, and let it raise explicit, retryable errors."
+            },
+            {
+              "id": "b",
+              "label": "Wrap the schema fetch in a try/except and default to an empty schema",
+              "description": "Swallow the network error so construction never fails, and let later calls deal with a missing schema."
+            },
+            {
+              "id": "c",
+              "label": "Add a longer timeout to the schema fetch",
+              "description": "Give the network call more time to succeed before giving up."
+            },
+            {
+              "id": "d",
+              "label": "Cache the schema fetch behind a module-level singleton",
+              "description": "Fetch the schema once globally the first time any client is constructed, regardless of host/port."
+            }
+          ],
+          "branches": {
+            "a": "o1_dependency_injection_choice",
+            "b": "o1_recovery_constructor",
+            "c": "o1_recovery_constructor",
+            "d": "o1_recovery_dependency"
+          },
+          "rationale": "Option A separates concerns by lifetime: __init__ should be deterministic and fast (assign + validate), while anything that can fail for reasons outside the object's own state — network calls, file I/O, background threads — belongs in an explicit, separately-callable method. That makes construction safe to retry, mock, and unit test, and makes failures attributable to a specific lifecycle stage instead of a vague 'sometimes object creation hangs.' Swallowing the error (B) hides an outage as missing data; widening the timeout (C) treats a design smell as a tuning problem; a global singleton (D) conflates schema-per-host with a single shared cache and silently sidesteps the actual host/port the caller asked for."
+        },
+        "o1_dependency_injection_choice": {
+          "id": "o1_dependency_injection_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 3",
+          "title": "Stage 3 · Make it testable",
+          "prompt": "Your warmup() refactor ships. Now a teammate wants a unit test for FeatureStoreClient's retry logic that runs in CI with zero network access. The class currently constructs its own `requests.Session` internally. What change makes this testable without monkeypatching the requests library?",
+          "code_snippet": "class FeatureStoreClient:\n    def __init__(self, host, port, api_key):\n        self.host = host\n        self.port = port\n        self.api_key = api_key\n        self.session = requests.Session()  # hardcoded dependency\n\n    def connect(self):\n        self.schema = self._fetch_schema()",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Accept an injected session/client as a constructor parameter with a sensible default",
+              "description": "def __init__(self, host, port, api_key, session=None): self.session = session or requests.Session() — tests pass a fake session, production code gets the real one for free."
+            },
+            {
+              "id": "b",
+              "label": "Use unittest.mock.patch on requests.Session inside every test",
+              "description": "Keep the hardcoded dependency and monkeypatch the requests module wherever it's imported."
+            },
+            {
+              "id": "c",
+              "label": "Add an environment variable that disables network calls during tests",
+              "description": "Branch inside _fetch_schema on os.environ to decide whether to actually hit the network."
+            },
+            {
+              "id": "d",
+              "label": "Make _fetch_schema a static method so it can be called without an instance",
+              "description": "Decouple the method from self so tests can call it directly."
+            }
+          ],
+          "branches": {
+            "a": "o1_lifecycle_terminal",
+            "b": "o1_recovery_dependency",
+            "c": "o1_recovery_dependency",
+            "d": "o1_recovery_lifecycle"
+          },
+          "rationale": "Dependency injection (A) makes the collaborator explicit and swappable: production code is unchanged because the default still builds a real Session, while tests inject a fake one and assert on calls without touching the network or global state. Monkeypatching (B) works but couples every test to the exact import path and breaks silently on refactors. An environment-variable branch (C) adds a hidden mode switch that diverges test behavior from production behavior — the thing you're testing isn't the thing that ships. Making the method static (D) doesn't address the dependency at all; it just changes how the method is invoked while requests.Session() is still hardcoded."
+        },
+        "o1_recovery_constructor": {
+          "id": "o1_recovery_constructor",
+          "type": "scenario_choice",
+          "badge": "Recovery A",
+          "title": "Recovery · What belongs in __init__?",
+          "prompt": "Step back from the specific bug. In general, which responsibilities are safe to put inside a Python __init__ method?",
+          "code_snippet": "def __init__(self, config):\n    self.config = config          # ?\n    self.cache = {}                # ?\n    self.db = connect_to_db(config)  # ?\n    validate(config)               # ?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Assigning attributes and validating arguments already in hand",
+              "description": "Pure, deterministic work that depends only on the inputs passed to the constructor — no I/O, no network, no background work."
+            },
+            {
+              "id": "b",
+              "label": "Any code that 'sets up' the object, including network and file access",
+              "description": "If the object needs it to function, it belongs in __init__ regardless of how it's acquired."
+            },
+            {
+              "id": "c",
+              "label": "Only attribute assignment — validation should happen elsewhere",
+              "description": "Keep __init__ as bare as possible, even skipping argument checks."
+            },
+            {
+              "id": "d",
+              "label": "Whatever the original author of the class decided",
+              "description": "Constructor responsibilities are a style preference with no general rule."
+            }
+          ],
+          "branches": {
+            "a": "o1_god_constructor_choice",
+            "b": "o1_recovery_constructor",
+            "c": "o1_recovery_constructor",
+            "d": "o1_recovery_constructor"
+          },
+          "rationale": "A constructor should do only work that is fast, deterministic, and depends solely on its own arguments: assigning fields and validating invariants. Anything that can fail for reasons outside the object's own data — network calls, file reads, spawning threads, opening connections — should live behind an explicit, separately-callable method so failures are attributable, retries are possible, and tests don't need to fake the outside world just to build an object."
+        },
+        "o1_recovery_dependency": {
+          "id": "o1_recovery_dependency",
+          "type": "scenario_choice",
+          "badge": "Recovery B",
+          "title": "Recovery · Hardcoded vs injected dependencies",
+          "prompt": "A class builds its own database client inside __init__: `self.db = PostgresClient(DB_URL)`. Why does this make the class harder to test and reuse than accepting the client as a parameter?",
+          "code_snippet": "class OrderService:\n    def __init__(self, order_id):\n        self.order_id = order_id\n        self.db = PostgresClient(DB_URL)  # built internally",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Callers cannot substitute a fake or different implementation without changing the class itself",
+              "description": "Tests need a real Postgres connection (or heavy monkeypatching) and the class can never talk to any other database without editing its source."
+            },
+            {
+              "id": "b",
+              "label": "It uses more memory than passing a client in",
+              "description": "Object construction cost is the main concern."
+            },
+            {
+              "id": "c",
+              "label": "PostgresClient() is slower to type than receiving a parameter",
+              "description": "It's a minor ergonomics issue, not a design issue."
+            },
+            {
+              "id": "d",
+              "label": "It is fine as long as DB_URL is correct",
+              "description": "Hardcoding is only a problem when the connection string is wrong."
+            }
+          ],
+          "branches": {
+            "a": "o1_dependency_injection_choice",
+            "b": "o1_recovery_dependency",
+            "c": "o1_recovery_dependency",
+            "d": "o1_recovery_dependency"
+          },
+          "rationale": "Hardcoding a concrete dependency inside the constructor freezes the class to one implementation and one global configuration. Injecting the dependency (with a sensible default for production convenience) lets tests pass an in-memory fake, lets the class be reused against a different backend, and makes the object's collaborators visible in its signature instead of buried in its body."
+        },
+        "o1_recovery_lifecycle": {
+          "id": "o1_recovery_lifecycle",
+          "type": "scenario_choice",
+          "badge": "Recovery C",
+          "title": "Recovery · Naming the lifecycle stages",
+          "prompt": "A reviewer asks you to describe FeatureStoreClient's lifecycle in one sentence per stage. Which breakdown best matches the deterministic-construction, explicit-side-effects pattern you've been building toward?",
+          "code_snippet": "client = FeatureStoreClient(host, port, api_key)  # stage 1\nclient.connect()                                    # stage 2\nfeatures = client.get(user_id)                      # stage 3\nclient.close()                                       # stage 4",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Construct (validate + assign) → connect (side effects) → use → close",
+              "description": "Each stage has a distinct, attributable failure mode and can be tested independently."
+            },
+            {
+              "id": "b",
+              "label": "Construct does everything, the rest are just convenience wrappers",
+              "description": "All real work happens at construction time; later methods only delegate."
+            },
+            {
+              "id": "c",
+              "label": "Construct and connect should always be merged into one call for simplicity",
+              "description": "Fewer method calls means a simpler API, even if it reintroduces blocking I/O into instantiation."
+            },
+            {
+              "id": "d",
+              "label": "There is no meaningful lifecycle — Python objects are just data",
+              "description": "Lifecycle staging is unnecessary ceremony in Python."
+            }
+          ],
+          "branches": {
+            "a": "o1_dependency_injection_choice",
+            "b": "o1_recovery_lifecycle",
+            "c": "o1_recovery_lifecycle",
+            "d": "o1_recovery_lifecycle"
+          },
+          "rationale": "Splitting the lifecycle into construct, connect, use, and close gives each stage a single responsibility and a single class of failure: construction fails only on bad input, connect fails only on environment/network issues, use fails only on per-call problems, and close releases resources deterministically. Merging stages back together (C) re-creates the original incident — slow, flaky, untestable instantiation — in the name of a shorter call site."
+        },
+        "o1_lifecycle_terminal": {
+          "id": "o1_lifecycle_terminal",
+          "type": "scenario_choice",
+          "badge": "Complete",
+          "title": "Complete · Constructor design mastered",
+          "terminal": true,
+          "prompt": "A senior interviewer asks you to summarize, in one sentence, the rule you'd give a junior engineer about what belongs in __init__. What's the strongest answer?",
+          "code_snippet": "# Rule of thumb:\n# __init__  -> assignment + validation (fast, deterministic, no I/O)\n# explicit methods -> side effects (network, files, threads, pools)\n# constructor params -> injected dependencies, not hardcoded concretes",
+          "choices": [
+            {
+              "id": "a",
+              "label": "If creating the object can fail for a reason outside the arguments you were given, that work doesn't belong in __init__",
+              "description": "This generalizes past the specific feature-store example to any class with side effects."
+            },
+            {
+              "id": "b",
+              "label": "Constructors should always be as short as possible, regardless of correctness",
+              "description": "Brevity over correctness."
+            },
+            {
+              "id": "c",
+              "label": "Never validate in __init__ — let errors surface later, closer to where they matter",
+              "description": "Defer all validation to first use."
+            },
+            {
+              "id": "d",
+              "label": "It depends entirely on team convention; there is no general principle",
+              "description": "No transferable rule."
+            }
+          ],
+          "branches": {
+            "a": "o1_lifecycle_terminal",
+            "b": "o1_lifecycle_terminal",
+            "c": "o1_lifecycle_terminal",
+            "d": "o1_lifecycle_terminal"
+          },
+          "rationale": "The transferable rule is about failure attribution and determinism, not line count: __init__ should only do work that depends purely on its own arguments and cannot fail for reasons outside the caller's control. Anything else — network calls, file I/O, background threads, opening pools — belongs behind an explicit, separately invokable method so failures are diagnosable, retries are possible, and tests can construct the object without faking the outside world."
+        }
+      }
+    },},
   "py-o2": {
     durationLabel: MODULE_TIME_LABEL,
     outcomes: [
@@ -246,7 +510,269 @@ After the clip, sketch one inheritance tree from memory and annotate where contr
       { question: "Best signal of a broken hierarchy?", options: ["Callers need type checks/branching to use subclasses safely", "Base class has docstrings", "Methods return values"], correctIndex: 0, explanation: "If callers branch on subtype, polymorphism likely failed." },
       { question: "First refactor for fragile deep trees?", options: ["Extract behavior strategies and compose them", "Add more inheritance layers", "Rename classes only"], correctIndex: 0, explanation: "Composition localizes variation without expanding brittle hierarchies." },
     ],
-  },
+  
+    interviewGraph: {
+      "initialStageId": "o2_dispatch_click",
+      "artifactDimensions": [
+        {
+          "label": "Liskov Substitution",
+          "recoveryStageId": "o2_recovery_liskov"
+        },
+        {
+          "label": "Inheritance vs Composition",
+          "recoveryStageId": "o2_recovery_composition"
+        },
+        {
+          "label": "Contract Design",
+          "recoveryStageId": "o2_recovery_contract",
+          "passLabel": "Polymorphism Mastery"
+        }
+      ],
+      "stages": {
+        "o2_dispatch_click": {
+          "id": "o2_dispatch_click",
+          "type": "click_target",
+          "badge": "Stage 1",
+          "title": "Stage 1 · Spot the broken substitution",
+          "prompt": "A pricing pipeline calls BasePricer.compute(order) polymorphically across markets. Results silently diverge between the US and EU subclasses. Click the line that breaks the substitutability promise of the base class.",
+          "code_snippet": "class BasePricer:\n    def compute(self, order):\n        \"\"\"Returns the price the customer pays, in the order's currency.\"\"\"\n        return order.subtotal + self._shipping(order)  # ds-target:base_contract\n\n    def _shipping(self, order):\n        return 5.00\n\n\nclass USPricer(BasePricer):\n    def compute(self, order):\n        return order.subtotal + self._shipping(order)  # ds-target:us_consistent\n\n\nclass EUPricer(BasePricer):\n    def compute(self, order):\n        # EU prices are VAT-inclusive in subtotal already, but this still\n        # adds shipping on top of a gross (tax-included) subtotal expectation\n        return order.subtotal * 1.0 + self._shipping(order) - order.vat_already_charged  # ds-target:eu_silent_divergence\n\n    def _shipping(self, order):\n        return 4.50",
+          "validationCopy": {
+            "base_contract": "This is the contract callers rely on: 'compute returns what the customer pays.' It's not the bug itself — keep looking at the subclasses that are supposed to honor it.",
+            "us_consistent": "USPricer.compute follows the same contract as the base class (subtotal + shipping in the order's currency). This is not where the divergence comes from.",
+            "eu_silent_divergence": "Correct target. EUPricer redefines what 'compute' returns — it subtracts order.vat_already_charged, an assumption the base contract and USPricer never make. Callers that treat all pricers polymorphically get a silently different meaning of 'price' depending on which subclass they happen to hold."
+          },
+          "branches": {
+            "base_contract": "o2_recovery_liskov",
+            "us_consistent": "o2_recovery_liskov",
+            "eu_silent_divergence": "o2_substitution_choice",
+            "default": "o2_recovery_liskov"
+          }
+        },
+        "o2_substitution_choice": {
+          "id": "o2_substitution_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 2",
+          "title": "Stage 2 · Diagnose the violation",
+          "prompt": "You found the divergent line. Precisely, what design rule does EUPricer.compute violate relative to BasePricer.compute?",
+          "code_snippet": "class BasePricer:\n    def compute(self, order):\n        \"\"\"Returns the price the customer pays, in the order's currency.\"\"\"\n        return order.subtotal + self._shipping(order)\n\nclass EUPricer(BasePricer):\n    def compute(self, order):\n        return order.subtotal * 1.0 + self._shipping(order) - order.vat_already_charged",
+          "choices": [
+            {
+              "id": "a",
+              "label": "It changes the postcondition of compute() without changing its name or signature",
+              "description": "Callers that only know the base contract ('returns what the customer pays') get a different computed quantity depending on the concrete subclass — a Liskov substitution violation."
+            },
+            {
+              "id": "b",
+              "label": "It is a naming problem — compute() should be renamed computeEU()",
+              "description": "Renaming the method would fix the confusion."
+            },
+            {
+              "id": "c",
+              "label": "It is a performance problem because subtraction is slower than addition",
+              "description": "The runtime cost of the extra operation is the real issue."
+            },
+            {
+              "id": "d",
+              "label": "It is not a violation — every market is allowed to compute price differently",
+              "description": "Subclasses overriding methods is exactly what polymorphism is for, so any override is fine."
+            }
+          ],
+          "branches": {
+            "a": "o2_composition_choice",
+            "b": "o2_recovery_liskov",
+            "c": "o2_recovery_liskov",
+            "d": "o2_recovery_liskov"
+          },
+          "rationale": "Liskov substitution says a subclass must be usable anywhere the base class is expected without the caller needing to know which concrete type it has. The base contract promises 'compute() returns what the customer pays.' EUPricer secretly redefines that to mean 'gross subtotal plus shipping minus VAT already charged' — a different postcondition smuggled in under the same method name. Renaming (B) only relabels the confusion; it doesn't fix that callers iterating over a list of BasePricer instances now get inconsistent semantics. Overriding itself (D) is fine — overriding in a way that changes what the return value *means* is what breaks substitutability."
+        },
+        "o2_composition_choice": {
+          "id": "o2_composition_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 3",
+          "title": "Stage 3 · Inheritance or composition?",
+          "prompt": "The team wants to add a third market (UK, with its own VAT and shipping rules) and expects more markets next quarter. Each new market needs slightly different pricing math, but they all need the existing 'apply promo codes' and 'round to currency precision' logic that lives in BasePricer. What's the strongest long-term design?",
+          "code_snippet": "# Today:\n# BasePricer -> USPricer, EUPricer (more markets coming: UK, APAC, ...)\n# Shared logic: apply_promo(), round_to_currency()\n# Varying logic: tax treatment, shipping cost, VAT handling",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Keep one PricingEngine class; inject a market-specific PricingPolicy strategy object",
+              "description": "PricingEngine.compute(order) calls self.policy.price(order) for the varying part, and keeps apply_promo()/round_to_currency() as its own methods used by every policy."
+            },
+            {
+              "id": "b",
+              "label": "Keep growing the BasePricer subclass tree, one subclass per market",
+              "description": "Add UKPricer(BasePricer), APACPricer(BasePricer), etc., each overriding compute() with its own math."
+            },
+            {
+              "id": "c",
+              "label": "Duplicate the shared promo/rounding logic into each market subclass",
+              "description": "Copy apply_promo() and round_to_currency() into USPricer, EUPricer, UKPricer so each is self-contained."
+            },
+            {
+              "id": "d",
+              "label": "Add an if/elif market check inside a single compute() method",
+              "description": "One BasePricer.compute() branches on order.market to apply the right tax/shipping rule inline."
+            }
+          ],
+          "branches": {
+            "a": "o2_contract_terminal",
+            "b": "o2_recovery_composition",
+            "c": "o2_recovery_composition",
+            "d": "o2_recovery_contract"
+          },
+          "rationale": "When the number of behavior variants is expected to keep growing and each variant differs in 'how the math works' rather than 'what kind of thing this is,' composition (a strategy/policy object) scales better than a deepening subclass tree: each new market is a new policy object, not a new branch in an inheritance hierarchy, and the shared promo/rounding logic stays in exactly one place. Growing the subclass tree (B) repeats the original Liskov risk for every new market. Duplicating shared logic (C) creates drift the moment someone fixes a rounding bug in one subclass and forgets the others. A market if/elif ladder (D) avoids subclassing but concentrates every market's logic into one unbounded method, which becomes the new fragility point."
+        },
+        "o2_recovery_liskov": {
+          "id": "o2_recovery_liskov",
+          "type": "scenario_choice",
+          "badge": "Recovery A",
+          "title": "Recovery · What does substitutability actually require?",
+          "prompt": "State the Liskov substitution principle precisely: what must be true for a subclass to be safely substitutable wherever the base class is expected?",
+          "code_snippet": "def total_revenue(orders, pricer: BasePricer):\n    return sum(pricer.compute(order) for order in orders)\n    # caller has no idea which concrete subclass 'pricer' is",
+          "choices": [
+            {
+              "id": "a",
+              "label": "The subclass must not strengthen preconditions or weaken postconditions of inherited methods",
+              "description": "Callers relying only on the base class's documented behavior must get consistent results regardless of which subclass they actually hold."
+            },
+            {
+              "id": "b",
+              "label": "The subclass must override every method the base class defines",
+              "description": "Substitutability is about how many methods are overridden."
+            },
+            {
+              "id": "c",
+              "label": "The subclass must have the same number of attributes as the base class",
+              "description": "Structural attribute parity is what matters."
+            },
+            {
+              "id": "d",
+              "label": "The subclass must call super().__init__() in its constructor",
+              "description": "Calling the parent constructor is sufficient for substitutability."
+            }
+          ],
+          "branches": {
+            "a": "o2_substitution_choice",
+            "b": "o2_recovery_liskov",
+            "c": "o2_recovery_liskov",
+            "d": "o2_recovery_liskov"
+          },
+          "rationale": "Liskov substitution is a behavioral contract, not a structural checklist: a subclass may override methods, add attributes, or skip calling super() and still be safe, as long as it honors the meaning callers expect from the base type — it shouldn't demand more from its inputs (stronger preconditions) or promise less about its outputs (weaker postconditions) than the base class documented."
+        },
+        "o2_recovery_composition": {
+          "id": "o2_recovery_composition",
+          "type": "scenario_choice",
+          "badge": "Recovery B",
+          "title": "Recovery · When does a subclass tree become a liability?",
+          "prompt": "A growing subclass tree (BasePricer -> USPricer -> EUPricer -> UKPricer -> ...) starts requiring callers to special-case behavior per subclass. What is the clearest signal that inheritance has been pushed past its useful point here?",
+          "code_snippet": "if isinstance(pricer, EUPricer):\n    price = pricer.compute(order) + extra_vat_adjustment(order)\nelse:\n    price = pricer.compute(order)",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Callers need isinstance checks or type-specific branching to use the subclasses correctly",
+              "description": "If polymorphism actually worked, callers would never need to know which concrete subclass they're holding."
+            },
+            {
+              "id": "b",
+              "label": "The tree has grown past 2 levels of subclassing",
+              "description": "Depth alone signals overuse of inheritance."
+            },
+            {
+              "id": "c",
+              "label": "Each subclass has a different file name",
+              "description": "File organization indicates a hierarchy problem."
+            },
+            {
+              "id": "d",
+              "label": "Subclasses use different variable names internally",
+              "description": "Naming consistency inside method bodies signals composition is needed."
+            }
+          ],
+          "branches": {
+            "a": "o2_composition_choice",
+            "b": "o2_recovery_composition",
+            "c": "o2_recovery_composition",
+            "d": "o2_recovery_composition"
+          },
+          "rationale": "The clearest tell that an inheritance hierarchy has broken down is callers writing isinstance checks or branching on concrete subclass type to get correct behavior — that defeats the entire point of polymorphism, which is that callers shouldn't need to know which subclass they have. At that point, the varying behavior should be extracted into an explicit object (a strategy/policy) that the caller or a thin wrapper class selects, rather than encoded as ever-more-specific subclasses."
+        },
+        "o2_recovery_contract": {
+          "id": "o2_recovery_contract",
+          "type": "scenario_choice",
+          "badge": "Recovery C",
+          "title": "Recovery · Narrow interfaces vs branching logic",
+          "prompt": "Compare a single compute() method that branches internally on order.market against a design where each market is a separate policy object with one job. Which property does the policy-object design preserve that the branching version does not?",
+          "code_snippet": "# Branching version:\ndef compute(self, order):\n    if order.market == \"US\":\n        ...\n    elif order.market == \"EU\":\n        ...\n    elif order.market == \"UK\":\n        ...\n    # one function, unbounded growth\n\n# Policy version:\nclass USPolicy:\n    def price(self, order): ...\nclass EUPolicy:\n    def price(self, order): ...",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Each market's logic is isolated, independently testable, and addable without touching existing code paths",
+              "description": "Adding APACPolicy means writing a new small class, not editing a growing function that every market already depends on."
+            },
+            {
+              "id": "b",
+              "label": "The branching version is always slower at runtime",
+              "description": "Performance is the main differentiator."
+            },
+            {
+              "id": "c",
+              "label": "The policy version requires fewer total lines of code",
+              "description": "Line count is the deciding factor."
+            },
+            {
+              "id": "d",
+              "label": "There is no meaningful difference — both are equally maintainable",
+              "description": "The two designs are interchangeable in practice."
+            }
+          ],
+          "branches": {
+            "a": "o2_composition_choice",
+            "b": "o2_recovery_contract",
+            "c": "o2_recovery_contract",
+            "d": "o2_recovery_contract"
+          },
+          "rationale": "The branching version concentrates every market's logic into one function that grows forever and that every change risks regressing for unrelated markets — a classic open/closed principle violation. The policy-object design keeps each market's logic in its own narrow, single-responsibility class: adding a market means adding a new class, not editing a function every other market already relies on, and each policy can be unit tested in isolation."
+        },
+        "o2_contract_terminal": {
+          "id": "o2_contract_terminal",
+          "type": "scenario_choice",
+          "badge": "Complete",
+          "title": "Complete · Inheritance and polymorphism mastered",
+          "terminal": true,
+          "prompt": "Summarize the single sentence you'd give a teammate who is about to subclass a base class purely to reuse a couple of utility methods.",
+          "code_snippet": "# Decision rule:\n# - Is the subclass a true behavioral subtype (substitutable everywhere)?\n#     -> inheritance is fine\n# - Do you just want to reuse some methods, with differing behavior elsewhere?\n#     -> composition / strategy object",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Inherit only if the subclass can honor every promise callers make about the base class; otherwise compose",
+              "description": "This generalizes the pricing example to any hierarchy: substitutability, not code reuse, is the test for inheritance."
+            },
+            {
+              "id": "b",
+              "label": "Always prefer inheritance because it requires less boilerplate",
+              "description": "Boilerplate reduction is the primary criterion."
+            },
+            {
+              "id": "c",
+              "label": "Subclass first, refactor to composition only if a bug appears",
+              "description": "Default to inheritance and wait for problems."
+            },
+            {
+              "id": "d",
+              "label": "It doesn't matter as long as tests pass",
+              "description": "Passing tests are sufficient evidence of a sound design."
+            }
+          ],
+          "branches": {
+            "a": "o2_contract_terminal",
+            "b": "o2_contract_terminal",
+            "c": "o2_contract_terminal",
+            "d": "o2_contract_terminal"
+          },
+          "rationale": "The transferable rule is substitutability, not convenience: inheritance is the right tool only when a subclass can be dropped in anywhere the base class is used without surprising callers about what its methods return or require. When the real goal is sharing a couple of utility methods while behavior otherwise diverges, composition (injecting a collaborator or strategy object) avoids baking that divergence into a hierarchy that callers will eventually have to special-case around."
+        }
+      }
+    },},
   "py-o3": {
     durationLabel: MODULE_TIME_LABEL,
     outcomes: [
@@ -301,7 +827,269 @@ Watch the clip and then implement \`__repr__\`, ${MD_CODE_TICK}__eq__${MD_CODE_T
       { question: "Which overload is usually unsafe?", options: ["Operator overloads with hidden side effects", "__repr__ returning readable output", "__len__ returning count"], correctIndex: 0, explanation: "Side-effectful operators violate reader expectations and create subtle bugs." },
       { question: "Best debugging support for custom types?", options: ["A precise, unambiguous __repr__ plus protocol tests", "Randomized __str__ for variety", "Disable equality to avoid mistakes"], correctIndex: 0, explanation: "Readable representation and invariant tests shorten incident/debug loops." },
     ],
-  },
+  
+    interviewGraph: {
+      "initialStageId": "o3_hash_click",
+      "artifactDimensions": [
+        {
+          "label": "Equality/Hash Consistency",
+          "recoveryStageId": "o3_recovery_hash"
+        },
+        {
+          "label": "Operator Side Effects",
+          "recoveryStageId": "o3_recovery_operator"
+        },
+        {
+          "label": "Debuggability (__repr__)",
+          "recoveryStageId": "o3_recovery_repr",
+          "passLabel": "Dunder Protocol Mastery"
+        }
+      ],
+      "stages": {
+        "o3_hash_click": {
+          "id": "o3_hash_click",
+          "type": "click_target",
+          "badge": "Stage 1",
+          "title": "Stage 1 · Find the cache-miss bug",
+          "prompt": "A feature key object is used as a dict key, and cache hit rate has collapsed. Click the line that breaks the equality/hash contract.",
+          "code_snippet": "class FeatureKey:\n    def __init__(self, user_id, feature_name, computed_at):\n        self.user_id = user_id\n        self.feature_name = feature_name\n        self.computed_at = computed_at  # high-resolution timestamp\n\n    def __eq__(self, other):\n        if not isinstance(other, FeatureKey):\n            return NotImplemented\n        return (self.user_id, self.feature_name) == (other.user_id, other.feature_name)  # ds-target:eq_excludes_timestamp\n\n    def __hash__(self):\n        return hash((self.user_id, self.feature_name, self.computed_at))  # ds-target:hash_includes_timestamp\n\n    def __repr__(self):\n        return f\"FeatureKey({self.user_id!r}, {self.feature_name!r})\"  # ds-target:repr_line",
+          "validationCopy": {
+            "eq_excludes_timestamp": "This line is part of the story, but on its own it's reasonable — equality intentionally ignoring computed_at is a valid design choice. The contract violation is that __hash__ doesn't make the same choice. Keep looking.",
+            "hash_includes_timestamp": "Correct target. __eq__ says two keys with the same user_id and feature_name are equal regardless of computed_at, but __hash__ includes computed_at — so two 'equal' keys can land in different hash buckets. Python's contract requires that a == b implies hash(a) == hash(b); breaking it causes dict/set lookups to silently miss on objects that compare equal.",
+            "repr_line": "This repr is fine and even helpful for debugging — it's not related to the cache-miss symptom, which is about equality and hashing, not display."
+          },
+          "branches": {
+            "eq_excludes_timestamp": "o3_recovery_hash",
+            "hash_includes_timestamp": "o3_consistency_choice",
+            "repr_line": "o3_recovery_hash",
+            "default": "o3_recovery_hash"
+          }
+        },
+        "o3_consistency_choice": {
+          "id": "o3_consistency_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 2",
+          "title": "Stage 2 · Fix the equality/hash contract",
+          "prompt": "You found the mismatch: __eq__ ignores computed_at, __hash__ doesn't. Which fix correctly restores the dict/set invariant while preserving the intended business meaning (two keys for the same user+feature should collide in the cache)?",
+          "code_snippet": "def __eq__(self, other):\n    if not isinstance(other, FeatureKey):\n        return NotImplemented\n    return (self.user_id, self.feature_name) == (other.user_id, other.feature_name)\n\ndef __hash__(self):\n    return hash((self.user_id, self.feature_name, self.computed_at))  # mismatch",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Make __hash__ use exactly the same fields as __eq__",
+              "description": "return hash((self.user_id, self.feature_name)) — drop computed_at from the hash so it matches what equality actually compares."
+            },
+            {
+              "id": "b",
+              "label": "Make __eq__ also compare computed_at",
+              "description": "Add computed_at into the equality tuple so it matches what __hash__ already uses."
+            },
+            {
+              "id": "c",
+              "label": "Remove __hash__ entirely and rely on the default",
+              "description": "Let Python fall back to identity-based hashing."
+            },
+            {
+              "id": "d",
+              "label": "Round computed_at to the nearest second before hashing only",
+              "description": "Keep both fields in hash, but coarsen the timestamp's precision just for __hash__."
+            }
+          ],
+          "branches": {
+            "a": "o3_operator_choice",
+            "b": "o3_recovery_hash",
+            "c": "o3_recovery_hash",
+            "d": "o3_recovery_hash"
+          },
+          "rationale": "The fix must make __hash__ derive from exactly the fields __eq__ uses — nothing more, nothing less — because the contract is a == b implies hash(a) == hash(b). Option A does that directly and matches the stated business intent (same user+feature should be the same cache entry). Option B is also internally consistent, but it silently changes the business meaning: two reads of the same feature computed microseconds apart would now be 'different' keys, defeating the cache's purpose. Removing __hash__ (C) makes the class unhashable by identity only, breaking any code that currently uses it as a dict key. Rounding only the hash input (D) reintroduces the same mismatch at the boundary — two keys could compare equal but round differently and land in different buckets."
+        },
+        "o3_operator_choice": {
+          "id": "o3_operator_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 3",
+          "title": "Stage 3 · Audit a suspicious operator overload",
+          "prompt": "While fixing FeatureKey, a teammate shows you a related class with an overloaded `+` operator used to merge feature batches. Code review flags it. What's wrong with this overload, and what's the right fix?",
+          "code_snippet": "class FeatureBatch:\n    def __init__(self, records):\n        self.records = records\n\n    def __add__(self, other):\n        self.records.extend(other.records)  # mutates self in place\n        self.log_merge(other)                # writes to an audit log\n        return self",
+          "choices": [
+            {
+              "id": "a",
+              "label": "__add__ should be pure: return a new FeatureBatch without mutating self or doing I/O",
+              "description": "def __add__(self, other): return FeatureBatch(self.records + other.records) — readers expect `a + b` to behave like int/str addition: no mutation of operands, no side effects."
+            },
+            {
+              "id": "b",
+              "label": "It's fine — __add__ is just a method, it can do whatever the class needs",
+              "description": "Operator overloads have no special expectations attached to them."
+            },
+            {
+              "id": "c",
+              "label": "The only problem is the audit log call; mutating self is acceptable for +=-style efficiency",
+              "description": "Performance justifies in-place mutation under the + operator."
+            },
+            {
+              "id": "d",
+              "label": "Rename it to __iadd__ since it mutates in place",
+              "description": "Switching to the in-place-add dunder is sufficient to make mutation acceptable, with no other changes."
+            }
+          ],
+          "branches": {
+            "a": "o3_repr_terminal",
+            "b": "o3_recovery_operator",
+            "c": "o3_recovery_operator",
+            "d": "o3_recovery_operator"
+          },
+          "rationale": "Dunder methods are protocol contracts: when a reader sees `batch1 + batch2`, they bring decades of expectations from int/str/list addition — a new value comes back, and the operands are untouched, with no hidden I/O. This __add__ mutates self, silently empties the meaning of `other` being a separate object after the call, and performs an audit-log write inside what looks like pure arithmetic. The fix is to make __add__ return a new object and leave side effects (like logging) to an explicit, named method the caller can see in the call stack. Renaming to __iadd__ (D) is closer in spirit for in-place mutation, but it still wouldn't license a hidden audit-log call inside what readers expect to be a simple in-place merge."
+        },
+        "o3_recovery_hash": {
+          "id": "o3_recovery_hash",
+          "type": "scenario_choice",
+          "badge": "Recovery A",
+          "title": "Recovery · State the equality/hash invariant",
+          "prompt": "What exact invariant must hold between __eq__ and __hash__ for a class to be safely used as a dict key or set member?",
+          "code_snippet": "d = {}\nkey1 = FeatureKey(\"u1\", \"ctr\", t1)\nkey2 = FeatureKey(\"u1\", \"ctr\", t2)  # same user/feature, different timestamp\nd[key1] = \"cached value\"\nd[key2]  # should this be a hit or a miss?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "If a == b, then hash(a) == hash(b) must also be true",
+              "description": "Equal objects must hash identically, or dict/set lookups silently fail to find entries that compare equal."
+            },
+            {
+              "id": "b",
+              "label": "hash(a) == hash(b) must imply a == b",
+              "description": "Hash collisions should never happen between unequal objects."
+            },
+            {
+              "id": "c",
+              "label": "__eq__ and __hash__ must use entirely different fields",
+              "description": "Separating which fields drive equality vs. hashing is the safe default."
+            },
+            {
+              "id": "d",
+              "label": "There is no required relationship; Python handles it automatically",
+              "description": "Equality and hashing are independent and Python reconciles any mismatch."
+            }
+          ],
+          "branches": {
+            "a": "o3_consistency_choice",
+            "b": "o3_recovery_hash",
+            "c": "o3_recovery_hash",
+            "d": "o3_recovery_hash"
+          },
+          "rationale": "The required direction is a == b implies hash(a) == hash(b) — not the reverse (hash collisions between unequal objects are expected and handled by the hash table). When this invariant breaks, as in FeatureKey, a dict can contain two 'equal' keys living in different buckets, so a lookup with a key that should match an existing entry instead reports a miss, silently doubling cache entries or losing data depending on which direction the bug points."
+        },
+        "o3_recovery_operator": {
+          "id": "o3_recovery_operator",
+          "type": "scenario_choice",
+          "badge": "Recovery B",
+          "title": "Recovery · What readers assume about operators",
+          "prompt": "When you write a custom __mul__, __add__, or __eq__, what baseline behavior do readers of `a + b` or `a * b` implicitly assume, based on how built-in types behave?",
+          "code_snippet": "result = a + b\n# reader's mental model, based on int/str/list/tuple:\n# - a and b are unchanged after this line\n# - result is a new value\n# - no file/network/log writes happened",
+          "choices": [
+            {
+              "id": "a",
+              "label": "The operands are left unchanged and no hidden side effects occur — only a new value is produced",
+              "description": "This is the implicit contract every built-in arithmetic and sequence operator follows, and custom overloads should preserve it."
+            },
+            {
+              "id": "b",
+              "label": "Operators can do anything, including mutation and I/O, as long as it's documented somewhere",
+              "description": "Documentation is sufficient to override reader expectations."
+            },
+            {
+              "id": "c",
+              "label": "Operators should always be faster than calling an equivalent named method",
+              "description": "Performance is the implicit contract."
+            },
+            {
+              "id": "d",
+              "label": "Operators must always return the same type as the left operand",
+              "description": "Type preservation is the only implicit expectation."
+            }
+          ],
+          "branches": {
+            "a": "o3_operator_choice",
+            "b": "o3_recovery_operator",
+            "c": "o3_recovery_operator",
+            "d": "o3_recovery_operator"
+          },
+          "rationale": "Operator syntax carries strong implicit semantics inherited from how built-in types behave: `+` produces a new value without mutating its operands or doing anything observable beyond the computation. Even thorough documentation doesn't fix the problem, because most call sites never read the docstring — they read `a + b` and pattern-match against int/str/list behavior. Surprising an operator with mutation or I/O creates bugs that are hard to spot in review because the code *looks* like pure arithmetic."
+        },
+        "o3_recovery_repr": {
+          "id": "o3_recovery_repr",
+          "type": "scenario_choice",
+          "badge": "Recovery C",
+          "title": "Recovery · Why __repr__ matters operationally",
+          "prompt": "Two FeatureKey objects appear to behave differently in production, but `print(key)` for both just shows `<FeatureKey object at 0x7f...>`. Why does this make the incident harder to resolve, and what's the fix?",
+          "code_snippet": "# No __repr__ defined -> default object repr\nprint(key1)  # <FeatureKey object at 0x7f3a1c0a4d90>\nprint(key2)  # <FeatureKey object at 0x7f3a1c0a4e10>\n# On-call engineer cannot tell from logs whether key1 and key2\n# differ by user_id, feature_name, or just timestamp.",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Define __repr__ to show every field relevant to equality and hashing",
+              "description": "def __repr__(self): return f'FeatureKey(user_id={self.user_id!r}, feature_name={self.feature_name!r})' — an unambiguous, field-revealing representation that shows up directly in logs and debuggers."
+            },
+            {
+              "id": "b",
+              "label": "Rely on __str__ instead since it's meant for end users",
+              "description": "__str__ is the right place for debugging output, not __repr__."
+            },
+            {
+              "id": "c",
+              "label": "Print individual attributes manually at each log site instead of defining __repr__",
+              "description": "Push the responsibility of readable output onto every call site that logs the object."
+            },
+            {
+              "id": "d",
+              "label": "Leave the default repr — object identity (memory address) is enough to distinguish instances",
+              "description": "Memory addresses give on-call engineers what they need."
+            }
+          ],
+          "branches": {
+            "a": "o3_operator_choice",
+            "b": "o3_recovery_repr",
+            "c": "o3_recovery_repr",
+            "d": "o3_recovery_repr"
+          },
+          "rationale": "__repr__ is what shows up in logs, stack traces, REPL output, and debugger watch panes by default — it is the single highest-leverage piece of debuggability you can add to a class. A repr that shows the fields driving equality/hashing lets an on-call engineer immediately see *why* two keys are or aren't the same cache entry, without attaching a debugger or adding print statements mid-incident. Memory addresses (D) tell you instances are different objects, which you already knew, but say nothing about *why* they behave differently."
+        },
+        "o3_repr_terminal": {
+          "id": "o3_repr_terminal",
+          "type": "scenario_choice",
+          "badge": "Complete",
+          "title": "Complete · Dunder protocols mastered",
+          "terminal": true,
+          "prompt": "Summarize the principle that ties together the equality/hash bug, the mutating __add__, and the missing __repr__ you just fixed.",
+          "code_snippet": "# Dunder methods are protocol contracts.\n# Readers bring expectations from built-in types:\n# - __eq__/__hash__ must agree on which fields matter\n# - operators should be pure (no mutation, no I/O)\n# - __repr__ should make state legible, not decorative",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Dunder methods inherit reader expectations from built-in types; violating them creates bugs that look like ordinary code but aren't",
+              "description": "Predictability, not cleverness, is the design goal of every operator and protocol overload."
+            },
+            {
+              "id": "b",
+              "label": "Dunder methods are just syntactic sugar with no behavioral expectations attached",
+              "description": "They're purely stylistic choices."
+            },
+            {
+              "id": "c",
+              "label": "Only __eq__ and __hash__ need to be consistent; operators and repr are cosmetic",
+              "description": "Some protocols matter more than others, with no general rule."
+            },
+            {
+              "id": "d",
+              "label": "The safest approach is to avoid defining any dunder methods at all",
+              "description": "Default object behavior is always preferable to custom protocols."
+            }
+          ],
+          "branches": {
+            "a": "o3_repr_terminal",
+            "b": "o3_repr_terminal",
+            "c": "o3_repr_terminal",
+            "d": "o3_repr_terminal"
+          },
+          "rationale": "Every dunder method you implement is borrowing syntax and expectations from Python's built-in types, and the job is to honor those expectations rather than just make the syntax compile: __eq__/__hash__ must agree on which fields define identity, operators like __add__ must stay pure and side-effect-free the way `+` is for ints and strings, and __repr__ must make an object's state legible during debugging rather than hiding behind a memory address. Avoiding dunders entirely (D) isn't the lesson — used predictably, they make custom objects behave like first-class citizens in dicts, sets, arithmetic, and logs."
+        }
+      }
+    },},
   "py-o4": {
     durationLabel: "28–35 min",
     outcomes: [
@@ -677,7 +1465,74 @@ def wrapper(*args, **kwargs):
         },
       },
     },
-    knowledgeCheck: [],
+    knowledgeCheck: [
+      {
+        "question": "In the original retry() decorator, why does the bug only appear in production and not in local tests?",
+        "options": [
+          "Local tests typically call the decorated function once per process, so the shared `attempts` closure cell never accumulates across multiple users the way it does in a long-running worker",
+          "Local tests use a different Python version that initializes closures differently",
+          "The bug is caused by network latency, which only exists in production",
+          "Local tests don't import the `time` module"
+        ],
+        "correctIndex": 0,
+        "explanation": "The `attempts` counter lives in the decorator factory's closure, created once at decoration time. A test that calls the decorated function once per process never reveals that the counter is shared across calls — only a long-running worker handling many requests exposes the cross-request leakage."
+      },
+      {
+        "question": "What does `functools.wraps` actually fix when applied to a decorator's inner wrapper function?",
+        "options": [
+          "It copies the wrapped function's __name__, __doc__, and other metadata onto the wrapper, so introspection, debugging, and tooling see the original function's identity instead of 'wrapper'",
+          "It makes the decorated function run faster by skipping the wrapper call",
+          "It automatically adds retry logic to any function it's applied to",
+          "It prevents the decorator from being applied more than once"
+        ],
+        "correctIndex": 0,
+        "explanation": "Without @wraps, the decorated function's __name__, __doc__, and __module__ get replaced by the wrapper's, which breaks introspection-based tooling (debuggers, documentation generators, certain test frameworks) that rely on accurate function metadata."
+      },
+      {
+        "question": "Why is a single global threading.Lock() around the wrapped function call a poor fix for the thundering-herd retry problem?",
+        "options": [
+          "It serializes all calls through one critical section, creating head-of-line blocking across unrelated requests and risking deadlock if a decorated function calls another function sharing the same lock",
+          "Locks are deprecated in modern Python and raise a DeprecationWarning",
+          "Locks only work correctly inside async functions",
+          "A lock would prevent the retry loop from executing more than once total"
+        ],
+        "correctIndex": 0,
+        "explanation": "A global lock fixes the symptom (a data race on shared state) by destroying concurrency entirely — every call, even from unrelated users, now waits in line. It can also deadlock if a decorated function indirectly invokes another function guarded by the same lock."
+      },
+      {
+        "question": "What problem does 'full jitter' (random delay scaled by an exponential cap) solve that a fixed one-second sleep does not?",
+        "options": [
+          "It decorrelates retry timing across many workers, preventing synchronized retry waves ('thundering herd') from hitting the dependency at the same instant after an outage",
+          "It guarantees that every retry will succeed on the first attempt",
+          "It eliminates the need for a maximum retry count",
+          "It makes the retry logic compatible with asyncio without any other changes"
+        ],
+        "correctIndex": 0,
+        "explanation": "A fixed sleep makes every worker retry at the same intervals, so after a brownout, all workers hammer the dependency simultaneously. Randomizing the delay (jitter) spreads retries out over time, smoothing the load instead of creating synchronized spikes."
+      },
+      {
+        "question": "Why does catching a broad `Exception` (or `BaseException`) inside a retry decorator create risk beyond just retrying transient failures?",
+        "options": [
+          "It also retries programmer bugs (e.g. TypeError), cancellation signals, and non-idempotent side effects that should not be silently repeated",
+          "Broad exception handling is always slower than catching specific exception types",
+          "Python forbids catching Exception inside a decorator",
+          "It causes the decorator to skip the retry loop entirely"
+        ],
+        "correctIndex": 0,
+        "explanation": "A narrow, transient-only exception taxonomy ensures retries only happen for failures that are actually safe and likely to succeed on a second attempt. Catching everything means masking real bugs as 'flakiness' and potentially re-running operations that have already had side effects, which can corrupt state if they aren't idempotent."
+      },
+      {
+        "question": "When choosing between one universal decorator that uses runtime introspection (inspect.iscoroutinefunction, signature inspection) and two explicit @retry_sync/@retry_async decorators, what is the main trade-off a senior engineer should articulate?",
+        "options": [
+          "The universal decorator is more convenient and DRY but adds per-call introspection overhead and can hide performance cliffs on latency-critical paths, while explicit decorators are faster and clearer but duplicate some policy plumbing",
+          "There is no real trade-off — the universal decorator is strictly better in every scenario",
+          "Explicit decorators are impossible to implement correctly in Python",
+          "The choice only matters for code style, not for runtime behavior"
+        ],
+        "correctIndex": 0,
+        "explanation": "Universal introspecting decorators reduce API surface and duplication but pay a runtime cost (and complexity cost) for detecting sync vs async at call time. On a sub-millisecond latency budget, that overhead and unpredictability can matter more than the convenience, which is why explicit sync/async decorators (or infrastructure-level retries) are often the safer default for hot paths."
+      }
+    ],
   },
 
   "py-d1": {
@@ -754,7 +1609,227 @@ Finish with a short note: what improved, why it improved, and where memory owner
         explanation: "Measured tradeoff reasoning is stronger than slogan-level optimization advice.",
       },
     ],
-  },
+  
+    interviewGraph: {
+      "initialStageId": "d1_vectorize_click",
+      "artifactDimensions": [
+        {
+          "label": "Broadcasting Reasoning",
+          "recoveryStageId": "d1_recovery_broadcast"
+        },
+        {
+          "label": "View vs Copy Semantics",
+          "recoveryStageId": "d1_recovery_viewcopy",
+          "passLabel": "Memory Model Mastery"
+        }
+      ],
+      "stages": {
+        "d1_vectorize_click": {
+          "id": "d1_vectorize_click",
+          "type": "click_target",
+          "badge": "Stage 1",
+          "title": "Stage 1 · A silent broadcasting bug",
+          "prompt": "A teammate computes per-row z-scores for a (5000, 12) feature matrix and the model's offline AUC quietly drops after deploy. Click the line that produces a result with the wrong shape without raising any error.",
+          "code_snippet": "import numpy as np\n\nX = load_feature_matrix()          # shape (5000, 12)\nrow_mean = X.mean(axis=0)          # ds-target:wrong_axis\nrow_std = X.std(axis=0) + 1e-9     # ds-target:wrong_axis_std\n\nz = (X - row_mean) / row_std       # ds-target:apply_zscore\nsave_features(z)",
+          "validationCopy": {
+            "wrong_axis": "Closer, but this line alone doesn't crash or silently misbehave by itself — the real damage happens when it's broadcast against X. Look at where mean and std actually get used.",
+            "wrong_axis_std": "Same issue as the mean line — axis=0 computes a per-column statistic, not per-row. Still, the symptom only appears once it's applied. Click the line where the subtraction/division actually happens.",
+            "apply_zscore": "Correct. `axis=0` reduces over rows, producing a length-12 vector — one mean per *column*, not per row. Broadcasting (5000,12) against a (12,) vector is shape-compatible, so NumPy runs it without complaint, but it computes column z-scores, not row z-scores. The bug never throws; it just silently changes which axis is being normalized."
+          },
+          "branches": {
+            "wrong_axis": "d1_recovery_broadcast",
+            "wrong_axis_std": "d1_recovery_broadcast",
+            "apply_zscore": "d1_shape_choice"
+          }
+        },
+        "d1_shape_choice": {
+          "id": "d1_shape_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 2",
+          "title": "Stage 2 · Designing the fix under ambiguity",
+          "prompt": "The team agrees the bug is real but disagrees on what 'per-row' should mean once you fix the axis. Given X has shape (5000, 12) — 5000 samples, 12 features — which fix correctly normalizes each *feature column* across all samples (the standard ML preprocessing convention), while keeping the result broadcastable back onto X?",
+          "code_snippet": "import numpy as np\n\nX = load_feature_matrix()  # (5000, 12): rows=samples, cols=features\n\n# candidate fix\nmean = X.mean(axis=?, keepdims=?)\nstd = X.std(axis=?, keepdims=?) + 1e-9\nz = (X - mean) / std",
+          "choices": [
+            {
+              "id": "a",
+              "label": "axis=0, keepdims=True on both mean and std",
+              "description": "Reduce over axis 0 (the sample axis) to get one statistic per feature column, shape (1, 12). keepdims=True preserves rank-2 shape so broadcasting against (5000, 12) is unambiguous and intention-revealing."
+            },
+            {
+              "id": "b",
+              "label": "axis=1, keepdims=True on both mean and std",
+              "description": "axis=1 reduces over the feature axis, producing one statistic per sample (row) — that normalizes each row to have its own mean/std across features, which is a different operation (row-wise scaling, not feature standardization)."
+            },
+            {
+              "id": "c",
+              "label": "axis=0, keepdims=False (the default)",
+              "description": "This gives the correct values but shape (12,) instead of (1, 12) — broadcasting still works here because trailing dimensions align, but it's fragile: it silently breaks if X ever gains a leading batch dimension."
+            },
+            {
+              "id": "d",
+              "label": "Flatten X with .ravel() first, then compute a single global mean/std",
+              "description": "This collapses the 2D structure entirely and computes one scalar mean/std across every value in the matrix, destroying per-feature scale information."
+            }
+          ],
+          "branches": {
+            "a": "d1_view_copy_choice",
+            "b": "d1_recovery_broadcast",
+            "c": "d1_recovery_broadcast",
+            "d": "d1_recovery_broadcast"
+          },
+          "rationale": "axis=0 reduces along the sample dimension, leaving one value per feature column — exactly what standardization needs. keepdims=True is the senior habit: it keeps shape (1, 12) instead of (12,), so the broadcast rule ('align from the right, dims must match or be 1') is satisfied explicitly rather than by accident. Without keepdims, the code works today only because of a shape coincidence that breaks the moment an extra dimension is introduced upstream."
+        },
+        "d1_view_copy_choice": {
+          "id": "d1_view_copy_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 3",
+          "title": "Stage 3 · View, copy, and a production data leak",
+          "prompt": "After fixing the broadcast, a downstream bug appears: clipping outliers in a feature-engineering function is somehow mutating the raw ingested array that three other pipelines also read from the same process memory. Which line is the root cause, and what's the correct fix?",
+          "code_snippet": "def clip_outliers(X, lower=-3.0, upper=3.0):\n    capped = X[:, :5]          # slice the first 5 feature columns\n    capped[capped > upper] = upper\n    capped[capped < lower] = lower\n    return capped\n\nraw = load_feature_matrix()    # shared across 3 pipelines downstream\nclipped = clip_outliers(raw)",
+          "choices": [
+            {
+              "id": "a",
+              "label": "X[:, :5] returns a view; mutating `capped` mutates `raw` in place. Fix with `capped = X[:, :5].copy()`.",
+              "description": "Basic slicing (slices with `:`, no boolean/integer-array indexing) shares the underlying buffer. The masked assignments `capped[...] = value` write through that shared buffer straight into `raw`. An explicit `.copy()` at the function boundary isolates the output and removes the cross-pipeline side effect."
+            },
+            {
+              "id": "b",
+              "label": "Boolean masking like `capped[capped > upper]` always creates a copy, so this can't be the bug — look at `load_feature_matrix()` instead.",
+              "description": "Boolean masking on the right-hand side of an expression does return a copy, but `capped[mask] = value` is an in-place assignment on `capped`'s own memory, not a new array — and since `capped` is a view, that write propagates to `raw`."
+            },
+            {
+              "id": "c",
+              "label": "NumPy arrays are always copied on function call, so the mutation must be coming from `load_feature_matrix()` caching a module-level array.",
+              "description": "NumPy does not copy arrays on function call by default — they're passed by reference, just like Python lists. This is exactly the assumption that causes this class of bug."
+            },
+            {
+              "id": "d",
+              "label": "Replace `X[:, :5]` with `X[:, [0,1,2,3,4]]` — fancy indexing returns a copy, so the aliasing disappears without an explicit `.copy()` call.",
+              "description": "This is technically true and would fix the symptom, but it's a fragile, non-obvious fix that relies on incidental NumPy indexing semantics rather than a clear ownership boundary — the next engineer to touch this code won't know why fancy indexing was chosen over basic slicing."
+            }
+          ],
+          "branches": {
+            "a": "d1_terminal",
+            "b": "d1_recovery_viewcopy",
+            "c": "d1_recovery_viewcopy",
+            "d": "d1_recovery_viewcopy"
+          },
+          "rationale": "Basic slicing returns a view that shares memory with the parent array; any in-place mutation (`arr[mask] = val`, `arr += 1`, etc.) on that view writes through to the parent. The senior fix is not to find a different indexing trick that happens to copy — it's to make ownership explicit with `.copy()` at any boundary where a function hands data to a caller who doesn't expect shared mutable state."
+        },
+        "d1_recovery_broadcast": {
+          "id": "d1_recovery_broadcast",
+          "type": "scenario_choice",
+          "badge": "Recovery A",
+          "title": "Recovery · Broadcasting compatibility rule",
+          "prompt": "NumPy is about to broadcast a (5000, 1) array against a (1, 12) array in an elementwise operation. What determines whether two dimensions are broadcast-compatible?",
+          "code_snippet": "a = np.random.rand(5000, 1)\nb = np.random.rand(1, 12)\nresult = a + b   # what shape, and is it valid?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Compare dimensions right to left; each pair must be equal or one of them must be 1",
+              "description": "Correct. NumPy aligns shapes from the trailing dimension. (5000,1) vs (1,12): rightmost pair is 1 vs 12 — compatible because one side is 1, so it stretches to 12. Next pair is 5000 vs 1 — compatible, stretches to 5000. Result shape is (5000, 12)."
+            },
+            {
+              "id": "b",
+              "label": "The arrays must have the exact same shape",
+              "description": "That would make broadcasting pointless — its entire purpose is to combine arrays of different but compatible shapes without manually tiling them."
+            },
+            {
+              "id": "c",
+              "label": "NumPy broadcasts by matching total element count between the two arrays",
+              "description": "Total element count is irrelevant to the broadcasting rule; it's purely a per-dimension, right-aligned comparison."
+            },
+            {
+              "id": "d",
+              "label": "Broadcasting always reduces both arrays to the smaller array's shape",
+              "description": "Broadcasting expands smaller dimensions (size 1) to match the larger one — it does not shrink the larger array."
+            }
+          ],
+          "branches": {
+            "a": "d1_shape_choice",
+            "b": "d1_recovery_broadcast",
+            "c": "d1_recovery_broadcast",
+            "d": "d1_recovery_broadcast"
+          },
+          "rationale": "Broadcasting compares shapes element-by-element starting from the trailing (rightmost) dimension. A pair is compatible if the sizes match or one of them is 1 — the size-1 dimension is virtually stretched. This is exactly why a (5000,1) and (1,12) combination silently succeeds and produces a (5000,12) cross-combination — which is sometimes the intended outer-product-like behavior, and sometimes a bug, depending on what the two axes represent."
+        },
+        "d1_recovery_viewcopy": {
+          "id": "d1_recovery_viewcopy",
+          "type": "scenario_choice",
+          "badge": "Recovery B",
+          "title": "Recovery · Identifying views",
+          "prompt": "Which of these operations is most likely to return a *view* sharing memory with the original array, rather than a new copy?",
+          "code_snippet": "arr = np.arange(20).reshape(4, 5)\n\nop1 = arr[1:3, :]            # ?\nop2 = arr[[0, 2], :]         # ?\nop3 = arr[arr > 10]          # ?\nop4 = arr.reshape(2, 10)     # ?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "op1 (`arr[1:3, :]`) — basic slicing with start:stop ranges",
+              "description": "Correct. Basic slicing using `:` ranges (no boolean or integer-array indices) always returns a view when possible, because the sliced region can be described as a stride pattern over the original buffer."
+            },
+            {
+              "id": "b",
+              "label": "op2 (`arr[[0, 2], :]`) — selecting specific rows by an integer list",
+              "description": "Fancy (integer-array) indexing always returns a copy, because the selected elements are not contiguous/strided in a way that can be expressed as a view into the original buffer."
+            },
+            {
+              "id": "c",
+              "label": "op3 (`arr[arr > 10]`) — boolean mask indexing",
+              "description": "Boolean masking always returns a copy for the same reason as fancy indexing: the selected elements don't form a regular stride pattern."
+            },
+            {
+              "id": "d",
+              "label": "All four operations return copies; NumPy never shares memory across operations",
+              "description": "NumPy shares memory routinely — that's precisely why `.copy()` exists as an escape hatch. Basic slicing and most reshape calls (when the data is contiguous) return views."
+            }
+          ],
+          "branches": {
+            "a": "d1_view_copy_choice",
+            "b": "d1_recovery_viewcopy",
+            "c": "d1_recovery_viewcopy",
+            "d": "d1_recovery_viewcopy"
+          },
+          "rationale": "The rule of thumb: basic slicing (`:` ranges, ellipsis, integer scalars) returns a view whenever the result can be expressed as a strided window into the same buffer. Fancy indexing (lists/arrays of indices) and boolean masking always materialize a new array because the selected elements aren't a regular stride. `reshape` returns a view if the data is contiguous and the new shape is compatible, otherwise it silently falls back to a copy — which is itself a common interview trap."
+        },
+        "d1_terminal": {
+          "id": "d1_terminal",
+          "type": "scenario_choice",
+          "badge": "Complete",
+          "title": "Complete · NumPy memory model mastered",
+          "terminal": true,
+          "prompt": "A senior engineer reviewing your fix asks: 'How would you prevent this entire class of view/copy and broadcasting bugs from reaching production again, not just this one instance?' What's the strongest answer?",
+          "code_snippet": "# Review comment: \"This works now. How do we stop the *next* one?\"",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Add shape/dtype assertions at function boundaries, default to .copy() at ownership handoffs, and write a unit test that mutates the output and asserts the input is unchanged",
+              "description": "This treats memory ownership and shape contracts as testable invariants rather than tribal knowledge — assertions fail loudly in CI instead of corrupting data silently in production three pipelines downstream."
+            },
+            {
+              "id": "b",
+              "label": "Tell every engineer to 'be careful with NumPy slicing' in the next team meeting",
+              "description": "Verbal reminders don't survive turnover, new hires, or a Friday-afternoon hotfix. The same bug class will resurface within a quarter."
+            },
+            {
+              "id": "c",
+              "label": "Switch the entire codebase to pandas, since DataFrames don't have view/copy ambiguity",
+              "description": "Pandas has the exact same view/copy ambiguity (the SettingWithCopyWarning exists because of it) — this doesn't solve the underlying problem, it just relocates it."
+            },
+            {
+              "id": "d",
+              "label": "Always call .copy() on every array everywhere, regardless of context",
+              "description": "This sidesteps the bug class at a real cost: doubled memory and unnecessary copies on hot paths where a view was intentional and safe. It's not an engineering decision, it's giving up on understanding ownership."
+            }
+          ],
+          "branches": {
+            "a": "d1_terminal",
+            "b": "d1_terminal",
+            "c": "d1_terminal",
+            "d": "d1_terminal"
+          },
+          "rationale": "Senior engineers convert tribal knowledge into structural guarantees: shape/dtype assertions at boundaries make contracts executable, explicit `.copy()` at handoff points (not everywhere) documents intent, and a regression test that exercises the exact failure mode (mutate output, assert input unchanged) ensures the fix can't silently regress. This is the difference between fixing a bug and fixing the conditions that produced it."
+        }
+      }
+    },},
   "py-d2": {
     durationLabel: MODULE_TIME_LABEL,
     outcomes: ["Use explicit indexing to avoid chained-assignment ambiguity.","Track dtype/null drift after each transform stage.","Build auditable DataFrame pipelines with clear contracts."],
@@ -789,7 +1864,225 @@ Close by writing a mini data contract: required columns, expected dtype families
       { question: "Why is dtype drift dangerous when code still runs?", options: ["Operations can change meaning silently, producing wrong business conclusions.","Pandas will always raise compile-time errors.","Drift only changes plotting style."], correctIndex: 0, explanation: "Silent semantic errors are the real risk; assertions catch them." },
       { question: "What signals senior pandas judgment in interviews?", options: ["A staged pipeline with schema checks, null policy, type normalization, and QA.","Listing many pandas methods quickly.","Relying on visual inspection only."], correctIndex: 0, explanation: "Process rigor and validation discipline are key senior signals." },
     ],
-  },
+  
+    interviewGraph: {
+      "initialStageId": "d2_chained_click",
+      "artifactDimensions": [
+        {
+          "label": "Explicit Indexing Discipline",
+          "recoveryStageId": "d2_recovery_indexing"
+        },
+        {
+          "label": "Dtype & Schema Vigilance",
+          "recoveryStageId": "d2_recovery_dtype",
+          "passLabel": "Pipeline Reliability Mastery"
+        }
+      ],
+      "stages": {
+        "d2_chained_click": {
+          "id": "d2_chained_click",
+          "type": "click_target",
+          "badge": "Stage 1",
+          "title": "Stage 1 · A chained-assignment that silently does nothing",
+          "prompt": "A revenue dashboard shows stale discount flags — the fix that was supposed to mark high-value orders never applied. Click the line responsible for the silent no-op.",
+          "code_snippet": "import pandas as pd\n\norders = load_orders_df()\n\nhigh_value = orders[orders[\"total\"] > 1000]        # ds-target:chained_select\nhigh_value[\"flagged\"] = True                       # ds-target:chained_assign\n\nsave_orders(orders)",
+          "validationCopy": {
+            "chained_select": "This line itself is fine — it's a normal boolean filter. The problem is what happens to the result on the next line. Click the assignment.",
+            "chained_assign": "Correct. `orders[orders[\"total\"] > 1000]` may return a copy (pandas doesn't guarantee view vs copy here — this is exactly the ambiguity behind SettingWithCopyWarning). Assigning into `high_value[\"flagged\"]` afterward mutates that intermediate object, which may or may not be backed by `orders`'s memory. `orders` itself is never reliably updated, so `save_orders(orders)` writes out unflagged data."
+          },
+          "branches": {
+            "chained_select": "d2_recovery_indexing",
+            "chained_assign": "d2_loc_choice"
+          }
+        },
+        "d2_loc_choice": {
+          "id": "d2_loc_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 2",
+          "title": "Stage 2 · Choosing the correct explicit fix",
+          "prompt": "You need to set `flagged = True` for all orders with total > 1000, directly and unambiguously on the original `orders` DataFrame. Which rewrite is correct?",
+          "code_snippet": "orders = load_orders_df()\nmask = orders[\"total\"] > 1000\n\n# candidate fix — fill in the blank\norders.____[mask, \"flagged\"] = True",
+          "choices": [
+            {
+              "id": "a",
+              "label": "orders.loc[mask, \"flagged\"] = True",
+              "description": "`.loc` with a boolean mask and explicit column label performs a single, unambiguous in-place assignment directly on `orders` — no intermediate object, no view/copy ambiguity, and pandas raises no SettingWithCopyWarning."
+            },
+            {
+              "id": "b",
+              "label": "orders[mask][\"flagged\"] = True",
+              "description": "This is the same chained-indexing pattern as Stage 1 — `orders[mask]` may return a copy, and the second `[\"flagged\"] = True` assigns onto that copy, not necessarily onto `orders`."
+            },
+            {
+              "id": "c",
+              "label": "orders.iloc[mask, \"flagged\"] = True",
+              "description": "`.iloc` is for purely integer-position-based indexing; it doesn't accept a boolean Series aligned by index combined with a string column label in this form — this raises a TypeError/IndexError, not a silent bug, but it's still the wrong tool here."
+            },
+            {
+              "id": "d",
+              "label": "orders.where(mask, \"flagged\") = True",
+              "description": "`.where()` returns a new DataFrame/Series with values replaced where the condition is False (or the inverse, depending on usage) — it's not an assignment mechanism and this syntax isn't valid Python (you can't assign to a function call)."
+            }
+          ],
+          "branches": {
+            "a": "d2_dtype_choice",
+            "b": "d2_recovery_indexing",
+            "c": "d2_recovery_indexing",
+            "d": "d2_recovery_indexing"
+          },
+          "rationale": "`.loc[row_selector, col_label] = value` is pandas's explicit, unambiguous mutation API: one call, one target, no intermediate object whose backing memory is uncertain. This is why production pandas style guides ban chained indexing (`df[mask][col] = ...`) and require `.loc`/`.iloc` for any assignment."
+        },
+        "d2_dtype_choice": {
+          "id": "d2_dtype_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 3",
+          "title": "Stage 3 · Dtype drift breaks a downstream join",
+          "prompt": "After the fix ships, a downstream join between `orders` and `customers` on `customer_id` starts dropping 8% of rows. Both columns look identical when printed. What's the most likely cause, and how do you confirm it before debugging further?",
+          "code_snippet": "orders = load_orders_df()         # customer_id read from a CSV with some blank cells\ncustomers = load_customers_df()   # customer_id read from a database, always populated\n\nmerged = orders.merge(customers, on=\"customer_id\", how=\"inner\")\nprint(len(merged), len(orders))   # merged is mysteriously short",
+          "choices": [
+            {
+              "id": "a",
+              "label": "customer_id likely has different dtypes across the two frames (e.g. object/str with NaN-coerced float in one, int64 in the other) — confirm with orders.dtypes and customers.dtypes before touching the merge logic",
+              "description": "When a CSV column has any blank cells, pandas often upcasts an otherwise-integer ID column to float64 (since NaN requires a float type), turning `12345` into `12345.0`. If `customers.customer_id` stays int64, the merge key types mismatch and matching rows silently fail to join — this is dtype drift, and `.dtypes` is the one-line check that confirms it instantly."
+            },
+            {
+              "id": "b",
+              "label": "The join must be using the wrong 'how' parameter — switch to how='outer' to recover the missing rows",
+              "description": "Switching to outer would surface the unmatched rows as NaN-filled instead of fixing the actual mismatch — it treats the symptom, not the dtype mismatch causing keys to fail to compare equal."
+            },
+            {
+              "id": "c",
+              "label": "Pandas merges are inherently lossy for large tables; this 8% drop is expected and not worth investigating",
+              "description": "Merges are deterministic and lossless with correct, matching keys. An unexplained row-count delta should always be investigated, never written off as 'expected.'"
+            },
+            {
+              "id": "d",
+              "label": "The customer_id column probably has duplicate values in customers, causing some orders rows to be dropped",
+              "description": "Duplicate keys in the right table cause row *inflation* (fan-out) in an inner/left join, not row *loss* — this points in the wrong direction for an 8% drop."
+            }
+          ],
+          "branches": {
+            "a": "d2_terminal",
+            "b": "d2_recovery_dtype",
+            "c": "d2_recovery_dtype",
+            "d": "d2_recovery_dtype"
+          },
+          "rationale": "Dtype drift is one of the most common silent-failure modes in pandas pipelines: a column that looks identical when printed (`12345` vs `12345.0`) can fail to match across frames because the underlying comparison is type-sensitive. The senior habit is to snapshot `.dtypes` (and null rates, and row counts) before and after every ingestion or transform stage, so a drift like this is caught by an assertion in CI rather than discovered as a silent 8% revenue-reporting gap."
+        },
+        "d2_recovery_indexing": {
+          "id": "d2_recovery_indexing",
+          "type": "scenario_choice",
+          "badge": "Recovery A",
+          "title": "Recovery · Why chained assignment is ambiguous",
+          "prompt": "Why does pandas raise (or used to raise) a SettingWithCopyWarning for `df[df.x > 0][\"y\"] = 1`?",
+          "code_snippet": "df[df.x > 0][\"y\"] = 1\n# vs.\ndf.loc[df.x > 0, \"y\"] = 1",
+          "choices": [
+            {
+              "id": "a",
+              "label": "df[df.x > 0] may return a new object (copy) rather than a view into df, so the second assignment might mutate a throwaway intermediate instead of df itself",
+              "description": "Correct. Pandas can't always guarantee whether boolean/fancy indexing returns a view or a copy internally. Chaining a second `[...] = value` onto that ambiguous intermediate means the assignment's target is undefined from the caller's perspective — sometimes it works, sometimes it silently doesn't."
+            },
+            {
+              "id": "b",
+              "label": "Pandas DataFrames are immutable, so any direct assignment syntax is invalid",
+              "description": "DataFrames are mutable — `.loc` and `.iloc` assignment work specifically because mutation is supported when the target is unambiguous."
+            },
+            {
+              "id": "c",
+              "label": "The warning is purely stylistic; both forms are functionally identical under the hood",
+              "description": "They are not equivalent — that's precisely why the warning exists. One has a well-defined mutation target, the other does not."
+            },
+            {
+              "id": "d",
+              "label": "It only matters for very large DataFrames where memory copying becomes expensive",
+              "description": "The issue is correctness (does the write land where you think it does), not performance — it occurs regardless of DataFrame size."
+            }
+          ],
+          "branches": {
+            "a": "d2_loc_choice",
+            "b": "d2_recovery_indexing",
+            "c": "d2_recovery_indexing",
+            "d": "d2_recovery_indexing"
+          },
+          "rationale": "`df[mask]` is a `__getitem__` call that pandas may satisfy with a view or a copy depending on internal block-manager details you don't control. Chaining a write onto that result makes the actual mutation target undefined. `.loc[mask, col] = value` is a single `__setitem__` call with one unambiguous target — there is no intermediate object for the write to silently land on incorrectly."
+        },
+        "d2_recovery_dtype": {
+          "id": "d2_recovery_dtype",
+          "type": "scenario_choice",
+          "badge": "Recovery B",
+          "title": "Recovery · Detecting dtype drift",
+          "prompt": "What's the fastest, most reliable way to confirm two columns that 'look the same' when printed actually have a dtype mismatch preventing a merge?",
+          "code_snippet": "orders[\"customer_id\"].head()\ncustomers[\"customer_id\"].head()\n# both print: 1001, 1002, 1003 ...",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Compare orders['customer_id'].dtype and customers['customer_id'].dtype directly",
+              "description": "Correct. `.dtype` reports the actual underlying storage type (int64, float64, object) regardless of how values are rendered for display — print formatting hides the float-vs-int distinction that breaks equality comparisons during the merge."
+            },
+            {
+              "id": "b",
+              "label": "Print more rows with .head(50) to look for visual differences",
+              "description": "More rows won't reveal a dtype mismatch — `12345` and `12345.0` can both render as `12345` depending on pandas display settings, regardless of how many rows you print."
+            },
+            {
+              "id": "c",
+              "label": "Convert both columns to string with .astype(str) before checking — if they match as strings, the dtype is fine",
+              "description": "This converts away the very mismatch you're trying to detect; both would become identical strings, masking the original dtype issue rather than diagnosing it."
+            },
+            {
+              "id": "d",
+              "label": "Trust that pandas would raise an error immediately if dtypes didn't match during a merge",
+              "description": "Pandas does not raise an error for a dtype mismatch on merge keys — it silently treats unequal-typed values as non-matching, which is exactly the silent failure mode in this scenario."
+            }
+          ],
+          "branches": {
+            "a": "d2_dtype_choice",
+            "b": "d2_recovery_dtype",
+            "c": "d2_recovery_dtype",
+            "d": "d2_recovery_dtype"
+          },
+          "rationale": "`.dtype` / `.dtypes` is the one-line ground truth for what pandas actually stored, independent of how values are displayed. Production pipelines should snapshot dtypes (and null rates, and row counts) at every stage boundary as an assertion, because display formatting actively hides the int/float/object distinctions that break joins, comparisons, and groupbys."
+        },
+        "d2_terminal": {
+          "id": "d2_terminal",
+          "type": "scenario_choice",
+          "badge": "Complete",
+          "title": "Complete · Pandas reliability discipline mastered",
+          "terminal": true,
+          "prompt": "Leadership asks you to write a one-paragraph standard for the data team to prevent both chained-assignment bugs and dtype-drift joins going forward. What belongs in it?",
+          "code_snippet": "# Team standard for pandas pipeline reliability (draft this in one breath)",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Require .loc/.iloc for all mutations (no chained indexing), and require a schema/dtype/null-rate/row-count snapshot assertion immediately after every ingestion and transform stage, enforced in CI",
+              "description": "This converts both failure modes from 'discovered in production by a confused stakeholder' to 'caught by an assertion in a pull request.' It's the staged ingest → validate → normalize → transform → QA workflow made executable rather than aspirational."
+            },
+            {
+              "id": "b",
+              "label": "Ban pandas and require all transforms to be rewritten in raw SQL",
+              "description": "This doesn't address the underlying issue (implicit mutation targets, type drift across ingestion sources) and just moves the same class of bugs into a different tool with its own footguns."
+            },
+            {
+              "id": "c",
+              "label": "Require every engineer to print .head() and .dtypes manually before every commit, with no automated enforcement",
+              "description": "Manual, unenforced checks degrade over time under deadline pressure — the same bug classes will recur as soon as someone skips the manual step during a hotfix."
+            },
+            {
+              "id": "d",
+              "label": "Add try/except around every merge and assignment so errors never crash the pipeline",
+              "description": "Both bugs in this scenario didn't raise exceptions — they failed silently with no error to catch. Try/except is the wrong tool for silent semantic bugs; it would actually make them harder to detect by suppressing any incidental warnings."
+            }
+          ],
+          "branches": {
+            "a": "d2_terminal",
+            "b": "d2_terminal",
+            "c": "d2_terminal",
+            "d": "d2_terminal"
+          },
+          "rationale": "The two bugs in this simulation share a root cause: implicit behavior that pandas allows silently (ambiguous mutation targets, type coercion on ingest) without raising an error. The fix that scales across a team is making the previously-implicit checks explicit and automated — `.loc`-only mutation policy plus stage-boundary schema/dtype/null/row-count assertions in CI — rather than relying on any individual engineer's vigilance."
+        }
+      }
+    },},
   "py-d3": {
     durationLabel: MODULE_TIME_LABEL,
     outcomes: ["Define data grain before groupby/merge/pivot operations.","Prevent join fan-out and aggregate inflation.","Validate reshaped outputs with reconciliation checks."],
@@ -822,7 +2115,227 @@ Create two toy tables with duplicate keys, predict merge row count, run merge, f
       { question: "Why define grain before groupby logic?", options: ["Aggregate correctness depends on what each row represents.","Pandas requires grain metadata to run.","Grain only affects chart formatting."], correctIndex: 0, explanation: "Without grain clarity, outputs can be plausible but wrong." },
       { question: "Which interview response is strongest?", options: ["State uniqueness assumptions, expected row counts, and reconciliation checks.","Memorize join syntax only.","Trust outputs if nulls are low."], correctIndex: 0, explanation: "Reliability thinking beats syntax-only recall." },
     ],
-  },
+  
+    interviewGraph: {
+      "initialStageId": "d3_fanout_click",
+      "artifactDimensions": [
+        {
+          "label": "Join Fan-Out Detection",
+          "recoveryStageId": "d3_recovery_fanout"
+        },
+        {
+          "label": "Grain & Reconciliation Discipline",
+          "recoveryStageId": "d3_recovery_grain",
+          "passLabel": "Aggregation Integrity Mastery"
+        }
+      ],
+      "stages": {
+        "d3_fanout_click": {
+          "id": "d3_fanout_click",
+          "type": "click_target",
+          "badge": "Stage 1",
+          "title": "Stage 1 · Revenue doubled overnight",
+          "prompt": "Total revenue in a finance report jumped 40% after adding a 'promo campaign' lookup join — but no actual sales changed. Click the line responsible for the inflation.",
+          "code_snippet": "import pandas as pd\n\norders = load_orders_df()              # 1 row per order_id (unique)\npromos = load_promo_lookup_df()        # ds-target:promo_load\n\nmerged = orders.merge(promos, on=\"campaign_id\", how=\"left\")   # ds-target:merge_step\nrevenue = merged[\"order_total\"].sum()  # ds-target:sum_revenue\nprint(revenue)",
+          "validationCopy": {
+            "promo_load": "Loading the table isn't the bug by itself — the issue is whether campaign_id is unique inside promos. Look at the merge or the sum.",
+            "merge_step": "Correct. `promos` has multiple rows per `campaign_id` (e.g. one row per promo tier or per region), so the left join multiplies each order row once per matching promo row — a classic fan-out. `orders` was 1-row-per-order before the merge; after it, some orders appear 2-3x, inflating the subsequent .sum().",
+            "sum_revenue": "The sum itself is just doing its job correctly on whatever rows exist — the row count was already wrong by the time we get here. Click the merge line where the duplication actually happens."
+          },
+          "branches": {
+            "promo_load": "d3_recovery_fanout",
+            "merge_step": "d3_groupby_choice",
+            "sum_revenue": "d3_recovery_fanout"
+          }
+        },
+        "d3_groupby_choice": {
+          "id": "d3_groupby_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 2",
+          "title": "Stage 2 · Fixing the fan-out without losing the lookup",
+          "prompt": "You still need each order to know its campaign's promo *name* for reporting, but `promos` has multiple rows per campaign_id (one per tier). Which fix preserves the 1-row-per-order grain while still attaching campaign metadata?",
+          "code_snippet": "orders = load_orders_df()           # 1 row per order_id\npromos = load_promo_lookup_df()     # multiple rows per campaign_id (tiers)\n\n# candidate fix — pick the grain-safe approach",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Deduplicate promos down to one row per campaign_id first (e.g. promos.drop_duplicates('campaign_id') or pick a canonical tier), then merge — confirm orders row count is unchanged before/after",
+              "description": "Pre-aggregating or deduplicating the right-hand table to match the join key's intended grain (one row per campaign_id) before merging guarantees the left table's grain is preserved. Checking `len(orders) == len(merged)` after the merge is the reconciliation step that proves it."
+            },
+            {
+              "id": "b",
+              "label": "Keep the fan-out merge, then divide order_total by the count of matching promo rows per order to 'undo' the inflation",
+              "description": "This is a fragile patch that recovers the right total by coincidence but corrupts every other column that gets duplicated (e.g. order_date, customer_id now appear multiple times per order) and breaks the moment someone groups by a different column."
+            },
+            {
+              "id": "c",
+              "label": "Switch how='left' to how='inner' — that will remove the duplicate rows",
+              "description": "Changing the join type doesn't address cardinality on the right side; an inner join with a non-unique key still fans out the matching rows, it just additionally drops orders with no campaign match."
+            },
+            {
+              "id": "d",
+              "label": "Add .drop_duplicates() on the final merged DataFrame after the join",
+              "description": "Deduplicating after the merge on the full row (which now includes tier-specific promo columns) won't remove the fan-out rows, since each duplicate row differs by the promo tier columns — they're not exact duplicates."
+            }
+          ],
+          "branches": {
+            "a": "d3_pivot_choice",
+            "b": "d3_recovery_fanout",
+            "c": "d3_recovery_fanout",
+            "d": "d3_recovery_fanout"
+          },
+          "rationale": "The grain-first principle: before any merge, ask what one row represents on each side, and what it should represent after. `orders` is 1-row-per-order; `promos` is 1-row-per-(campaign,tier). Merging without resolving that grain mismatch silently changes `orders`'s grain. The fix is always upstream — make the right-hand table match the intended join cardinality — and always verifiable with a pre/post row-count check, never a downstream arithmetic patch."
+        },
+        "d3_pivot_choice": {
+          "id": "d3_pivot_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 3",
+          "title": "Stage 3 · A pivot table that doesn't reconcile",
+          "prompt": "A stakeholder built a region x quarter revenue pivot table for the board deck. The grand total in the pivot's corner cell doesn't match `orders['order_total'].sum()` computed directly. What's the most likely cause and the right way to catch it before the board sees it?",
+          "code_snippet": "pivot = orders.pivot_table(\n    index=\"region\",\n    columns=\"quarter\",\n    values=\"order_total\",\n    aggfunc=\"sum\",\n)\nprint(pivot.sum().sum())            # pivot grand total\nprint(orders[\"order_total\"].sum())  # direct total\n# these two numbers don't match",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Some orders likely have null region or quarter values and pivot_table drops them by default — confirm with orders[['region','quarter']].isna().sum() and decide a policy (fillna with a 'Unknown' bucket, or explicitly exclude and footnote it)",
+              "description": "`pivot_table` silently excludes rows where the index/column keys are NaN, because there's no cell for them to land in. This is the single most common reconciliation gap in pivot reporting — checking null counts on the grouping keys before trusting any pivot total is the standard QA step."
+            },
+            {
+              "id": "b",
+              "label": "pivot_table always rounds values for display, which explains the small discrepancy",
+              "description": "pivot_table doesn't apply implicit rounding to underlying values — display formatting is separate from the actual aggregated numbers being summed here."
+            },
+            {
+              "id": "c",
+              "label": "The discrepancy must mean aggfunc='sum' is computing a mean for some cells",
+              "description": "aggfunc is applied uniformly across all cells in a single pivot_table call — it wouldn't silently switch to mean for a subset."
+            },
+            {
+              "id": "d",
+              "label": "This is expected; pivot tables are approximations and exact reconciliation isn't possible",
+              "description": "Pivot tables are exact reshaping/aggregation operations — a correctly-specified pivot must reconcile exactly to the source aggregate. Any mismatch indicates a real data issue (usually nulls in the grouping keys), not an inherent approximation."
+            }
+          ],
+          "branches": {
+            "a": "d3_terminal",
+            "b": "d3_recovery_grain",
+            "c": "d3_recovery_grain",
+            "d": "d3_recovery_grain"
+          },
+          "rationale": "`pivot_table` (like `groupby`) silently drops rows whose index/column key is NaN — there's no cell to place them in. This is exactly why grain discipline includes a reconciliation step: the pivot's grand total must equal the pre-pivot aggregate, and any gap is a concrete, debuggable signal (usually nulls in a grouping key) rather than something to wave away as rounding or approximation."
+        },
+        "d3_recovery_fanout": {
+          "id": "d3_recovery_fanout",
+          "type": "scenario_choice",
+          "badge": "Recovery A",
+          "title": "Recovery · What causes join fan-out",
+          "prompt": "When does merging two tables on a key produce more rows than the left table originally had?",
+          "code_snippet": "left = pd.DataFrame({\"id\": [1, 2, 3]})\nright = pd.DataFrame({\"id\": [1, 1, 2], \"val\": [\"a\", \"b\", \"c\"]})\nresult = left.merge(right, on=\"id\", how=\"left\")\nprint(len(result))   # left has 3 rows... result has?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "When the join key is not unique in at least one of the two tables — each match on the non-unique side multiplies the corresponding row on the other side",
+              "description": "Correct. Here `id=1` appears twice in `right`, so the single `id=1` row in `left` matches twice, producing two output rows for it. Result has 4 rows, not 3 — fan-out comes directly from key duplication on the side being joined against."
+            },
+            {
+              "id": "b",
+              "label": "Only when using how='outer' — left and inner joins never produce extra rows",
+              "description": "Fan-out occurs with any join type (inner, left, right, outer) whenever the key is duplicated on the side being matched against — the join type controls how unmatched rows are handled, not whether matched rows multiply."
+            },
+            {
+              "id": "c",
+              "label": "Only when column names overlap between the two tables besides the join key",
+              "description": "Overlapping non-key column names cause pandas to add `_x`/`_y` suffixes — a naming/readability issue, unrelated to whether rows multiply."
+            },
+            {
+              "id": "d",
+              "label": "Pandas merge always preserves the left table's exact row count regardless of key duplication",
+              "description": "This is precisely the false assumption that causes fan-out bugs to go unnoticed — merge row count depends on key cardinality on both sides, not just the left table's original size."
+            }
+          ],
+          "branches": {
+            "a": "d3_groupby_choice",
+            "b": "d3_recovery_fanout",
+            "c": "d3_recovery_fanout",
+            "d": "d3_recovery_fanout"
+          },
+          "rationale": "Join fan-out is purely a function of key cardinality: if the key you're joining on is duplicated on either side, every duplicate produces an additional matched row. The defensive habit is to check `df[key].is_unique` (or `df[key].duplicated().sum()`) on both tables before merging, and to compare row counts immediately after — `len(result)` should equal `len(left)` whenever the right-hand key is unique."
+        },
+        "d3_recovery_grain": {
+          "id": "d3_recovery_grain",
+          "type": "scenario_choice",
+          "badge": "Recovery B",
+          "title": "Recovery · Defining grain before aggregating",
+          "prompt": "Before running any groupby or pivot, what question should you answer first to avoid producing a plausible-looking but wrong aggregate?",
+          "code_snippet": "# orders_df: what does ONE ROW represent right now?\n# after group/pivot: what should one row represent?\nresult = orders_df.groupby([\"region\", \"quarter\"])[\"order_total\"].sum()",
+          "choices": [
+            {
+              "id": "a",
+              "label": "What does a single row represent before the operation, and what should a single row represent after it — i.e., define the grain on both sides",
+              "description": "Correct. If `orders_df` is 1-row-per-order, grouping by (region, quarter) changes the grain to 1-row-per-(region,quarter). Confirming that's the intended grain — and that no duplicate orders or null keys are silently distorting it — is the entire purpose of grain-first thinking."
+            },
+            {
+              "id": "b",
+              "label": "Whether the DataFrame fits in memory",
+              "description": "Memory footprint is an operational concern, but it has nothing to do with whether the aggregate is semantically correct."
+            },
+            {
+              "id": "c",
+              "label": "Whether the column names are properly capitalized",
+              "description": "Naming conventions are a style concern, unrelated to whether the resulting aggregate correctly represents the business question being asked."
+            },
+            {
+              "id": "d",
+              "label": "Whether to use groupby or pivot_table, since they produce different numeric results",
+              "description": "groupby and pivot_table are different *shapes* of the same aggregation logic — given the same grouping keys, aggfunc, and clean data, they produce the same underlying numbers, just arranged differently (long vs wide)."
+            }
+          ],
+          "branches": {
+            "a": "d3_pivot_choice",
+            "b": "d3_recovery_grain",
+            "c": "d3_recovery_grain",
+            "d": "d3_recovery_grain"
+          },
+          "rationale": "Grain is the contract that defines what one row means. Every groupby/merge/pivot bug in this lesson — fan-out, inflated sums, pivot totals that don't reconcile — traces back to losing track of grain at some step. Stating grain explicitly before and after each transformation turns a vague 'does this look right?' check into a precise, verifiable assertion (row counts, uniqueness, reconciled totals)."
+        },
+        "d3_terminal": {
+          "id": "d3_terminal",
+          "type": "scenario_choice",
+          "badge": "Complete",
+          "title": "Complete · GroupBy/Merge/Pivot integrity mastered",
+          "terminal": true,
+          "prompt": "A new analyst on your team asks: 'What's the one habit that would have caught all three bugs in this scenario — the fan-out, the broken fix, and the pivot mismatch?' What do you tell them?",
+          "code_snippet": "# Three bugs, one missing habit. What is it?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Always compare row counts and a known total before and after every merge, groupby, or pivot — if they don't reconcile to what the grain implies, stop and investigate before trusting the output",
+              "description": "All three bugs were detectable with a single cheap check: does `len(result)` or `result.sum()` match what the stated grain predicts? A pre/post reconciliation check is the generalizable habit, not three separate bug-specific fixes."
+            },
+            {
+              "id": "b",
+              "label": "Memorize the pandas merge/groupby/pivot_table API signatures more thoroughly",
+              "description": "All three bugs occurred despite syntactically correct API usage — the failures were semantic (grain, cardinality, null handling), not syntax errors that better API memorization would catch."
+            },
+            {
+              "id": "c",
+              "label": "Avoid pivot_table entirely and only use groupby, since pivot_table is less reliable",
+              "description": "pivot_table and groupby have the same underlying reliability characteristics — avoiding one tool doesn't address the actual root cause (unreconciled aggregates after key-cardinality or null-key issues)."
+            },
+            {
+              "id": "d",
+              "label": "Add more print statements throughout the pipeline to visually inspect intermediate DataFrames",
+              "description": "Visual inspection doesn't scale and is exactly what missed all three bugs originally — a row count that's 40% too high or a pivot total that's off by a few percent is easy to miss by eye but trivial to catch with an explicit numeric reconciliation assertion."
+            }
+          ],
+          "branches": {
+            "a": "d3_terminal",
+            "b": "d3_terminal",
+            "c": "d3_terminal",
+            "d": "d3_terminal"
+          },
+          "rationale": "The unifying lesson across fan-out, broken patches, and unreconciled pivots is that pandas will happily produce a plausible-looking wrong number without ever raising an error. The single habit that generalizes across all of them is treating reconciliation — row counts, key uniqueness, totals before/after — as a mandatory, automatable checkpoint rather than an optional sanity glance."
+        }
+      }
+    },},
   "py-d4": {
     durationLabel: MODULE_TIME_LABEL,
     outcomes: ["Classify missingness sources and pick policy intentionally.","Measure metric impact of drop/fill/impute choices.","Document null assumptions as data-contract decisions."],
@@ -855,7 +2368,227 @@ Profile null rates by column and segment, apply three policies on one important 
       { question: "Best first step for null handling?", options: ["Identify missingness mechanism and business context.","Apply median fill globally.","Drop every row with any null."], correctIndex: 0, explanation: "Policy quality depends on cause and decision context." },
       { question: "Strongest interview answer on missing data?", options: ["Compare strategies, quantify downstream impact, and justify a monitored policy.","State one universal rule.","Treat null handling as cosmetic cleanup."], correctIndex: 0, explanation: "Evidence-backed tradeoff reasoning signals maturity." },
     ],
-  },
+  
+    interviewGraph: {
+      "initialStageId": "d4_zerofill_click",
+      "artifactDimensions": [
+        {
+          "label": "Missingness Diagnosis",
+          "recoveryStageId": "d4_recovery_diagnosis"
+        },
+        {
+          "label": "Policy Selection & Impact Measurement",
+          "recoveryStageId": "d4_recovery_policy",
+          "passLabel": "Null-Handling Mastery"
+        }
+      ],
+      "stages": {
+        "d4_zerofill_click": {
+          "id": "d4_zerofill_click",
+          "type": "click_target",
+          "badge": "Stage 1",
+          "title": "Stage 1 · A zero-fill that corrupts a KPI",
+          "prompt": "Average order discount reported to finance dropped from 12% to 7% after a 'data cleaning' pass — but the actual discounting behavior didn't change. Click the line that caused the distortion.",
+          "code_snippet": "import pandas as pd\n\norders = load_orders_df()\nprint(orders[\"discount_pct\"].isna().sum())   # ds-target:check_nulls\n\norders[\"discount_pct\"] = orders[\"discount_pct\"].fillna(0)   # ds-target:zero_fill\navg_discount = orders[\"discount_pct\"].mean()                # ds-target:compute_mean\nprint(avg_discount)",
+          "validationCopy": {
+            "check_nulls": "Checking null counts is good practice, not the bug — this line just reports a number. The distortion happens at the fill step.",
+            "zero_fill": "Correct. Null `discount_pct` likely means 'no discount was ever evaluated or applicable for this order' — not necessarily 'discount was applied and was zero.' If nulls actually represent 'not yet computed' (e.g., from a pipeline lag) rather than 'no discount,' filling with 0 silently asserts a business fact that may be false, dragging the average down and corrupting a finance-facing KPI.",
+            "compute_mean": "The mean calculation is doing exactly what it's told — the corrupted input came from the fill step before this. Click that line instead."
+          },
+          "branches": {
+            "check_nulls": "d4_recovery_diagnosis",
+            "zero_fill": "d4_diagnosis_choice",
+            "compute_mean": "d4_recovery_diagnosis"
+          }
+        },
+        "d4_diagnosis_choice": {
+          "id": "d4_diagnosis_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 2",
+          "title": "Stage 2 · Diagnosing why discount_pct is null",
+          "prompt": "Before picking a fix, you investigate why `discount_pct` is null. You find: nulls cluster heavily in orders from the last 3 days, and are otherwise rare and randomly scattered in older data. What does this pattern most likely indicate, and what's the right next step?",
+          "code_snippet": "orders.groupby(orders[\"order_date\"].dt.date)[\"discount_pct\"].apply(\n    lambda s: s.isna().mean()\n).tail(10)\n# null rate: ~1-2% for most days, spikes to ~85% for the last 3 days",
+          "choices": [
+            {
+              "id": "a",
+              "label": "This is delayed ingestion / pipeline lag for recent orders, not 'no discount applied' — the discount-calculation job likely hasn't run yet for the last 3 days. Exclude the recent window from the KPI until the lag resolves, and fill the older scattered nulls based on their own (likely different) cause",
+              "description": "A null rate that spikes specifically in the most recent time window is the classic signature of pipeline/ingestion lag, not informative missingness about the business event itself. Treating it as 'discount = 0' would systematically bias the rolling KPI downward every reporting period, right when the freshest data is being read. The correct move is to recognize this as a data-freshness issue and handle it separately from genuinely sparse, randomly-missing historical nulls."
+            },
+            {
+              "id": "b",
+              "label": "Fill all nulls with the column mean discount_pct, since that's the standard imputation technique",
+              "description": "Mean imputation assumes missingness is unrelated to time or process state (missing-completely-at-random). Here the pattern is clearly time-clustered and tied to ingestion lag — applying a global mean would smear a pipeline problem across the data without fixing or even flagging it."
+            },
+            {
+              "id": "c",
+              "label": "Drop all rows with null discount_pct, since 1-2% is a small fraction of the data",
+              "description": "Dropping the recent 85%-null window would remove almost all of the last 3 days of orders, severely understating recent order volume and revenue in any report that uses this filtered frame — a much bigger distortion than the original nulls."
+            },
+            {
+              "id": "d",
+              "label": "This pattern doesn't matter — any consistent fill strategy will produce a usable KPI",
+              "description": "The pattern is exactly what determines whether a fill strategy is usable. Applying a single global strategy while ignoring that recent nulls have an entirely different cause (and meaning) than older nulls is how silently biased KPIs get shipped to stakeholders."
+            }
+          ],
+          "branches": {
+            "a": "d4_policy_choice",
+            "b": "d4_recovery_diagnosis",
+            "c": "d4_recovery_diagnosis",
+            "d": "d4_recovery_diagnosis"
+          },
+          "rationale": "Missingness has a cause, and the cause determines the correct policy. A null rate that spikes specifically in the most recent rows is a strong signal of ingestion/processing lag — informative missingness tied to *when* data was captured, not to the underlying business value. Conflating this with 'no discount' (filling with 0) or treating it identically to old, sparse, plausibly-random nulls would both produce a number that looks clean but means something false."
+        },
+        "d4_policy_choice": {
+          "id": "d4_policy_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 3",
+          "title": "Stage 3 · Choosing and defending a monitored policy",
+          "prompt": "Leadership wants a single, ongoing dashboard metric for 'average discount %' that's robust to this pipeline lag recurring in future weeks. Which policy is the strongest production choice?",
+          "code_snippet": "# Requirements:\n# - Metric must be reportable daily without manual intervention\n# - Must not silently bias when recent-data lag recurs\n# - Must be auditable: someone should be able to tell WHY a number changed",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Compute the KPI only over rows where discount_pct is non-null, report the null rate alongside it as a freshness/completeness indicator, and alert if the null rate for the trailing window exceeds a threshold (e.g. 10%)",
+              "description": "This treats the null rate itself as a monitored signal rather than something to silently absorb. The KPI stays honest (computed only on resolved data), and a spike in nulls becomes a visible alert about pipeline health instead of a silent bias in the average — exactly the kind of policy that survives the next time this lag recurs."
+            },
+            {
+              "id": "b",
+              "label": "Fill nulls with 0 permanently, since it's the simplest rule and finance already saw that number",
+              "description": "This locks in a known-biased number as the standard going forward, and ensures every future occurrence of ingestion lag will repeat the same silent distortion finance already got burned by."
+            },
+            {
+              "id": "c",
+              "label": "Fill nulls with the previous day's average discount_pct as a forward-fill estimate",
+              "description": "This produces a plausible-looking number with no flag that anything was estimated, hiding the pipeline lag from anyone consuming the dashboard — auditability is lost entirely."
+            },
+            {
+              "id": "d",
+              "label": "Switch to median instead of mean, since median is generally more robust",
+              "description": "Median is more robust to outliers, but it doesn't address the actual problem here, which is that a large fraction of recent rows are missing for a reason unrelated to the discount distribution itself — robustness to outliers doesn't fix bias from non-random missingness."
+            }
+          ],
+          "branches": {
+            "a": "d4_terminal",
+            "b": "d4_recovery_policy",
+            "c": "d4_recovery_policy",
+            "d": "d4_recovery_policy"
+          },
+          "rationale": "A production-grade missing-data policy treats the *missingness itself* as a signal worth monitoring, not just an obstacle to clean away. Computing the KPI on resolved data while exposing the null rate as a parallel completeness metric keeps the number honest and makes the next occurrence of this exact pipeline lag visible and actionable — instead of silently corrupting the same KPI again next quarter."
+        },
+        "d4_recovery_diagnosis": {
+          "id": "d4_recovery_diagnosis",
+          "type": "scenario_choice",
+          "badge": "Recovery A",
+          "title": "Recovery · Reading a missingness pattern",
+          "prompt": "A column's null rate is 2% across most segments but jumps to 60% for one specific device_type value. What should you suspect first?",
+          "code_snippet": "df.groupby(\"device_type\")[\"session_duration\"].apply(lambda s: s.isna().mean())\n# desktop: 0.02\n# mobile:  0.03\n# legacy_tablet: 0.61",
+          "choices": [
+            {
+              "id": "a",
+              "label": "There's likely a structural or measurement reason specific to legacy_tablet — e.g. that device type's SDK doesn't report session_duration, or it's an older app version missing the tracking call",
+              "description": "Correct. A null rate that's dramatically elevated for one specific segment, while normal elsewhere, points to a structural cause tied to that segment (a missing instrumentation call, an unsupported SDK version, a different data path) — not random chance. The fix should investigate that segment's data path, not apply a generic statistical fill."
+            },
+            {
+              "id": "b",
+              "label": "This is just normal random variation in missingness across segments and can be ignored",
+              "description": "A 30x difference in null rate (2% vs 61%) between segments is not consistent with random variation — random missingness would produce roughly similar rates across segments with only sampling noise between them."
+            },
+            {
+              "id": "c",
+              "label": "The legacy_tablet rows should be dropped entirely since their data is mostly missing",
+              "description": "Dropping the segment removes a real population from the dataset and may bias any downstream analysis that should include legacy_tablet users — the better first move is to understand the cause, which might be cheaply fixable (e.g. an SDK update) or might justify a segment-specific imputation policy."
+            },
+            {
+              "id": "d",
+              "label": "Apply mean imputation using the overall column mean across all device types",
+              "description": "Using the overall mean would impute legacy_tablet's mostly-missing values using desktop/mobile's typical session behavior, which may not reflect how legacy_tablet sessions actually behave — masking a structural data gap with statistically unjustified values."
+            }
+          ],
+          "branches": {
+            "a": "d4_diagnosis_choice",
+            "b": "d4_recovery_diagnosis",
+            "c": "d4_recovery_diagnosis",
+            "d": "d4_recovery_diagnosis"
+          },
+          "rationale": "The shape of a missingness pattern across segments, time, or other columns is diagnostic. A uniform low rate everywhere suggests random/incidental missingness. A sharp spike isolated to one segment or one time window points to a structural cause — broken instrumentation, a pipeline lag, an unsupported code path — that should be investigated and fixed (or explicitly modeled) rather than statistically smoothed over."
+        },
+        "d4_recovery_policy": {
+          "id": "d4_recovery_policy",
+          "type": "scenario_choice",
+          "badge": "Recovery B",
+          "title": "Recovery · Comparing fill policies on a KPI",
+          "prompt": "You're testing three policies for a 'days_since_last_purchase' field with some nulls (likely meaning 'never purchased before'). Which evaluation approach correctly compares them?",
+          "code_snippet": "# Policy 1: fillna(0)\n# Policy 2: fillna(df[\"days_since_last_purchase\"].median())\n# Policy 3: fillna(9999) + add a boolean \"is_new_customer\" indicator column\n\ntarget_kpi = \"avg_days_since_last_purchase\"",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Apply each policy separately, recompute the target KPI under each, and compare the resulting values against what's most defensible given what null actually means here (likely 'never purchased,' which is closer to 'infinitely long ago' than to 0 or the median)",
+              "description": "Correct. Policy 1 (fillna 0) would assert these customers purchased *today*, which is the opposite of the truth and would crater the average. Policy 2 (median) hides new customers inside typical existing-customer behavior. Policy 3 (large sentinel + explicit indicator flag) preserves the true semantic ('never purchased') while keeping the column numeric and queryable — and the indicator flag lets any downstream consumer filter or weight new customers explicitly. Comparing the actual KPI output under each policy against the known semantics is what makes the choice defensible rather than arbitrary."
+            },
+            {
+              "id": "b",
+              "label": "Pick whichever policy produces the KPI value closest to last quarter's reported number",
+              "description": "Optimizing for a fill strategy that reproduces a prior number, rather than one that's semantically correct, risks deliberately encoding whatever bias existed in last quarter's calculation — it's optimizing for consistency with a possibly-wrong baseline, not correctness."
+            },
+            {
+              "id": "c",
+              "label": "Always use fillna(0) since it's the simplest and most common imputation default",
+              "description": "'Simple and common' isn't the same as 'correct for this column's semantics.' Here it actively inverts the meaning of the missing value (never purchased becomes purchased today), which is a worse error than doing nothing."
+            },
+            {
+              "id": "d",
+              "label": "Skip evaluation and pick the median fill since median is generally considered the safest default for numeric columns",
+              "description": "There's no single 'safest default' independent of what missingness means in context — for a column where null encodes a meaningfully different category (never purchased) rather than a noisy true gap, median fill actively erases that distinction."
+            }
+          ],
+          "branches": {
+            "a": "d4_policy_choice",
+            "b": "d4_recovery_policy",
+            "c": "d4_recovery_policy",
+            "d": "d4_recovery_policy"
+          },
+          "rationale": "Comparing fill policies means recomputing the actual downstream metric under each candidate and judging the result against what missingness *means* in that column — not picking based on simplicity, convention, or matching a prior number. A sentinel-plus-indicator approach is often superior to either extreme fill because it preserves the semantic distinction (never happened vs. happened a typical amount of time ago) while keeping the column usable in arithmetic."
+        },
+        "d4_terminal": {
+          "id": "d4_terminal",
+          "type": "scenario_choice",
+          "badge": "Complete",
+          "title": "Complete · Missing data discipline mastered",
+          "terminal": true,
+          "prompt": "A junior analyst asks you: 'Is there ever a case where it's fine to just fillna(0) without all this investigation?' What's the most accurate senior answer?",
+          "code_snippet": "# When (if ever) is fillna(0) actually fine without investigation?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Yes — when you've confirmed null genuinely means zero for that column's business meaning (e.g. a 'number of complaints' column where no row was ever written because nothing happened) — the investigation is still required, just usually faster for unambiguous cases",
+              "description": "This is the accurate nuance: fillna(0) isn't categorically wrong, it's wrong when applied without confirming that null actually represents the value zero rather than 'unknown,' 'not yet computed,' or 'inapplicable.' For genuinely sparse event-absence columns (e.g. a count that's null only because no event rows existed to aggregate), zero is the correct semantic fill — but that conclusion still required a one-step check of what null means, not a blanket default."
+            },
+            {
+              "id": "b",
+              "label": "No, never — every null must always go through a full multi-day investigation regardless of context",
+              "description": "This overstates the bar. Some columns have unambiguous, fast-to-confirm semantics (e.g. a derived count column that's null purely because the aggregation had nothing to sum) where the 'investigation' is a one-line sanity check, not a multi-day process. The point isn't bureaucracy, it's not skipping the check entirely."
+            },
+            {
+              "id": "c",
+              "label": "Yes, fillna(0) is always safe for numeric columns regardless of context",
+              "description": "This is exactly the assumption that caused the Stage 1 bug — a numeric column's null can mean many things other than zero, and assuming otherwise is what corrupted the discount KPI."
+            },
+            {
+              "id": "d",
+              "label": "It depends only on what percentage of the column is null, not on what null means",
+              "description": "Percentage of nulls affects how much a wrong choice will hurt, but it doesn't determine whether zero is the *correct* semantic value — a column that's 90% null but where null genuinely means zero is fine to fill, while a column that's 1% null but where null means 'unknown' is not safe to zero-fill."
+            }
+          ],
+          "branches": {
+            "a": "d4_terminal",
+            "b": "d4_terminal",
+            "c": "d4_terminal",
+            "d": "d4_terminal"
+          },
+          "rationale": "The lesson isn't 'never use fillna(0)' — it's 'never use any fill without first confirming what null means for that specific column in that specific business context.' Sometimes that confirmation is instant (a count column where absence of rows is the only way to get a null, and absence genuinely means zero occurrences). The discipline is the confirmation step itself, applied consistently, not a permanent ban on any particular fill value."
+        }
+      }
+    },},
   "py-d5": {
     durationLabel: MODULE_TIME_LABEL,
     outcomes: ["Profile first, then optimize bottlenecks with evidence.","Replace row-wise loops with vectorized/batched work when appropriate.","Balance runtime gains against memory/readability costs."],
@@ -900,7 +2633,227 @@ Implement a row-wise baseline transform, profile it, rewrite with vectorized/bat
       { question: "Why can a vectorized rewrite still be a poor production choice?", options: ["It may increase memory pressure or reduce maintainability despite CPU gains.","Vectorized code cannot be tested.","Vectorized code is numerically random."], correctIndex: 0, explanation: "Performance decisions are multi-objective, not CPU-only." },
       { question: "What interview response best demonstrates optimization maturity?", options: ["Present before/after metrics, explain mechanism, and discuss tradeoffs.","Claim a big speedup without method.","Say optimization is unnecessary if code runs."], correctIndex: 0, explanation: "Evidence plus tradeoff clarity is the strongest signal." },
     ],
-  },
+  
+    interviewGraph: {
+      "initialStageId": "d5_loop_click",
+      "artifactDimensions": [
+        {
+          "label": "Bottleneck Profiling",
+          "recoveryStageId": "d5_recovery_profiling"
+        },
+        {
+          "label": "Vectorization Trade-off Judgment",
+          "recoveryStageId": "d5_recovery_tradeoff",
+          "passLabel": "Performance Engineering Mastery"
+        }
+      ],
+      "stages": {
+        "d5_loop_click": {
+          "id": "d5_loop_click",
+          "type": "click_target",
+          "badge": "Stage 1",
+          "title": "Stage 1 · A nightly batch job that's about to miss its SLA",
+          "prompt": "A nightly job that tags 2 million transactions with a risk category now takes 40 minutes and is climbing each week as data grows. Click the line most directly responsible for the scaling problem.",
+          "code_snippet": "import pandas as pd\n\ntxns = load_transactions_df()          # 2,000,000 rows\nrisk_labels = []                       # ds-target:init_list\n\nfor _, row in txns.iterrows():         # ds-target:iterrows_loop\n    if row[\"amount\"] > 10000 and row[\"country\"] != row[\"home_country\"]:\n        risk_labels.append(\"high\")\n    elif row[\"amount\"] > 10000:\n        risk_labels.append(\"medium\")\n    else:\n        risk_labels.append(\"low\")\n\ntxns[\"risk\"] = risk_labels             # ds-target:assign_result",
+          "validationCopy": {
+            "init_list": "Initializing an empty list is cheap and not the bottleneck — the cost is in how that list gets filled. Click the loop.",
+            "iterrows_loop": "Correct. `.iterrows()` reconstructs a Python Series object for every single row, which is extremely expensive at 2M rows — it's one of the slowest common patterns in pandas precisely because it throws away vectorization and pays full Python-object overhead per row, per column access.",
+            "assign_result": "Assigning the finished list back to a column is cheap — the cost was already paid by the time we get here. Click the loop instead."
+          },
+          "branches": {
+            "init_list": "d5_recovery_profiling",
+            "iterrows_loop": "d5_vectorize_choice",
+            "assign_result": "d5_recovery_profiling"
+          }
+        },
+        "d5_vectorize_choice": {
+          "id": "d5_vectorize_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 2",
+          "title": "Stage 2 · Choosing the right vectorized rewrite",
+          "prompt": "Before rewriting, you profile the loop and confirm `.iterrows()` row reconstruction dominates the runtime (not I/O, not the comparison logic itself). Which rewrite correctly vectorizes this exact 3-branch conditional logic?",
+          "code_snippet": "import numpy as np\n\n# original conditional:\n# if amount > 10000 and country != home_country: \"high\"\n# elif amount > 10000: \"medium\"\n# else: \"low\"\n\n# candidate vectorized rewrite — fill in the blank\ntxns[\"risk\"] = np.select(\n    [_____________________________, txns[\"amount\"] > 10000],\n    [\"high\", \"medium\"],\n    default=\"low\",\n)",
+          "choices": [
+            {
+              "id": "a",
+              "label": "(txns[\"amount\"] > 10000) & (txns[\"country\"] != txns[\"home_country\"])",
+              "description": "This builds a boolean Series evaluating both conditions elementwise across the full 2M rows in native NumPy/pandas operations — `np.select` then checks this condition first (matching the original elif precedence: 'high' must be checked before the looser 'medium' condition), assigning 'high' where true, falling through to the 'amount > 10000' check for 'medium', and 'low' otherwise."
+            },
+            {
+              "id": "b",
+              "label": "(txns[\"amount\"] > 10000) and (txns[\"country\"] != txns[\"home_country\"])",
+              "description": "Python's `and`/`or` operators don't work elementwise on pandas Series — they expect a single boolean and will raise a ValueError ('truth value of a Series is ambiguous') the moment this runs against more than one row."
+            },
+            {
+              "id": "c",
+              "label": "txns[\"amount\"] > 10000 | txns[\"country\"] != txns[\"home_country\"]",
+              "description": "This is both an operator-precedence bug (missing parentheses mean `|` binds tighter than `>` and `!=` in this expression, evaluating incorrectly) and the wrong logical operator — the original condition requires AND (both amount AND country mismatch), not OR."
+            },
+            {
+              "id": "d",
+              "label": "txns.apply(lambda row: row[\"amount\"] > 10000 and row[\"country\"] != row[\"home_country\"], axis=1)",
+              "description": "`.apply(..., axis=1)` is row-wise and pays nearly the same per-row Python-object overhead as `.iterrows()` — it's a common 'looks vectorized but isn't' trap that won't meaningfully fix the scaling problem at 2M rows."
+            }
+          ],
+          "branches": {
+            "a": "d5_tradeoff_choice",
+            "b": "d5_recovery_tradeoff",
+            "c": "d5_recovery_tradeoff",
+            "d": "d5_recovery_tradeoff"
+          },
+          "rationale": "True vectorization means the condition-building and branch-selection happen via compiled, elementwise NumPy/pandas operations across the whole column at once — never a Python-level loop or per-row callback. `np.select` with elementwise boolean masks (correctly parenthesized, using `&`/`|` not `and`/`or`) replaces the entire if/elif/else chain in one pass, while `.apply(axis=1)` is a common disguise that still iterates in Python and barely improves on `.iterrows()`."
+        },
+        "d5_tradeoff_choice": {
+          "id": "d5_tradeoff_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 3",
+          "title": "Stage 3 · When the vectorized win isn't free",
+          "prompt": "The vectorized rewrite drops runtime from 40 minutes to 4 seconds — a huge win. But profiling now shows peak memory jumped from 1.2GB to 3.8GB on this box, which also runs two other jobs concurrently and is starting to swap. What's the principal-level response?",
+          "code_snippet": "# Before: row-wise loop, 1.2GB peak memory, 40 min runtime\n# After:  vectorized np.select, 3.8GB peak memory, 4 sec runtime\n# Box also runs 2 other concurrent jobs; total memory budget is tight",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Keep the vectorized logic but process in chunks (e.g. via pd.read_csv(chunksize=...) or manual row-range slicing), applying np.select per chunk and writing incrementally — trading a little speed for bounded memory",
+              "description": "This preserves nearly all of the vectorization win (each chunk is still vectorized internally) while capping peak memory to roughly chunk_size's footprint instead of the full 2M-row intermediate arrays. It directly targets the actual constraint (shared memory budget under concurrent jobs) rather than treating the original 40-minute runtime or the new 4-second runtime as the only thing that matters."
+            },
+            {
+              "id": "b",
+              "label": "Revert to the original row-wise loop, since 1.2GB memory is clearly safer than 3.8GB",
+              "description": "This throws away a 600x runtime improvement to solve a memory problem that has a much cheaper fix (chunking) — reverting entirely is a false trade-off between two extremes when an intermediate solution exists."
+            },
+            {
+              "id": "c",
+              "label": "Ignore the memory increase since the job now finishes in 4 seconds either way",
+              "description": "Runtime and memory are both real constraints — a job that finishes in 4 seconds but causes the box to swap and degrade the two other concurrent jobs has just traded one SLA violation for a different, possibly worse one."
+            },
+            {
+              "id": "d",
+              "label": "Move the entire job to a bigger machine with more RAM to absorb the 3.8GB peak",
+              "description": "This solves the symptom by spending more money rather than addressing the actual inefficiency (large unnecessary intermediate arrays from np.select's full-column boolean masks) — it's a valid emergency lever but not the first-choice engineering response when a memory-bounded rewrite is available at no infrastructure cost."
+            }
+          ],
+          "branches": {
+            "a": "d5_terminal",
+            "b": "d5_recovery_tradeoff",
+            "c": "d5_recovery_tradeoff",
+            "d": "d5_recovery_tradeoff"
+          },
+          "rationale": "Vectorization trades Python-loop overhead for materialized intermediate arrays — `np.select`'s boolean masks and candidate arrays all exist in memory simultaneously across the full row count. When memory is the binding constraint (shared infrastructure, concurrent jobs), chunked vectorization captures most of the speed win while bounding peak memory to a tunable chunk size — this is the 'profile, optimize the dominant cost, re-measure, document the tradeoff' loop applied a second time, now against memory instead of runtime."
+        },
+        "d5_recovery_profiling": {
+          "id": "d5_recovery_profiling",
+          "type": "scenario_choice",
+          "badge": "Recovery A",
+          "title": "Recovery · Profile before you optimize",
+          "prompt": "A teammate wants to immediately rewrite a slow pandas pipeline using vectorized operations, without profiling first. What's the risk?",
+          "code_snippet": "# Pipeline stages:\n# 1. read_csv (2M rows)       <- maybe slow?\n# 2. row-wise tagging loop     <- maybe slow?\n# 3. write to database         <- maybe slow?\n# Total runtime: 40 minutes. Where is the time actually going?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Without profiling, you might vectorize a stage that isn't actually the bottleneck (e.g. the loop), while the real cost is somewhere else (e.g. an unbatched database write) — burning effort for no measured improvement",
+              "description": "Correct. 'Vectorize don't loop' is a useful default, but it's not a substitute for measurement. If the database write is actually the dominant cost (say, one row at a time over the network), rewriting the in-memory loop with `np.select` might shave seconds off a 40-minute job and leave the real bottleneck untouched — costing engineering time with no measured business benefit."
+            },
+            {
+              "id": "b",
+              "label": "There's no risk — vectorizing is always a strict improvement over loops regardless of where time is spent",
+              "description": "Vectorizing a non-bottleneck stage doesn't meaningfully improve total runtime even though the rewritten stage itself got faster — the overall job is still gated by whichever stage actually dominates."
+            },
+            {
+              "id": "c",
+              "label": "The only risk is wasted typing effort, since vectorized code is always shorter",
+              "description": "The real risk is wasted engineering time chasing a stage that isn't the bottleneck, plus potentially introducing new bugs in code that didn't need to change — not just keystrokes."
+            },
+            {
+              "id": "d",
+              "label": "Profiling is unnecessary if the loop is the most visually obvious 'slow-looking' code",
+              "description": "Visual intuition about which code 'looks slow' is frequently wrong — I/O, network calls, and per-row database writes can dominate wall-clock time far more than an in-memory Python loop, especially at scales where the loop body itself is cheap."
+            }
+          ],
+          "branches": {
+            "a": "d5_vectorize_choice",
+            "b": "d5_recovery_profiling",
+            "c": "d5_recovery_profiling",
+            "d": "d5_recovery_profiling"
+          },
+          "rationale": "Profiling exists to separate the stage that actually dominates wall-clock time from stages that merely look inefficient. Optimizing without measurement risks investing effort in a rewrite that doesn't move the total runtime at all, because the true bottleneck — often I/O, network calls, or unbatched writes — was never touched. 'Profile, lock correctness, optimize the dominant cost, re-measure' is the sequence; vectorization is a tool applied after profiling identifies where it will actually help."
+        },
+        "d5_recovery_tradeoff": {
+          "id": "d5_recovery_tradeoff",
+          "type": "scenario_choice",
+          "badge": "Recovery B",
+          "title": "Recovery · When NOT to vectorize",
+          "prompt": "Which of these scenarios is the strongest case for keeping a plain Python loop instead of forcing a vectorized rewrite?",
+          "code_snippet": "# Scenario: a stateful simulation where each step's outcome depends on\n# an accumulating balance from all previous steps, with early-exit logic\n# if the balance drops below zero (stop simulating further steps for that account).\nfor account in accounts:\n    balance = account.start_balance\n    for txn in account.transactions:\n        balance += txn.amount\n        if balance < 0:\n            break   # early exit — stop processing this account",
+          "choices": [
+            {
+              "id": "a",
+              "label": "This one — the logic is inherently sequential (each step depends on the running balance) and has an early-exit, both of which resist clean vectorization without major rewrites that hurt readability for a real maintenance cost",
+              "description": "Correct. Path-dependent state (each transaction's effect depends on the cumulative result of all prior transactions) and early-exit control flow are exactly the patterns called out as bad vectorization candidates — forcing this into a vectorized form usually means cumulative-sum tricks with manual masking to fake the early exit, producing code that's harder to verify correct than the loop it replaced."
+            },
+            {
+              "id": "b",
+              "label": "A row-wise loop computing the same simple arithmetic transform independently on every row of a 2M-row DataFrame",
+              "description": "This is the canonical *good* vectorization candidate — independent, stateless, identical operations per row are exactly what NumPy/pandas vectorized operations are built to accelerate with no readability cost."
+            },
+            {
+              "id": "c",
+              "label": "A one-time exploratory script processing 200 rows in a Jupyter notebook",
+              "description": "Small N with a one-off context is also a reasonable case to skip vectorization, but the question asks for the *strongest* case — stateful, path-dependent, early-exit logic is a structural reason vectorization is hard, not just a 'not worth the effort at this size' reason."
+            },
+            {
+              "id": "d",
+              "label": "A loop that calls an expensive pure function on the same repeated input values many times",
+              "description": "This scenario's bottleneck is redundant computation, which is best solved by memoization (`functools.lru_cache`) rather than vectorization or keeping the loop as-is — it's a different category of fix entirely."
+            }
+          ],
+          "branches": {
+            "a": "d5_tradeoff_choice",
+            "b": "d5_recovery_tradeoff",
+            "c": "d5_recovery_tradeoff",
+            "d": "d5_recovery_tradeoff"
+          },
+          "rationale": "Vectorization assumes independent, stateless, uniform operations across rows. Path-dependent logic (each step's result depends on an accumulating value from prior steps) and early-exit control flow both violate that assumption structurally — forcing them into vectorized form typically requires fragile cumulative-operation tricks with manual masking to simulate the early exit, which is harder to read, harder to verify, and easier to get subtly wrong than the loop it was meant to replace."
+        },
+        "d5_terminal": {
+          "id": "d5_terminal",
+          "type": "scenario_choice",
+          "badge": "Complete",
+          "title": "Complete · Performance engineering judgment mastered",
+          "terminal": true,
+          "prompt": "A staff engineer asks you to summarize your optimization methodology for a postmortem doc, in one sentence that would generalize to any future performance incident, not just this one. What do you write?",
+          "code_snippet": "# Postmortem: \"Optimization methodology\" — one generalizable sentence",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Profile to find the true bottleneck before changing anything, fix only that bottleneck with the least invasive correct technique (vectorize, chunk, cache, or batch I/O as appropriate), and re-measure both runtime and memory against the actual operating constraints before calling it done",
+              "description": "This generalizes because it names the full loop — measure, target the real cost, choose the technique that fits the *specific* constraint (not just 'vectorize everything'), and verify against all the constraints that matter (not just the one that was visibly broken) — rather than hard-coding 'vectorize loops' as a universal rule."
+            },
+            {
+              "id": "b",
+              "label": "Always replace loops with vectorized pandas/NumPy operations, since that's the standard performance fix",
+              "description": "This was demonstrated to be incomplete twice in this exact scenario: vectorizing without profiling first risks optimizing the wrong stage, and vectorizing without considering memory risks trading a runtime SLA violation for a memory one."
+            },
+            {
+              "id": "c",
+              "label": "Performance problems are solved by throwing more hardware at them",
+              "description": "More hardware was one valid lever considered in Stage 3 but explicitly not the first-choice answer — it treats a fixable inefficiency (oversized intermediates) as an unavoidable cost, which doesn't generalize as a methodology."
+            },
+            {
+              "id": "d",
+              "label": "Trust intuition about which code looks slow, since experienced engineers can usually tell",
+              "description": "This is the exact assumption the recovery stage warned against — intuition about 'slow-looking' code repeatedly misses real bottlenecks like I/O or unbatched writes, which is precisely why profiling is the first step rather than expert guessing."
+            }
+          ],
+          "branches": {
+            "a": "d5_terminal",
+            "b": "d5_terminal",
+            "c": "d5_terminal",
+            "d": "d5_terminal"
+          },
+          "rationale": "The methodology that generalizes is the loop itself — profile, target the real cost with the technique suited to the actual constraint (which might be runtime, memory, readability, or all three), and re-measure against every constraint that matters, not just the one that originally complained. 'Vectorize don't loop' is a useful heuristic inside that loop, not a replacement for it — as this scenario demonstrated when the first vectorized fix solved runtime but introduced a new memory constraint that needed its own measured fix."
+        }
+      }
+    },},
 
   "sql-capstone-01": {
   durationLabel: "45 min",
@@ -1460,7 +3413,242 @@ If you can explain these tradeoffs clearly, you’ll outperform most candidates.
         explanation: "Normalize early. Avoid repeated ad-hoc conversions that drift and break in weird places.",
       },
     ],
-  },
+  
+    interviewGraph: {
+      "initialStageId": "b1_typehint_click",
+      "artifactDimensions": [
+        {
+          "label": "Name/Object Binding Model",
+          "recoveryStageId": "b1_recovery_binding"
+        },
+        {
+          "label": "Identity vs Equality",
+          "recoveryStageId": "b1_recovery_identity"
+        },
+        {
+          "label": "Boundary Typing Discipline",
+          "recoveryStageId": "b1_recovery_boundary",
+          "passLabel": "Binding Model Mastery"
+        }
+      ],
+      "stages": {
+        "b1_typehint_click": {
+          "id": "b1_typehint_click",
+          "type": "click_target",
+          "badge": "Stage 1",
+          "title": "Stage 1 · The mutable default argument trap",
+          "prompt": "A teammate's ingestion helper accumulates rows across unrelated calls in production, even though each call passes fresh data. Click the line that creates the shared, accidentally-reused object.",
+          "code_snippet": "def normalize_batch(rows, errors=[]):\n    cleaned = []\n    for row in rows:\n        if not row.get(\"user_id\"):\n            errors.append(row)          # ds-target:append_call\n            continue\n        cleaned.append(row)\n    return cleaned, errors\n\ndef load_batch(rows, to=[]):\n    to.extend(rows)                     # ds-target:extend_call\n    return to\n\ndef make_helper(rows, errors=[]):       # ds-target:default_arg\n    return normalize_batch(rows, errors)",
+          "validationCopy": {
+            "append_call": "Close, but appending to a list isn't the bug by itself — appending is normal list behavior. The real defect is which object 'errors' is bound to across calls. Click the default-argument definition line.",
+            "extend_call": "Same trap, different function — extending a list in place is normal. The actual root cause is upstream of this line: the default object was created once and is shared.",
+            "default_arg": "Correct. `errors=[]` is evaluated exactly once, at function-definition time, and that single list object is bound as the default for every call that omits the argument. Each 'fresh' call silently reuses and mutates the same object — a classic name-vs-object bug, not a list bug."
+          },
+          "branches": {
+            "append_call": "b1_recovery_binding",
+            "extend_call": "b1_recovery_binding",
+            "default_arg": "b1_alias_choice"
+          }
+        },
+        "b1_alias_choice": {
+          "id": "b1_alias_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 2",
+          "title": "Stage 2 · Aliasing in a nested config",
+          "prompt": "A config loader does `base_cfg = load_defaults()` and then, for each environment, does `env_cfg = base_cfg; env_cfg['region'] = env_name`. After processing three environments, every environment's config shows the same (last) region. What is happening?",
+          "code_snippet": "base_cfg = load_defaults()   # {\"region\": None, \"retries\": 3}\n\nconfigs = {}\nfor env_name in [\"dev\", \"staging\", \"prod\"]:\n    env_cfg = base_cfg\n    env_cfg[\"region\"] = env_name\n    configs[env_name] = env_cfg\n\nprint(configs[\"dev\"][\"region\"])  # prints \"prod\", not \"dev\"",
+          "choices": [
+            {
+              "id": "a",
+              "label": "env_cfg = base_cfg creates an alias, not a copy",
+              "description": "Assignment binds a second name to the same dict object. Mutating env_cfg['region'] mutates the one underlying object that every loop iteration — and every stored config — points to."
+            },
+            {
+              "id": "b",
+              "label": "Dictionaries are immutable, so this is a Python bug",
+              "description": "Dictionaries are mutable. If they were immutable, this exact bug would be impossible because 'region' could never be reassigned in place."
+            },
+            {
+              "id": "c",
+              "label": "The for loop variable env_name is leaking into the dict",
+              "description": "env_name is just a string used as a key and a value; it has no special scoping interaction with env_cfg's identity."
+            },
+            {
+              "id": "d",
+              "label": "configs[env_name] = env_cfg performs a deep copy automatically",
+              "description": "Dict assignment never copies values implicitly in Python. Storing env_cfg under a new key stores a reference to the same object, not a snapshot."
+            }
+          ],
+          "branches": {
+            "a": "b1_is_vs_eq_choice",
+            "b": "b1_recovery_binding",
+            "c": "b1_recovery_binding",
+            "d": "b1_recovery_binding"
+          },
+          "rationale": "Python variables are names bound to objects, not boxes holding copies. `env_cfg = base_cfg` makes two names point at one dict. Every '.region' write mutates that single shared object, so by the end of the loop, all three stored references show the last value written. The fix is `env_cfg = dict(base_cfg)` (or `copy.deepcopy` for nested structures) to create an independent object per iteration."
+        },
+        "b1_is_vs_eq_choice": {
+          "id": "b1_is_vs_eq_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 3",
+          "title": "Stage 3 · Boundary validation under interview pressure",
+          "prompt": "Your service reads `max_retries` from an environment variable and a `user_id` from a JSON payload. A teammate proposes checking `if user_id:` to validate presence, and `if config.get('max_retries') is 3:` to check a default. What is the strongest critique of this code?",
+          "code_snippet": "import os\n\nmax_retries = os.environ.get(\"MAX_RETRIES\")   # str, e.g. \"3\", or None\npayload = parse_json(request_body)\nuser_id = payload.get(\"user_id\")               # could legitimately be 0\n\nif user_id:                                      # truthiness check\n    process(user_id)\n\nif config.get(\"max_retries\") is 3:                # identity check on an int\n    apply_default_policy()",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Both checks confuse value semantics with the wrong tool: truthiness breaks on valid falsy values, and `is` checks identity, not value, on a number",
+              "description": "`if user_id:` treats 0 as 'missing' even though 0 is a valid user_id. `is 3` relies on CPython's small-int caching, which is an implementation detail, not a language guarantee — `==` is the correct tool for value comparison."
+            },
+            {
+              "id": "b",
+              "label": "Nothing is wrong; `is` is just a faster version of `==` for integers",
+              "description": "`is` checks object identity. CPython happens to cache small integers so `is` can appear to 'work', but this is undefined behavior across implementations and Python versions — it is not an optimization of `==`."
+            },
+            {
+              "id": "c",
+              "label": "The bug is that os.environ.get returns None instead of raising an error",
+              "description": ".get returning None on a missing key is intended, documented behavior — that's not the defect here. The defect is how the retrieved values are subsequently validated."
+            },
+            {
+              "id": "d",
+              "label": "The bug is that JSON payloads can't contain integer user_ids",
+              "description": "JSON freely supports integer values, and Python's json module deserializes them as int. That is not the issue in this snippet."
+            }
+          ],
+          "branches": {
+            "a": "b1_terminal",
+            "b": "b1_recovery_identity",
+            "c": "b1_recovery_boundary",
+            "d": "b1_recovery_boundary"
+          },
+          "rationale": "Senior boundary code distinguishes 'missing' (`k not in d` or `d.get(k) is None`) from 'falsy-but-present' (0, \"\", False). It also never uses `is` for value comparisons on ints/strings, because CPython's interning of small ints and short strings is an implementation detail you should not depend on. Parse and validate untrusted input once at the boundary, then use `==`/`is None` correctly downstream."
+        },
+        "b1_recovery_binding": {
+          "id": "b1_recovery_binding",
+          "type": "scenario_choice",
+          "badge": "Recovery A",
+          "title": "Recovery · Naming the binding model",
+          "prompt": "What is the most accurate one-sentence description of what `x = [1, 2]` does in Python?",
+          "code_snippet": "x = [1, 2]\ny = x\ny.append(3)\nprint(x)   # what prints, and why?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "It binds the name x to a list object; x is a reference, not a container holding the list directly",
+              "description": "Correct framing. `y = x` binds a second name to the same object — there is one list, two names. y.append(3) mutates that one object, so x sees [1, 2, 3] too."
+            },
+            {
+              "id": "b",
+              "label": "It copies the values 1 and 2 into a memory slot called x",
+              "description": "This 'variable as a box' model is the misconception that causes aliasing bugs to look mysterious. Python has no such box — only names bound to objects."
+            },
+            {
+              "id": "c",
+              "label": "It creates a new list every time the list is read",
+              "description": "Reading a name does not create new objects. A new list object is created only when a list literal, comprehension, or constructor call executes."
+            },
+            {
+              "id": "d",
+              "label": "It is identical to declaring a typed array in a statically typed language",
+              "description": "Python names carry no fixed type; the same name can be rebound to a value of any type. This is meaningfully different from a statically typed declared variable."
+            }
+          ],
+          "branches": {
+            "a": "b1_alias_choice",
+            "b": "b1_recovery_binding",
+            "c": "b1_recovery_binding",
+            "d": "b1_recovery_binding"
+          },
+          "rationale": "Names are labels bound to objects, not containers. `y = x` never copies; it adds a second label to the same object. Aliasing bugs disappear once you can mentally draw this binding graph before running any code."
+        },
+        "b1_recovery_identity": {
+          "id": "b1_recovery_identity",
+          "type": "scenario_choice",
+          "badge": "Recovery B",
+          "title": "Recovery · is vs ==",
+          "prompt": "Two lists, `a = [1, 2]` and `b = [1, 2]`, are built separately. What do `a == b` and `a is b` evaluate to, and why?",
+          "code_snippet": "a = [1, 2]\nb = [1, 2]\nprint(a == b)   # ?\nprint(a is b)   # ?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "a == b is True (same contents); a is b is False (two distinct objects)",
+              "description": "== calls __eq__ and compares contents/value. is compares object identity (same id()). Two separately constructed lists with equal contents are equal in value but are different objects in memory."
+            },
+            {
+              "id": "b",
+              "label": "Both are True, because Python caches identical lists",
+              "description": "Python does not intern or cache mutable list literals. Each `[1, 2]` literal allocates a new list object."
+            },
+            {
+              "id": "c",
+              "label": "Both are False, because lists can never be compared",
+              "description": "Lists support element-wise equality comparison via __eq__; `a == b` works fine and returns True here."
+            },
+            {
+              "id": "d",
+              "label": "a == b raises a TypeError because lists are unhashable",
+              "description": "Hashability is irrelevant to == comparisons; only operations like using a list as a dict key require hashability."
+            }
+          ],
+          "branches": {
+            "a": "b1_is_vs_eq_choice",
+            "b": "b1_recovery_identity",
+            "c": "b1_recovery_identity",
+            "d": "b1_recovery_identity"
+          },
+          "rationale": "`==` answers 'do these have the same value?' via `__eq__`. `is` answers 'are these literally the same object?' via identity (`id()`). The only idiomatic default use of `is` is `x is None`, because None is a true singleton — comparing other values with `is` (especially ints and strings) risks relying on CPython implementation details like small-int caching."
+        },
+        "b1_recovery_boundary": {
+          "id": "b1_recovery_boundary",
+          "type": "scenario_choice",
+          "badge": "Recovery C",
+          "title": "Recovery · Parse early, validate once",
+          "prompt": "An API handler reads a `limit` query parameter, which always arrives as a string (or is absent). Downstream code needs an int and treats absence/invalid input as an error. What's the senior pattern?",
+          "code_snippet": "# raw input: request.args.get(\"limit\") -> \"20\" | None | \"abc\"\n\ndef get_limit(raw_limit):\n    ???",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Convert and validate once at the boundary, then pass a clean typed value (or raise) into the rest of the system",
+              "description": "`raw_limit = request.args.get('limit'); if raw_limit is None: raise MissingParam(...); limit = int(raw_limit)` (catching ValueError) converts untrusted input into a trustworthy int exactly once. Everything downstream can assume a valid int."
+            },
+            {
+              "id": "b",
+              "label": "Leave it as a string everywhere and call int() at each usage site",
+              "description": "Scattering conversions means every call site can drift, forget to handle invalid input differently, or silently behave differently. One boundary conversion is the senior pattern."
+            },
+            {
+              "id": "c",
+              "label": "Add a type hint of `limit: int` to the function signature and rely on Python to coerce it",
+              "description": "Type hints are not enforced at runtime. Annotating a parameter as int does not convert or validate a string passed in — it only helps tooling and reviewers."
+            },
+            {
+              "id": "d",
+              "label": "Use `if limit:` to check whether it was provided",
+              "description": "Truthiness conflates 'absent' with 'falsy-but-valid' (e.g., a limit of 0, or the string '0' which is truthy but means a meaningful limit). Use explicit None/absence checks."
+            }
+          ],
+          "branches": {
+            "a": "b1_terminal",
+            "b": "b1_recovery_boundary",
+            "c": "b1_recovery_boundary",
+            "d": "b1_recovery_boundary"
+          },
+          "rationale": "Type hints are documentation and tooling leverage — they never coerce or enforce types at runtime. The senior pattern parses and validates untrusted input (env vars, JSON, query params) exactly once at the system boundary, producing a clean internal value, so core logic never has to re-check 'is this actually an int?' five call sites deep."
+        },
+        "b1_terminal": {
+          "id": "b1_terminal",
+          "type": "scenario_choice",
+          "badge": "Terminal",
+          "title": "Interview complete · Binding model locked in",
+          "prompt": "You diagnosed the mutable-default-argument trap, explained aliasing in nested config objects, and defended boundary validation over truthiness/identity shortcuts.",
+          "code_snippet": "# Mental model:\n# names bind to objects; assignment never copies;\n# mutation changes the object, rebinding changes what the name points to;\n# is checks identity, == checks value; parse/validate once at boundaries.",
+          "choices": [],
+          "branches": {},
+          "terminal": true,
+          "rationale": "The senior answer ties every bug back to one model: Python variables are names bound to objects. Aliasing, mutable defaults, and is/== confusion are all the same root cause viewed from different angles — and boundary validation is how you keep that model from leaking untrusted, ambiguous data into the rest of the system."
+        }
+      }
+    },},
 
   "py-b2": {
     durationLabel: MODULE_TIME_LABEL,
@@ -1755,7 +3943,240 @@ If you can narrate all five of these, you are ahead of most Python screens.`,
         explanation: "f-strings bake values into the SQL source string. Parameterized queries keep the value in a separate slot the driver escapes and the DB treats as data, not code.",
       },
     ],
-  },
+  
+    interviewGraph: {
+      "initialStageId": "b2_logging_click",
+      "artifactDimensions": [
+        {
+          "label": "Format Mini-Language Precision",
+          "recoveryStageId": "b2_recovery_format"
+        },
+        {
+          "label": "Safe Interpolation Boundaries",
+          "recoveryStageId": "b2_recovery_safety"
+        },
+        {
+          "label": "String Method Pipeline Fluency",
+          "recoveryStageId": "b2_recovery_methods",
+          "passLabel": "String Mastery"
+        }
+      ],
+      "stages": {
+        "b2_logging_click": {
+          "id": "b2_logging_click",
+          "type": "click_target",
+          "badge": "Stage 1",
+          "title": "Stage 1 · The eager-formatting logging bug",
+          "prompt": "A high-throughput service logs at DEBUG level but runs in production at INFO level, yet CPU profiling shows significant time spent building debug strings that are never emitted. Click the line responsible for this waste.",
+          "code_snippet": "import logging\nlogger = logging.getLogger(\"ingest\")\nlogger.setLevel(logging.INFO)\n\ndef process_batch(batch_id, rows):\n    logger.debug(f\"processing batch {batch_id} with {len(rows)} rows\")  # ds-target:eager_fstring\n    cleaned = [r for r in rows if r.get(\"user_id\")]\n    logger.info(\"cleaned batch %s: %d -> %d rows\", batch_id, len(rows), len(cleaned))  # ds-target:lazy_percent\n    return cleaned",
+          "validationCopy": {
+            "eager_fstring": "Correct. The f-string is evaluated immediately when the line executes, regardless of whether DEBUG is enabled. Every call pays the full cost of building the string — including the len(rows) call and string interpolation — only to discard it when the logger filters DEBUG out.",
+            "lazy_percent": "This line is actually the fix, not the bug — the %-style call defers interpolation to the logging framework, which only formats the message if the record will actually be emitted."
+          },
+          "branches": {
+            "eager_fstring": "b2_format_choice",
+            "lazy_percent": "b2_recovery_safety"
+          }
+        },
+        "b2_format_choice": {
+          "id": "b2_format_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 2",
+          "title": "Stage 2 · Reading the format mini-language",
+          "prompt": "A dashboard export needs revenue right-aligned in a 12-character field, always showing a sign, with thousands separators and 2 decimal places. Which f-string spec is correct for `revenue = -1234.5`?",
+          "code_snippet": "revenue = -1234.5\n# target output should look like: \"   -1,234.50\"  (12 chars wide)\nprint(f\"{revenue:???}\")",
+          "choices": [
+            {
+              "id": "a",
+              "label": "{revenue:+12,.2f}",
+              "description": "sign(+) shows +/- always, width(12) sets the minimum field width, comma adds thousands separators, .2 gives two decimal digits, f is fixed-point — read left to right this matches the spec grammar exactly."
+            },
+            {
+              "id": "b",
+              "label": "{revenue:12,+.2f}",
+              "description": "The format mini-language has a fixed token order: [[fill]align][sign][#][0][width][,][.precision][type]. Sign must come before width, not after — most engines will raise a ValueError on this ordering."
+            },
+            {
+              "id": "c",
+              "label": "{revenue:.2,12+f}",
+              "description": "Precision before width before sign reverses the required grammar order entirely; this will fail to parse as a valid format spec."
+            },
+            {
+              "id": "d",
+              "label": "{revenue:>12.2f}",
+              "description": "This sets width and alignment and precision correctly but omits the sign flag — negative numbers would show '-' but positive numbers would show no sign, and there is no thousands separator, so '1234.50' would not get a comma."
+            }
+          ],
+          "branches": {
+            "a": "b2_injection_choice",
+            "b": "b2_recovery_format",
+            "c": "b2_recovery_format",
+            "d": "b2_recovery_format"
+          },
+          "rationale": "The mini-language grammar is strictly ordered: `[[fill]align][sign][#][0][width][,_][.precision][type]`. Reading left to right for `+12,.2f`: always show sign, minimum width 12, comma-grouped thousands, 2 decimal digits, fixed-point. Memorizing the *order*, not just the symbols, is what lets you compose specs under interview pressure without trial and error."
+        },
+        "b2_injection_choice": {
+          "id": "b2_injection_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 3",
+          "title": "Stage 3 · Defending against f-string misuse at trust boundaries",
+          "prompt": "A code reviewer flags this line in a PR. A junior engineer argues f-strings are 'more readable' than parameterized queries and asks why it matters. What is the strongest senior response?",
+          "code_snippet": "def get_user_orders(user_id):\n    query = f\"SELECT * FROM orders WHERE user_id = {user_id}\"\n    return db.execute(query)",
+          "choices": [
+            {
+              "id": "a",
+              "label": "f-strings bake the value directly into the SQL source text, so a crafted user_id can change the query's logic; parameterized queries keep the value in a separate slot the driver treats strictly as data",
+              "description": "If user_id ever originates from user input (even indirectly), an attacker can inject `1; DROP TABLE orders;`-style payloads. Parameterization (`db.execute('... WHERE user_id = %s', (user_id,))`) guarantees the value can never be interpreted as SQL syntax, regardless of readability preferences."
+            },
+            {
+              "id": "b",
+              "label": "f-strings are slower than %-formatting, so performance is the main concern",
+              "description": "Performance is a minor, usually irrelevant factor here. The decisive issue is security: f-strings interpolate values directly into code/query text with no escaping."
+            },
+            {
+              "id": "c",
+              "label": "There's no real difference — both approaches produce the same final SQL string",
+              "description": "They do not behave the same way under adversarial input. f-strings produce a single string the database parses as code; parameterized queries send the value out-of-band from the query structure, so it can never alter query syntax."
+            },
+            {
+              "id": "d",
+              "label": "The fix is to use .format() instead of an f-string",
+              "description": ".format() has the exact same vulnerability as f-strings — both interpolate values into the SQL text itself. The fix is parameterization, not switching string-formatting syntax."
+            }
+          ],
+          "branches": {
+            "a": "b2_terminal",
+            "b": "b2_recovery_safety",
+            "c": "b2_recovery_safety",
+            "d": "b2_recovery_safety"
+          },
+          "rationale": "f-strings, %, and .format() are all just ways of producing a string — none of them are safe for SQL, shell commands, or any other context where the resulting text is later parsed as code. The senior instinct is to recognize 'this string becomes code somewhere downstream' and reach for the API that keeps untrusted data structurally separate from the command (parameterized queries, subprocess argv lists, etc.), regardless of which formatting syntax produced the surrounding text."
+        },
+        "b2_recovery_format": {
+          "id": "b2_recovery_format",
+          "type": "scenario_choice",
+          "badge": "Recovery A",
+          "title": "Recovery · Width vs precision",
+          "prompt": "`name = 'ada lovelace'`. What does `f\"{name:<20.10}\"` produce?",
+          "code_snippet": "name = \"ada lovelace\"\nprint(f\"{name:<20.10}\")",
+          "choices": [
+            {
+              "id": "a",
+              "label": "'ada lovela' left-aligned and padded with spaces to a 20-character field",
+              "description": "Precision on a string means 'truncate to N characters' — here, 10. Width then pads the (now-truncated) result out to a minimum total field width of 20, left-aligned because of <."
+            },
+            {
+              "id": "b",
+              "label": "The full string 'ada lovelace' padded to 20 characters",
+              "description": "Precision (.10) truncates strings; it is not ignored just because width is also present. The string is cut to 10 characters before padding."
+            },
+            {
+              "id": "c",
+              "label": "A ValueError, because precision can't be used on strings",
+              "description": "Precision is valid and meaningful on strings — it means 'maximum characters to show', unlike on floats where it means decimal digits. No error is raised."
+            },
+            {
+              "id": "d",
+              "label": "'ada lovelace' right-aligned in 20 characters",
+              "description": "The `<` flag explicitly requests left alignment, and precision still applies, truncating to 10 characters first."
+            }
+          ],
+          "branches": {
+            "a": "b2_format_choice",
+            "b": "b2_recovery_format",
+            "c": "b2_recovery_format",
+            "d": "b2_recovery_format"
+          },
+          "rationale": "The format mini-language is context-sensitive: on numeric types `.N` means N decimal digits, but on strings `.N` means 'truncate to N characters'. Width and precision do different jobs and both apply independently — width never truncates, only precision does."
+        },
+        "b2_recovery_safety": {
+          "id": "b2_recovery_safety",
+          "type": "scenario_choice",
+          "badge": "Recovery B",
+          "title": "Recovery · Lazy logging",
+          "prompt": "Which logging call avoids doing any string-formatting work when the configured log level filters the message out entirely?",
+          "code_snippet": "user_id, action = 42, \"checkout\"\n\n# Option A\nlogger.debug(f\"user {user_id} did {action}\")\n\n# Option B\nlogger.debug(\"user %s did %s\", user_id, action)",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Option B — the %-style call passes raw arguments; the logging framework only interpolates them if the record will actually be emitted",
+              "description": "logging.Logger.debug(msg, *args) defers % formatting until (and unless) the handler decides to emit the record. If DEBUG is filtered out, the interpolation never happens — Option A's f-string has already done all the work by the time debug() is even called."
+            },
+            {
+              "id": "b",
+              "label": "Option A — f-strings are evaluated lazily by the interpreter",
+              "description": "f-strings are evaluated eagerly, at the point the literal executes — there is no deferred or lazy evaluation built into f-string syntax."
+            },
+            {
+              "id": "c",
+              "label": "Both are equally lazy because logger.debug always checks the level first",
+              "description": "The level check happens inside debug(), but by then Option A's f-string argument has already been fully constructed before the call — the eager work is in building the argument, not in the call itself."
+            },
+            {
+              "id": "d",
+              "label": "Neither — only logger.isEnabledFor() can prevent formatting work",
+              "description": "Wrapping every call in an explicit isEnabledFor() check works but is exactly what the %-style lazy-argument convention already gives you for free, without cluttering call sites."
+            }
+          ],
+          "branches": {
+            "a": "b2_injection_choice",
+            "b": "b2_recovery_safety",
+            "c": "b2_recovery_safety",
+            "d": "b2_recovery_safety"
+          },
+          "rationale": "f-strings are eagerly evaluated Python syntax — by the time `logger.debug(f\"...\")` is called, the string already exists in memory. The %-style `logger.debug(\"...%s...\", arg)` signature instead passes the template and raw args separately, letting the logging module skip interpolation work entirely for filtered-out levels. This is the same reason structured-logging collectors prefer the %-style call: the raw arguments survive as separate fields instead of being pre-flattened into text."
+        },
+        "b2_recovery_methods": {
+          "id": "b2_recovery_methods",
+          "type": "scenario_choice",
+          "badge": "Recovery C",
+          "title": "Recovery · Choosing the right string method",
+          "prompt": "You need to strip a known literal suffix `.csv` from filenames, case-insensitively compare usernames from different locales, and concatenate 100,000 log lines efficiently. Which set of choices is correct?",
+          "code_snippet": "filename = \"report_final.csv\"\nname_a, name_b = \"Straße\", \"STRASSE\"\nlines = load_100k_lines()",
+          "choices": [
+            {
+              "id": "a",
+              "label": "removesuffix('.csv') for the filename, casefold() for comparison, ''.join(lines) for concatenation",
+              "description": "removesuffix removes an exact trailing literal (unlike rstrip, which treats its argument as a character set). casefold() is the Unicode-aware aggressive lowercasing designed for case-insensitive comparisons (handling ß -> ss). join allocates once for O(n) concatenation instead of O(n^2) repeated +=."
+            },
+            {
+              "id": "b",
+              "label": "rstrip('.csv') for the filename, lower() for comparison, += in a loop for concatenation",
+              "description": "rstrip treats '.csv' as a set of characters to strip from the end, which can over-strip (e.g. a name ending in 's' or 'c'). lower() misses locale-specific cases like German ß. += in a loop reallocates a new string each iteration — O(n^2) on 100k lines."
+            },
+            {
+              "id": "c",
+              "label": "split('.csv') for the filename, upper() for comparison, str.format() in a loop for concatenation",
+              "description": "split('.csv') returns a list, not the stripped string, and is the wrong tool entirely. upper() has the same locale blind spots as lower(). Looping str.format() calls still rebuilds strings repeatedly rather than batching with join."
+            },
+            {
+              "id": "d",
+              "label": "replace('.csv', '') for the filename, casefold() for comparison, ''.join(lines) for concatenation",
+              "description": "replace('.csv', '') would also remove '.csv' if it appeared in the middle of the filename, not just the suffix — removesuffix is the precise tool for 'strip from the end only, exact match'. The other two choices here are correct."
+            }
+          ],
+          "branches": {
+            "a": "b2_terminal",
+            "b": "b2_recovery_methods",
+            "c": "b2_recovery_methods",
+            "d": "b2_recovery_methods"
+          },
+          "rationale": "Senior string handling means picking the precise tool: removesuffix/removeprefix for exact literal trims (not rstrip/lstrip, which are charset-based), casefold for case-insensitive comparisons across locales (not lower/upper), and join for batch concatenation (never += in a loop, which is O(n^2) due to string immutability)."
+        },
+        "b2_terminal": {
+          "id": "b2_terminal",
+          "type": "scenario_choice",
+          "badge": "Terminal",
+          "title": "Interview complete · String fluency locked in",
+          "prompt": "You diagnosed eager f-string formatting in hot logging paths, composed a precise format-mini-language spec, and defended parameterized queries over any string-formatting syntax at a trust boundary.",
+          "code_snippet": "# Mental model:\n# str is an immutable sequence of Unicode code points;\n# f-strings are eager syntax, not safe for logging/SQL/shell;\n# format spec order: [[fill]align][sign][#][0][width][,_][.precision][type]",
+          "choices": [],
+          "branches": {},
+          "terminal": true,
+          "rationale": "The thread connecting every stage: a Python str is immutable, so every transformation returns a new object, which is why += in loops is slow and why f-strings are evaluated once, eagerly, wherever they appear. The senior skill is knowing exactly which tool — format spec, string method, or escaping API — fits each context, especially at performance- or trust-sensitive boundaries."
+        }
+      }
+    },},
 
   "py-b4": {
     durationLabel: MODULE_TIME_LABEL,
@@ -2059,7 +4480,240 @@ If you can explain this diagram in 60 seconds, the rest of the lesson comes for 
         explanation: "Equality checks the mapping, not the order. Insertion order is preserved for iteration (3.7+), but two mappings with the same (k, v) pairs are always equal.",
       },
     ],
-  },
+  
+    interviewGraph: {
+      "initialStageId": "b4_fromkeys_click",
+      "artifactDimensions": [
+        {
+          "label": "Hashing & Hashability Contract",
+          "recoveryStageId": "b4_recovery_hash"
+        },
+        {
+          "label": "Mutate-During-Iteration Safety",
+          "recoveryStageId": "b4_recovery_iteration"
+        },
+        {
+          "label": "Container Selection Under Scale",
+          "recoveryStageId": "b4_recovery_scale",
+          "passLabel": "Hash Table Mastery"
+        }
+      ],
+      "stages": {
+        "b4_fromkeys_click": {
+          "id": "b4_fromkeys_click",
+          "type": "click_target",
+          "badge": "Stage 1",
+          "title": "Stage 1 · The shared-default dict.fromkeys bug",
+          "prompt": "A feature flag service initializes per-user override lists, but enabling a flag for one user mysteriously enables it for every user. Click the line that creates this shared state.",
+          "code_snippet": "users = [\"alice\", \"bob\", \"carol\"]\noverrides = dict.fromkeys(users, [])     # ds-target:fromkeys_shared\n\ndef enable_flag(user, flag):\n    overrides[user].append(flag)         # ds-target:append_override\n    return overrides\n\nenable_flag(\"alice\", \"dark_mode\")\nprint(overrides[\"bob\"])  # prints ['dark_mode'] — bob never asked for this",
+          "validationCopy": {
+            "fromkeys_shared": "Correct. `dict.fromkeys(users, [])` does not create a new empty list per key — it evaluates `[]` once and binds every key's value to that single shared list object. Appending through any one key's value mutates the list every other key also points to.",
+            "append_override": "Appending is normal mutation; the defect is that all three keys' values are the *same* list object, created upstream by dict.fromkeys. Look at the line that builds the dict."
+          },
+          "branches": {
+            "fromkeys_shared": "b4_iteration_choice",
+            "append_override": "b4_recovery_hash"
+          }
+        },
+        "b4_iteration_choice": {
+          "id": "b4_iteration_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 2",
+          "title": "Stage 2 · Mutating a dict while iterating it",
+          "prompt": "A cleanup job removes stale cache entries by iterating the cache dict and deleting expired keys. It crashes intermittently in production. What's the safest fix?",
+          "code_snippet": "cache = load_cache()   # {key: (value, expires_at), ...}\n\nfor key in cache:\n    if is_expired(cache[key]):\n        del cache[key]   # RuntimeError: dictionary changed size during iteration",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Iterate a snapshot of the keys, e.g. `for key in list(cache):`, or rebuild via a dict comprehension: `cache = {k: v for k, v in cache.items() if not is_expired(v)}`",
+              "description": "Both avoid mutating the dict's internal structure while Python's iterator is walking it. `list(cache)` takes a frozen snapshot of keys up front, so deletions during the loop don't disturb the iteration. The comprehension is often cleaner: build an entirely new dict containing only the non-expired entries."
+            },
+            {
+              "id": "b",
+              "label": "Wrap the for-loop in a try/except RuntimeError and continue",
+              "description": "Catching the RuntimeError doesn't fix the underlying issue — the iteration order is still corrupted, and you risk skipping keys or processing the dict in an inconsistent state. This treats a symptom, not the cause."
+            },
+            {
+              "id": "c",
+              "label": "Switch from `for key in cache` to `for key, value in cache.items()` — this avoids the structural-change error",
+              "description": ".items() is still a view backed by the same dict; deleting from the dict during iteration over .items() raises the identical RuntimeError. The view type doesn't matter — mutating the dict mid-iteration is the problem."
+            },
+            {
+              "id": "d",
+              "label": "Use a while loop with cache.popitem() until empty",
+              "description": "This would delete every entry, not just expired ones — popitem() removes an arbitrary (LIFO order in CPython) item regardless of expiration status. It solves the crash but breaks the actual goal."
+            }
+          ],
+          "branches": {
+            "a": "b4_scale_choice",
+            "b": "b4_recovery_iteration",
+            "c": "b4_recovery_iteration",
+            "d": "b4_recovery_iteration"
+          },
+          "rationale": "Python dicts track a structural version internally; mutating size during iteration (insert or delete, not just value updates) invalidates the live iterator and raises RuntimeError. The two safe patterns are: iterate a snapshot (`list(cache)` or `list(cache.items())`) so the in-flight loop is unaffected by deletions, or build a fresh dict via comprehension, which sidesteps in-place mutation entirely and is usually the more readable option."
+        },
+        "b4_scale_choice": {
+          "id": "b4_scale_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 3",
+          "title": "Stage 3 · Choosing containers under scale",
+          "prompt": "You need to find users who are active this week but have never paid, across two sets of ~50 million user IDs each (active_users, paying_users). A teammate proposes nested for-loops with `in` checks against a list. What's the right approach and why?",
+          "code_snippet": "active_users = load_active_user_ids()    # ~50M ids\npaying_users = load_paying_user_ids()    # ~50M ids\n\n# Naive approach:\nwinback_pool = []\nfor uid in active_users:                  # O(n)\n    if uid not in paying_users:           # O(m) if paying_users is a list!\n        winback_pool.append(uid)\n# Total: O(n * m) -- with n, m ~ 50M, this is roughly 2.5 * 10^15 operations",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Convert both collections to sets and use set difference: `winback_pool = set(active_users) - set(paying_users)`",
+              "description": "Set membership (`in`) and set difference are O(1) average per element and O(n+m) overall respectively, because both rely on hashing rather than linear scans. This collapses the naive O(n*m) nested-loop cost down to roughly O(n+m) — the difference between a job that finishes in seconds and one that never finishes."
+            },
+            {
+              "id": "b",
+              "label": "Sort both lists first, then use the nested loop — sorting makes 'in' fast",
+              "description": "Sorting helps if you binary-search (O(log m) per lookup, O(n log m) total) but a plain `in` check on a list remains a linear scan regardless of whether the list is sorted. Sets are still the simpler and faster idiomatic choice here."
+            },
+            {
+              "id": "c",
+              "label": "Keep both as lists but add an early-exit break on the first match",
+              "description": "An early exit only helps when matches are near the front of the list; worst case (no match, which is exactly the winback case you're searching for) it still scans the entire list — no asymptotic improvement."
+            },
+            {
+              "id": "d",
+              "label": "Use a list comprehension with `in` instead of a for-loop — comprehensions are O(1) for membership tests",
+              "description": "Comprehensions are syntactic sugar over the same loop machinery; they don't change the algorithmic complexity of an `in` check against a list, which remains O(m) per lookup regardless of whether it's written as a loop or a comprehension."
+            }
+          ],
+          "branches": {
+            "a": "b4_terminal",
+            "b": "b4_recovery_scale",
+            "c": "b4_recovery_scale",
+            "d": "b4_recovery_scale"
+          },
+          "rationale": "This is the canonical 'set algebra replaces nested loops' interview pattern. `in` on a list is O(n) because there's no structure to exploit — every check scans linearly. `in` on a set is O(1) average because the set hashes the element directly to a slot. Converting both collections once (O(n) and O(m)) and then computing `active - paying` (O(n+m)) turns a quadratic disaster into a linear one — the senior answer always asks 'what's the membership-test complexity of the container I'm using?' before reaching for nested loops."
+        },
+        "b4_recovery_hash": {
+          "id": "b4_recovery_hash",
+          "type": "scenario_choice",
+          "badge": "Recovery A",
+          "title": "Recovery · Why dict/set lookups are O(1)",
+          "prompt": "An interviewer asks: 'Why is checking membership in a set faster than in a list?' What's the precise mechanism, not just the complexity result?",
+          "code_snippet": "big_list = list(range(1_000_000))\nbig_set = set(big_list)\n\n999_999 in big_list   # scans up to 1,000,000 elements\n999_999 in big_set    # ?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "The set computes hash(999_999), uses it to jump directly to a slot in its internal array, and compares only the (typically few) elements in that slot — no linear scan needed",
+              "description": "Hashing converts the value into an index. The set's internal table can be indexed directly at that slot, so membership testing doesn't need to inspect every element — only the (usually 0 or 1) elements that hash to the same slot, resolved via probing on collision."
+            },
+            {
+              "id": "b",
+              "label": "Sets are stored pre-sorted, so Python does a binary search",
+              "description": "Sets are not stored in sorted order — iteration order over a set is essentially arbitrary (hash-bucket order), not sorted. Binary search is not the mechanism at play."
+            },
+            {
+              "id": "c",
+              "label": "Python caches every 'in' result so repeated lookups for the same value are instant",
+              "description": "There's no membership-test result cache in CPython's set implementation. Every `in` check independently computes the hash and probes the table — there's no need for caching because the hash lookup is already fast."
+            },
+            {
+              "id": "d",
+              "label": "Sets only support a fixed maximum size, which makes lookups trivially fast",
+              "description": "Sets have no fixed maximum size — they grow dynamically (CPython resizes the underlying table as needed) and remain O(1) average for membership regardless of how large they get."
+            }
+          ],
+          "branches": {
+            "a": "b4_iteration_choice",
+            "b": "b4_recovery_hash",
+            "c": "b4_recovery_hash",
+            "d": "b4_recovery_hash"
+          },
+          "rationale": "The hash function maps a hashable value to an integer that doubles as a candidate index into the set/dict's internal contiguous array. That's the entire trick: instead of scanning, you compute one hash and jump straight to (approximately) the right slot. Collisions are resolved by probing forward to the next slot. This is also why mutable objects can't be set elements or dict keys: if the object's contents change after insertion, its hash would change too, and the table would be looking in the wrong slot forever."
+        },
+        "b4_recovery_iteration": {
+          "id": "b4_recovery_iteration",
+          "type": "scenario_choice",
+          "badge": "Recovery B",
+          "title": "Recovery · Snapshot vs live iteration",
+          "prompt": "What specifically does `list(d)` do when `d` is a dict, and why does it make the cache-cleanup loop safe?",
+          "code_snippet": "d = {\"a\": 1, \"b\": 2, \"c\": 3}\nfor k in list(d):     # vs: for k in d:\n    if should_remove(k):\n        del d[k]",
+          "choices": [
+            {
+              "id": "a",
+              "label": "list(d) eagerly materializes a snapshot of the dict's current keys into a separate list object; the for-loop then iterates that independent list, so deleting from d afterward never invalidates the loop's iterator",
+              "description": "Once `list(d)` runs, you have two unrelated objects: the original dict (which you're free to mutate) and a plain list of keys (which is just data, not a live view). The for-loop's iterator belongs to the list, not the dict, so dict mutations during the loop are completely safe."
+            },
+            {
+              "id": "b",
+              "label": "list(d) locks the dict so no other thread can modify it during the loop",
+              "description": "list(d) provides no locking or thread-safety guarantee — it simply copies the current keys into a new list at the moment it's called. This is unrelated to concurrency control."
+            },
+            {
+              "id": "c",
+              "label": "list(d) and d behave identically when iterated — there's no difference",
+              "description": "There's a critical difference: `d` iterated directly is a live view tied to the dict's structural version (mutating size raises RuntimeError); `list(d)` is a static copy with no such tie."
+            },
+            {
+              "id": "d",
+              "label": "list(d) sorts the keys, which is what prevents the RuntimeError",
+              "description": "list(d) preserves insertion order (matching dict iteration order in 3.7+); it doesn't sort anything. The safety comes from being a detached snapshot, not from ordering."
+            }
+          ],
+          "branches": {
+            "a": "b4_scale_choice",
+            "b": "b4_recovery_iteration",
+            "c": "b4_recovery_iteration",
+            "d": "b4_recovery_iteration"
+          },
+          "rationale": "Iterating a dict directly produces a live iterator tied to the dict's internal structural version counter; any operation that changes the dict's size (insert or delete a key) during that iteration raises RuntimeError. `list(d)` breaks that tie by copying the keys into an independent list before the loop starts, so the loop body is free to mutate the original dict without disturbing its own iteration."
+        },
+        "b4_recovery_scale": {
+          "id": "b4_recovery_scale",
+          "type": "scenario_choice",
+          "badge": "Recovery C",
+          "title": "Recovery · Picking the right container",
+          "prompt": "You're deduplicating a list of 10 million event IDs while preserving their original order. Which approach is both correct and efficient?",
+          "code_snippet": "event_ids = load_events()   # 10M items, many duplicates, order matters\n\n# Goal: unique_ordered = [...] with duplicates removed, original order kept",
+          "choices": [
+            {
+              "id": "a",
+              "label": "unique_ordered = list(dict.fromkeys(event_ids))",
+              "description": "Since Python 3.7, dicts preserve insertion order, and dict.fromkeys with no explicit value creates one entry per first occurrence of each key (later duplicates are no-ops, since the key already exists). Converting back to a list gives you deduplicated, order-preserving output in roughly O(n) — much faster than checking `if x not in result_list` for each item, which would be O(n^2)."
+            },
+            {
+              "id": "b",
+              "label": "unique_ordered = list(set(event_ids))",
+              "description": "Converting to a set deduplicates correctly, but sets have no guaranteed order — the resulting list order is arbitrary, not the original order. This fails the 'preserve order' requirement."
+            },
+            {
+              "id": "c",
+              "label": "Loop through event_ids and check `if x not in unique_ordered: unique_ordered.append(x)`",
+              "description": "This works and preserves order, but `x not in unique_ordered` is an O(n) list scan performed n times — O(n^2) overall. At 10 million items this is far too slow in practice."
+            },
+            {
+              "id": "d",
+              "label": "Sort event_ids, then use itertools.groupby to collapse runs of duplicates",
+              "description": "Sorting changes the original order, which violates the requirement to preserve it, and also costs O(n log n) for no benefit here — dict.fromkeys is both simpler and faster."
+            }
+          ],
+          "branches": {
+            "a": "b4_terminal",
+            "b": "b4_recovery_scale",
+            "c": "b4_recovery_scale",
+            "d": "b4_recovery_scale"
+          },
+          "rationale": "`dict.fromkeys(iterable)` is the idiomatic, O(n)-ish way to deduplicate while preserving first-seen order, relying on two facts: dict keys are inherently unique (so duplicates collapse automatically) and dict iteration order matches insertion order since Python 3.7. It beats the naive 'check membership in a growing list' approach by replacing O(n) linear scans with O(1) average hash lookups under the hood."
+        },
+        "b4_terminal": {
+          "id": "b4_terminal",
+          "type": "scenario_choice",
+          "badge": "Terminal",
+          "title": "Interview complete · Hash table fluency locked in",
+          "prompt": "You diagnosed a dict.fromkeys shared-default bug, fixed an unsafe mutate-during-iteration crash, and chose sets over nested loops for a 50-million-row membership problem.",
+          "code_snippet": "# Mental model:\n# dict/set are hash tables: hash(key) -> slot, O(1) average lookup;\n# only immutable-all-the-way-down values are hashable;\n# never mutate size while iterating live; snapshot or rebuild instead;\n# set algebra (| & - ^) replaces nested loops for membership-heavy problems.",
+          "choices": [],
+          "branches": {},
+          "terminal": true,
+          "rationale": "Every stage traced back to the same hashing mechanism: dict and set both convert a key into an array index via its hash, which is what makes lookup, insert, and delete O(1) on average instead of O(n). That mechanism also explains the iteration-safety rule (mutating size mid-iteration corrupts the live structural view) and the scale lesson (membership tests against a set are asymptotically better than against a list) — three different bugs, one underlying model."
+        }
+      }
+    },},
 
   "py-b5": {
     durationLabel: MODULE_TIME_LABEL,
@@ -2395,7 +5049,242 @@ If those five are automatic, you can solve ~half of all Python screens without t
         explanation: "Multiple `for` clauses nest **in the order written**, outer-to-inner. Reversing them flips the iteration and usually raises NameError because the inner variable hasn't been bound yet.",
       },
     ],
-  },
+  
+    interviewGraph: {
+      "initialStageId": "b5_sideeffect_click",
+      "artifactDimensions": [
+        {
+          "label": "Comprehension Grammar Precision",
+          "recoveryStageId": "b5_recovery_grammar"
+        },
+        {
+          "label": "Eager vs Lazy Evaluation",
+          "recoveryStageId": "b5_recovery_laziness"
+        },
+        {
+          "label": "Readability Judgment",
+          "recoveryStageId": "b5_recovery_readability",
+          "passLabel": "Pythonic Fluency"
+        }
+      ],
+      "stages": {
+        "b5_sideeffect_click": {
+          "id": "b5_sideeffect_click",
+          "type": "click_target",
+          "badge": "Stage 1",
+          "title": "Stage 1 · The side-effect comprehension code smell",
+          "prompt": "A reviewer flags this PR as confusing even though it 'works'. Click the line whose entire purpose is a side effect, which is a misuse of comprehension syntax.",
+          "code_snippet": "def archive_stale_sessions(sessions):\n    expired = [s for s in sessions if s.is_expired()]      # ds-target:filter_expired\n    [db.delete(s.id) for s in expired]                       # ds-target:sideeffect_delete\n    return len(expired)\n\ndef label_active(sessions):\n    return [s for s in sessions if not s.is_expired()]      # ds-target:filter_active",
+          "validationCopy": {
+            "filter_expired": "This is a legitimate use of a list comprehension — it produces a real collection (expired) that is used afterward. The defect is elsewhere.",
+            "sideeffect_delete": "Correct. This comprehension's result (a list of None values, since db.delete returns nothing useful) is built and immediately discarded — it is never assigned or used. The only reason this line exists is the side effect of calling db.delete for each session. That's a for-loop wearing a comprehension's clothes, and it confuses every reviewer into wondering where the returned list went.",
+            "filter_active": "This is a legitimate, idiomatic comprehension — it produces and returns a real collection. The defect is in the other function."
+          },
+          "branches": {
+            "filter_expired": "b5_recovery_grammar",
+            "sideeffect_delete": "b5_conditional_choice",
+            "filter_active": "b5_recovery_grammar"
+          }
+        },
+        "b5_conditional_choice": {
+          "id": "b5_conditional_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 2",
+          "title": "Stage 2 · The conditional-position trap",
+          "prompt": "A pricing function needs to replace negative discounts with 0 while keeping all other discounts unchanged — every input row must produce an output row. A teammate writes `[d for d in discounts if d > 0]`. What's wrong, and what's the fix?",
+          "code_snippet": "discounts = [10, -5, 20, -2, 0, 15]\n\n# Teammate's version:\ncleaned = [d for d in discounts if d > 0]\nprint(cleaned)          # [10, 20, 15]  -- length changed from 6 to 3!\nprint(len(cleaned))      # 3, but caller expects 6 (one output per input row)",
+          "choices": [
+            {
+              "id": "a",
+              "label": "`if d > 0` at the tail is a filter (drops items); the fix is a conditional expression at the head: `[d if d > 0 else 0 for d in discounts]`",
+              "description": "A trailing `if` decides whether to keep an item at all — it changes the length of the output. A leading `if/else` decides what value to emit for every item, preserving length. The teammate needed the second form: keep the row count at 6, but replace negatives with 0."
+            },
+            {
+              "id": "b",
+              "label": "Nothing is wrong; len(cleaned) being 3 instead of 6 is expected Python behavior for any comprehension",
+              "description": "It's expected behavior for *this* comprehension (a filtering one), but it doesn't match the stated requirement of one output per input row — the bug is a mismatch between the chosen comprehension form and the actual goal."
+            },
+            {
+              "id": "c",
+              "label": "The fix is to move the if to the front without an else: `[d if d > 0 for d in discounts]`",
+              "description": "This is a SyntaxError — a leading conditional expression in a comprehension requires both branches (`if ... else ...`); you cannot use a head-position if without an else clause."
+            },
+            {
+              "id": "d",
+              "label": "The fix is to add `else None`: `[d if d > 0 else None for d in discounts]`",
+              "description": "This is syntactically valid and does preserve length, but it doesn't satisfy the stated requirement to replace negative discounts with 0 — it would replace them with None instead, likely breaking downstream arithmetic."
+            }
+          ],
+          "branches": {
+            "a": "b5_generator_choice",
+            "b": "b5_recovery_grammar",
+            "c": "b5_recovery_grammar",
+            "d": "b5_recovery_grammar"
+          },
+          "rationale": "Python comprehensions have two distinct conditional positions that are easy to confuse: a trailing `if` (after the `for` clause) is a *filter* — it decides whether an item is kept, and can shrink the output length. A leading `if/else` (before the `for` clause, as part of the expression) is a *conditional expression* — it decides what value to emit for every item, and always preserves length. Swapping them silently changes program behavior, which is exactly why interviewers probe this distinction."
+        },
+        "b5_generator_choice": {
+          "id": "b5_generator_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 3",
+          "title": "Stage 3 · List comprehension vs generator at scale",
+          "prompt": "You need to compute the total byte size of 500 million log lines streamed from disk, but only the running sum matters — you never need the individual lines again. A teammate writes `total = sum([len(line.encode()) for line in read_lines(path)])`. What's the senior critique?",
+          "code_snippet": "def read_lines(path):\n    with open(path) as f:\n        for line in f:\n            yield line\n\n# Teammate's version:\ntotal = sum([len(line.encode()) for line in read_lines(path)])\n\n# Proposed alternative:\ntotal = sum(len(line.encode()) for line in read_lines(path))",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Drop the square brackets: the list comprehension eagerly materializes all 500M line-length integers in memory before sum() ever runs, while the generator expression produces and discards one value at a time, keeping memory flat",
+              "description": "sum() only ever needs one running total — it doesn't need a complete list to iterate over. The list comprehension version pays for an unnecessary intermediate list of 500 million integers (and implicitly forces read_lines to be fully consumed into memory-adjacent objects before summing starts). The generator expression form computes each length on demand and immediately feeds it to sum(), needing only O(1) extra memory beyond the running total."
+            },
+            {
+              "id": "b",
+              "label": "Both versions behave identically; the brackets are purely stylistic",
+              "description": "The brackets are functionally significant here: with brackets, Python must construct and hold the entire intermediate list before sum() can iterate it. Without brackets, sum() consumes the generator lazily, one value at a time."
+            },
+            {
+              "id": "c",
+              "label": "The list comprehension version is faster because list operations are always faster than generator iteration",
+              "description": "List comprehensions can be marginally faster per-element due to specialized bytecode, but that small per-element speedup is irrelevant here — the dominant cost at 500M lines is the unnecessary memory allocation for the full intermediate list, which the generator version avoids entirely."
+            },
+            {
+              "id": "d",
+              "label": "Neither version works because read_lines is a generator function and can't be used inside sum()",
+              "description": "Both forms work correctly — list comprehensions and generator expressions can both iterate over any iterable, including a generator. The issue is purely about memory efficiency, not correctness."
+            }
+          ],
+          "branches": {
+            "a": "b5_terminal",
+            "b": "b5_recovery_laziness",
+            "c": "b5_recovery_laziness",
+            "d": "b5_recovery_laziness"
+          },
+          "rationale": "This is the textbook 'why prefer a generator expression' scenario: when you only need a one-pass aggregate (sum, max, min, any, all) and never need to revisit or index the intermediate values, a generator expression avoids materializing the full collection. At 500 million elements the difference is the gap between a job that fits comfortably in memory and one that doesn't run at all. The senior instinct is to ask 'do I need this as a concrete, indexable collection, or do I just need to consume it once?' before reaching for square brackets."
+        },
+        "b5_recovery_grammar": {
+          "id": "b5_recovery_grammar",
+          "type": "scenario_choice",
+          "badge": "Recovery A",
+          "title": "Recovery · Reading comprehension execution order",
+          "prompt": "`[x * 2 for x in range(5) if x % 2 == 0]` — in what order does Python actually execute the pieces, even though they're written expression-first?",
+          "code_snippet": "result = [x * 2 for x in range(5) if x % 2 == 0]\nprint(result)   # ?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "For each x pulled from range(5) in order: first test the filter (x % 2 == 0); only if it passes, evaluate the expression (x * 2) and collect it",
+              "description": "Execution order is source (for) -> filter (if) -> expression -> collect, even though it's written as expression-for-if. For x in [0,1,2,3,4]: 0 passes filter -> 0; 1 fails; 2 passes -> 4; 3 fails; 4 passes -> 8. Result: [0, 4, 8]."
+            },
+            {
+              "id": "b",
+              "label": "Python evaluates x * 2 for every x first, then filters the resulting doubled values where the original x was even",
+              "description": "The filter is applied to x (the loop variable) before the expression is evaluated, not applied after doubling. The expression is only computed for items that already passed the filter."
+            },
+            {
+              "id": "c",
+              "label": "The whole list is built in reverse order because comprehensions iterate backwards internally",
+              "description": "Comprehensions iterate in the same forward order as an equivalent for-loop over the same iterable — there's no hidden reversal."
+            },
+            {
+              "id": "d",
+              "label": "Since the if comes last in the source, it is evaluated last, after the full list of doubled values is already built",
+              "description": "Reading order and execution order differ here — that's the entire point of this recovery question. The filter is evaluated per-item, before that item's expression, regardless of where 'if' appears in the source text."
+            }
+          ],
+          "branches": {
+            "a": "b5_conditional_choice",
+            "b": "b5_recovery_grammar",
+            "c": "b5_recovery_grammar",
+            "d": "b5_recovery_grammar"
+          },
+          "rationale": "Comprehensions are written expression-first (`[expression for var in iterable if predicate]`) but executed iteration-first: pull the next item, test the filter, and only if it passes, evaluate the expression and collect the result. This mismatch between reading order and execution order is the single most common source of comprehension bugs for people new to the syntax."
+        },
+        "b5_recovery_laziness": {
+          "id": "b5_recovery_laziness",
+          "type": "scenario_choice",
+          "badge": "Recovery B",
+          "title": "Recovery · Eager vs lazy collections",
+          "prompt": "What is the key behavioral difference between `squares = [x**2 for x in range(1_000_000)]` and `squares = (x**2 for x in range(1_000_000))`?",
+          "code_snippet": "list_version = [x**2 for x in range(1_000_000)]\ngen_version  = (x**2 for x in range(1_000_000))\n\nprint(type(list_version))   # ?\nprint(type(gen_version))    # ?\nprint(len(list_version))    # works?\nprint(len(gen_version))     # works?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "list_version is a fully materialized list (supports len(), indexing, multiple iterations); gen_version is a generator object that produces values lazily one at a time and can only be iterated once",
+              "description": "The square brackets eagerly compute and store all 1,000,000 squared values immediately. The parentheses create a generator object — no values are computed until something iterates it, and `len()` raises TypeError on a generator because it has no precomputed size. Once a generator is exhausted (fully iterated), it cannot be restarted."
+            },
+            {
+              "id": "b",
+              "label": "Both produce a list; the parentheses are just an alternate list syntax",
+              "description": "Parentheses around a comprehension create a distinct type — a generator object, not a list. type(gen_version) is `<class 'generator'>`, not `<class 'list'>`."
+            },
+            {
+              "id": "c",
+              "label": "gen_version is faster to fully iterate to completion than list_version in every case",
+              "description": "Generators save memory, not necessarily time — for full iteration to completion, a generator can have comparable or sometimes slightly higher per-item overhead than a pre-built list, because the list comprehension's specialized bytecode is optimized for bulk construction."
+            },
+            {
+              "id": "d",
+              "label": "len(gen_version) returns 1_000_000 because Python knows the size of range(1_000_000) in advance",
+              "description": "Generators don't expose a length even when their underlying source has a known size — len() is simply not defined for generator objects, and calling it raises TypeError."
+            }
+          ],
+          "branches": {
+            "a": "b5_generator_choice",
+            "b": "b5_recovery_laziness",
+            "c": "b5_recovery_laziness",
+            "d": "b5_recovery_laziness"
+          },
+          "rationale": "Square brackets request a list: eager, fully materialized, indexable, re-iterable, and `len()`-able, at the cost of allocating memory for every element up front. Parentheses request a generator expression: lazy, producing (and discarding) one value at a time on demand, with no `len()` and only a single pass before exhaustion. The choice is a direct trade between 'I need to use this collection multiple times or by index' (list) and 'I only need to consume this once, possibly at huge scale' (generator)."
+        },
+        "b5_recovery_readability": {
+          "id": "b5_recovery_readability",
+          "type": "scenario_choice",
+          "badge": "Recovery C",
+          "title": "Recovery · When to stop using a comprehension",
+          "prompt": "Which of these comprehensions has crossed the readability line and should be refactored into a plain loop or named helper function?",
+          "code_snippet": "# Candidate 1\nsquares = [x**2 for x in range(10)]\n\n# Candidate 2\nresult = [\n    transform(row) if validate(row) else fallback(row, context.get(row.id, {}))\n    for row in rows\n    for context in [load_context(row.batch_id)]\n    if row.status in (\"pending\", \"retry\") and not row.is_archived\n]",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Candidate 2 — it has two for-clauses, a compound filter, and a nested conditional expression with side-effecting-looking calls; a senior engineer would extract this into a named function with an explicit loop",
+              "description": "Once a comprehension needs more than one `for`, more than one `if`, or an expression that spans multiple logical ideas (validation + transformation + fallback + context lookup), it has stopped being 'a clear one-liner' and started being 'dense code that happens to compile'. Refactoring to a named function with a plain for-loop (and maybe early-return logic) makes each step debuggable and reviewable."
+            },
+            {
+              "id": "b",
+              "label": "Candidate 1 — single-variable comprehensions are always too clever for production code",
+              "description": "Candidate 1 is exactly the kind of simple, single-for, single-expression comprehension that is the idiomatic, readable Pythonic form — this is not the one with a readability problem."
+            },
+            {
+              "id": "c",
+              "label": "Neither — comprehensions are always more Pythonic than loops, regardless of complexity",
+              "description": "Pythonic doesn't mean 'always cram it into one expression.' Senior judgment recognizes that comprehension syntax has a complexity ceiling, beyond which a named function and explicit loop are more maintainable and more 'Pythonic' in the broader sense of valuing readability."
+            },
+            {
+              "id": "d",
+              "label": "Both — any comprehension with more than 5 words should be refactored",
+              "description": "Word count isn't the right heuristic. The actual signal is structural complexity: multiple for-clauses, multiple filters, or a conditional expression that itself contains multiple ideas — Candidate 1 has none of these and is fine as-is."
+            }
+          ],
+          "branches": {
+            "a": "b5_terminal",
+            "b": "b5_recovery_readability",
+            "c": "b5_recovery_readability",
+            "d": "b5_recovery_readability"
+          },
+          "rationale": "The readability ceiling for comprehensions is structural, not stylistic: one `for`, one `if`, and a simple expression is the sweet spot. The moment you need a second `for`, a second `if`, or a conditional expression that itself branches into multiple helper calls, the comprehension is doing the job of several lines of a for-loop while looking like one line — which makes it harder to debug (no breakpoint-friendly statement boundaries) and harder to review. The senior move is naming the intermediate steps explicitly."
+        },
+        "b5_terminal": {
+          "id": "b5_terminal",
+          "type": "scenario_choice",
+          "badge": "Terminal",
+          "title": "Interview complete · Pythonic comprehension fluency locked in",
+          "prompt": "You caught a side-effect comprehension code smell, distinguished the filter position from the conditional-expression position, and chose a generator expression over a list comprehension for a one-pass aggregate at scale.",
+          "code_snippet": "# Mental model:\n# comprehensions read expression-first, execute iteration-first;\n# trailing if filters (changes length); leading if/else transforms (preserves length);\n# [] is eager and materialized; () is lazy and single-pass;\n# stop at one for + one if + a simple expression -- promote anything denser to a named function.",
+          "choices": [],
+          "branches": {},
+          "terminal": true,
+          "rationale": "Every stage tested the same underlying skill: knowing precisely what a comprehension does versus what it merely looks like it does. Side-effect comprehensions look like loops but are expressions; trailing/leading conditionals look similar but mean opposite things; brackets and parentheses look like a stylistic choice but mean eager versus lazy evaluation. Pythonic fluency means never confusing the syntax's appearance with its actual semantics."
+        }
+      }
+    },},
 
   "py-c1": {
     durationLabel: MODULE_TIME_LABEL,
@@ -2830,7 +5719,259 @@ Half the lines, same behaviour, clearer intent. Note how \`case 0:\` quietly han
         explanation: "Guards run **after** the pattern matches and bindings are made. If the guard fails, the case is rejected and the next one is tried — the bindings made during the failed match are discarded.",
       },
     ],
-  },
+  
+    interviewGraph: {
+      "initialStageId": "c1_match_click",
+      "artifactDimensions": [
+        {
+          "label": "Truthiness Discipline",
+          "recoveryStageId": "c1_recovery_truthiness"
+        },
+        {
+          "label": "Pattern Matching Semantics",
+          "recoveryStageId": "c1_recovery_capture"
+        },
+        {
+          "label": "Dispatch Design Judgment",
+          "recoveryStageId": "c1_recovery_dispatch",
+          "passLabel": "Branching Mastery"
+        }
+      ],
+      "stages": {
+        "c1_match_click": {
+          "id": "c1_match_click",
+          "type": "click_target",
+          "badge": "Stage 1",
+          "title": "Stage 1 · Find the capture-pattern bug",
+          "prompt": "This `match` block was supposed to classify HTTP-like response codes, but it always returns \"ok\" even for failures. Click the line that causes the bug.",
+          "code_snippet": "class Status:\n    OK = 200\n    FAIL = 500\n\ndef classify(code):\n    OK = 200          # ds-target:local_ok_shadow\n    FAIL = 500\n    match code:\n        case OK:       # ds-target:bare_capture_case\n            return \"ok\"\n        case FAIL:     # ds-target:bare_capture_fail\n            return \"fail\"\n        case _:        # ds-target:wildcard_case\n            return \"unknown\"\n\nclassify(500)  # returns \"ok\" -- bug",
+          "validationCopy": {
+            "local_ok_shadow": "This local variable exists, but defining it isn't the bug by itself — the bug is how it gets used two lines down inside the match block. Click the case line.",
+            "bare_capture_case": "Correct. `case OK:` is a bare name, so Python treats it as a capture pattern, not an equality check. It binds `OK = code` and matches unconditionally — the very first case always fires, so `classify(500)` returns \"ok\".",
+            "bare_capture_fail": "This case is dead code as a result of the bug, but it isn't the line that causes it — execution never even reaches here because the case above always matches first.",
+            "wildcard_case": "The wildcard is also unreachable once the first case always matches, but it isn't the root cause — it's correctly written and just never gets a turn."
+          },
+          "branches": {
+            "local_ok_shadow": "c1_recovery_capture",
+            "bare_capture_case": "c1_truthiness_choice",
+            "bare_capture_fail": "c1_recovery_capture",
+            "wildcard_case": "c1_recovery_capture",
+            "default": "c1_recovery_capture"
+          }
+        },
+        "c1_truthiness_choice": {
+          "id": "c1_truthiness_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 2",
+          "title": "Stage 2 · Fix the capture bug correctly",
+          "prompt": "You've found the root cause. Code review asks for the smallest correct fix that still reads naturally to the next engineer. Which fix is correct?",
+          "code_snippet": "def classify(code):\n    match code:\n        case OK:        # always matches -- needs fixing\n            return \"ok\"\n        case FAIL:\n            return \"fail\"\n        case _:\n            return \"unknown\"",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Use literal values: case 200 / case 500",
+              "description": "Replace the bare names with the actual literal integers Python should compare against."
+            },
+            {
+              "id": "b",
+              "label": "Wrap in parentheses: case (OK)",
+              "description": "Add parentheses around the bare name to force it to be treated as a comparison."
+            },
+            {
+              "id": "c",
+              "label": "Rename the variable to avoid shadowing",
+              "description": "Pick a different local variable name like `ok_code` so it no longer collides with the class attribute."
+            },
+            {
+              "id": "d",
+              "label": "Use `==` inside a guard: case x if x == OK",
+              "description": "Bind the subject to x unconditionally, then filter with a guard clause."
+            }
+          ],
+          "branches": {
+            "a": "c1_dispatch_choice",
+            "b": "c1_recovery_capture",
+            "c": "c1_recovery_capture",
+            "d": "c1_recovery_capture"
+          },
+          "rationale": "Parentheses do not change pattern semantics — `case (OK):` is still a bare-name capture pattern and still matches everything. Renaming the variable sidesteps the *symptom* (shadowing a class attribute) but the underlying rule is unchanged: any bare name in a case is a capture, regardless of what it's named. A guard like `case x if x == OK:` works, but it's needlessly indirect — it binds the whole subject first and only then filters. The cleanest fix is a literal pattern (`case 200:`) or a dotted value pattern (`case Status.OK:`), both of which are real equality checks by Python's pattern-matching rules."
+        },
+        "c1_dispatch_choice": {
+          "id": "c1_dispatch_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 3",
+          "title": "Stage 3 · Choose the right dispatch tool",
+          "prompt": "The fixed `match` block has grown to fifteen `case` branches, each just calling a different handler function with the same single argument. A teammate asks if this should stay as `match`. What do you tell them, and why?",
+          "code_snippet": "match event[\"type\"]:\n    case \"user_signup\":\n        on_signup(event)\n    case \"user_login\":\n        on_login(event)\n    case \"user_logout\":\n        on_logout(event)\n    # ... 12 more identical-shape branches",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Switch to a dispatch dict: DISPATCH.get(event[\"type\"], default)(event)",
+              "description": "Every branch is the same shape (string key -> function call), so a dict gives O(1) lookup, runtime extensibility, and per-handler unit tests."
+            },
+            {
+              "id": "b",
+              "label": "Keep `match` — it's the modern idiomatic choice",
+              "description": "Python 3.10+ added `match` specifically to replace long if/elif and dispatch chains, so it should always be preferred once available."
+            },
+            {
+              "id": "c",
+              "label": "Convert to nested if/elif on event[\"type\"]",
+              "description": "if/elif chains are simpler to read line by line than match blocks, so this trades match's pattern power for plain conditionals."
+            },
+            {
+              "id": "d",
+              "label": "Add a guard to every case for type safety",
+              "description": "Adding `if isinstance(event, dict)` guards to each case tightens validation without changing the dispatch shape."
+            }
+          ],
+          "branches": {
+            "a": "c1_terminal",
+            "b": "c1_recovery_dispatch",
+            "c": "c1_recovery_dispatch",
+            "d": "c1_recovery_dispatch"
+          },
+          "rationale": "`match` earns its keep when branches differ in **shape** — different keys, different structure, different argument counts. Here every branch is structurally identical: a string equality check followed by one function call. That is a dispatch problem, not a pattern-matching problem, and a dict (`DISPATCH = {\"user_signup\": on_signup, ...}`) is shorter, O(1), pluggable at runtime (`DISPATCH[\"new_event\"] = handler`), and each handler is independently testable. Defaulting to `match` everywhere just because it's newer, or adding guards that don't address the shape mismatch, both miss the actual design signal."
+        },
+        "c1_recovery_truthiness": {
+          "id": "c1_recovery_truthiness",
+          "type": "scenario_choice",
+          "badge": "Recovery A",
+          "title": "Recovery · Truthiness vs explicit checks",
+          "prompt": "A function `add_tag(tags=None)` does `if not tags: tags = []` before appending. A bug report says calling `add_tag(existing_list)` with an already-empty list silently returns a brand-new list instead of mutating the caller's list. What is the correct fix?",
+          "code_snippet": "def add_tag(tags=None):\n    if not tags:        # bug: empty list is also falsy\n        tags = []\n    tags.append(\"new\")\n    return tags",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Use `if tags is None:` instead of `if not tags:`",
+              "description": "Only the missing-argument sentinel (None) should trigger building a new list; an explicitly-passed empty list should be mutated in place."
+            },
+            {
+              "id": "b",
+              "label": "Use `if len(tags) == 0:` instead of `if not tags:`",
+              "description": "Check emptiness explicitly via length rather than relying on truthiness."
+            },
+            {
+              "id": "c",
+              "label": "Use `if tags == []:` instead of `if not tags:`",
+              "description": "Compare directly against the empty list literal."
+            },
+            {
+              "id": "d",
+              "label": "Leave it as `if not tags:` — it's idiomatic Python",
+              "description": "Truthiness checks are the Pythonic style and this is working as intended."
+            }
+          ],
+          "branches": {
+            "a": "c1_truthiness_choice",
+            "b": "c1_recovery_truthiness",
+            "c": "c1_recovery_truthiness",
+            "d": "c1_recovery_truthiness"
+          },
+          "rationale": "`if not tags:` collapses every falsy value — `None` AND an empty list `[]` — into the same branch. But here those two cases mean different things: `None` means \"no list was passed, build one\"; `[]` means \"the caller explicitly passed an empty list and expects it back, mutated.\" `is None` is the sentinel check that distinguishes \"absent\" from \"present but empty.\" `len(tags) == 0` and `tags == []` both still misclassify the legitimate empty-list case the same way `not tags` does."
+        },
+        "c1_recovery_capture": {
+          "id": "c1_recovery_capture",
+          "type": "scenario_choice",
+          "badge": "Recovery B",
+          "title": "Recovery · Capture pattern vs value pattern",
+          "prompt": "Inside a `match` block, what distinguishes a pattern that performs an equality comparison from one that always matches and binds a name?",
+          "code_snippet": "STATUS_OK = 200\n\nmatch code:\n    case STATUS_OK:    # bare name -- what does this do?\n        ...\n    case Status.OK:    # dotted name -- what does this do?\n        ...\n    case _:            # underscore -- what does this do?\n        ...",
+          "choices": [
+            {
+              "id": "a",
+              "label": "A dotted name (Status.OK) is a value pattern (equality check); a bare name (STATUS_OK) is a capture pattern (always binds and matches); `_` is the wildcard (matches anything, binds nothing)",
+              "description": "The presence of a dot is exactly what tells Python's pattern matcher to treat a name as a value lookup instead of a new binding."
+            },
+            {
+              "id": "b",
+              "label": "Both STATUS_OK and Status.OK perform equality checks; only `_` binds",
+              "description": "Any uppercase name is assumed to be a constant by the match statement."
+            },
+            {
+              "id": "c",
+              "label": "Capitalization determines capture vs value — ALL_CAPS names are treated as constants",
+              "description": "Python's pattern matcher reads naming convention to decide whether a name is a constant."
+            },
+            {
+              "id": "d",
+              "label": "It depends on whether the name was assigned earlier in the function",
+              "description": "Python pattern matching checks the enclosing scope to see if a binding already exists."
+            }
+          ],
+          "branches": {
+            "a": "c1_truthiness_choice",
+            "b": "c1_recovery_capture",
+            "c": "c1_recovery_capture",
+            "d": "c1_recovery_capture"
+          },
+          "rationale": "Python's structural pattern matching uses one purely syntactic rule, not a semantic one: a name containing a dot (`Status.OK`, `module.CONST`) is parsed as a value pattern and triggers an equality comparison; a bare name (`STATUS_OK`, `x`, `foo`) is always a capture pattern, regardless of capitalization, and always matches while binding that name. Capitalization, prior assignment, and scope are irrelevant to the parser — which is exactly why this footgun is so easy to miss in review."
+        },
+        "c1_recovery_dispatch": {
+          "id": "c1_recovery_dispatch",
+          "type": "scenario_choice",
+          "badge": "Recovery C",
+          "title": "Recovery · When match earns its keep",
+          "prompt": "Which of these dispatch problems is the kind where `match` is actually the right tool, rather than a dict or a plain if/elif?",
+          "code_snippet": "match command:\n    case [\"deploy\", env, \"--dry-run\"]:\n        plan(env)\n    case [\"deploy\", env]:\n        deploy(env)\n    case [\"rollback\", env, version]:\n        rollback(env, version)\n    case _:\n        print(\"unknown command\")",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Parsing a CLI argv list where each branch has a different shape (length, literal sub-values, presence of flags)",
+              "description": "match's structural patterns can check sequence length, literal positions, and bind remaining args in one expression — a dict can't express 'this list has exactly 2 elements where the first is the literal deploy'."
+            },
+            {
+              "id": "b",
+              "label": "Calling one of fifteen functions based solely on a string key",
+              "description": "This is uniform shape, varying value -- a dispatch dict expresses it in one line and stays extensible."
+            },
+            {
+              "id": "c",
+              "label": "Checking a single boolean flag to decide between two code paths",
+              "description": "A plain if/else is shorter and clearer for a true/false branch."
+            },
+            {
+              "id": "d",
+              "label": "Looking up a numeric ID in a precomputed table of records",
+              "description": "A dict or list index is the direct, O(1) tool here; match adds no value."
+            }
+          ],
+          "branches": {
+            "a": "c1_dispatch_choice",
+            "b": "c1_recovery_dispatch",
+            "c": "c1_recovery_dispatch",
+            "d": "c1_recovery_dispatch"
+          },
+          "rationale": "`match` wins precisely when branches differ in **shape** — different sequence lengths, different literal sub-patterns, different sets of keys — because a single `case` expresses a check that would otherwise need several `isinstance`/`len`/indexing lines. A flat string-to-function mapping, a single boolean branch, or a numeric table lookup are all uniform-shape problems where a dict, an if/else, or direct indexing is shorter, faster, and more idiomatic than reaching for pattern matching."
+        },
+        "c1_terminal": {
+          "id": "c1_terminal",
+          "type": "scenario_choice",
+          "badge": "Complete",
+          "title": "Complete · Conditionals & Pattern Matching mastered",
+          "terminal": true,
+          "prompt": "A staff engineer summarizes the lesson in one line: \"If branches differ in what is true, use if/elif. If they differ in what the value looks like, use match. If they differ only in which function to call, use a dispatch dict.\" Which scenario best fits the dispatch-dict case?",
+          "code_snippet": "# Scenario: route an incoming webhook by its \"event\" field\n# to one of 20 handler functions, all taking the same payload shape.",
+          "choices": [
+            {
+              "id": "a",
+              "label": "20 handlers, same call signature, keyed by one string field — use ROUTES.get(event, default)(payload)",
+              "description": "Uniform shape varying only by value is the dispatch-dict signature: O(1) lookup, runtime-pluggable, independently testable handlers."
+            },
+            {
+              "id": "b",
+              "label": "20 handlers, each expecting a differently-shaped payload — use match on payload structure",
+              "description": "This describes shape-based branching, not the dispatch-dict scenario the question asks about."
+            }
+          ],
+          "branches": {
+            "a": "c1_terminal",
+            "b": "c1_terminal"
+          },
+          "rationale": "The dispatch dict is the right call exactly when every branch is the same shape and only the destination function changes — a string key mapped to a callable. The moment payload shapes genuinely differ between branches, you're back to `match`'s structural patterns, because a dict can't express 'this case only applies when the list has exactly two elements and the first is a literal.'"
+        }
+      }
+    },},
 
   "py-c2": {
     durationLabel: MODULE_TIME_LABEL,
@@ -3278,7 +6419,296 @@ If you can spot all four in code review without running it, you are calibrated.`
         explanation: "This is the single most-asked `itertools` interview trap. `groupby` is a streaming primitive — it walks once and breaks the stream wherever the key value changes. To get SQL-`GROUP BY` semantics, sort first: `groupby(sorted(rows, key=k), key=k)`.",
       },
     ],
-  },
+  
+    interviewGraph: {
+      "initialStageId": "c2_exhaustion_click",
+      "artifactDimensions": [
+        {
+          "label": "Iterator/Iterable Distinction",
+          "recoveryStageId": "c2_recovery_distinction"
+        },
+        {
+          "label": "Lazy Pipeline Design",
+          "recoveryStageId": "c2_recovery_pipeline"
+        },
+        {
+          "label": "itertools Fluency",
+          "recoveryStageId": "c2_recovery_itertools",
+          "passLabel": "Iteration Mastery"
+        }
+      ],
+      "stages": {
+        "c2_exhaustion_click": {
+          "id": "c2_exhaustion_click",
+          "type": "click_target",
+          "badge": "Stage 1",
+          "title": "Stage 1 · Find the exhausted-generator bug",
+          "prompt": "A teammate's report says: \"my min() always returns the smallest value, but my max() right after it raises ValueError on an empty sequence.\" Click the line that causes the second call to see nothing.",
+          "code_snippet": "def scaled_scores(raw_scores):\n    return (s * 1.05 for s in raw_scores)   # ds-target:generator_definition\n\nraw_scores = [88, 91, 76, 95, 82]\ng = scaled_scores(raw_scores)               # ds-target:single_generator_built\n\nprint(\"best:\", max(g))                      # ds-target:first_consumption\nprint(\"worst:\", min(g))                     # ds-target:second_consumption -- ValueError: min() arg is an empty sequence",
+          "validationCopy": {
+            "generator_definition": "Defining the generator function is fine on its own — the bug only appears once you build a single generator object and try to read it twice. Look at how `g` gets consumed.",
+            "single_generator_built": "Building `g` once is fine in principle — generators are meant to be built once. The bug is in what happens to `g` afterward.",
+            "first_consumption": "Correct line to flag, but the bug isn't *in* this call — `max(g)` is a completely valid, correct use of the generator. It just happens to be the call that drains it. Click the second consumption instead to point at where the empty-sequence error actually surfaces.",
+            "second_consumption": "Correct. `g` is a generator — an iterator — and `max(g)` on the previous line walked it to completion. By the time `min(g)` runs, the cursor is already past the end, so `min()` sees zero items and raises. The generator was never \"refilled\"; it is one-shot by definition."
+          },
+          "branches": {
+            "generator_definition": "c2_recovery_distinction",
+            "single_generator_built": "c2_recovery_distinction",
+            "first_consumption": "c2_recovery_distinction",
+            "second_consumption": "c2_distinction_choice",
+            "default": "c2_recovery_distinction"
+          }
+        },
+        "c2_distinction_choice": {
+          "id": "c2_distinction_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 2",
+          "title": "Stage 2 · Fix the exhaustion bug",
+          "prompt": "You need both the max and the min of the scaled scores, and the underlying data is small enough to fit in memory comfortably. Which fix is most appropriate?",
+          "code_snippet": "raw_scores = [88, 91, 76, 95, 82]\ng = scaled_scores(raw_scores)\nprint(\"best:\", max(g))\nprint(\"worst:\", min(g))   # fails -- g already exhausted",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Materialize once: scores = list(scaled_scores(raw_scores)); then max(scores), min(scores)",
+              "description": "Build the values into a list a single time, then reuse that list as many times as needed since lists are iterables, not one-shot iterators."
+            },
+            {
+              "id": "b",
+              "label": "Call scaled_scores(raw_scores) again before each of max() and min()",
+              "description": "Re-invoke the generator function fresh for every consumer that needs the values."
+            },
+            {
+              "id": "c",
+              "label": "Wrap g in list() right before each call: max(list(g)), min(list(g))",
+              "description": "Convert the same generator object to a list each time it's needed."
+            },
+            {
+              "id": "d",
+              "label": "Use itertools.tee(g, 2) and pass one cursor to each function",
+              "description": "Fork the single generator into two independent cursors before consuming either."
+            }
+          ],
+          "branches": {
+            "a": "c2_pipeline_choice",
+            "b": "c2_recovery_distinction",
+            "c": "c2_recovery_distinction",
+            "d": "c2_recovery_distinction"
+          },
+          "rationale": "Since the data is small, the simplest and clearest fix is to materialize once into a list — lists are iterables and hand out a fresh cursor on every `iter()` call, so `max(scores)` and `min(scores)` each work correctly without re-deriving anything. Calling the generator function again works too but redundantly redoes the multiplication; `list(g)` on the same exhausted `g` is a no-op because `g` is already drained by the time you wrap it; `tee` is the right tool for genuinely large or infinite streams where materializing isn't an option, but it's overkill (and adds buffering complexity) for five numbers."
+        },
+        "c2_pipeline_choice": {
+          "id": "c2_pipeline_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 3",
+          "title": "Stage 3 · Scale to a 50 GB log file",
+          "prompt": "Now the input isn't five scores — it's a 50 GB log file, and you need to count lines containing \"ERROR\" in the first 24 hours of data only, stopping early once you cross the day boundary. Which approach is correct at this scale?",
+          "code_snippet": "# app.log: 50 GB, lines like \"2024-01-01T08:00:00|INFO|started\"\n# Goal: count ERROR lines with timestamp < \"2024-01-02T00:00:00\", then stop.",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Stream with generators + itertools.takewhile, never materializing the file",
+              "description": "with open(...) as f: day_one = takewhile(lambda r: r.ts < cutoff, (parse(l) for l in f)); count = sum(1 for r in day_one if r.level == 'ERROR')"
+            },
+            {
+              "id": "b",
+              "label": "lines = open('app.log').readlines(); filter in a list comprehension",
+              "description": "Read the entire file into a list of lines first, then comprehend over it to count ERROR lines within the day-one cutoff."
+            },
+            {
+              "id": "c",
+              "label": "Read the whole file into one generator expression, then call list() on it before filtering",
+              "description": "Build a generator over every line, materialize it fully with list(), then filter and count from that list."
+            },
+            {
+              "id": "d",
+              "label": "Use a for loop with break once the timestamp exceeds the cutoff, but still call f.readlines() first",
+              "description": "Read all lines eagerly, then loop with an early break the moment the cutoff is exceeded."
+            }
+          ],
+          "branches": {
+            "a": "c2_itertools_choice",
+            "b": "c2_recovery_pipeline",
+            "c": "c2_recovery_pipeline",
+            "d": "c2_recovery_pipeline"
+          },
+          "rationale": "At 50 GB, anything that calls `readlines()` or wraps the whole stream in `list()` loads the entire file into RAM before you've filtered a single line — that's the memory-bomb pattern. The correct shape keeps every stage lazy: the file object is itself a line-by-line iterator, a generator expression parses one line at a time, and `takewhile` stops pulling the moment the predicate fails — so you never even read past the day-one boundary. `sum(1 for r in day_one if ...)` then holds only a running integer. Memory stays flat regardless of file size."
+        },
+        "c2_itertools_choice": {
+          "id": "c2_itertools_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 4",
+          "title": "Stage 4 · Defend the groupby decision",
+          "prompt": "A junior engineer writes `itertools.groupby(rows, key=lambda r: r.user_id)` expecting three groups (one per distinct user), but gets six groups because the same user_id appears in non-adjacent rows. As the reviewer, what do you tell them?",
+          "code_snippet": "rows = [\n    {\"user_id\": 1, \"evt\": \"login\"},\n    {\"user_id\": 2, \"evt\": \"login\"},\n    {\"user_id\": 1, \"evt\": \"click\"},   # user 1 reappears -- breaks the run\n    {\"user_id\": 2, \"evt\": \"click\"},\n    {\"user_id\": 1, \"evt\": \"logout\"},\n    {\"user_id\": 2, \"evt\": \"logout\"},\n]\nfor uid, group in itertools.groupby(rows, key=lambda r: r[\"user_id\"]):\n    print(uid, list(group))",
+          "choices": [
+            {
+              "id": "a",
+              "label": "groupby only collapses consecutive equal-key runs; sort by the same key first: groupby(sorted(rows, key=k), key=k)",
+              "description": "groupby is a streaming primitive that breaks a group the instant the key value changes, so it does not give SQL-style GROUP BY semantics on unsorted input."
+            },
+            {
+              "id": "b",
+              "label": "groupby requires hashable keys, and user_id integers aren't hashable in this context",
+              "description": "Switch to string-based keys instead of integers to make groupby aggregate correctly."
+            },
+            {
+              "id": "c",
+              "label": "groupby needs the input wrapped in list() first to behave correctly",
+              "description": "Materializing rows into a list before passing it to groupby will fix the aggregation."
+            },
+            {
+              "id": "d",
+              "label": "This is expected behavior — groupby is only for already-grouped data and the code is correct as-is",
+              "description": "No change is needed; six groups is the intended outcome for this input."
+            }
+          ],
+          "branches": {
+            "a": "c2_terminal",
+            "b": "c2_recovery_itertools",
+            "c": "c2_recovery_itertools",
+            "d": "c2_recovery_itertools"
+          },
+          "rationale": "This is the single most-asked `itertools` trap. `groupby` walks the stream once and starts a new group the instant the key changes — it has no memory of keys it has already seen. Integers are perfectly hashable and `list()`-wrapping doesn't change the adjacency problem. The only fix that produces SQL-style GROUP BY semantics is sorting by the same key first so that every occurrence of a given user_id becomes contiguous, then grouping that sorted stream."
+        },
+        "c2_recovery_distinction": {
+          "id": "c2_recovery_distinction",
+          "type": "scenario_choice",
+          "badge": "Recovery A",
+          "title": "Recovery · Iterable vs iterator",
+          "prompt": "What is the precise distinction between an iterable and an iterator, and which Python objects fall into each bucket?",
+          "code_snippet": "xs = [1, 2, 3]\na = iter(xs); b = iter(xs)\nnext(a), next(a), next(b)   # 1, 2, 1 -- two independent cursors\n\ng = (x * x for x in range(3))\nlist(g)   # [0, 1, 4]\nlist(g)   # [] -- exhausted, no rewind",
+          "choices": [
+            {
+              "id": "a",
+              "label": "An iterable hands out a fresh cursor every time iter() is called on it; an iterator IS the cursor and is one-shot (iter(it) is it)",
+              "description": "Lists, tuples, dicts, strings, ranges are iterables. Generators, files, map/filter/zip results, and itertools.* objects are iterators."
+            },
+            {
+              "id": "b",
+              "label": "They're interchangeable terms Python uses for the same concept",
+              "description": "There is no meaningful distinction between the two words in the language."
+            },
+            {
+              "id": "c",
+              "label": "An iterator supports random access like xs[3]; an iterable only supports for loops",
+              "description": "Indexing capability is what separates the two categories."
+            },
+            {
+              "id": "d",
+              "label": "An iterable is mutable; an iterator is immutable",
+              "description": "Mutability is the defining property that separates the two categories."
+            }
+          ],
+          "branches": {
+            "a": "c2_distinction_choice",
+            "b": "c2_recovery_distinction",
+            "c": "c2_recovery_distinction",
+            "d": "c2_recovery_distinction"
+          },
+          "rationale": "The cheap test is `iter(x) is x`. Iterables (lists, dicts, strings, ranges, sets) return `False` — calling `iter()` mints a brand-new cursor, so you can loop over them as many times as you like. Iterators (generators, open files, `map`/`filter`/`zip` results, anything from `itertools`) return `True` — they are their own cursor, which means once exhausted there is no rewind. Random access and mutability are unrelated to this distinction."
+        },
+        "c2_recovery_pipeline": {
+          "id": "c2_recovery_pipeline",
+          "type": "scenario_choice",
+          "badge": "Recovery B",
+          "title": "Recovery · Lazy vs eager pipelines",
+          "prompt": "Why does `lines = open(\"app.log\").readlines()` followed by a list comprehension defeat the purpose of streaming a 50 GB file, even though the final filtered result might be small?",
+          "code_snippet": "# Eager:\nlines = open(\"app.log\").readlines()             # 50 GB into RAM, all at once\nerrors = [l for l in lines if \"ERROR\" in l]      # another large list\n\n# Lazy:\nwith open(\"app.log\") as f:\n    errors = (line for line in f if \"ERROR\" in line)\n    count = sum(1 for _ in errors)",
+          "choices": [
+            {
+              "id": "a",
+              "label": "readlines() forces the entire file into memory as one list before any filtering happens, regardless of how small the final answer is",
+              "description": "The cost is paid at the readlines() call itself -- the comprehension afterward can't undo the fact that the whole file is already resident in RAM."
+            },
+            {
+              "id": "b",
+              "label": "List comprehensions are always slower than generator expressions, regardless of input size",
+              "description": "Performance, not memory, is the primary difference being tested here."
+            },
+            {
+              "id": "c",
+              "label": "readlines() and a generator over the file object produce different sets of lines",
+              "description": "The two approaches would compute a different final count."
+            },
+            {
+              "id": "d",
+              "label": "Only generator expressions can use the `in` operator for substring checks",
+              "description": "Lazy and eager pipelines differ in which string operators are available to them."
+            }
+          ],
+          "branches": {
+            "a": "c2_pipeline_choice",
+            "b": "c2_recovery_pipeline",
+            "c": "c2_recovery_pipeline",
+            "d": "c2_recovery_pipeline"
+          },
+          "rationale": "The file object itself is an iterator that yields one line at a time without `readlines()`; calling `readlines()` short-circuits that laziness by eagerly pulling everything into a Python list first. After that point it doesn't matter how clever your filtering is — the 50 GB is already in memory. The lazy version's generator expression and `sum(1 for _ in errors)` together hold at most one line plus a running counter, regardless of file size. Both approaches compute the identical final count; the only difference is memory footprint."
+        },
+        "c2_recovery_itertools": {
+          "id": "c2_recovery_itertools",
+          "type": "scenario_choice",
+          "badge": "Recovery C",
+          "title": "Recovery · Picking the right itertools primitive",
+          "prompt": "Match the request to the correct itertools primitive: \"Stop reading a stream of rows the moment a row's timestamp exceeds a cutoff, without reading the rest of the stream.\"",
+          "code_snippet": "rows = stream_of_rows()   # potentially very large / infinite\ncutoff = \"23:59:59\"\n# Need: every row up to (and stopping at) the first row past cutoff",
+          "choices": [
+            {
+              "id": "a",
+              "label": "itertools.takewhile(lambda r: r.ts <= cutoff, rows)",
+              "description": "takewhile pulls items while the predicate is true and stops immediately -- never touching -- the first item where it's false."
+            },
+            {
+              "id": "b",
+              "label": "itertools.dropwhile(lambda r: r.ts <= cutoff, rows)",
+              "description": "dropwhile discards items while the predicate is true and starts yielding from the first false item onward."
+            },
+            {
+              "id": "c",
+              "label": "itertools.chain(rows, [])",
+              "description": "chain concatenates iterables together; it doesn't filter or stop based on a predicate."
+            },
+            {
+              "id": "d",
+              "label": "list(rows) followed by a manual break in a for loop",
+              "description": "Materialize the whole stream first, then loop with a break once the cutoff is exceeded."
+            }
+          ],
+          "branches": {
+            "a": "c2_itertools_choice",
+            "b": "c2_recovery_itertools",
+            "c": "c2_recovery_itertools",
+            "d": "c2_recovery_itertools"
+          },
+          "rationale": "`takewhile` is the order-sensitive primitive that yields items only while the predicate holds and stops pulling from the underlying iterator the instant it sees a failing item — exactly \"give me everything up to the cutoff, then stop.\" `dropwhile` is its mirror image (skip until the predicate fails, then yield everything after) and would do the opposite of what's needed here. `chain` solves a completely different problem (concatenation). Materializing with `list()` first defeats the laziness benefit entirely, which matters when the stream is large or infinite."
+        },
+        "c2_terminal": {
+          "id": "c2_terminal",
+          "type": "scenario_choice",
+          "badge": "Complete",
+          "title": "Complete · Loops, Iterators & Generators mastered",
+          "terminal": true,
+          "prompt": "A staff engineer asks you to summarize the core mental model in one sentence for a junior. Which summary captures it best?",
+          "code_snippet": "# for x in xs:\n#     work(x)\n#\n# desugars to:\n# it = iter(xs)\n# while True:\n#     try: x = next(it)\n#     except StopIteration: break\n#     work(x)",
+          "choices": [
+            {
+              "id": "a",
+              "label": "for loops call iter() once to get a cursor, then next() repeatedly until StopIteration; iterables mint fresh cursors, iterators ARE the cursor and exhaust after one pass",
+              "description": "This is the full desugaring and the basis for every iterator-exhaustion, generator-laziness, and itertools question in the lesson."
+            },
+            {
+              "id": "b",
+              "label": "for loops index into a sequence from 0 to len-1, and anything iterable must support indexing",
+              "description": "This describes only sequence-like objects and would break for files, generators, and dict views."
+            }
+          ],
+          "branches": {
+            "a": "c2_terminal",
+            "b": "c2_terminal"
+          },
+          "rationale": "Every bug and design choice in this lesson — exhausted generators, mutate-while-iterating, lazy pipelines, late-binding closures, and `itertools` semantics — traces back to the same two-step protocol: `iter()` once, then `next()` until `StopIteration`. Indexing is not part of the contract at all; that's precisely why files, generators, and `zip`/`map`/`filter` results can be looped over even though none of them support `xs[i]`."
+        }
+      }
+    },},
 
   "py-c3": {
     durationLabel: MODULE_TIME_LABEL,
@@ -3762,7 +7192,298 @@ If you can do that in five seconds per call, you have internalized the binding r
         explanation: "`*` and `**` at the call site are the inverse of `*args` and `**kwargs` in the signature. They unpack an iterable (or mapping) into individual positional (or keyword) arguments. The same call also follows the binding rules: positionals are placed first, then keywords.",
       },
     ],
-  },
+  
+    interviewGraph: {
+      "initialStageId": "c3_mutable_default_click",
+      "artifactDimensions": [
+        {
+          "label": "Default-Value Semantics",
+          "recoveryStageId": "c3_recovery_default"
+        },
+        {
+          "label": "Signature Slot Classification",
+          "recoveryStageId": "c3_recovery_slots"
+        },
+        {
+          "label": "Wrapper API Design",
+          "recoveryStageId": "c3_recovery_wrapper",
+          "passLabel": "Signature Mastery"
+        }
+      ],
+      "stages": {
+        "c3_mutable_default_click": {
+          "id": "c3_mutable_default_click",
+          "type": "click_target",
+          "badge": "Stage 1",
+          "title": "Stage 1 · Find the shared-state bug",
+          "prompt": "QA reports that unrelated requests are somehow sharing cache entries that were never explicitly passed between them. Click the line responsible.",
+          "code_snippet": "def get_or_compute(key, cache={}):   # ds-target:mutable_default\n    if key in cache:\n        return cache[key]\n    value = expensive_lookup(key)    # ds-target:expensive_call\n    cache[key] = value               # ds-target:cache_write\n    return value\n\nresult_a = get_or_compute(\"user:1\")   # ds-target:call_site_a\nresult_b = get_or_compute(\"user:2\")   # ds-target:call_site_b -- sees user:1's cache too!",
+          "validationCopy": {
+            "mutable_default": "Correct. `cache={}` is evaluated exactly once, at function-definition time, creating a single dict object. Every call that omits the `cache` argument reuses that *same* dict, so `get_or_compute(\"user:2\")` silently sees and can pollute the cache built up by every previous call — a classic cross-request data leak.",
+            "expensive_call": "This line just does the lookup work — it isn't the cause of state leaking between unrelated calls.",
+            "cache_write": "Writing to `cache` is necessary and not wrong by itself; the problem is which `cache` object is being written to across calls. Click the default-value line.",
+            "call_site_a": "This call site behaves correctly in isolation. The bug is in the function definition, not in how it's called here.",
+            "call_site_b": "This call exposes the symptom (returns/sees user:1's leaked cache), but the root cause lives in the function's default argument, not at this call site."
+          },
+          "branches": {
+            "mutable_default": "c3_default_choice",
+            "expensive_call": "c3_recovery_default",
+            "cache_write": "c3_recovery_default",
+            "call_site_a": "c3_recovery_default",
+            "call_site_b": "c3_recovery_default",
+            "default": "c3_recovery_default"
+          }
+        },
+        "c3_default_choice": {
+          "id": "c3_default_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 2",
+          "title": "Stage 2 · Fix the mutable default",
+          "prompt": "You've identified the shared-dict bug. Which fix correctly gives every call that omits `cache` a fresh dict, while still letting a caller pass in their own dict explicitly?",
+          "code_snippet": "def get_or_compute(key, cache={}):\n    if key in cache:\n        return cache[key]\n    value = expensive_lookup(key)\n    cache[key] = value\n    return value",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Use cache=None as the default, then `if cache is None: cache = {}` inside the body",
+              "description": "None is an immutable singleton with no shared state; a fresh dict is built inside the function body on every call that omits the argument."
+            },
+            {
+              "id": "b",
+              "label": "Use cache={} but call cache.clear() at the top of the function",
+              "description": "Clear the dict at the start of every call so leftover entries from previous calls don't leak through."
+            },
+            {
+              "id": "c",
+              "label": "Keep cache={} but document that callers must always pass their own dict explicitly",
+              "description": "Rely on documentation and caller discipline to avoid ever hitting the default value."
+            },
+            {
+              "id": "d",
+              "label": "Change the default to cache=dict() instead of cache={}",
+              "description": "Swap the empty-dict literal for the dict() constructor call as the default value."
+            }
+          ],
+          "branches": {
+            "a": "c3_slots_choice",
+            "b": "c3_recovery_default",
+            "c": "c3_recovery_default",
+            "d": "c3_recovery_default"
+          },
+          "rationale": "`dict()` and `{}` both construct a dict at definition time exactly once — swapping one for the other changes nothing about the sharing bug. Calling `.clear()` at the top would force every call to start empty, defeating the entire purpose of a persistent cache, and still doesn't fix the underlying single-object-reused issue if a caller ever wanted default behavior with retained state. Relying on caller discipline just defers the bug to the first person who forgets. The correct, idiomatic fix is the `None`-sentinel pattern: `None` is immutable and shared safely, and a fresh mutable object is constructed inside the function body on each call that needs one."
+        },
+        "c3_slots_choice": {
+          "id": "c3_slots_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 3",
+          "title": "Stage 3 · Classify a five-slot signature",
+          "prompt": "A teammate wrote this API and asks you to predict what happens at each call site before running anything. Which statement about this signature is correct?",
+          "code_snippet": "def render(template, /, data, *layers, theme=\"dark\", **opts):\n    ...\n\nrender(t, data={\"x\": 1})                       # call 1\nrender(t, {\"x\": 1}, \"header\", \"footer\")          # call 2\nrender(t, {\"x\": 1}, \"header\", \"dark\")            # call 3\nrender(template=t, data={\"x\": 1})                # call 4",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Call 4 raises TypeError because template is positional-only and cannot be passed by keyword",
+              "description": "The `/` marker forbids template=t at the call site -- it must be passed positionally, so call 4 fails while calls 1-3 succeed."
+            },
+            {
+              "id": "b",
+              "label": "All four calls succeed identically because / and * are purely stylistic and don't change binding rules",
+              "description": "Positional-only and keyword-only markers are treated as documentation hints, not enforced contracts."
+            },
+            {
+              "id": "c",
+              "label": "Call 3 sets theme=\"dark\" because the string \"dark\" matches the default value",
+              "description": "Python matches keyword-only defaults by value equality against trailing positional arguments."
+            },
+            {
+              "id": "d",
+              "label": "Call 2 raises TypeError because layers can only accept up to 2 extra positional arguments",
+              "description": "*layers has an implicit cap based on the number of named parameters that follow it."
+            }
+          ],
+          "branches": {
+            "a": "c3_wrapper_choice",
+            "b": "c3_recovery_slots",
+            "c": "c3_recovery_slots",
+            "d": "c3_recovery_slots"
+          },
+          "rationale": "The `/` marker is a real, enforced contract (PEP 570): everything before it must be passed positionally, so `render(template=t, ...)` is a `TypeError` no matter what value is given. `*layers` has no implicit cap — it absorbs every extra positional argument into a tuple, however many there are. In call 3, the third positional `\"dark\"` simply becomes `layers[1]`; it does not get matched to `theme` by value — `theme` can only be set by the literal keyword `theme=`. None of this is stylistic; `/` and bare `*` change what TypeErrors the interpreter raises."
+        },
+        "c3_wrapper_choice": {
+          "id": "c3_wrapper_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 4",
+          "title": "Stage 4 · Design a timing decorator for any function",
+          "prompt": "You need a `@timed` decorator that works on functions with arbitrary, unknown signatures — some take positional args, some keyword-only, some both. What is the correct way to write the wrapper so it works for all of them without knowing their signatures in advance?",
+          "code_snippet": "def timed(fn):\n    def wrapper(???):\n        t0 = time.perf_counter()\n        result = fn(???)\n        log.info(\"%s took %.3fms\", fn.__name__, 1000 * (time.perf_counter() - t0))\n        return result\n    return wrapper",
+          "choices": [
+            {
+              "id": "a",
+              "label": "def wrapper(*args, **kwargs): ... fn(*args, **kwargs)",
+              "description": "*args and **kwargs absorb any combination of positional and keyword arguments and forward them transparently, regardless of the wrapped function's actual signature."
+            },
+            {
+              "id": "b",
+              "label": "def wrapper(a, b, c, **kwargs): ... fn(a, b, c, **kwargs)",
+              "description": "Hard-code three positional slots since most functions take a small, fixed number of arguments."
+            },
+            {
+              "id": "c",
+              "label": "def wrapper(args: list, kwargs: dict): ... fn(args, kwargs)",
+              "description": "Accept a list and a dict explicitly, then pass them straight through as two arguments."
+            },
+            {
+              "id": "d",
+              "label": "def wrapper(*, **kwargs): ... fn(**kwargs)",
+              "description": "Use a bare * to force keyword-only, with **kwargs absorbing everything by name."
+            }
+          ],
+          "branches": {
+            "a": "c3_terminal",
+            "b": "c3_recovery_wrapper",
+            "c": "c3_recovery_wrapper",
+            "d": "c3_recovery_wrapper"
+          },
+          "rationale": "Transparent forwarding is the entire reason `*args, **kwargs` exists: the wrapper absorbs whatever positional and keyword arguments the caller supplies, without needing to know `fn`'s signature, and `fn(*args, **kwargs)` re-expands them faithfully at the call site. Hard-coding a fixed arity breaks for any function with a different parameter count. Passing `args`/`kwargs` through as two literal arguments (`fn(args, kwargs)`) doesn't unpack them — `fn` would receive a list and a dict as two positional arguments instead of the original call shape. A bare `*` with no `*args` discards positional arguments entirely, breaking any wrapped function that takes positional parameters."
+        },
+        "c3_recovery_default": {
+          "id": "c3_recovery_default",
+          "type": "scenario_choice",
+          "badge": "Recovery A",
+          "title": "Recovery · When are defaults evaluated?",
+          "prompt": "Exactly when does Python evaluate a parameter's default value expression, and what does that imply for `def f(x, items=[]):`?",
+          "code_snippet": "def f(x, items=[]):\n    items.append(x)\n    return items\n\nf(1)   # [1]\nf(2)   # ?\nf(3)   # ?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Once, when the def statement runs — the same [] object is reused across every call that omits items, so f(2) returns [1, 2] and f(3) returns [1, 2, 3]",
+              "description": "Default expressions execute exactly once at function-definition time, not per call, which is why mutable defaults accumulate state across calls."
+            },
+            {
+              "id": "b",
+              "label": "Every time the function is called — a brand-new [] is created on each call, so f(2) and f(3) each independently return a single-item list",
+              "description": "Default values are re-evaluated fresh on each invocation, like a local variable initializer."
+            },
+            {
+              "id": "c",
+              "label": "Once per unique value of x — Python caches a separate default per argument value",
+              "description": "Python memoizes default values keyed by the other arguments passed in."
+            },
+            {
+              "id": "d",
+              "label": "It depends on whether the function is called positionally or by keyword",
+              "description": "The calling convention at the call site changes how often the default is constructed."
+            }
+          ],
+          "branches": {
+            "a": "c3_mutable_default_click",
+            "b": "c3_recovery_default",
+            "c": "c3_recovery_default",
+            "d": "c3_recovery_default"
+          },
+          "rationale": "Default value expressions are evaluated exactly once, at `def` time, and the resulting object is stored on the function itself, reused for every subsequent call that doesn't override it. For an immutable default (a string, a number) this is invisible and harmless. For a mutable default (`[]`, `{}`, `set()`) it means every omitted-argument call shares and can mutate the *same* object, which is why `f(1)`, `f(2)`, `f(3)` accumulate into one growing list instead of three independent ones. Calling convention and argument values have no effect on when the default expression runs."
+        },
+        "c3_recovery_slots": {
+          "id": "c3_recovery_slots",
+          "type": "scenario_choice",
+          "badge": "Recovery B",
+          "title": "Recovery · The five signature slots",
+          "prompt": "In `def f(a, /, b, *args, c, **kwargs):`, which statement correctly classifies every parameter into its slot?",
+          "code_snippet": "def f(a, /, b, *args, c, **kwargs):\n    ...\n\nf(1, 2, 3, 4, c=5, extra=6)",
+          "choices": [
+            {
+              "id": "a",
+              "label": "a is positional-only, b is positional-or-keyword, args absorbs extra positionals as a tuple, c is keyword-only (forced by *args), kwargs absorbs extra keywords as a dict",
+              "description": "Reading left to right: before / is positional-only, between / and * is positional-or-keyword, *args is the variadic positional divider, after it is keyword-only, **kwargs is always last."
+            },
+            {
+              "id": "b",
+              "label": "a and b are both positional-only because they appear before *args",
+              "description": "Everything before a variadic *args is treated as positional-only."
+            },
+            {
+              "id": "c",
+              "label": "c is positional-or-keyword because it has no explicit * marker directly before it",
+              "description": "Only an explicit bare * immediately preceding a parameter makes it keyword-only; *args doesn't count."
+            },
+            {
+              "id": "d",
+              "label": "kwargs can appear anywhere in the signature as long as it's typed as a dict",
+              "description": "**kwargs placement is flexible and not restricted to the end of the signature."
+            }
+          ],
+          "branches": {
+            "a": "c3_slots_choice",
+            "b": "c3_recovery_slots",
+            "c": "c3_recovery_slots",
+            "d": "c3_recovery_slots"
+          },
+          "rationale": "The five slots read left to right: positional-only (before `/`), positional-or-keyword (between `/` and `*`), `*args` (variadic positional, also a divider), keyword-only (after `*args` or a bare `*`), and `**kwargs` (always last, variadic keyword). Only `a` is before the `/`, so only `a` is positional-only — `b` is positional-or-keyword. `*args` itself acts as the divider into keyword-only territory, so `c`, appearing after it, is keyword-only even with no separate bare `*`. `**kwargs` is syntactically required to be the last parameter in the signature."
+        },
+        "c3_recovery_wrapper": {
+          "id": "c3_recovery_wrapper",
+          "type": "scenario_choice",
+          "badge": "Recovery C",
+          "title": "Recovery · Forwarding vs explicit signatures",
+          "prompt": "When designing a wrapper function, when should you use `*args, **kwargs` passthrough versus writing out an explicit signature?",
+          "code_snippet": "# Option 1: generic decorator/wrapper\ndef log_calls(fn):\n    def wrapper(*args, **kwargs):\n        print(f\"calling {fn.__name__}\")\n        return fn(*args, **kwargs)\n    return wrapper\n\n# Option 2: a public API function\ndef create_user(name, email, *, role=\"member\"):\n    ...",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Use *args/**kwargs for transparent forwarding (decorators, wrappers) where the wrapped function's shape is unknown; use an explicit signature for primary public APIs where callers benefit from documented, checkable parameters",
+              "description": "Forwarding is for plumbing that shouldn't need to know callee signatures; explicit signatures are for the actual contract callers rely on and get IDE/type-checker support."
+            },
+            {
+              "id": "b",
+              "label": "Always prefer *args/**kwargs everywhere, since it's more flexible and future-proof for any function",
+              "description": "Maximum flexibility is universally preferable regardless of whether the function is internal plumbing or a public-facing API."
+            },
+            {
+              "id": "c",
+              "label": "Always prefer explicit signatures everywhere, including decorators, even if it means duplicating the wrapped function's parameter list",
+              "description": "Explicit signatures should be hand-written for every wrapper, no matter how generic the wrapper needs to be."
+            },
+            {
+              "id": "d",
+              "label": "The choice is purely stylistic and has no effect on usability, documentation, or tooling",
+              "description": "Both styles are functionally and ergonomically equivalent in every context."
+            }
+          ],
+          "branches": {
+            "a": "c3_wrapper_choice",
+            "b": "c3_recovery_wrapper",
+            "c": "c3_recovery_wrapper",
+            "d": "c3_recovery_wrapper"
+          },
+          "rationale": "A generic decorator or wrapper genuinely doesn't know the wrapped function's signature ahead of time, so `*args, **kwargs` is the only viable way to forward calls transparently. A public API like `create_user(name, email, *, role=\"member\")` is a contract callers read, autocomplete against, and get type-checked against — collapsing it to `**kwargs` would make the function undocumented by construction and hide required parameters. The choice has real consequences for tooling, documentation, and the clarity of TypeErrors raised on misuse, so neither extreme (always one or the other) is correct."
+        },
+        "c3_terminal": {
+          "id": "c3_terminal",
+          "type": "scenario_choice",
+          "badge": "Complete",
+          "title": "Complete · Functions: Args, *args, **kwargs mastered",
+          "terminal": true,
+          "prompt": "Summarize the single rule that prevents the most common Python TypeError you'll see in production code review.",
+          "code_snippet": "# The rule that prevents 90% of TypeErrors at call sites:\n# Python binds positionals first (left to right), then keywords by name,\n# then whatever's left goes to *args / **kwargs if present, else TypeError.",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Mutable default arguments (lists, dicts, sets) are evaluated once at def time and shared across calls -- always use a None sentinel and build fresh inside the body",
+              "description": "This single rule prevents the cross-call state leakage that silently corrupts caches, accumulators, and config objects across unrelated invocations."
+            },
+            {
+              "id": "b",
+              "label": "Always use **kwargs for every parameter to avoid ever triggering a TypeError",
+              "description": "Catching everything in **kwargs avoids strict argument binding entirely, which trades safety for flexibility everywhere."
+            }
+          ],
+          "branches": {
+            "a": "c3_terminal",
+            "b": "c3_terminal"
+          },
+          "rationale": "Of all the TypeErrors and subtle bugs covered in this lesson, the mutable-default footgun is the one most likely to silently corrupt production state rather than loudly crash — it doesn't raise an exception, it just shares data across calls that should be independent. The None-sentinel pattern (`x=None` then `if x is None: x = []` inside the body) is the fix every senior reviewer looks for. Catching everything in `**kwargs` instead would remove argument validation entirely and push every mistake downstream into confusing runtime errors."
+        }
+      }
+    },},
 
   "py-c4": {
     durationLabel: MODULE_TIME_LABEL,
@@ -4234,7 +7955,292 @@ A 10× speedup is normal. The senior heuristic in pandas: **if you reach for \`l
         explanation: "Python 3 made `map` and `filter` lazy iterators (they were lists in Python 2). `functools.reduce` is *not* lazy — it consumes the entire input and returns a value. The 'iterator exhaustion' rules from the Loops/Iterators lesson apply directly: `m = map(...); list(m); list(m)` returns the data once, then `[]`.",
       },
     ],
-  },
+  
+    interviewGraph: {
+      "initialStageId": "c4_latebinding_click",
+      "artifactDimensions": [
+        {
+          "label": "Closure & Lambda Semantics",
+          "recoveryStageId": "c4_recovery_closure"
+        },
+        {
+          "label": "Map/Filter/Reduce Selection",
+          "recoveryStageId": "c4_recovery_mfr"
+        },
+        {
+          "label": "Readability & Escape Hatches",
+          "recoveryStageId": "c4_recovery_escape",
+          "passLabel": "Functional Idiom Mastery"
+        }
+      ],
+      "stages": {
+        "c4_latebinding_click": {
+          "id": "c4_latebinding_click",
+          "type": "click_target",
+          "badge": "Stage 1",
+          "title": "Stage 1 · Find the late-binding closure bug",
+          "prompt": "A list of \"callback\" lambdas was supposed to remember each button's index, but every callback reports the same final index. Click the line that causes this.",
+          "code_snippet": "buttons = [\"save\", \"cancel\", \"delete\"]\ncallbacks = []\n\nfor i in range(len(buttons)):\n    callbacks.append(lambda: print(f\"clicked button {i}: {buttons[i]}\"))   # ds-target:late_binding_lambda\n\nfor cb in callbacks:    # ds-target:invocation_loop\n    cb()                 # prints \"clicked button 2\" three times instead of 0, 1, 2",
+          "validationCopy": {
+            "late_binding_lambda": "Correct. The lambda's body references `i`, but it doesn't capture the *value* of `i` at the time the lambda is created — it captures the *variable* `i` itself, looked up fresh every time the lambda runs. By the time any callback is called, the loop has finished and `i` is permanently 2.",
+            "invocation_loop": "Calling the callbacks just reveals the symptom — it's correct code that exposes the bug baked in at the point where the lambdas were created, one line above."
+          },
+          "branches": {
+            "late_binding_lambda": "c4_closure_choice",
+            "invocation_loop": "c4_recovery_closure",
+            "default": "c4_recovery_closure"
+          }
+        },
+        "c4_closure_choice": {
+          "id": "c4_closure_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 2",
+          "title": "Stage 2 · Fix the late-binding bug",
+          "prompt": "You've correctly diagnosed late binding. Which fix correctly captures each loop iteration's value of `i` at lambda-creation time?",
+          "code_snippet": "callbacks = []\nfor i in range(len(buttons)):\n    callbacks.append(lambda: print(f\"clicked button {i}: {buttons[i]}\"))",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Use a default argument to snapshot i: lambda i=i: print(f\"clicked button {i}: {buttons[i]}\")",
+              "description": "Default argument values ARE evaluated at definition time (per the previous lesson), so i=i captures the current loop value as that lambda's own default, immune to later reassignment of the outer i."
+            },
+            {
+              "id": "b",
+              "label": "Rename the loop variable from i to idx",
+              "description": "Use a different variable name for the loop counter so it doesn't collide with anything inside the lambda."
+            },
+            {
+              "id": "c",
+              "label": "Move the lambda definition after the for loop finishes",
+              "description": "Wait until the loop has completed, then build all the lambdas in a second pass."
+            },
+            {
+              "id": "d",
+              "label": "Wrap the lambda body in parentheses: (lambda: print(f\"clicked button {i}\"))",
+              "description": "Add parentheses around the lambda expression for clarity."
+            }
+          ],
+          "branches": {
+            "a": "c4_mfr_choice",
+            "b": "c4_recovery_closure",
+            "c": "c4_recovery_closure",
+            "d": "c4_recovery_closure"
+          },
+          "rationale": "Renaming the variable doesn't change the closure mechanics at all — every lambda would still close over the same single `idx` cell and see its final value. Moving the lambda creation after the loop makes the problem worse, since there's no longer any varying `i` to capture at all. Parentheses are cosmetic and change nothing about variable capture. The real fix exploits a rule from the previous lesson: default argument values are evaluated once, at function (or lambda) *definition* time — so `lambda i=i: ...` snapshots the current value of the outer `i` into a fresh default for that specific lambda, immune to the outer variable changing afterward."
+        },
+        "c4_mfr_choice": {
+          "id": "c4_mfr_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 3",
+          "title": "Stage 3 · Choose between map/filter and a comprehension",
+          "prompt": "A code reviewer flags this line. The team's style guide says \"prefer comprehensions when a lambda is involved.\" What should the line become, and why?",
+          "code_snippet": "active_emails = list(map(lambda u: u.email, filter(lambda u: u.is_active, users)))",
+          "choices": [
+            {
+              "id": "a",
+              "label": "active_emails = [u.email for u in users if u.is_active]",
+              "description": "A single comprehension expresses transform-and-filter in one readable pass, with no lambda required and no nested map/filter calls to mentally unwind."
+            },
+            {
+              "id": "b",
+              "label": "active_emails = list(map(lambda u: u.email, [u for u in users if u.is_active]))",
+              "description": "Keep map for the transform step but replace filter with a comprehension for the filtering step."
+            },
+            {
+              "id": "c",
+              "label": "active_emails = list(filter(lambda u: u.is_active, map(lambda u: u.email, users)))",
+              "description": "Swap the order: map first to extract emails, then filter the resulting list of email strings for active users."
+            },
+            {
+              "id": "d",
+              "label": "Leave it as-is — map and filter are always faster than comprehensions",
+              "description": "map/filter chains are claimed to have a meaningful performance edge over comprehensions in every case."
+            }
+          ],
+          "branches": {
+            "a": "c4_escape_choice",
+            "b": "c4_recovery_mfr",
+            "c": "c4_recovery_mfr",
+            "d": "c4_recovery_mfr"
+          },
+          "rationale": "Once you're typing `lambda` for both the map and the filter step, a single comprehension reads top-to-bottom as one coherent operation instead of two nested function calls you have to unwind inside-out. Option c is also subtly broken: filtering by `u.is_active` only works before extracting `.email`, since after `map` the items are bare strings with no `.is_active` attribute. There's no general performance law favoring map/filter over comprehensions; the readability tiebreaker is the only one this lesson's heuristic relies on, and it favors the comprehension whenever a lambda would otherwise be needed."
+        },
+        "c4_escape_choice": {
+          "id": "c4_escape_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 4",
+          "title": "Stage 4 · Defend a reduce-based dict merge",
+          "prompt": "A teammate proposes replacing `reduce(lambda a, b: {**a, **b}, list_of_dicts, {})` with something \"more Pythonic.\" As the senior reviewer, evaluate the options for merging a list of config dicts where later dicts should override earlier keys.",
+          "code_snippet": "configs = [{\"timeout\": 5}, {\"timeout\": 10, \"retries\": 3}, {\"retries\": 5}]\nmerged = reduce(lambda a, b: {**a, **b}, configs, {})\n# merged == {\"timeout\": 10, \"retries\": 5}",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Keep reduce here — dict-merge-with-override is exactly the kind of custom fold reduce exists for; sum/min/max/any/all don't cover it",
+              "description": "reduce earns its keep precisely when no specialized built-in covers the fold logic, and a later-keys-win dict merge has no simpler equivalent in the standard library before considering ChainMap."
+            },
+            {
+              "id": "b",
+              "label": "Replace it with sum(configs)",
+              "description": "sum() can add dicts together to merge their keys."
+            },
+            {
+              "id": "c",
+              "label": "Replace it with max(configs, key=len)",
+              "description": "Take whichever single config dict has the most keys, ignoring the others entirely."
+            },
+            {
+              "id": "d",
+              "label": "Replace it with any(configs)",
+              "description": "any() can be used to combine the dicts into a single merged result."
+            }
+          ],
+          "branches": {
+            "a": "c4_terminal",
+            "b": "c4_recovery_escape",
+            "c": "c4_recovery_escape",
+            "d": "c4_recovery_escape"
+          },
+          "rationale": "The lesson's rule is: reach for the specialized fold first (`sum`, `min`, `max`, `any`, `all`), and reserve `reduce` for genuinely custom folds like dict merges or set unions with non-trivial semantics. `sum()` doesn't support dicts as operands and would raise a TypeError. `max(configs, key=len)` picks one whole dict and discards the override semantics entirely — wrong behavior, not just wrong tool. `any()` returns a boolean, not a merged structure. A later-keys-win merge across N dicts has no single specialized built-in, which is exactly the situation where `reduce` (or `functools.reduce` combined with `ChainMap` as an alternative) is the right call."
+        },
+        "c4_recovery_closure": {
+          "id": "c4_recovery_closure",
+          "type": "scenario_choice",
+          "badge": "Recovery A",
+          "title": "Recovery · What does a lambda actually capture?",
+          "prompt": "When a lambda (or any nested function) references a variable from an enclosing scope, what exactly does it capture?",
+          "code_snippet": "fns = [lambda: i for i in range(3)]\nresults = [fn() for fn in fns]\n# results == ?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "It captures the variable itself (a reference to the enclosing cell), not a snapshot of its value at creation time -- so results == [2, 2, 2]",
+              "description": "Every lambda looks up i fresh each time it's called; since all three lambdas share the same loop variable cell, they all see whatever i equals by the time they're invoked (the loop's final value, 2)."
+            },
+            {
+              "id": "b",
+              "label": "It captures the value of i at the moment the lambda was created, like a photograph -- so results == [0, 1, 2]",
+              "description": "Each lambda freezes a private copy of i's value at definition time."
+            },
+            {
+              "id": "c",
+              "label": "It captures i only for the first lambda; the rest raise NameError",
+              "description": "Only the first closure successfully binds to the loop variable."
+            },
+            {
+              "id": "d",
+              "label": "The behavior is undefined and varies between Python runs",
+              "description": "Closure capture semantics are non-deterministic in CPython."
+            }
+          ],
+          "branches": {
+            "a": "c4_latebinding_click",
+            "b": "c4_recovery_closure",
+            "c": "c4_recovery_closure",
+            "d": "c4_recovery_closure"
+          },
+          "rationale": "This is \"late binding\": closures in Python capture the *variable* (technically, the cell it lives in), not the value at the instant the closure was created. The lookup of `i` happens when the lambda is *called*, not when it's defined. Since all three lambdas in the list comprehension share the exact same `i` cell from the enclosing scope, and the loop has finished running (leaving `i == 2`) before any lambda is invoked, every single one reports `2`. This is fully deterministic, not random, and applies uniformly to every lambda in the list, not just the first."
+        },
+        "c4_recovery_mfr": {
+          "id": "c4_recovery_mfr",
+          "type": "scenario_choice",
+          "badge": "Recovery B",
+          "title": "Recovery · map / filter / reduce shapes",
+          "prompt": "Which heuristic correctly matches each of map, filter, and reduce to the shape of output it produces relative to its input?",
+          "code_snippet": "xs = [1, 2, 3, 4, 5]\n\na = map(lambda x: x * 2, xs)        # ?\nb = filter(lambda x: x % 2 == 0, xs) # ?\nc = reduce(lambda acc, x: acc + x, xs) # ?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "map: same count out, each transformed (1:1). filter: a subset out (1:0-or-1). reduce: a single folded value out (N:1)",
+              "description": "These are the three fundamental shapes -- transform, keep-some, fold-to-one -- and recognizing which shape a problem needs tells you which primitive to reach for."
+            },
+            {
+              "id": "b",
+              "label": "map and filter both always return the same number of items as the input; only reduce can shrink the count",
+              "description": "filter is claimed not to actually remove any items, just mark them."
+            },
+            {
+              "id": "c",
+              "label": "reduce always returns the same type as the elements of xs; map and filter can change types freely",
+              "description": "Type preservation is claimed to be reduce's defining constraint."
+            },
+            {
+              "id": "d",
+              "label": "All three return lists directly in Python 3",
+              "description": "map, filter, and reduce all eagerly construct and return list objects."
+            }
+          ],
+          "branches": {
+            "a": "c4_mfr_choice",
+            "b": "c4_recovery_mfr",
+            "c": "c4_recovery_mfr",
+            "d": "c4_recovery_mfr"
+          },
+          "rationale": "The shape heuristic is exactly: `map` is 1:1 (same count, each item transformed), `filter` is 1:0-or-1 (a subset survives, nothing is transformed), `reduce` is N:1 (the whole sequence folds into one value). `filter` genuinely removes items from the output count, it doesn't just mark them. `reduce`'s accumulator can be any type, including a different type than the input elements (e.g. folding numbers into a string). And critically, in Python 3 both `map` and `filter` return lazy *iterators*, not lists — you must wrap them in `list(...)` to materialize; only `reduce` (from `functools`) eagerly returns a single value directly."
+        },
+        "c4_recovery_escape": {
+          "id": "c4_recovery_escape",
+          "type": "scenario_choice",
+          "badge": "Recovery C",
+          "title": "Recovery · operator and partial as lambda replacements",
+          "prompt": "Which rewrite correctly replaces a lambda with a standard-library escape hatch, preserving identical behavior?",
+          "code_snippet": "rows = [{\"revenue\": 50}, {\"revenue\": 200}, {\"revenue\": 10}]\nsorted_rows = sorted(rows, key=lambda r: r[\"revenue\"])",
+          "choices": [
+            {
+              "id": "a",
+              "label": "sorted(rows, key=operator.itemgetter(\"revenue\"))",
+              "description": "itemgetter('revenue') builds a callable equivalent to lambda r: r['revenue'], implemented in C, and is both shorter and measurably faster in tight loops."
+            },
+            {
+              "id": "b",
+              "label": "sorted(rows, key=operator.attrgetter(\"revenue\"))",
+              "description": "attrgetter accesses an object attribute (r.revenue), not a dict key (r['revenue']), so it would raise AttributeError on these plain dicts."
+            },
+            {
+              "id": "c",
+              "label": "sorted(rows, key=functools.partial(lambda r: r[\"revenue\"]))",
+              "description": "Wrap the same lambda in functools.partial with no arguments fixed, which doesn't remove the lambda or change anything."
+            },
+            {
+              "id": "d",
+              "label": "sorted(rows, key=\"revenue\")",
+              "description": "Pass the string key name directly as the key function."
+            }
+          ],
+          "branches": {
+            "a": "c4_escape_choice",
+            "b": "c4_recovery_escape",
+            "c": "c4_recovery_escape",
+            "d": "c4_recovery_escape"
+          },
+          "rationale": "`operator.itemgetter(\"revenue\")` is precisely the named, C-implemented equivalent of `lambda r: r[\"revenue\"]` for dict/sequence indexing, which is why it's the textbook replacement. `attrgetter` is for object *attribute* access (`r.revenue`) and would fail on these dict rows since dicts don't expose `.revenue` as an attribute. Wrapping the original lambda in `partial` with nothing fixed doesn't eliminate the lambda at all — it's a no-op wrapper. `key` must be a callable, not a bare string, so passing `\"revenue\"` directly raises a TypeError."
+        },
+        "c4_terminal": {
+          "id": "c4_terminal",
+          "type": "scenario_choice",
+          "badge": "Complete",
+          "title": "Complete · Lambda, Map, Filter, Reduce mastered",
+          "terminal": true,
+          "prompt": "Summarize the senior-level decision tree for picking between lambda+map/filter, a comprehension, and a named def.",
+          "code_snippet": "# Decision tree:\n# - lambda body needs more than one expression -> def\n# - lambda is feeding map/filter -> prefer a comprehension for readability\n# - the operation is plain indexing/attribute access -> operator.itemgetter/attrgetter\n# - some arguments are fixed ahead of time -> functools.partial\n# - the fold has a specialized built-in (sum/min/max/any/all) -> use that, not reduce",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Default to a comprehension for transform/filter; promote to def once logic exceeds one simple expression; reach for operator/partial before reaching for reduce; reserve reduce for genuinely custom folds",
+              "description": "This ordering matches the lesson's heuristics exactly: readability and named-function clarity beat lambda-chaining, and specialized built-ins beat hand-rolled reduce calls."
+            },
+            {
+              "id": "b",
+              "label": "Always use lambda with map/filter/reduce since it's the most 'functional' style and therefore always preferred",
+              "description": "Stylistic purity is claimed to override the lesson's actual readability and performance heuristics."
+            }
+          ],
+          "branches": {
+            "a": "c4_terminal",
+            "b": "c4_terminal"
+          },
+          "rationale": "Every stage of this lesson reinforces the same decision order: comprehensions beat map/filter+lambda on readability the moment a lambda is involved; a lambda whose body would need more than one expression should be promoted to a named `def` so tracebacks and debuggers can reference it by name; `operator.itemgetter`/`attrgetter` and `functools.partial` remove lambdas entirely for indexing, attribute access, and argument-fixing; and `reduce` is reserved for folds with no specialized built-in equivalent. Treating `lambda` as inherently more 'Pythonic' than the alternatives is exactly the junior mistake this lesson corrects."
+        }
+      }
+    },},
 
   "py-c5": {
     durationLabel: MODULE_TIME_LABEL,
@@ -4758,7 +8764,296 @@ A stripped \`assert\` is one of the most embarrassing production bugs in Python 
         explanation: "`assert` exists for testing invariants — when it fires, you have a *bug*, not a *user error*. The `-O` flag (and `PYTHONOPTIMIZE=1`) removes them entirely. Use `assert` for sanity checks in tests and for documenting invariants; use `raise` for any condition that depends on runtime input.",
       },
     ],
-  },
+  
+    interviewGraph: {
+      "initialStageId": "c5_bare_except_click",
+      "artifactDimensions": [
+        {
+          "label": "Exception Hierarchy Judgment",
+          "recoveryStageId": "c5_recovery_hierarchy"
+        },
+        {
+          "label": "try/except/else/finally Control Flow",
+          "recoveryStageId": "c5_recovery_clauses"
+        },
+        {
+          "label": "Re-raising & Debugging Discipline",
+          "recoveryStageId": "c5_recovery_reraise",
+          "passLabel": "Error Handling Mastery"
+        }
+      ],
+      "stages": {
+        "c5_bare_except_click": {
+          "id": "c5_bare_except_click",
+          "type": "click_target",
+          "badge": "Stage 1",
+          "title": "Stage 1 · Find the dangerous catch",
+          "prompt": "On-call reports that a long-running batch job cannot be stopped with Ctrl+C, and errors never show up in logs. Click the line responsible.",
+          "code_snippet": "def process_batch(rows):\n    results = []\n    for row in rows:\n        try:\n            results.append(transform(row))   # ds-target:risky_call\n        except:                                # ds-target:bare_except\n            pass                                # ds-target:silent_pass\n    return results                              # ds-target:return_results",
+          "validationCopy": {
+            "risky_call": "Calling `transform(row)` inside a `try` is reasonable — the problem isn't that this can raise, it's how broadly the exception gets caught two lines down.",
+            "bare_except": "Correct. A bare `except:` catches `BaseException`, which includes `KeyboardInterrupt` (Ctrl+C) and `SystemExit`. That's exactly why the operator can't stop the job — their interrupt signal is being silently swallowed along with every real error.",
+            "silent_pass": "Silently discarding the exception with `pass` is also a real problem (no logging means errors vanish), but it isn't what blocks Ctrl+C — that's caused by which exception types get caught in the first place.",
+            "return_results": "Returning the accumulated results is normal and correct; it doesn't relate to the Ctrl+C or silent-failure bug."
+          },
+          "branches": {
+            "risky_call": "c5_recovery_hierarchy",
+            "bare_except": "c5_hierarchy_choice",
+            "silent_pass": "c5_recovery_hierarchy",
+            "return_results": "c5_recovery_hierarchy",
+            "default": "c5_recovery_hierarchy"
+          }
+        },
+        "c5_hierarchy_choice": {
+          "id": "c5_hierarchy_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 2",
+          "title": "Stage 2 · Narrow the catch correctly",
+          "prompt": "You need to skip rows that fail to transform due to bad data, while still letting the operator interrupt the job and still surfacing unexpected bugs. Which fix is correct?",
+          "code_snippet": "for row in rows:\n    try:\n        results.append(transform(row))\n    except:          # too broad -- needs narrowing\n        pass",
+          "choices": [
+            {
+              "id": "a",
+              "label": "except (ValueError, KeyError) as e: log.warning(\"skipping bad row: %s\", e)",
+              "description": "Catch only the specific exception types that represent expected bad-data problems, log them, and let everything else (including KeyboardInterrupt and genuine bugs) propagate."
+            },
+            {
+              "id": "b",
+              "label": "except Exception as e: log.warning(\"skipping bad row: %s\", e)",
+              "description": "Catch the broad Exception base class, which excludes BaseException-level signals like KeyboardInterrupt and SystemExit."
+            },
+            {
+              "id": "c",
+              "label": "except BaseException as e: log.warning(\"skipping bad row: %s\", e)",
+              "description": "Catch BaseException explicitly but log it this time instead of silently passing."
+            },
+            {
+              "id": "d",
+              "label": "Keep except: pass, but wrap the whole function body in a signal handler for SIGINT",
+              "description": "Leave the broad except as-is and work around the Ctrl+C problem with a separate signal handler instead of narrowing the catch."
+            }
+          ],
+          "branches": {
+            "a": "c5_clauses_choice",
+            "b": "c5_recovery_hierarchy",
+            "c": "c5_recovery_hierarchy",
+            "d": "c5_recovery_hierarchy"
+          },
+          "rationale": "`except Exception:` is still too broad for *this specific row-skipping use case* — it would also silently swallow genuine bugs like `AttributeError` or `TypeError` from a broken `transform` implementation, hiding real defects as if they were expected bad data. `except BaseException:` is exactly as dangerous as the original bare `except:` since BaseException is what bare except already catches — it still swallows Ctrl+C. Adding a separate signal handler is solving the wrong layer of the problem and doesn't fix the silent-bug-swallowing issue. Catching only the specific, anticipated exception types (`ValueError`, `KeyError`) lets real bugs and interrupts propagate while still handling the known bad-data case."
+        },
+        "c5_clauses_choice": {
+          "id": "c5_clauses_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 3",
+          "title": "Stage 3 · Predict the four-clause control flow",
+          "prompt": "Given this function, what runs (in order) when `parse(row)` raises a `ValueError` that IS caught, versus when it raises a `RuntimeError` that is NOT caught?",
+          "code_snippet": "def load_row(row):\n    try:\n        value = parse(row)\n    except ValueError as e:\n        log.warning(\"bad row: %s\", e)\n        return None\n    else:\n        return value\n    finally:\n        metrics.increment(\"rows_processed\")",
+          "choices": [
+            {
+              "id": "a",
+              "label": "ValueError case: try (partial) -> except -> finally -> returns None. RuntimeError case: try (partial) -> finally runs -> RuntimeError still propagates uncaught",
+              "description": "finally always runs on the way out regardless of whether the exception was caught, returned from, or left to propagate; else only runs when try raised nothing at all."
+            },
+            {
+              "id": "b",
+              "label": "ValueError case: try -> except -> else -> finally, because else always runs after except. RuntimeError case: finally is skipped since the exception is unhandled",
+              "description": "else is claimed to run unconditionally after any except block, and finally is claimed to be skippable when nothing catches the exception."
+            },
+            {
+              "id": "c",
+              "label": "Both cases run try -> else -> finally identically, since else only depends on whether parse() was called, not whether it raised",
+              "description": "else is claimed to run regardless of whether an exception occurred, as long as parse() executed."
+            },
+            {
+              "id": "d",
+              "label": "In the RuntimeError case, finally never executes because the function exits via an uncaught exception",
+              "description": "finally is claimed to be bypassed whenever the exception is not caught by any except clause in this function."
+            }
+          ],
+          "branches": {
+            "a": "c5_reraise_choice",
+            "b": "c5_recovery_clauses",
+            "c": "c5_recovery_clauses",
+            "d": "c5_recovery_clauses"
+          },
+          "rationale": "`finally` is unconditional — it runs whether the try block succeeded, was caught, returned early, or is propagating an exception nobody caught. `else` runs only when the `try` block raised absolutely nothing, which is why it's wired to \"no exception,\" not to \"an except ran.\" In the `ValueError` case, the matching `except` runs (not `else`, since an exception did occur), then `finally`, then the `return None` takes effect. In the `RuntimeError` case, no `except` clause matches, so the frame still unwinds through `finally` (incrementing the metric) before the `RuntimeError` continues propagating up the call stack uncaught."
+        },
+        "c5_reraise_choice": {
+          "id": "c5_reraise_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 4",
+          "title": "Stage 4 · Choose the correct re-raise pattern",
+          "prompt": "A low-level `parse(row)` raises `ValueError`. The caller wants to wrap it in a higher-level, more meaningful `RowParseError`, while preserving the original traceback context for debugging. Which re-raise is correct?",
+          "code_snippet": "def load_row(row):\n    try:\n        return parse(row)\n    except ValueError as e:\n        ???",
+          "choices": [
+            {
+              "id": "a",
+              "label": "raise RowParseError(f\"could not parse row: {row}\") from e",
+              "description": "Explicit exception chaining sets __cause__ to the original ValueError, so the traceback shows both the new RowParseError and 'the above exception was the direct cause of' the original -- ideal for deliberate translation across abstraction layers."
+            },
+            {
+              "id": "b",
+              "label": "raise RowParseError(f\"could not parse row: {row}\")",
+              "description": "Raise the new exception with no chaining clause at all inside the except block."
+            },
+            {
+              "id": "c",
+              "label": "raise e",
+              "description": "Re-raise the variable e directly instead of using a bare raise or constructing a new exception."
+            },
+            {
+              "id": "d",
+              "label": "print(e); raise RowParseError(f\"could not parse row: {row}\") from None",
+              "description": "Print the original error for visibility, then raise the new exception with chaining explicitly silenced."
+            }
+          ],
+          "branches": {
+            "a": "c5_terminal",
+            "b": "c5_recovery_reraise",
+            "c": "c5_recovery_reraise",
+            "d": "c5_recovery_reraise"
+          },
+          "rationale": "`raise NewError(...) from e` sets `__cause__` explicitly, producing a traceback that clearly shows the new exception and labels the original as its direct cause — exactly what's wanted when deliberately translating a low-level exception into a higher-level one. Raising with no `from` clause at all still chains implicitly via `__context__` (labeled 'during handling of the above exception'), which is less precise about intent than an explicit `from e`. `raise e` re-raises the same exception object but loses the clean chaining semantics and discards the opportunity to give the caller the more meaningful `RowParseError` type. `from None` explicitly suppresses chaining entirely, hiding the original traceback from anyone debugging later — the opposite of what's needed here, even with a manual `print(e)` as a weak substitute."
+        },
+        "c5_recovery_hierarchy": {
+          "id": "c5_recovery_hierarchy",
+          "type": "scenario_choice",
+          "badge": "Recovery A",
+          "title": "Recovery · Why bare except: is dangerous",
+          "prompt": "What specifically is wrong with `except:` (no exception type named at all)?",
+          "code_snippet": "try:\n    do_work()\nexcept:\n    pass\n\n# vs.\ntry:\n    do_work()\nexcept Exception:\n    pass",
+          "choices": [
+            {
+              "id": "a",
+              "label": "A bare except: catches BaseException, which includes KeyboardInterrupt and SystemExit -- so Ctrl+C and sys.exit() get silently swallowed and the program can't be stopped normally",
+              "description": "BaseException sits above Exception in the hierarchy and includes the signals used to deliberately terminate a program, which is why catching everything is actively harmful, not just imprecise."
+            },
+            {
+              "id": "b",
+              "label": "A bare except: is just shorthand for except Exception: and behaves identically",
+              "description": "The two forms are described as equivalent syntax sugar for the same set of caught exception types."
+            },
+            {
+              "id": "c",
+              "label": "A bare except: only catches exceptions with no explicit type annotation",
+              "description": "Bare except is claimed to be scoped to untyped exceptions specifically."
+            },
+            {
+              "id": "d",
+              "label": "A bare except: is fine as long as it's followed by pass and not a more complex handler",
+              "description": "The presence of additional logic in the handler, not the exception types caught, is claimed to be what matters."
+            }
+          ],
+          "branches": {
+            "a": "c5_hierarchy_choice",
+            "b": "c5_recovery_hierarchy",
+            "c": "c5_recovery_hierarchy",
+            "d": "c5_recovery_hierarchy"
+          },
+          "rationale": "`except:` with no type is exactly equivalent to `except BaseException:`, which sits above `Exception` in the hierarchy and additionally includes `KeyboardInterrupt`, `SystemExit`, and `GeneratorExit` — signals that exist specifically so a program *can* be interrupted or asked to exit cleanly. Swallowing those means the user loses the ability to Ctrl+C out of a runaway script. `except Exception:` is meaningfully narrower (it excludes those three) but is still broad enough to be a bug magnet inside ordinary function bodies. The danger is about which exception *types* get caught, not about what the handler body does with them."
+        },
+        "c5_recovery_clauses": {
+          "id": "c5_recovery_clauses",
+          "type": "scenario_choice",
+          "badge": "Recovery B",
+          "title": "Recovery · The try/except/else/finally truth table",
+          "prompt": "Fill in the missing row: which clauses run when the try block executes successfully with no exception raised at all?",
+          "code_snippet": "try:\n    value = compute()   # succeeds, no exception\nexcept ValueError:\n    handle_error()\nelse:\n    ???\nfinally:\n    ???",
+          "choices": [
+            {
+              "id": "a",
+              "label": "else runs (success path) and finally runs (always) -- except is skipped entirely since nothing was raised",
+              "description": "else exists precisely to hold success-only code outside the try block, so an unrelated exception in that code isn't accidentally caught by the except clause above it; finally is unconditional."
+            },
+            {
+              "id": "b",
+              "label": "Only finally runs; else is skipped because no exception occurred",
+              "description": "else is claimed to require an exception to have occurred in order to run, the opposite of its actual purpose."
+            },
+            {
+              "id": "c",
+              "label": "except runs by default whenever no other clause matches, followed by finally",
+              "description": "except is claimed to act as a catch-all fallback even when nothing was raised."
+            },
+            {
+              "id": "d",
+              "label": "Nothing runs except the try block itself; else and finally are claimed to be mutually exclusive with each other",
+              "description": "else and finally are claimed to never both execute in the same successful run."
+            }
+          ],
+          "branches": {
+            "a": "c5_clauses_choice",
+            "b": "c5_recovery_clauses",
+            "c": "c5_recovery_clauses",
+            "d": "c5_recovery_clauses"
+          },
+          "rationale": "`else` is specifically the \"the try block raised nothing\" clause — it exists to keep success-path code outside the `try`, so that an unrelated exception inside that success code doesn't get accidentally caught by an `except` clause meant for a different failure. `finally` is unconditional and always runs, success or failure, caught or uncaught. `except` only ever runs when its named exception type (or a subclass) is actually raised — it's never a generic fallback for the no-exception case. `else` and `finally` are not mutually exclusive; in the successful path here, both execute, in that order."
+        },
+        "c5_recovery_reraise": {
+          "id": "c5_recovery_reraise",
+          "type": "scenario_choice",
+          "badge": "Recovery C",
+          "title": "Recovery · __cause__ vs __context__",
+          "prompt": "What is the difference between `raise NewError() from e` and a plain `raise NewError()` written inside an except block (with no `from` clause at all)?",
+          "code_snippet": "try:\n    risky()\nexcept ValueError as e:\n    raise NewError(\"wrapped\")            # implicit chaining\n    # vs.\n    raise NewError(\"wrapped\") from e     # explicit chaining\n    # vs.\n    raise NewError(\"wrapped\") from None  # suppressed chaining",
+          "choices": [
+            {
+              "id": "a",
+              "label": "from e sets __cause__ explicitly ('the direct cause of'); no from clause still sets __context__ implicitly ('during handling of'); from None suppresses the link and shows only NewError",
+              "description": "All three raise NewError, but the traceback tells a different story: explicit deliberate chaining, implicit handling-time chaining, or no link to the original exception at all."
+            },
+            {
+              "id": "b",
+              "label": "All three produce an identical traceback because Python always preserves the original exception regardless of syntax",
+              "description": "The from clause is claimed to have no effect on traceback presentation."
+            },
+            {
+              "id": "c",
+              "label": "from e and from None are equivalent; only the no-from-clause version differs",
+              "description": "from None and from e are claimed to behave the same, both differing only from the plain raise."
+            },
+            {
+              "id": "d",
+              "label": "from e re-raises the original ValueError directly instead of NewError",
+              "description": "Explicit chaining with from e is claimed to discard NewError and propagate the original exception object instead."
+            }
+          ],
+          "branches": {
+            "a": "c5_reraise_choice",
+            "b": "c5_recovery_reraise",
+            "c": "c5_recovery_reraise",
+            "d": "c5_recovery_reraise"
+          },
+          "rationale": "All three forms raise `NewError`, but they differ in what gets attached for debugging: `from e` sets `__cause__` explicitly, producing 'the above exception was the direct cause of the following exception' — a deliberate, intentional chain. With no `from` clause at all, Python still implicitly sets `__context__` because the raise happened while handling another exception, producing 'during handling of the above exception, another exception occurred' — informative but less precise about intent. `from None` explicitly suppresses both, so the traceback shows only `NewError` with no link back to the `ValueError` at all. The three produce visibly different tracebacks, and none of them discards `NewError` in favor of the original."
+        },
+        "c5_terminal": {
+          "id": "c5_terminal",
+          "type": "scenario_choice",
+          "badge": "Complete",
+          "title": "Complete · Error Handling & Debugging mastered",
+          "terminal": true,
+          "prompt": "A staff engineer asks you to state the single most important discipline for production exception handling in one sentence. Which captures it best?",
+          "code_snippet": "# The discipline:\n# Catch the narrowest exception that means what you mean,\n# let everything else propagate to a layer that can actually act on it,\n# and never silently swallow BaseException-level signals.",
+          "choices": [
+            {
+              "id": "a",
+              "label": "Narrow except clauses + intentional re-raising/chaining + letting unexpected errors propagate is what keeps both debuggability and operability (Ctrl+C, sys.exit) intact",
+              "description": "This synthesizes every stage of the lesson: the bare-except bug, the clause truth table, and the from-e chaining pattern all serve the same goal -- never hide information a future debugger or operator needs."
+            },
+            {
+              "id": "b",
+              "label": "Catching Exception broadly everywhere and logging it is sufficient discipline for any production system",
+              "description": "Blanket broad catching plus logging is claimed to be an adequate universal strategy regardless of context."
+            }
+          ],
+          "branches": {
+            "a": "c5_terminal",
+            "b": "c5_terminal"
+          },
+          "rationale": "Every stage of this lesson reinforces one idea from a different angle: catching too broadly (bare `except:`) hides operational signals like Ctrl+C; misreading the `try`/`except`/`else`/`finally` truth table leads to cleanup code running in the wrong place or success code being accidentally caught; and re-raising without `from e` (or worse, with `from None`) erases the debugging trail a future engineer needs. Blanket `except Exception` plus logging, applied indiscriminately at every layer rather than at a deliberate outermost edge, is exactly the anti-pattern this lesson warns against — it trades real-bug visibility for the illusion of robustness."
+        }
+      }
+    },},
 
   "sq-b2": {
     durationLabel: MODULE_TIME_LABEL,
@@ -4957,7 +9252,242 @@ This module still ships a full **written** walkthrough and the mutability lab �
         explanation: "Default arg objects are created at function definition time — shared mutable state.",
       },
     ],
-  },
+  
+    interviewGraph: {
+      "initialStageId": "b3_default_arg_click",
+      "artifactDimensions": [
+        {
+          "label": "Mutable vs Immutable Identity",
+          "recoveryStageId": "b3_recovery_mutability"
+        },
+        {
+          "label": "Aliasing in Nested Structures",
+          "recoveryStageId": "b3_recovery_aliasing"
+        },
+        {
+          "label": "Tuple/Hashability Trade-offs",
+          "recoveryStageId": "b3_recovery_hashability",
+          "passLabel": "Mutability Mastery"
+        }
+      ],
+      "stages": {
+        "b3_default_arg_click": {
+          "id": "b3_default_arg_click",
+          "type": "click_target",
+          "badge": "Stage 1",
+          "title": "Stage 1 · The Airbnb-style listing cleaner bug",
+          "prompt": "Two engineers share this 'clean a listing' helper. After processing a batch of listings, unrelated listings in the batch start showing each other's amenities. Click the line that causes shared state to leak across calls.",
+          "code_snippet": "def clean_listing(listing, seen_amenities=[]):\n    for amenity in listing[\"amenities\"]:\n        if amenity not in seen_amenities:\n            seen_amenities.append(amenity)        # ds-target:append_seen\n    listing[\"amenities\"] = seen_amenities          # ds-target:assign_shared\n    return listing\n\ndef clean_batch(listings, errors=None):\n    if errors is None:                              # ds-target:none_guard\n        errors = []\n    return [clean_listing(l) for l in listings], errors",
+          "validationCopy": {
+            "append_seen": "Appending itself is normal mutation of a list — the defect is which list object is being mutated across unrelated calls. Look at the function's default argument.",
+            "assign_shared": "Correct. `seen_amenities=[]` is created once, at function-definition time, and reused as the default on every call that omits the argument. Each call mutates and then assigns that one shared list onto a different listing, so all listings in the batch end up pointing to the same amenities list — explaining why unrelated listings show each other's amenities.",
+            "none_guard": "This line is actually the *correct* pattern — using None as a sentinel default and creating a fresh list inside the function body avoids the shared-default bug entirely. That's the fix, not the defect."
+          },
+          "branches": {
+            "append_seen": "b3_recovery_mutability",
+            "assign_shared": "b3_alias_choice",
+            "none_guard": "b3_recovery_mutability"
+          }
+        },
+        "b3_alias_choice": {
+          "id": "b3_alias_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 2",
+          "title": "Stage 2 · Ghost updates in a batch job",
+          "prompt": "A nightly job copies a template config for each listing using `cfg = dict(template)` where `template = {\"rules\": [\"no smoking\"], \"max_guests\": 4}`. After the job runs, every listing's rules list contains entries from every other listing, even though `max_guests` correctly differs per listing. Why?",
+          "code_snippet": "template = {\"rules\": [\"no smoking\"], \"max_guests\": 4}\n\nfor listing in listings:\n    cfg = dict(template)              # shallow copy\n    cfg[\"max_guests\"] = listing.capacity\n    cfg[\"rules\"].append(listing.custom_rule)\n    listing.config = cfg",
+          "choices": [
+            {
+              "id": "a",
+              "label": "dict(template) is a shallow copy: it copies the top-level keys, but the 'rules' list inside is still the same shared object across every cfg",
+              "description": "Shallow copy creates a new outer dict with new bindings for each key, but the *values* themselves (like the rules list) are not recursively copied — every cfg['rules'] points at the one original list object, so .append mutates it for everyone."
+            },
+            {
+              "id": "b",
+              "label": "dict(template) fails silently and returns the same dict object every time",
+              "description": "dict(template) does create a genuinely new dict object each call — that's why max_guests correctly varies per listing. The bug is specifically about the nested list value, not the outer dict."
+            },
+            {
+              "id": "c",
+              "label": "Lists can't be stored as dict values, so 'rules' silently becomes a shared global",
+              "description": "Lists are completely valid dict values. There's no special global-promotion behavior — the issue is purely about shallow vs deep copying."
+            },
+            {
+              "id": "d",
+              "label": "cfg[\"max_guests\"] = listing.capacity is overwriting the rules list too",
+              "description": "Assigning to one key of a dict has no effect on other keys. max_guests behaves correctly precisely because integers are immutable and assignment rebinds that one key independently."
+            }
+          ],
+          "branches": {
+            "a": "b3_tuple_choice",
+            "b": "b3_recovery_aliasing",
+            "c": "b3_recovery_aliasing",
+            "d": "b3_recovery_aliasing"
+          },
+          "rationale": "`dict(template)` (like `copy.copy`) performs a shallow copy: a new outer container, but the same inner objects. Immutable values (ints, strings, tuples-of-immutables) behave fine after a shallow copy because they can't be mutated in place — any 'change' rebinds the key to a new object. Mutable nested values (lists, dicts) are exactly where shallow copies leak: every cfg shares the one 'rules' list, so append() on any of them is visible to all of them. The fix is `copy.deepcopy(template)` or rebuilding nested mutable values explicitly."
+        },
+        "b3_tuple_choice": {
+          "id": "b3_tuple_choice",
+          "type": "scenario_choice",
+          "badge": "Stage 3",
+          "title": "Stage 3 · Defending an immutability choice in a cache key",
+          "prompt": "You need to cache pricing results keyed by `(listing_id, checkin_date, checkout_date, guest_count)`. A teammate suggests using a list instead of a tuple for the key 'because lists are more flexible'. How do you respond as the senior engineer?",
+          "code_snippet": "cache = {}\n\ndef price_key(listing_id, checkin, checkout, guests):\n    return (listing_id, checkin, checkout, guests)   # tuple\n\ndef get_price(listing_id, checkin, checkout, guests):\n    key = price_key(listing_id, checkin, checkout, guests)\n    if key not in cache:\n        cache[key] = compute_price(listing_id, checkin, checkout, guests)\n    return cache[key]",
+          "choices": [
+            {
+              "id": "a",
+              "label": "A list can't be a dict key at all — lists are unhashable because they're mutable, so `cache[key]` would raise TypeError; the tuple works because, being immutable, it has a stable hash",
+              "description": "Hashability requires a stable hash for the object's lifetime, which mutable objects can't guarantee (their contents — and thus their natural hash — can change after insertion). Tuples of hashable elements are immutable and hashable; lists are unhashable by design specifically to prevent this exact mistake."
+            },
+            {
+              "id": "b",
+              "label": "Lists would work fine and are strictly better since you could mutate the key later if requirements change",
+              "description": "This is exactly backwards — a dict key that could be mutated after insertion would let you silently corrupt the hash table's internal structure (or, for lists, simply isn't allowed at all because `__hash__` is undefined for lists)."
+            },
+            {
+              "id": "c",
+              "label": "Tuples are slower than lists for this use case, so the list is the right performance trade-off",
+              "description": "Performance is not the deciding factor here, and tuples are not slower for this access pattern. The decisive factor is that the dict requires a hashable key, and only the tuple satisfies that contract."
+            },
+            {
+              "id": "d",
+              "label": "It doesn't matter; Python automatically converts lists to tuples when used as dict keys",
+              "description": "Python performs no such automatic conversion. Attempting `cache[[listing_id, checkin, checkout, guests]]` raises `TypeError: unhashable type: 'list'` immediately."
+            }
+          ],
+          "branches": {
+            "a": "b3_terminal",
+            "b": "b3_recovery_hashability",
+            "c": "b3_recovery_hashability",
+            "d": "b3_recovery_hashability"
+          },
+          "rationale": "The hashability contract requires a stable hash for the lifetime of the object's use as a key — only achievable if the object can't change underneath you. Lists are mutable, so Python disables `__hash__` for them entirely. Tuples are immutable (assuming their elements are too) and therefore safely hashable, which is precisely why composite cache keys, memoization keys, and dict/set elements reach for tuples. This is also the senior answer to 'when do you use a tuple vs a list vs a frozen dataclass': tuples for fixed-shape, hashable, lightweight keys; frozen dataclasses when you want named fields and hashability; lists only when you need in-place mutation and don't need hashability."
+        },
+        "b3_recovery_mutability": {
+          "id": "b3_recovery_mutability",
+          "type": "scenario_choice",
+          "badge": "Recovery A",
+          "title": "Recovery · Mutable default arguments",
+          "prompt": "Why is `def append_to(element, to=[]):` considered a classic Python footgun?",
+          "code_snippet": "def append_to(element, to=[]):\n    to.append(element)\n    return to\n\nprint(append_to(1))   # [1]\nprint(append_to(2))   # what does this print?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "[1, 2] — the default list is created once at function-definition time and reused (and mutated) across every call that omits the argument",
+              "description": "Default argument values are evaluated exactly once, when the `def` statement executes — not once per call. That single list object is bound to `to` every time the caller omits the argument, so every append accumulates onto the same shared list."
+            },
+            {
+              "id": "b",
+              "label": "[2] — each call gets a fresh empty list because Python re-evaluates the default every time",
+              "description": "This is the intuitive but incorrect assumption. Python evaluates default argument expressions once, at definition time, not per-call — which is exactly why this function is a footgun."
+            },
+            {
+              "id": "c",
+              "label": "TypeError — you can't use a mutable literal as a default argument",
+              "description": "Python permits mutable default arguments syntactically; it just produces surprising shared-state behavior, not an error."
+            },
+            {
+              "id": "d",
+              "label": "[1] both times, because Python resets the default after each call",
+              "description": "Python performs no such reset. The default list persists across calls for the lifetime of the function object, accumulating mutations."
+            }
+          ],
+          "branches": {
+            "a": "b3_alias_choice",
+            "b": "b3_recovery_mutability",
+            "c": "b3_recovery_mutability",
+            "d": "b3_recovery_mutability"
+          },
+          "rationale": "Default argument expressions run once, when the function is defined, and the resulting object is reused for every call that doesn't supply that argument. For mutable defaults (lists, dicts, sets), this means every 'omitted argument' call shares and mutates one persistent object. The fix is the sentinel pattern: `def append_to(element, to=None): if to is None: to = []`."
+        },
+        "b3_recovery_aliasing": {
+          "id": "b3_recovery_aliasing",
+          "type": "scenario_choice",
+          "badge": "Recovery B",
+          "title": "Recovery · Shallow copy vs deep copy",
+          "prompt": "What is the precise difference between `copy.copy(nested)` (shallow) and `copy.deepcopy(nested)` (deep) when `nested = {\"tags\": [\"a\", \"b\"]}`?",
+          "code_snippet": "import copy\nnested = {\"tags\": [\"a\", \"b\"]}\n\nshallow = copy.copy(nested)\ndeep = copy.deepcopy(nested)\n\nshallow[\"tags\"].append(\"c\")\nprint(nested[\"tags\"])   # ?\nprint(deep[\"tags\"])     # ?",
+          "choices": [
+            {
+              "id": "a",
+              "label": "nested['tags'] becomes ['a','b','c'] because shallow only copies the outer dict, sharing the inner list; deep['tags'] stays ['a','b'] because deepcopy recursively copies nested objects too",
+              "description": "Shallow copy makes a new outer container but reuses references to the same inner mutable objects. Deep copy recursively duplicates every nested mutable object, so mutating the inner list of one copy never affects the original or other copies."
+            },
+            {
+              "id": "b",
+              "label": "Both shallow and deep copies fully duplicate nested structures; there's no real difference",
+              "description": "There is a meaningful difference: shallow copy stops at one level deep and shares inner mutable objects; deep copy recurses through the entire object graph."
+            },
+            {
+              "id": "c",
+              "label": "shallow copy and deep copy both share all inner references, so nested and deep would both show ['a','b','c']",
+              "description": "This describes shallow copy correctly but misdescribes deep copy — deepcopy specifically exists to break that sharing by recursively duplicating nested mutable objects."
+            },
+            {
+              "id": "d",
+              "label": "copy.copy() raises an error on dicts containing lists",
+              "description": "copy.copy() works fine on dicts containing lists; it simply doesn't recurse into those nested values, which is the source of the shallow-copy aliasing bug."
+            }
+          ],
+          "branches": {
+            "a": "b3_tuple_choice",
+            "b": "b3_recovery_aliasing",
+            "c": "b3_recovery_aliasing",
+            "d": "b3_recovery_aliasing"
+          },
+          "rationale": "A shallow copy duplicates only the outermost container; any mutable values nested inside are still shared by reference with the original. A deep copy recursively duplicates every level, so no mutable object is ever shared between the original and the copy. When you only need independence at the top level (e.g., reassigning whole keys), shallow copy is fine and cheaper; when nested mutable values might be mutated independently, you need deepcopy."
+        },
+        "b3_recovery_hashability": {
+          "id": "b3_recovery_hashability",
+          "type": "scenario_choice",
+          "badge": "Recovery C",
+          "title": "Recovery · What can be a dict key",
+          "prompt": "Which of these can safely be used as a dict key or set element in Python?",
+          "code_snippet": "candidates = [\n    [1, 2],                  # ?\n    (1, 2),                  # ?\n    (1, [2, 3]),              # ?\n    frozenset({1, 2}),        # ?\n]",
+          "choices": [
+            {
+              "id": "a",
+              "label": "(1, 2) and frozenset({1, 2}) are hashable; [1, 2] and (1, [2, 3]) are not",
+              "description": "A tuple is hashable only if every element inside it is hashable. (1, 2) qualifies. (1, [2, 3]) contains a list, which is unhashable, so the outer tuple becomes unhashable too — TypeError on insertion. Plain lists are always unhashable. frozenset is the immutable, hashable counterpart to set."
+            },
+            {
+              "id": "b",
+              "label": "All four are hashable, because hashability only depends on the outermost type",
+              "description": "Hashability of a tuple depends recursively on its elements' hashability — a tuple containing a list is just as unhashable as the list itself."
+            },
+            {
+              "id": "c",
+              "label": "Only [1, 2] is hashable because lists are the 'simplest' container",
+              "description": "Lists are unhashable precisely because they are mutable — this is backwards from how Python's hashability rules actually work."
+            },
+            {
+              "id": "d",
+              "label": "None of these are hashable because they're all containers",
+              "description": "Tuples of hashable elements and frozensets are explicitly designed to be hashable container types — that's their entire purpose as the immutable counterparts to list and set."
+            }
+          ],
+          "branches": {
+            "a": "b3_tuple_choice",
+            "b": "b3_recovery_hashability",
+            "c": "b3_recovery_hashability",
+            "d": "b3_recovery_hashability"
+          },
+          "rationale": "Hashability rule of thumb: a value is hashable if it is immutable *all the way down*. int, float, str, bytes, and frozenset are hashable. A tuple is hashable only if every element it holds is itself hashable — a tuple containing a list is unhashable because the list could mutate underneath the hash. list, dict, and set are always unhashable because they are mutable."
+        },
+        "b3_terminal": {
+          "id": "b3_terminal",
+          "type": "scenario_choice",
+          "badge": "Terminal",
+          "title": "Interview complete · Mutability model locked in",
+          "prompt": "You diagnosed a shared mutable default argument, explained shallow-copy aliasing in nested structures, and defended tuples over lists for hashable cache keys.",
+          "code_snippet": "# Mental model:\n# mutable objects change in place (same id());\n# immutable objects return new objects on \"change\" (id() changes);\n# shallow copy shares nested mutable values; deepcopy doesn't;\n# only immutable-all-the-way-down values are hashable.",
+          "choices": [],
+          "branches": {},
+          "terminal": true,
+          "rationale": "Every stage traces back to one question: does this operation create a new object, or mutate the existing one in place? Mutable default arguments, shallow-copy aliasing, and hashability rules are three faces of the same underlying model — and being able to name which object is being shared, by whom, and for how long is exactly what separates a senior debugging answer from a guess."
+        }
+      }
+    },},
 
   ...ML_FOUNDATIONS,
   ...ML_SUPERVISED,

@@ -5,7 +5,8 @@ const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
-const DAILY_LIMIT = 20; // messages per user per day
+const FREE_DAILY_LIMIT = 5; // AI tutor messages per day on the free plan
+const PRO_DAILY_LIMIT = 20; // ...and on Pro
 
 function cors(res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -13,14 +14,44 @@ function cors(res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
-function extractAnthropicText(data) {
-  return data?.content?.map((b) => b?.text || "").join("") || "I couldn't generate a response. Please try again.";
-}
-
 function extractGeminiText(data) {
   const parts = data?.candidates?.[0]?.content?.parts;
   if (!Array.isArray(parts)) return "I couldn't generate a response. Please try again.";
   return parts.map((p) => p?.text || "").join("").trim() || "I couldn't generate a response. Please try again.";
+}
+
+// Reads Anthropic's SSE stream and invokes onDelta(text) for each text chunk.
+async function streamAnthropicText(body, onDelta) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let sep;
+    while ((sep = buffer.indexOf("\n\n")) !== -1) {
+      const block = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      for (const line of block.split("\n")) {
+        if (!line.startsWith("data:")) continue;
+        const raw = line.slice(5).trim();
+        if (!raw) continue;
+        try {
+          const evt = JSON.parse(raw);
+          if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") {
+            onDelta(evt.delta.text);
+          }
+        } catch {
+          // skip malformed chunk
+        }
+      }
+    }
+  }
+}
+
+function writeNdjson(res, obj) {
+  res.write(`${JSON.stringify(obj)}\n`);
 }
 
 function toGeminiContents(messages) {
@@ -54,8 +85,22 @@ async function authenticateRequest(req) {
   return { userId: user.id, error: null };
 }
 
+// Looks up the user's plan to pick their daily message allowance.
+async function getDailyLimit(userId) {
+  if (userId === "anonymous") return PRO_DAILY_LIMIT;
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return PRO_DAILY_LIMIT;
+  const { data } = await supabase
+    .from("user_subscriptions")
+    .select("plan, status")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const isPro = data?.plan === "pro" && ["active", "trialing"].includes(data?.status);
+  return isPro ? PRO_DAILY_LIMIT : FREE_DAILY_LIMIT;
+}
+
 // Returns { count, limited } after incrementing usage by 1
-async function checkAndIncrementUsage(userId) {
+async function checkAndIncrementUsage(userId, dailyLimit) {
   if (userId === "anonymous") return { count: 1, limited: false };
 
   const supabase = getSupabaseAdmin();
@@ -72,7 +117,7 @@ async function checkAndIncrementUsage(userId) {
     .maybeSingle();
 
   const current = data?.message_count ?? 0;
-  if (current >= DAILY_LIMIT) return { count: current, limited: true };
+  if (current >= dailyLimit) return { count: current, limited: true };
 
   // Increment
   await supabase.from("chatbot_usage").upsert(
@@ -98,13 +143,15 @@ export default async function handler(req, res) {
   const { userId, error: authError } = await authenticateRequest(req);
   if (authError) return res.status(authError.status).json(authError.body);
 
-  // ── Rate limit ──
-  const { count, limited } = await checkAndIncrementUsage(userId);
+  // ── Rate limit (plan-aware) ──
+  const dailyLimit = await getDailyLimit(userId);
+  const { count, limited } = await checkAndIncrementUsage(userId, dailyLimit);
   if (limited) {
+    const upsell = dailyLimit === FREE_DAILY_LIMIT ? " Upgrade to Pro for more." : "";
     return res.status(429).json({
       error: "rate_limit_exceeded",
-      message: `You've reached your ${DAILY_LIMIT} message daily limit. Come back tomorrow!`,
-      limit: DAILY_LIMIT,
+      message: `You've reached your ${dailyLimit} message daily limit.${upsell} Come back tomorrow!`,
+      limit: dailyLimit,
       used: count,
     });
   }
@@ -115,7 +162,7 @@ export default async function handler(req, res) {
   }
 
   // Include remaining count in response so UI can update
-  const remaining = DAILY_LIMIT - count;
+  const remaining = dailyLimit - count;
 
   try {
     if (anthropicApiKey) {
@@ -131,13 +178,27 @@ export default async function handler(req, res) {
           max_tokens: typeof max_tokens === "number" ? max_tokens : 800,
           system,
           messages,
+          stream: true,
         }),
       });
-      const data = await upstream.json();
-      if (!upstream.ok) return res.status(upstream.status).json({ error: "anthropic_upstream_error", details: data?.error || data || null });
-      return res.status(200).json({ text: extractAnthropicText(data), remaining });
+
+      if (!upstream.ok) {
+        const data = await upstream.json().catch(() => null);
+        return res.status(upstream.status).json({ error: "anthropic_upstream_error", details: data?.error || data || null });
+      }
+
+      res.writeHead(200, {
+        "Content-Type": "application/x-ndjson; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        "X-Accel-Buffering": "no",
+      });
+      await streamAnthropicText(upstream.body, (text) => writeNdjson(res, { delta: text }));
+      writeNdjson(res, { done: true, remaining });
+      return res.end();
     }
 
+    // Gemini fallback has no streaming wired up — emit the full reply as a single chunk
+    // so the client's streaming reader handles both providers the same way.
     const geminiModel = typeof model === "string" && model.startsWith("gemini-") ? model : DEFAULT_GEMINI_MODEL;
     const upstream = await fetch(
       `${GEMINI_API_URL}/${geminiModel}:generateContent?key=${encodeURIComponent(geminiApiKey)}`,
@@ -153,8 +214,17 @@ export default async function handler(req, res) {
     );
     const data = await upstream.json();
     if (!upstream.ok) return res.status(upstream.status).json({ error: "gemini_upstream_error", details: data?.error || data || null });
-    return res.status(200).json({ text: extractGeminiText(data), remaining });
+
+    res.writeHead(200, {
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
+    });
+    writeNdjson(res, { delta: extractGeminiText(data) });
+    writeNdjson(res, { done: true, remaining });
+    return res.end();
   } catch {
-    return res.status(500).json({ error: "chat_request_failed" });
+    if (!res.headersSent) return res.status(500).json({ error: "chat_request_failed" });
+    return res.end();
   }
 }
