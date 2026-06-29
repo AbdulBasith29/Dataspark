@@ -8,3 +8,4 @@ build/
 
 .vercel
 .claude/
+tmp_lessons/
