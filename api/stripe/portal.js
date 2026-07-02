@@ -34,7 +34,12 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
 
   const secretKey = process.env.STRIPE_SECRET_KEY;
-  if (!secretKey) return res.status(500).json({ error: "missing_stripe_key" });
+  if (!secretKey) {
+    return res.status(500).json({
+      error: "missing_stripe_key",
+      message: "Payments aren't configured on this deployment yet (STRIPE_SECRET_KEY is not set).",
+    });
+  }
 
   const user = await getUser(req);
   if (!user) return res.status(401).json({ error: "auth_required" });
