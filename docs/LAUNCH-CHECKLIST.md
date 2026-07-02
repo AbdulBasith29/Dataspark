@@ -9,7 +9,9 @@ is a one-time dashboard/console step.
 - [ ] Apply every migration in `supabase/migrations/` to the production project
       (SQL editor or `supabase db push`). Billing depends on
       `20260616000002_user_subscriptions.sql`; the AI tutor limits depend on
-      `20260611000001_chatbot_usage.sql`.
+      `20260611000001_chatbot_usage.sql`; practice-question progress and
+      verifiable certificates depend on
+      `20260702000000_question_progress_and_certificates.sql`.
 - [ ] Confirm RLS is enabled on `user_subscriptions` (the migration does this)
       and that no write policy exists — only the webhook writes, via the
       service-role key.
