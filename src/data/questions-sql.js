@@ -1,6 +1,7 @@
 export const SQL_QUESTIONS = [
   {
     id: "sqq1", courseId: "sql", topicId: "sql-foundations",
+    runnable: true, runnerTables: ["orders", "customers"],
     title: "Revenue by Customer Segment", difficulty: "Easy", type: "code", language: "sql", estimatedMinutes: 12,
     prompt: "Write a query returning each customer segment, unique purchasers, total revenue (completed orders only), and avg order value. Filter to segments with >$10K revenue.",
     hints: [
@@ -33,19 +34,20 @@ ORDER BY total_revenue DESC;`,
   },
   {
     id: "sqq2", courseId: "sql", topicId: "sql-foundations",
+    runnable: true, runnerTables: ["customers", "sessions"],
     title: "Cohort Retention Analysis", difficulty: "Hard", type: "code", language: "sql", estimatedMinutes: 25,
     prompt: "Build a monthly cohort retention table showing cohort_month, cohort_size, months_since_signup (0–6), retained_users, and retention_rate for the last 12 months.",
     hints: [
       "First CTE: find each user's cohort_month (DATE_TRUNC of their signup date)",
-      "Second CTE: for every session, calculate months between cohort_month and activity month",
+      "For every session, months since signup = (year diff) * 12 + (month diff) — Postgres has no DATEDIFF",
       "Divide retained users by cohort_size * 100 for the rate",
     ],
     modelAnswer: `WITH cohorts AS (
   SELECT
-    customer_id,
+    id AS customer_id,
     DATE_TRUNC('month', created_at) AS cohort_month
   FROM customers
-  WHERE created_at >= DATEADD('month', -12, DATE_TRUNC('month', CURRENT_DATE))
+  WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '12 months'
 ),
 cohort_sizes AS (
   SELECT cohort_month, COUNT(*) AS cohort_size
@@ -56,12 +58,10 @@ activity AS (
   SELECT
     c.customer_id,
     c.cohort_month,
-    DATEDIFF('month', c.cohort_month,
-      DATE_TRUNC('month', s.created_at)) AS months_since_signup
+    (EXTRACT(YEAR  FROM s.created_at) - EXTRACT(YEAR  FROM c.cohort_month)) * 12
+  + (EXTRACT(MONTH FROM s.created_at) - EXTRACT(MONTH FROM c.cohort_month)) AS months_since_signup
   FROM cohorts c
   JOIN sessions s ON c.customer_id = s.customer_id
-  WHERE DATEDIFF('month', c.cohort_month,
-          DATE_TRUNC('month', s.created_at)) BETWEEN 0 AND 6
 )
 SELECT
   a.cohort_month,
@@ -72,11 +72,12 @@ SELECT
         / cs.cohort_size, 1)                           AS retention_rate
 FROM activity a
 JOIN cohort_sizes cs ON a.cohort_month = cs.cohort_month
+WHERE a.months_since_signup BETWEEN 0 AND 6
 GROUP BY a.cohort_month, cs.cohort_size, a.months_since_signup
 ORDER BY a.cohort_month, a.months_since_signup;`,
     rubric: [
       "CTE correctly identifies cohort_month per user",
-      "Second CTE calculates months_since_signup using DATEDIFF",
+      "Computes months_since_signup with year/month arithmetic (Postgres has no DATEDIFF)",
       "Filters cohort window to last 12 months",
       "Limits months_since_signup to 0–6",
       "COUNT(DISTINCT) for retained_users",
@@ -87,6 +88,7 @@ ORDER BY a.cohort_month, a.months_since_signup;`,
   },
   {
     id: "sqq3", courseId: "sql", topicId: "sql-foundations",
+    runnable: true, runnerTables: ["funnel_events"],
     title: "Funnel Conversion by City", difficulty: "Medium", type: "code", language: "sql", estimatedMinutes: 18,
     prompt: "Calculate step-over-step conversion rates for a 5-step funnel (app_open → search → select → confirm → complete) broken down by city for the last 30 days.",
     hints: [
@@ -126,6 +128,7 @@ ORDER BY s1_app_open DESC;`,
   },
   {
     id: "sqq4", courseId: "sql", topicId: "sql-foundations",
+    runnable: true, runnerTables: ["employees"],
     title: "Recursive Org Chart", difficulty: "Hard", type: "code", language: "sql", estimatedMinutes: 22,
     prompt: "Using a recursive CTE, generate a full org hierarchy showing employee, manager, level, full chain path, and team size (all direct + indirect reports).",
     hints: [
@@ -188,6 +191,7 @@ ORDER BY o.path;`,
   },
   {
     id: "sqq5", courseId: "sql", topicId: "sql-foundations",
+    runnable: true, runnerTables: ["users"],
     title: "Running Total with Gaps", difficulty: "Medium", type: "code", language: "sql", estimatedMinutes: 18,
     prompt: "Calculate daily signups with a running total, day-over-day change, and 7-day moving average. Handle days with zero signups using a date series.",
     hints: [
@@ -238,6 +242,7 @@ ORDER BY signup_date;`,
   },
   {
     id: "sqq6", courseId: "sql", topicId: "sql-foundations",
+    runnable: true, runnerTables: ["listings"],
     title: "Duplicate Detection & Cleanup", difficulty: "Easy", type: "code", language: "sql", estimatedMinutes: 15,
     prompt: "Find duplicate listings (same host_id, title, city), show counts, then write a DELETE keeping only the most recently updated record per group.",
     hints: [
@@ -282,6 +287,7 @@ WHERE id IN (
 
   {
     id: "sqq7", courseId: "sql", topicId: "sql-advanced",
+    runnable: true, runnerTables: ["order_items", "products"],
     title: "Top-N Per Group (Ranking Pattern)", difficulty: "Medium", type: "code", language: "sql", estimatedMinutes: 15,
     company: "Airbnb",
     prompt: "For each product category, return the top 3 products by total revenue. Include category, product_name, total_revenue, and rank. Break ties by product_id ascending.",
@@ -328,6 +334,7 @@ ORDER BY category, rank;`,
   },
   {
     id: "sqq8", courseId: "sql", topicId: "sql-advanced",
+    runnable: true, runnerTables: ["events"],
     title: "Session Gap Detection", difficulty: "Hard", type: "code", language: "sql", estimatedMinutes: 22,
     company: "Spotify",
     prompt: "Define a user session as a sequence of events where no gap between consecutive events exceeds 30 minutes. Given an events table (user_id, event_time), assign a session_id to each event and count total sessions per user.",
@@ -433,6 +440,7 @@ ANALYZE orders;
   },
   {
     id: "sqq10", courseId: "sql", topicId: "sql-advanced",
+    runnable: true, runnerTables: ["orders", "products"],
     title: "Monthly Revenue Pivot by Product Line", difficulty: "Medium", type: "code", language: "sql", estimatedMinutes: 18,
     company: "Amazon",
     prompt: "Pivot monthly revenue into columns for each product line (Electronics, Clothing, Food). Output: year, month, electronics_revenue, clothing_revenue, food_revenue, total_revenue. Show only months with revenue > $0.",

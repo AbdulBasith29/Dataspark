@@ -14,5 +14,7 @@ export default defineConfig(({ mode }) => {
     ],
     // Expose both VITE_* (Vite default) and SUPABASE_* (per deployment docs) to client code.
     envPrefix: ["VITE_", "SUPABASE_"],
+    // PGlite ships its own WASM assets — pre-bundling breaks their URLs in dev.
+    optimizeDeps: { exclude: ["@electric-sql/pglite"] },
   };
 });
