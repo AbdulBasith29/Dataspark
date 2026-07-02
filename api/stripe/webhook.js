@@ -17,12 +17,19 @@ function getSupabaseAdmin() {
 }
 
 function readRawBody(req) {
+  if (Buffer.isBuffer(req.body)) return Promise.resolve(req.body);
+  if (typeof req.body === "string") return Promise.resolve(Buffer.from(req.body));
+
   return new Promise((resolve, reject) => {
     const chunks = [];
-    req.on("data", (c) => chunks.push(c));
+    req.on("data", (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
     req.on("end", () => resolve(Buffer.concat(chunks)));
     req.on("error", reject);
   });
+}
+
+function subscriptionCustomerId(sub) {
+  return typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
 }
 
 // Maps a Stripe subscription object → the row we persist.
@@ -32,13 +39,38 @@ function rowFromSubscription(sub, userId) {
     user_id: userId,
     plan: active ? "pro" : "free",
     status: sub.status,
-    stripe_customer_id: typeof sub.customer === "string" ? sub.customer : sub.customer?.id,
+    stripe_customer_id: subscriptionCustomerId(sub),
     stripe_subscription_id: sub.id,
     current_period_end: sub.current_period_end
       ? new Date(sub.current_period_end * 1000).toISOString()
       : null,
     updated_at: new Date().toISOString(),
   };
+}
+
+async function findUserIdForSubscription(supabase, sub) {
+  const metadataUserId = sub.metadata?.user_id;
+  if (metadataUserId) return metadataUserId;
+
+  const customerId = subscriptionCustomerId(sub);
+  let query = supabase
+    .from("user_subscriptions")
+    .select("user_id")
+    .eq("stripe_subscription_id", sub.id);
+
+  if (customerId) query = query.or(`stripe_customer_id.eq.${customerId},stripe_subscription_id.eq.${sub.id}`);
+
+  const { data, error } = await query.maybeSingle();
+  if (error) throw error;
+  return data?.user_id || null;
+}
+
+async function upsertSubscription(supabase, sub, userId) {
+  const { error } = await supabase
+    .from("user_subscriptions")
+    .upsert(rowFromSubscription(sub, userId), { onConflict: "user_id" });
+
+  if (error) throw error;
 }
 
 export default async function handler(req, res) {
@@ -50,6 +82,7 @@ export default async function handler(req, res) {
 
   const stripe = new Stripe(secretKey);
   const sig = req.headers["stripe-signature"];
+  if (!sig) return res.status(400).json({ error: "missing_signature" });
 
   let event;
   try {
@@ -69,7 +102,7 @@ export default async function handler(req, res) {
         const userId = session.metadata?.user_id || session.client_reference_id;
         if (userId && session.subscription) {
           const sub = await stripe.subscriptions.retrieve(session.subscription);
-          await supabase.from("user_subscriptions").upsert(rowFromSubscription(sub, userId), { onConflict: "user_id" });
+          await upsertSubscription(supabase, sub, userId);
         }
         break;
       }
@@ -77,10 +110,8 @@ export default async function handler(req, res) {
       case "customer.subscription.updated":
       case "customer.subscription.deleted": {
         const sub = event.data.object;
-        const userId = sub.metadata?.user_id;
-        if (userId) {
-          await supabase.from("user_subscriptions").upsert(rowFromSubscription(sub, userId), { onConflict: "user_id" });
-        }
+        const userId = await findUserIdForSubscription(supabase, sub);
+        if (userId) await upsertSubscription(supabase, sub, userId);
         break;
       }
       default:
