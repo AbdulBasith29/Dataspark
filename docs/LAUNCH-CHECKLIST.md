@@ -16,7 +16,21 @@ is a one-time dashboard/console step.
 - [ ] In Auth → URL Configuration, make sure the production domain is in the
       redirect allow-list (Google sign-in returns there).
 
-## 2. Stripe Dashboard
+## 2. Stripe
+
+**Automated path (recommended):** run
+
+```sh
+STRIPE_SECRET_KEY=sk_test_... SITE_URL=https://your-domain.com \
+  node scripts/stripe-launch-setup.mjs
+```
+
+It idempotently creates the product, both AUD prices, the webhook endpoint
+(with the right events), and a billing-portal configuration, then prints the
+exact env vars to paste into Vercel. Run it once with test keys, and again
+with live keys when going live. If you use it, skip the manual steps below.
+
+**Manual path (Dashboard):**
 
 - [ ] Create the product **DataSpark Pro** with two recurring prices in AUD:
       - A$20 / month → copy the price ID into `STRIPE_PRICE_PRO_MONTHLY`
@@ -45,6 +59,7 @@ Server-only (no `VITE_` prefix — never exposed to the browser):
 | `STRIPE_WEBHOOK_SECRET` | webhook endpoint created above |
 | `STRIPE_PRICE_PRO_MONTHLY` | monthly price ID |
 | `STRIPE_PRICE_PRO_ANNUAL` | annual price ID |
+| `STRIPE_PORTAL_CONFIG_ID` (optional) | printed by `scripts/stripe-launch-setup.mjs`; not needed if you saved a default portal config in the Dashboard |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → API settings |
 | `SUPABASE_URL` | Supabase → API settings |
 | `ANTHROPIC_API_KEY` (or `GEMINI_API_KEY`) | AI tutor + answer evaluation |

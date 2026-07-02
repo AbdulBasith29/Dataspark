@@ -56,6 +56,11 @@ export default async function handler(req, res) {
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
       return_url: `${origin}/platform`,
+      // Optional: pin the configuration created by scripts/stripe-launch-setup.mjs
+      // so the portal works even if no default was ever saved in the Dashboard.
+      ...(process.env.STRIPE_PORTAL_CONFIG_ID
+        ? { configuration: process.env.STRIPE_PORTAL_CONFIG_ID }
+        : {}),
     });
     return res.status(200).json({ url: session.url });
   } catch (err) {
