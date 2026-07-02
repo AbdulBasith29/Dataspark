@@ -50,16 +50,24 @@ export default async function handler(req, res) {
   const stripe = new Stripe(secretKey);
   const origin = req.headers.origin || `https://${req.headers.host}`;
 
-  // Reuse an existing Stripe customer for this user if we have one.
+  // Reuse an existing Stripe customer for this user if we have one, and
+  // refuse to open a second checkout for someone who is already on Pro —
+  // that would create a second subscription and double-bill them.
   const supabase = getSupabaseAdmin();
   let customerId = null;
   if (supabase) {
     const { data } = await supabase
       .from("user_subscriptions")
-      .select("stripe_customer_id")
+      .select("stripe_customer_id, plan, status")
       .eq("user_id", user.id)
       .maybeSingle();
     customerId = data?.stripe_customer_id || null;
+    if (data?.plan === "pro" && ["active", "trialing"].includes(data?.status)) {
+      return res.status(409).json({
+        error: "already_subscribed",
+        message: "You're already on Pro. Use “Manage billing” to change your plan.",
+      });
+    }
   }
 
   try {
