@@ -716,4 +716,888 @@ Analysts are running full-table sequential scans on the primary OLTP database. P
     commonMistakes: ["Proposing only a read replica — it reduces contention but row-oriented scans are still slow", "Recommending adding more indexes to the primary — indexes help point lookups, not aggregate scans", "Not addressing data freshness — analysts need to know if data is 5 minutes or 24 hours old"],
   },
 
+  // ── Batch 2: sqq15–sqq40, all runnable against the practice database ──────
+  {
+    id: "sqq15", courseId: "sql", topicId: "sql-foundations",
+    runnable: true, runnerTables: ["orders", "customers"],
+    title: "Top 5 Customers by Revenue", difficulty: "Easy", type: "code", language: "sql", estimatedMinutes: 8,
+    prompt: "Return the 5 customers with the highest total completed-order revenue: customer id, segment, order count, and total revenue, highest first.",
+    hints: [
+      "Filter to status = 'completed' in WHERE, before aggregation",
+      "GROUP BY both the id and the segment you select",
+      "ORDER BY the aggregate, then LIMIT 5",
+    ],
+    modelAnswer: `SELECT
+  c.id AS customer_id,
+  c.segment,
+  COUNT(*)      AS orders,
+  SUM(o.amount) AS total_revenue
+FROM orders o
+JOIN customers c ON o.customer_id = c.id
+WHERE o.status = 'completed'
+GROUP BY c.id, c.segment
+ORDER BY total_revenue DESC
+LIMIT 5;`,
+    rubric: [
+      "Joins orders to customers on the customer key",
+      "Filters completed status in WHERE",
+      "Groups by every non-aggregated selected column",
+      "Orders by total revenue descending",
+      "Limits to 5 rows",
+    ],
+    tags: ["aggregation", "joins", "LIMIT"],
+    commonMistakes: ["Filtering status in HAVING (works but scans more)", "Selecting segment without grouping by it", "LIMIT before ORDER BY thinking"],
+  },
+  {
+    id: "sqq16", courseId: "sql", topicId: "sql-foundations",
+    runnable: true, runnerTables: ["products", "order_items", "orders"],
+    title: "Products That Never Sold", difficulty: "Easy", type: "code", language: "sql", estimatedMinutes: 8,
+    prompt: "Find products that appear in neither orders nor order_items — the classic anti-join. Return product_id and product_name.",
+    hints: [
+      "LEFT JOIN and keep rows where the right side IS NULL — or use NOT EXISTS",
+      "You must check both orders and order_items",
+      "NOT IN with a subquery breaks if the subquery can return NULL — prefer NOT EXISTS",
+    ],
+    modelAnswer: `SELECT p.product_id, p.product_name
+FROM products p
+WHERE NOT EXISTS (
+    SELECT 1 FROM orders o WHERE o.product_id = p.product_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM order_items oi WHERE oi.product_id = p.product_id
+  )
+ORDER BY p.product_id;`,
+    rubric: [
+      "Uses an anti-join pattern (NOT EXISTS or LEFT JOIN … IS NULL)",
+      "Checks both sales tables",
+      "Avoids NOT IN with a nullable subquery",
+      "Returns only unsold products",
+    ],
+    tags: ["anti-join", "NOT EXISTS", "joins"],
+    commonMistakes: ["NOT IN returning zero rows when the subquery contains a NULL", "Checking only one of the two sales tables", "INNER JOIN then WHERE — filters out exactly the rows you want"],
+  },
+  {
+    id: "sqq17", courseId: "sql", topicId: "sql-foundations",
+    runnable: true, runnerTables: ["employees"],
+    title: "Second-Highest Salary", difficulty: "Easy", type: "code", language: "sql", estimatedMinutes: 8,
+    prompt: "Return the second-highest DISTINCT salary in employees. Three people share the top salary — a naive ORDER BY salary DESC OFFSET 1 returns the top value again.",
+    hints: [
+      "MAX of everything strictly below the MAX",
+      "Alternative: SELECT DISTINCT salary ORDER BY DESC OFFSET 1 LIMIT 1",
+      "Test your logic against duplicate top salaries",
+    ],
+    modelAnswer: `SELECT MAX(salary) AS second_highest_salary
+FROM employees
+WHERE salary < (SELECT MAX(salary) FROM employees);`,
+    rubric: [
+      "Handles duplicate top salaries (DISTINCT semantics)",
+      "Returns exactly one row",
+      "Uses a subquery or OFFSET approach correctly",
+    ],
+    tags: ["subqueries", "aggregation", "classic"],
+    commonMistakes: ["ORDER BY salary DESC LIMIT 1 OFFSET 1 without DISTINCT — returns the duplicated max", "Returning multiple rows", "Hardcoding the max value"],
+  },
+  {
+    id: "sqq18", courseId: "sql", topicId: "sql-foundations",
+    runnable: true, runnerTables: ["employees"],
+    title: "Department Salary Summary", difficulty: "Easy", type: "code", language: "sql", estimatedMinutes: 8,
+    prompt: "For each department return headcount, average salary (rounded to whole dollars), and the salary spread (max − min), ordered by average salary descending.",
+    hints: [
+      "One GROUP BY department does everything",
+      "ROUND(AVG(salary), 0) for whole dollars",
+      "Spread is just MAX(salary) - MIN(salary)",
+    ],
+    modelAnswer: `SELECT
+  department,
+  COUNT(*)                    AS headcount,
+  ROUND(AVG(salary), 0)       AS avg_salary,
+  MAX(salary) - MIN(salary)   AS salary_spread
+FROM employees
+GROUP BY department
+ORDER BY avg_salary DESC;`,
+    rubric: [
+      "Single aggregation grouped by department",
+      "Average rounded as requested",
+      "Spread computed from MAX and MIN",
+      "Ordered by average salary descending",
+    ],
+    tags: ["aggregation", "GROUP BY"],
+    commonMistakes: ["Averaging in application code instead of SQL", "Forgetting ROUND", "Ordering by the raw column instead of the aggregate"],
+  },
+  {
+    id: "sqq19", courseId: "sql", topicId: "sql-foundations",
+    runnable: true, runnerTables: ["orders"],
+    title: "Monthly Order Status Breakdown", difficulty: "Easy", type: "code", language: "sql", estimatedMinutes: 10,
+    prompt: "Count orders per month per status for the last 6 months (calendar months, using DATE_TRUNC), ordered by month then status.",
+    hints: [
+      "DATE_TRUNC('month', order_date) buckets dates into months",
+      "GROUP BY the truncated month AND status",
+      "Filter with order_date >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '5 months'",
+    ],
+    modelAnswer: `SELECT
+  DATE_TRUNC('month', order_date)::date AS month,
+  status,
+  COUNT(*) AS orders
+FROM orders
+WHERE order_date >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '5 months'
+GROUP BY 1, 2
+ORDER BY 1, 2;`,
+    rubric: [
+      "Buckets by calendar month with DATE_TRUNC",
+      "Groups by month and status together",
+      "Date filter uses month boundaries, not a raw 180-day window",
+      "Sorted by month then status",
+    ],
+    tags: ["dates", "GROUP BY", "DATE_TRUNC"],
+    commonMistakes: ["Grouping by EXTRACT(MONTH …) alone — merges January 2025 with January 2026", "CURRENT_DATE - 180 instead of month boundaries", "Forgetting status in the GROUP BY"],
+  },
+  {
+    id: "sqq20", courseId: "sql", topicId: "sql-foundations",
+    runnable: true, runnerTables: ["customers", "orders"],
+    title: "Include the Zero-Spend Customers", difficulty: "Easy", type: "code", language: "sql", estimatedMinutes: 10,
+    prompt: "Return ALL 60 customers with their completed-order revenue, showing 0 (not NULL, and not a missing row) for customers with no completed orders. The status filter placement is the whole question.",
+    hints: [
+      "LEFT JOIN keeps unmatched customers",
+      "Put the status condition in the JOIN's ON clause — in WHERE it silently turns your LEFT JOIN into an INNER JOIN",
+      "COALESCE(SUM(amount), 0) turns NULL into 0",
+    ],
+    modelAnswer: `SELECT
+  c.id AS customer_id,
+  c.segment,
+  COALESCE(SUM(o.amount), 0) AS total_revenue
+FROM customers c
+LEFT JOIN orders o
+  ON o.customer_id = c.id
+ AND o.status = 'completed'
+GROUP BY c.id, c.segment
+ORDER BY total_revenue DESC, c.id;`,
+    rubric: [
+      "LEFT JOIN from customers so nobody is dropped",
+      "Status filter lives in ON, not WHERE",
+      "COALESCE converts NULL sums to 0",
+      "Returns all 60 customers",
+    ],
+    tags: ["joins", "LEFT JOIN", "COALESCE", "NULL"],
+    commonMistakes: ["WHERE o.status = 'completed' after a LEFT JOIN — drops the NULL rows and becomes an INNER JOIN", "Returning NULL instead of 0", "COUNT(*) counting the customer row itself as an order"],
+  },
+  {
+    id: "sqq21", courseId: "sql", topicId: "sql-foundations",
+    runnable: true, runnerTables: ["funnel_events"],
+    title: "Busiest Day per City (DISTINCT ON)", difficulty: "Easy", type: "code", language: "sql", estimatedMinutes: 10,
+    prompt: "For each city return the single day with the most funnel events (city, event_date, events). Use PostgreSQL's DISTINCT ON — or a window function if you prefer.",
+    hints: [
+      "First aggregate to (city, event_date) counts",
+      "DISTINCT ON (city) keeps the first row per city, so ORDER BY city, count DESC",
+      "Break count ties deterministically (e.g. earliest date)",
+    ],
+    modelAnswer: `SELECT DISTINCT ON (city)
+  city,
+  event_date,
+  COUNT(*) AS events
+FROM funnel_events
+GROUP BY city, event_date
+ORDER BY city, events DESC, event_date;`,
+    rubric: [
+      "Aggregates events by city and day first",
+      "Keeps exactly one row per city",
+      "Orders so the biggest day wins, with a deterministic tie-break",
+    ],
+    tags: ["DISTINCT ON", "aggregation", "postgres"],
+    commonMistakes: ["Plain DISTINCT (dedupes whole rows, doesn't pick per group)", "No tie-break, so results vary run to run", "GROUP BY city alone — loses which day it was"],
+  },
+  {
+    id: "sqq22", courseId: "sql", topicId: "sql-foundations",
+    runnable: true, runnerTables: ["employees"],
+    title: "Employees Out-Earning Their Manager", difficulty: "Medium", type: "code", language: "sql", estimatedMinutes: 10,
+    prompt: "Return employees who earn strictly more than their direct manager: employee name and salary, manager name and salary. The classic self-join.",
+    hints: [
+      "Join employees to itself: e.manager_id = m.id",
+      "Alias the two copies clearly (e for employee, m for manager)",
+      "The CEO has no manager — inner join naturally excludes them",
+    ],
+    modelAnswer: `SELECT
+  e.name   AS employee,
+  e.salary AS employee_salary,
+  m.name   AS manager,
+  m.salary AS manager_salary
+FROM employees e
+JOIN employees m ON e.manager_id = m.id
+WHERE e.salary > m.salary
+ORDER BY e.name;`,
+    rubric: [
+      "Self-join on manager_id = id",
+      "Clear aliases for the two roles",
+      "Strict inequality on salary",
+      "Handles the NULL-manager CEO correctly",
+    ],
+    tags: ["self-join", "joins", "classic"],
+    commonMistakes: ["Joining the wrong direction (manager's reports instead of employee's manager)", "Using >= instead of >", "LEFT JOIN then crashing on NULL manager salary"],
+  },
+  {
+    id: "sqq23", courseId: "sql", topicId: "sql-advanced",
+    runnable: true, runnerTables: ["employees"],
+    title: "Top Earner per Department (With Ties)", difficulty: "Medium", type: "code", language: "sql", estimatedMinutes: 12,
+    prompt: "Return each department's highest-paid employee(s). If two people tie for the top salary in a department, return both — which rules out ROW_NUMBER.",
+    hints: [
+      "DENSE_RANK (or RANK) keeps ties; ROW_NUMBER arbitrarily drops one",
+      "PARTITION BY department ORDER BY salary DESC",
+      "Filter rank = 1 in an outer query — window functions can't go in WHERE",
+    ],
+    modelAnswer: `WITH ranked AS (
+  SELECT
+    department,
+    name,
+    salary,
+    DENSE_RANK() OVER (
+      PARTITION BY department
+      ORDER BY salary DESC
+    ) AS rnk
+  FROM employees
+)
+SELECT department, name, salary
+FROM ranked
+WHERE rnk = 1
+ORDER BY department, name;`,
+    rubric: [
+      "Window ranking partitioned by department",
+      "RANK/DENSE_RANK chosen so salary ties both survive",
+      "Filters in an outer query or CTE, not in WHERE beside the window",
+    ],
+    tags: ["window-functions", "ranking", "ties"],
+    commonMistakes: ["ROW_NUMBER silently dropping tied earners", "Window function in WHERE (invalid SQL)", "GROUP BY department with MAX but losing the person's name"],
+  },
+  {
+    id: "sqq24", courseId: "sql", topicId: "sql-advanced",
+    runnable: true, runnerTables: ["orders"],
+    title: "Month-over-Month Revenue Growth", difficulty: "Medium", type: "code", language: "sql", estimatedMinutes: 12,
+    prompt: "Show monthly completed revenue with the previous month's revenue and the % change month-over-month (1 decimal). First month's change is NULL, not 0.",
+    hints: [
+      "Aggregate to monthly revenue in a CTE first",
+      "LAG(revenue) OVER (ORDER BY month) fetches last month",
+      "NULLIF(prev, 0) guards the division; LAG is NULL for the first month — leave it NULL",
+    ],
+    modelAnswer: `WITH monthly AS (
+  SELECT
+    DATE_TRUNC('month', order_date)::date AS month,
+    SUM(amount) AS revenue
+  FROM orders
+  WHERE status = 'completed'
+  GROUP BY 1
+)
+SELECT
+  month,
+  revenue,
+  LAG(revenue) OVER (ORDER BY month) AS prev_revenue,
+  ROUND(
+    100.0 * (revenue - LAG(revenue) OVER (ORDER BY month))
+    / NULLIF(LAG(revenue) OVER (ORDER BY month), 0), 1
+  ) AS mom_growth_pct
+FROM monthly
+ORDER BY month;`,
+    rubric: [
+      "Aggregates to month grain before applying the window",
+      "LAG over month ordering for previous value",
+      "Percentage formula with divide-by-zero/NULL protection",
+      "First month shows NULL growth, not 0",
+    ],
+    tags: ["window-functions", "LAG", "dates", "growth"],
+    commonMistakes: ["Applying LAG to raw orders instead of monthly totals", "COALESCE-ing first month's growth to 0 (fabricates a data point)", "Ordering the window by revenue instead of month"],
+  },
+  {
+    id: "sqq25", courseId: "sql", topicId: "sql-advanced",
+    runnable: true, runnerTables: ["orders", "customers"],
+    title: "Customer Value Quartiles (NTILE)", difficulty: "Medium", type: "code", language: "sql", estimatedMinutes: 12,
+    prompt: "Bucket customers with completed orders into 4 spend quartiles with NTILE, then return each quartile's customer count, min, and max total spend. Quartile 1 = biggest spenders.",
+    hints: [
+      "First CTE: total completed spend per customer",
+      "NTILE(4) OVER (ORDER BY spend DESC) labels quartiles",
+      "Aggregate again by quartile for the summary",
+    ],
+    modelAnswer: `WITH spend AS (
+  SELECT customer_id, SUM(amount) AS total_spend
+  FROM orders
+  WHERE status = 'completed'
+  GROUP BY customer_id
+),
+bucketed AS (
+  SELECT
+    customer_id,
+    total_spend,
+    NTILE(4) OVER (ORDER BY total_spend DESC) AS quartile
+  FROM spend
+)
+SELECT
+  quartile,
+  COUNT(*)         AS customers,
+  MIN(total_spend) AS min_spend,
+  MAX(total_spend) AS max_spend
+FROM bucketed
+GROUP BY quartile
+ORDER BY quartile;`,
+    rubric: [
+      "Two-step: per-customer totals, then NTILE",
+      "NTILE ordered so quartile 1 is highest spend",
+      "Summary aggregation per quartile",
+    ],
+    tags: ["window-functions", "NTILE", "segmentation"],
+    commonMistakes: ["NTILE over raw order rows instead of customer totals", "Ascending order making quartile 1 the smallest spenders", "Expecting exactly equal bucket sizes when count isn't divisible by 4"],
+  },
+  {
+    id: "sqq26", courseId: "sql", topicId: "sql-advanced",
+    runnable: true, runnerTables: ["orders", "customers"],
+    title: "Median and P90 Order Value by Segment", difficulty: "Medium", type: "code", language: "sql", estimatedMinutes: 12,
+    prompt: "AVG lies when data is skewed. Per customer segment, return completed-order count, mean, median, and 90th-percentile order amount (2 decimals each).",
+    hints: [
+      "PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY amount) is the median",
+      "Same construct with 0.9 for P90",
+      "These are ordered-set aggregates — they live in the SELECT alongside GROUP BY",
+    ],
+    modelAnswer: `SELECT
+  c.segment,
+  COUNT(*) AS orders,
+  ROUND(AVG(o.amount), 2) AS mean_amount,
+  ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY o.amount)::numeric, 2) AS median_amount,
+  ROUND(PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY o.amount)::numeric, 2) AS p90_amount
+FROM orders o
+JOIN customers c ON o.customer_id = c.id
+WHERE o.status = 'completed'
+GROUP BY c.segment
+ORDER BY c.segment;`,
+    rubric: [
+      "Uses PERCENTILE_CONT ordered-set aggregate syntax",
+      "Median and P90 computed per segment",
+      "Mentions/handles the numeric cast for rounding",
+      "Completed orders only",
+    ],
+    tags: ["percentiles", "aggregation", "statistics"],
+    commonMistakes: ["Reporting only AVG for skewed money data", "Trying PERCENTILE_CONT as a window function", "Forgetting WITHIN GROUP (ORDER BY …)"],
+  },
+  {
+    id: "sqq27", courseId: "sql", topicId: "sql-advanced",
+    runnable: true, runnerTables: ["orders"],
+    title: "Repeat-Purchase Rate (FILTER)", difficulty: "Medium", type: "code", language: "sql", estimatedMinutes: 10,
+    prompt: "What share of buyers purchased more than once? Return total buyers, repeat buyers (2+ completed orders), and the repeat rate % (1 decimal), using COUNT(*) FILTER (WHERE …).",
+    hints: [
+      "First collapse to one row per customer with their completed-order count",
+      "FILTER (WHERE n >= 2) is cleaner than SUM(CASE WHEN …)",
+      "Rate = 100.0 * repeat / total — keep the .0 to avoid integer division",
+    ],
+    modelAnswer: `WITH per_customer AS (
+  SELECT customer_id, COUNT(*) AS completed_orders
+  FROM orders
+  WHERE status = 'completed'
+  GROUP BY customer_id
+)
+SELECT
+  COUNT(*) AS buyers,
+  COUNT(*) FILTER (WHERE completed_orders >= 2) AS repeat_buyers,
+  ROUND(
+    100.0 * COUNT(*) FILTER (WHERE completed_orders >= 2) / COUNT(*), 1
+  ) AS repeat_rate_pct
+FROM per_customer;`,
+    rubric: [
+      "Aggregates to customer grain before computing the rate",
+      "Uses FILTER (or an equivalent conditional aggregate)",
+      "Avoids integer division",
+      "Single summary row",
+    ],
+    tags: ["FILTER", "conditional-aggregation", "metrics"],
+    commonMistakes: ["Counting orders instead of buyers in the denominator", "Integer division truncating the rate to 0", "Including pending/refunded orders in 'purchases'"],
+  },
+  {
+    id: "sqq28", courseId: "sql", topicId: "sql-advanced",
+    runnable: true, runnerTables: ["orders"],
+    title: "Days from First to Second Purchase", difficulty: "Medium", type: "code", language: "sql", estimatedMinutes: 14,
+    prompt: "For every customer with 2+ completed orders, return their first order date, second order date, and days between. Ties on the same date must break deterministically.",
+    hints: [
+      "ROW_NUMBER() PARTITION BY customer ORDER BY order_date, id — the id tie-break matters",
+      "Self-join rn=1 to rn=2, or use LEAD",
+      "In Postgres, date - date is already an integer number of days",
+    ],
+    modelAnswer: `WITH ranked AS (
+  SELECT
+    customer_id,
+    order_date,
+    ROW_NUMBER() OVER (
+      PARTITION BY customer_id
+      ORDER BY order_date, id
+    ) AS rn
+  FROM orders
+  WHERE status = 'completed'
+)
+SELECT
+  f.customer_id,
+  f.order_date            AS first_order,
+  s.order_date            AS second_order,
+  s.order_date - f.order_date AS days_between
+FROM ranked f
+JOIN ranked s
+  ON s.customer_id = f.customer_id
+ AND f.rn = 1
+ AND s.rn = 2
+ORDER BY days_between DESC, f.customer_id;`,
+    rubric: [
+      "Ranks orders per customer with a deterministic tie-break",
+      "Pairs rank 1 with rank 2 (join or LEAD)",
+      "Date subtraction for day count",
+      "Customers with a single order are naturally excluded",
+    ],
+    tags: ["window-functions", "ROW_NUMBER", "self-join", "retention"],
+    commonMistakes: ["No tie-break column, so same-day orders rank randomly", "MIN + MAX (that's first to LAST, not first to second)", "EXTRACT(DAY FROM …) on an interval when plain date math suffices"],
+  },
+  {
+    id: "sqq29", courseId: "sql", topicId: "sql-advanced",
+    runnable: true, runnerTables: ["listings"],
+    title: "Duplicate Pairs, Not Groups", difficulty: "Medium", type: "code", language: "sql", estimatedMinutes: 10,
+    prompt: "Return every PAIR of listing ids that duplicate each other on (host_id, title, city) — each unordered pair exactly once. The a.id < b.id trick is what's being tested.",
+    hints: [
+      "Self-join on all three duplicate-key columns",
+      "a.id < b.id keeps each pair once and excludes self-pairs",
+      "a.id != b.id alone gives you every pair twice",
+    ],
+    modelAnswer: `SELECT
+  a.id AS listing_a,
+  b.id AS listing_b,
+  a.host_id,
+  a.title,
+  a.city
+FROM listings a
+JOIN listings b
+  ON  a.host_id = b.host_id
+ AND a.title   = b.title
+ AND a.city    = b.city
+ AND a.id      < b.id
+ORDER BY a.host_id, a.id, b.id;`,
+    rubric: [
+      "Self-join on the full duplicate key",
+      "a.id < b.id for unordered-pair dedup",
+      "No self-pairs, no mirrored pairs",
+    ],
+    tags: ["self-join", "deduplication", "pairs"],
+    commonMistakes: ["!= instead of < (every pair appears twice)", "Joining on a partial key", "GROUP BY returning groups when pairs were asked for"],
+  },
+  {
+    id: "sqq30", courseId: "sql", topicId: "sql-advanced",
+    runnable: true, runnerTables: ["orders", "products"],
+    title: "Revenue Share by Product Line", difficulty: "Medium", type: "code", language: "sql", estimatedMinutes: 10,
+    prompt: "Return each product line's completed revenue and its % share of total revenue (1 decimal) — in one query, no second scan for the total.",
+    hints: [
+      "SUM(revenue) OVER () — a window over the whole result — gives the total without another query",
+      "Aggregate per line first in a CTE, then window over it",
+      "100.0, not 100, to keep the division fractional",
+    ],
+    modelAnswer: `WITH line_revenue AS (
+  SELECT
+    p.product_line,
+    SUM(o.amount) AS revenue
+  FROM orders o
+  JOIN products p USING (product_id)
+  WHERE o.status = 'completed'
+  GROUP BY p.product_line
+)
+SELECT
+  product_line,
+  revenue,
+  ROUND(100.0 * revenue / SUM(revenue) OVER (), 1) AS pct_of_total
+FROM line_revenue
+ORDER BY revenue DESC;`,
+    rubric: [
+      "Per-line aggregate first, then an empty-frame window for the grand total",
+      "No self-join or repeated scan for the total",
+      "Percent computed with non-integer arithmetic",
+    ],
+    tags: ["window-functions", "percent-of-total"],
+    commonMistakes: ["Cross-joining a separate total subquery (works, but the window is the idiom)", "SUM(SUM(amount)) OVER () confusion — that's actually valid, but only inside a grouped query", "Integer division"],
+  },
+  {
+    id: "sqq31", courseId: "sql", topicId: "sql-advanced",
+    runnable: true, runnerTables: ["orders"],
+    title: "First vs Latest Order Amount (Frame Gotcha)", difficulty: "Medium", type: "code", language: "sql", estimatedMinutes: 14,
+    prompt: "Per customer with completed orders, return their first order's amount, latest order's amount, and a trend label ('up'/'down'/'flat'). LAST_VALUE's default frame makes this deliberately tricky.",
+    hints: [
+      "FIRST_VALUE works with the default frame; LAST_VALUE does NOT",
+      "Fix: ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING",
+      "SELECT DISTINCT collapses the per-row window output to one row per customer",
+    ],
+    modelAnswer: `WITH sequenced AS (
+  SELECT
+    customer_id,
+    FIRST_VALUE(amount) OVER w AS first_amount,
+    LAST_VALUE(amount) OVER (
+      PARTITION BY customer_id
+      ORDER BY order_date, id
+      ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+    ) AS latest_amount
+  FROM orders
+  WHERE status = 'completed'
+  WINDOW w AS (PARTITION BY customer_id ORDER BY order_date, id)
+)
+SELECT DISTINCT
+  customer_id,
+  first_amount,
+  latest_amount,
+  CASE
+    WHEN latest_amount > first_amount THEN 'up'
+    WHEN latest_amount < first_amount THEN 'down'
+    ELSE 'flat'
+  END AS trend
+FROM sequenced
+ORDER BY customer_id;`,
+    rubric: [
+      "FIRST_VALUE and LAST_VALUE ordered deterministically",
+      "Explicit full frame on LAST_VALUE (the gotcha)",
+      "One row per customer",
+      "Correct three-way trend label",
+    ],
+    tags: ["window-functions", "FIRST_VALUE", "frames"],
+    commonMistakes: ["LAST_VALUE with the default frame returns the CURRENT row's amount", "Missing tie-break in ORDER BY", "GROUP BY customer_id with window functions mixed incorrectly"],
+  },
+  {
+    id: "sqq32", courseId: "sql", topicId: "sql-advanced",
+    runnable: true, runnerTables: ["logins"],
+    title: "Churned Users (EXCEPT)", difficulty: "Medium", type: "code", language: "sql", estimatedMinutes: 10,
+    prompt: "Users who logged in during the previous 30-day window (31–60 days ago) but NOT in the last 30 days have churned. Return their ids with EXCEPT — then know the anti-join equivalent.",
+    hints: [
+      "Two SELECTs over different date windows, glued with EXCEPT",
+      "EXCEPT dedupes automatically (it's a set operation)",
+      "Same result: NOT EXISTS against the recent window",
+    ],
+    modelAnswer: `SELECT user_id
+FROM logins
+WHERE login_date >= CURRENT_DATE - 60
+  AND login_date <  CURRENT_DATE - 30
+EXCEPT
+SELECT user_id
+FROM logins
+WHERE login_date >= CURRENT_DATE - 30
+ORDER BY user_id;`,
+    rubric: [
+      "Correct non-overlapping date windows",
+      "EXCEPT (or equivalent anti-join) semantics",
+      "No manual DISTINCT needed — knows set ops dedupe",
+    ],
+    tags: ["set-operations", "EXCEPT", "churn", "dates"],
+    commonMistakes: ["Overlapping windows double-counting the boundary day", "UNION instead of EXCEPT", "NOT IN with a NULL-able subquery"],
+  },
+  {
+    id: "sqq33", courseId: "sql", topicId: "sql-advanced",
+    runnable: true, runnerTables: ["funnel_events"],
+    title: "Reached Selection, Never Confirmed", difficulty: "Medium", type: "code", language: "sql", estimatedMinutes: 10,
+    prompt: "Return users who reached the 'select' step but have NO 'confirm' event — your drop-off cohort for remarketing. One row per user.",
+    hints: [
+      "Filter to step = 'select', then NOT EXISTS a confirm for the same user",
+      "DISTINCT because a user can have several select events",
+      "LEFT JOIN … IS NULL works too — say why you'd pick one",
+    ],
+    modelAnswer: `SELECT DISTINCT f.user_id
+FROM funnel_events f
+WHERE f.step = 'select'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM funnel_events c
+    WHERE c.user_id = f.user_id
+      AND c.step = 'confirm'
+  )
+ORDER BY f.user_id;`,
+    rubric: [
+      "Anti-join on the same table with a step condition",
+      "Deduplicates to one row per user",
+      "Correlated subquery correlates on user_id",
+    ],
+    tags: ["NOT EXISTS", "anti-join", "funnel"],
+    commonMistakes: ["step != 'confirm' in a WHERE (row-level test, not user-level)", "Forgetting DISTINCT", "Correlating on the wrong column"],
+  },
+  {
+    id: "sqq34", courseId: "sql", topicId: "sql-advanced",
+    runnable: true, runnerTables: ["logins"],
+    title: "Login Streaks (Gaps & Islands)", difficulty: "Hard", type: "code", language: "sql", estimatedMinutes: 20,
+    prompt: "Find every run of consecutive daily logins of 5+ days: user_id, streak start, streak end, length. This is the gaps-and-islands pattern — date minus ROW_NUMBER is the trick.",
+    hints: [
+      "For consecutive dates, login_date - ROW_NUMBER() is CONSTANT within a streak",
+      "Group by (user_id, that constant) to collapse each island",
+      "MIN/MAX/COUNT per group give start, end, length",
+    ],
+    modelAnswer: `WITH marked AS (
+  SELECT
+    user_id,
+    login_date,
+    login_date - ROW_NUMBER() OVER (
+      PARTITION BY user_id
+      ORDER BY login_date
+    )::int AS island
+  FROM logins
+),
+streaks AS (
+  SELECT
+    user_id,
+    MIN(login_date) AS streak_start,
+    MAX(login_date) AS streak_end,
+    COUNT(*)        AS streak_days
+  FROM marked
+  GROUP BY user_id, island
+)
+SELECT user_id, streak_start, streak_end, streak_days
+FROM streaks
+WHERE streak_days >= 5
+ORDER BY streak_days DESC, user_id, streak_start;`,
+    rubric: [
+      "date − ROW_NUMBER island identifier",
+      "Partitioned and ordered per user",
+      "Collapses islands with GROUP BY, then filters length",
+      "Returns start, end, and length per streak",
+    ],
+    tags: ["gaps-and-islands", "window-functions", "classic", "streaks"],
+    commonMistakes: ["LAG-based approaches that find gap boundaries but can't measure streak length without a second pass", "Forgetting the partition, mixing users' dates", "Off-by-one on streak length"],
+  },
+  {
+    id: "sqq35", courseId: "sql", topicId: "sql-advanced",
+    runnable: true, runnerTables: ["logins"],
+    title: "Rolling 7-Day Active Users", difficulty: "Hard", type: "code", language: "sql", estimatedMinutes: 20,
+    prompt: "For each of the last 30 days, count DISTINCT users active in the trailing 7 days (that day + 6 before). COUNT(DISTINCT) isn't allowed in a window frame — that's the puzzle.",
+    hints: [
+      "Build the 30 days with generate_series",
+      "Join logins with login_date BETWEEN day - 6 AND day, then COUNT(DISTINCT user_id) per day",
+      "The join deliberately fans out — each login can serve up to 7 days",
+    ],
+    modelAnswer: `WITH days AS (
+  SELECT generate_series(
+    CURRENT_DATE - 29, CURRENT_DATE, INTERVAL '1 day'
+  )::date AS day
+)
+SELECT
+  d.day,
+  COUNT(DISTINCT l.user_id) AS active_users_7d
+FROM days d
+LEFT JOIN logins l
+  ON l.login_date BETWEEN d.day - 6 AND d.day
+GROUP BY d.day
+ORDER BY d.day;`,
+    rubric: [
+      "Date spine via generate_series",
+      "Range join implementing the trailing window",
+      "COUNT(DISTINCT) after the join, not in a window frame",
+      "LEFT JOIN so zero-activity days still appear",
+    ],
+    tags: ["date-spine", "rolling-windows", "DAU", "joins"],
+    commonMistakes: ["COUNT(DISTINCT …) OVER (ROWS 6 PRECEDING) — Postgres rejects DISTINCT in window aggregates", "Summing daily distinct counts (double-counts users active on multiple days)", "INNER JOIN dropping quiet days"],
+  },
+  {
+    id: "sqq36", courseId: "sql", topicId: "sql-advanced",
+    runnable: true, runnerTables: ["events"],
+    title: "Average Session Duration", difficulty: "Hard", type: "code", language: "sql", estimatedMinutes: 22,
+    prompt: "Sessionize events with a 30-minute inactivity rule, then return per user: session count and average session duration in minutes (1 decimal). Single-event sessions count as 0 minutes.",
+    hints: [
+      "LAG + 30-min comparison marks session starts; a running SUM of the marks numbers the sessions",
+      "Session duration = MAX(event_time) - MIN(event_time) per (user, session)",
+      "EXTRACT(EPOCH FROM interval) / 60 converts to minutes",
+    ],
+    modelAnswer: `WITH gaps AS (
+  SELECT
+    user_id,
+    event_time,
+    CASE
+      WHEN LAG(event_time) OVER (PARTITION BY user_id ORDER BY event_time) IS NULL
+        OR event_time - LAG(event_time) OVER (PARTITION BY user_id ORDER BY event_time)
+           > INTERVAL '30 minutes'
+      THEN 1 ELSE 0
+    END AS is_new_session
+  FROM events
+),
+numbered AS (
+  SELECT
+    user_id,
+    event_time,
+    SUM(is_new_session) OVER (
+      PARTITION BY user_id ORDER BY event_time
+    ) AS session_no
+  FROM gaps
+),
+durations AS (
+  SELECT
+    user_id,
+    session_no,
+    EXTRACT(EPOCH FROM MAX(event_time) - MIN(event_time)) / 60 AS minutes
+  FROM numbered
+  GROUP BY user_id, session_no
+)
+SELECT
+  user_id,
+  COUNT(*) AS sessions,
+  ROUND(AVG(minutes)::numeric, 1) AS avg_session_minutes
+FROM durations
+GROUP BY user_id
+ORDER BY user_id;`,
+    rubric: [
+      "Session boundaries from LAG + threshold",
+      "Running SUM converts boundary flags into session numbers",
+      "Duration from MIN/MAX inside each session",
+      "Two-level aggregation up to per-user averages",
+    ],
+    tags: ["sessionization", "window-functions", "intervals"],
+    commonMistakes: ["Comparing intervals to bare numbers instead of INTERVAL literals", "Averaging event gaps instead of session durations", "Losing single-event sessions (they're 0, not excluded)"],
+  },
+  {
+    id: "sqq37", courseId: "sql", topicId: "sql-advanced",
+    runnable: true, runnerTables: ["orders"],
+    title: "New vs Returning Buyers per Month", difficulty: "Hard", type: "code", language: "sql", estimatedMinutes: 18,
+    prompt: "Per month: how many distinct buyers were NEW (first-ever completed order that month) vs RETURNING? A buyer's first month counts them as new even if they buy again the same month.",
+    hints: [
+      "One CTE computes each customer's first completed-order date",
+      "Compare each order's month against the customer's first-order month",
+      "COUNT(DISTINCT …) FILTER (WHERE is_new) keeps it to one pass",
+    ],
+    modelAnswer: `WITH firsts AS (
+  SELECT customer_id, MIN(order_date) AS first_order_date
+  FROM orders
+  WHERE status = 'completed'
+  GROUP BY customer_id
+),
+labeled AS (
+  SELECT
+    DATE_TRUNC('month', o.order_date)::date AS month,
+    o.customer_id,
+    DATE_TRUNC('month', f.first_order_date) = DATE_TRUNC('month', o.order_date) AS is_new
+  FROM orders o
+  JOIN firsts f USING (customer_id)
+  WHERE o.status = 'completed'
+)
+SELECT
+  month,
+  COUNT(DISTINCT customer_id) FILTER (WHERE is_new)     AS new_buyers,
+  COUNT(DISTINCT customer_id) FILTER (WHERE NOT is_new) AS returning_buyers
+FROM labeled
+GROUP BY month
+ORDER BY month;`,
+    rubric: [
+      "First-purchase date computed once per customer",
+      "Month-level comparison labels new vs returning",
+      "DISTINCT customers per month, not order counts",
+      "Single grouped pass with FILTER",
+    ],
+    tags: ["cohorts", "FILTER", "dates", "retention"],
+    commonMistakes: ["Counting orders instead of distinct buyers", "A same-month repeat purchase flipping the buyer to 'returning'", "Comparing raw dates instead of truncated months"],
+  },
+  {
+    id: "sqq38", courseId: "sql", topicId: "sql-advanced",
+    runnable: true, runnerTables: ["orders", "products"],
+    title: "Top 2 Products per Month", difficulty: "Hard", type: "code", language: "sql", estimatedMinutes: 16,
+    prompt: "For each month, return the top 2 products by completed revenue — keeping ties (a tie for 2nd returns 3+ rows for that month). Month, product name, revenue, rank.",
+    hints: [
+      "Aggregate to (month, product) revenue first",
+      "DENSE_RANK partitioned by month, ordered by revenue DESC",
+      "Filter rank <= 2 in the outer query",
+    ],
+    modelAnswer: `WITH product_months AS (
+  SELECT
+    DATE_TRUNC('month', o.order_date)::date AS month,
+    p.product_name,
+    SUM(o.amount) AS revenue
+  FROM orders o
+  JOIN products p USING (product_id)
+  WHERE o.status = 'completed'
+  GROUP BY 1, 2
+),
+ranked AS (
+  SELECT
+    month,
+    product_name,
+    revenue,
+    DENSE_RANK() OVER (
+      PARTITION BY month
+      ORDER BY revenue DESC
+    ) AS rnk
+  FROM product_months
+)
+SELECT month, product_name, revenue, rnk
+FROM ranked
+WHERE rnk <= 2
+ORDER BY month, rnk, product_name;`,
+    rubric: [
+      "Month-product aggregation before ranking",
+      "Rank partitioned per month",
+      "DENSE_RANK so revenue ties survive",
+      "Outer-query filter on the rank",
+    ],
+    tags: ["window-functions", "top-n", "ranking", "dates"],
+    commonMistakes: ["Ranking over raw order rows", "ROW_NUMBER discarding tied products", "Global LIMIT 2 instead of top-2 per month"],
+  },
+  {
+    id: "sqq39", courseId: "sql", topicId: "sql-advanced",
+    runnable: true, runnerTables: ["orders", "customers"],
+    title: "Cumulative Revenue vs Segment Total", difficulty: "Hard", type: "code", language: "sql", estimatedMinutes: 18,
+    prompt: "Per segment per month: monthly completed revenue, running cumulative revenue within the segment, and the cumulative % of that segment's total (1 decimal). Three window frames in one query.",
+    hints: [
+      "Aggregate to (segment, month) first",
+      "Running total: SUM OVER (PARTITION BY segment ORDER BY month)",
+      "Segment total: SUM OVER (PARTITION BY segment) — no ORDER BY means the whole partition",
+    ],
+    modelAnswer: `WITH seg_month AS (
+  SELECT
+    c.segment,
+    DATE_TRUNC('month', o.order_date)::date AS month,
+    SUM(o.amount) AS revenue
+  FROM orders o
+  JOIN customers c ON o.customer_id = c.id
+  WHERE o.status = 'completed'
+  GROUP BY 1, 2
+)
+SELECT
+  segment,
+  month,
+  revenue,
+  SUM(revenue) OVER (
+    PARTITION BY segment ORDER BY month
+  ) AS cumulative_revenue,
+  ROUND(
+    100.0 * SUM(revenue) OVER (PARTITION BY segment ORDER BY month)
+    / SUM(revenue) OVER (PARTITION BY segment), 1
+  ) AS cumulative_pct_of_segment
+FROM seg_month
+ORDER BY segment, month;`,
+    rubric: [
+      "Pre-aggregation to segment-month grain",
+      "Running total via ordered partition",
+      "Partition total via unordered partition",
+      "Knows ORDER BY inside OVER changes the frame from 'whole partition' to 'running'",
+    ],
+    tags: ["window-functions", "running-total", "frames"],
+    commonMistakes: ["Thinking SUM OVER (PARTITION BY x) and SUM OVER (PARTITION BY x ORDER BY y) return the same thing", "Dividing by the grand total instead of the segment total", "Cumulative % exceeding 100 from a wrong partition"],
+  },
+  {
+    id: "sqq40", courseId: "sql", topicId: "sql-advanced",
+    runnable: true, runnerTables: ["employees"],
+    title: "Salary by Org Depth (Recursive CTE)", difficulty: "Hard", type: "code", language: "sql", estimatedMinutes: 16,
+    prompt: "Walk the reporting tree from the CEO and return, per depth level (CEO = 0): employee count and average salary (whole dollars). Recursive CTE required.",
+    hints: [
+      "Anchor: manager_id IS NULL at depth 0",
+      "Recursive step joins employees to the CTE, depth + 1",
+      "Aggregate the CTE's output by depth",
+    ],
+    modelAnswer: `WITH RECURSIVE org AS (
+  SELECT id, salary, 0 AS depth
+  FROM employees
+  WHERE manager_id IS NULL
+
+  UNION ALL
+
+  SELECT e.id, e.salary, o.depth + 1
+  FROM employees e
+  JOIN org o ON e.manager_id = o.id
+)
+SELECT
+  depth,
+  COUNT(*)              AS employees,
+  ROUND(AVG(salary), 0) AS avg_salary
+FROM org
+GROUP BY depth
+ORDER BY depth;`,
+    rubric: [
+      "Correct anchor member (NULL manager, depth 0)",
+      "Recursive member increments depth via the self-join",
+      "Aggregation happens outside the recursive CTE",
+      "One row per depth level",
+    ],
+    tags: ["recursive-CTE", "hierarchies", "aggregation"],
+    commonMistakes: ["Aggregating inside the recursive member (not allowed)", "UNION instead of UNION ALL (dedup can silently truncate traversal)", "Depth off by one"],
+  },
 ];

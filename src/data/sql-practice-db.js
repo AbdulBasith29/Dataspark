@@ -37,7 +37,10 @@ INSERT INTO products (product_id, product_name, category, product_line) VALUES
   (6, 'Merino Socks',         'Basics',    'Clothing'),
   (7, 'Single-Origin Coffee', 'Pantry',    'Food'),
   (8, 'Dark Chocolate Box',   'Pantry',    'Food'),
-  (9, 'Olive Oil Tin',        'Pantry',    'Food');
+  (9, 'Olive Oil Tin',        'Pantry',    'Food'),
+  -- 10 and 11 intentionally have no sales anywhere (anti-join questions)
+  (10, 'Bamboo Cutting Board', 'Kitchen',  'Food'),
+  (11, 'Canvas Tote',          'Basics',   'Clothing');
 
 -- ── orders: 420 orders over the last 12 months, mixed statuses ──────────────
 CREATE TABLE orders (
@@ -48,9 +51,10 @@ CREATE TABLE orders (
   status      text NOT NULL,
   order_date  date NOT NULL
 );
+-- customers 58–60 never order (LEFT JOIN / zero-spend questions)
 INSERT INTO orders (id, customer_id, product_id, amount, status, order_date)
 SELECT g,
-       1 + (g % 60),
+       1 + (g % 57),
        1 + (g % 9),
        ROUND((25 + random() * 475)::numeric, 2),
        CASE WHEN g % 11 = 0 THEN 'refunded'
@@ -94,24 +98,30 @@ CROSS JOIN LATERAL generate_series(1,
        ELSE 5 END) AS s;
 
 -- ── employees: 12 people, 4 levels, one CEO ─────────────────────────────────
+-- Aisha and Ethan deliberately out-earn their managers; Priya, Aisha, and
+-- Ethan share the TOP salary, so naive "second highest" (ORDER BY … OFFSET 1)
+-- returns the max again — DISTINCT thinking is required.
 CREATE TABLE employees (
   id         int PRIMARY KEY,
   name       text NOT NULL,
-  manager_id int REFERENCES employees(id)
+  manager_id int REFERENCES employees(id),
+  department text NOT NULL,
+  salary     int NOT NULL,
+  hired_at   date NOT NULL
 );
-INSERT INTO employees (id, name, manager_id) VALUES
-  (1,  'Priya Sharma',    NULL),
-  (2,  'Marcus Chen',     1),
-  (3,  'Elena Rodriguez', 1),
-  (4,  'Tom Nguyen',      2),
-  (5,  'Aisha Khan',      2),
-  (6,  'Jack Wilson',     3),
-  (7,  'Sofia Rossi',     3),
-  (8,  'Liam O''Brien',   4),
-  (9,  'Mei Lin',         4),
-  (10, 'Noah Taylor',     5),
-  (11, 'Zara Ahmed',      6),
-  (12, 'Ethan Park',      7);
+INSERT INTO employees (id, name, manager_id, department, salary, hired_at) VALUES
+  (1,  'Priya Sharma',    NULL, 'Executive',   192000, CURRENT_DATE - 2600),
+  (2,  'Marcus Chen',     1,    'Engineering', 185000, CURRENT_DATE - 2200),
+  (3,  'Elena Rodriguez', 1,    'Analytics',   178000, CURRENT_DATE - 2100),
+  (4,  'Tom Nguyen',      2,    'Engineering', 150000, CURRENT_DATE - 1700),
+  (5,  'Aisha Khan',      2,    'Engineering', 192000, CURRENT_DATE - 1500),
+  (6,  'Jack Wilson',     3,    'Analytics',   140000, CURRENT_DATE - 1400),
+  (7,  'Sofia Rossi',     3,    'Analytics',   145000, CURRENT_DATE - 1300),
+  (8,  'Liam O''Brien',   4,    'Engineering', 118000, CURRENT_DATE - 900),
+  (9,  'Mei Lin',         4,    'Engineering', 126000, CURRENT_DATE - 800),
+  (10, 'Noah Taylor',     5,    'Engineering', 121000, CURRENT_DATE - 700),
+  (11, 'Zara Ahmed',      6,    'Analytics',   112000, CURRENT_DATE - 500),
+  (12, 'Ethan Park',      7,    'Analytics',   192000, CURRENT_DATE - 400);
 
 -- ── users: ~90 days of signups with recurring zero-signup gap days ──────────
 CREATE TABLE users (
@@ -153,6 +163,23 @@ SELECT g,
        1 + ((g * 7) % 9),
        ROUND((15 + ((g * 37) % 300))::numeric, 2)
 FROM generate_series(1, 360) AS g;
+
+-- ── logins: 60 days of daily logins for 25 users ────────────────────────────
+-- Users 1–5 have a guaranteed 7-day streak (3–9 days ago); users 21–25 only
+-- logged in 31–59 days ago, i.e. they churned in the last 30 days.
+CREATE TABLE logins (
+  user_id    int NOT NULL,
+  login_date date NOT NULL,
+  PRIMARY KEY (user_id, login_date)
+);
+INSERT INTO logins (user_id, login_date)
+SELECT u, CURRENT_DATE - d
+FROM generate_series(1, 25) AS u
+CROSS JOIN generate_series(0, 59) AS d
+WHERE (u <= 20 AND ((u * 31 + d * 7) % 10) < 4)
+   OR (u <= 5 AND d BETWEEN 3 AND 9)
+   OR (u > 20 AND d BETWEEN 31 AND 59 AND ((u + d) % 3) < 2)
+ON CONFLICT DO NOTHING;
 
 -- ── events: 6 users × 20 clicks; a 59-min gap every 4th event splits sessions
 CREATE TABLE events (
@@ -213,11 +240,12 @@ export function resultsMatch(a, b) {
 // querying without leaving the question.
 export const SQL_PRACTICE_TABLES = {
   customers: "customers(id, segment, created_at) — 60 signups over ~13 months; segment ∈ consumer/smb/enterprise",
-  products: "products(product_id, product_name, category, product_line) — 9 products; line ∈ Electronics/Clothing/Food",
+  products: "products(product_id, product_name, category, product_line) — 11 products; line ∈ Electronics/Clothing/Food; two have never sold",
   orders: "orders(id, customer_id → customers.id, product_id → products, amount, status ∈ completed/pending/refunded, order_date)",
   sessions: "sessions(customer_id → customers.id, created_at) — post-signup activity with monthly decay",
   funnel_events: "funnel_events(user_id, step ∈ app_open→search→select→confirm→complete, city, event_date) — last 30 days",
-  employees: "employees(id, name, manager_id → employees.id) — 12 people, CEO has NULL manager",
+  employees: "employees(id, name, manager_id → employees.id, department, salary, hired_at) — 12 people, CEO has NULL manager",
+  logins: "logins(user_id, login_date) — one row per user per active day, last 60 days",
   users: "users(id, created_at) — ~90 days of signups; some days have none",
   listings: "listings(id, host_id, title, city, updated_at) — contains exact duplicates on (host_id, title, city)",
   order_items: "order_items(id, order_id, product_id → products, amount)",
