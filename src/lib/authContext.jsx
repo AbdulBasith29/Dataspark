@@ -99,6 +99,18 @@ export function AuthProvider({ children }) {
         return;
       }
 
+      if (event === "MFA_CHALLENGE_VERIFIED") {
+        // This event's payload is the MFA verify response, not a canonical
+        // Session — read the real one instead of storing the wrong shape.
+        // Safe to call here: we're in a macrotask, outside the callback lock.
+        const { data } = await supabase.auth.getSession();
+        if (stale()) return;
+        setSession(data?.session ?? null);
+        setUser(data?.session?.user ?? null);
+        setMfaFactorId(null);
+        return;
+      }
+
       // TOKEN_REFRESHED, USER_UPDATED, etc.
       setSession(session);
       setUser(session?.user ?? null);
