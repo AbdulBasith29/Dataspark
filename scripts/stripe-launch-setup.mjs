@@ -99,19 +99,34 @@ if (endpoint) {
 // ── 4. Billing-portal configuration ─────────────────────────────────────────
 // api/stripe/portal.js uses STRIPE_PORTAL_CONFIG_ID when set, so this works
 // even if no default portal configuration was ever saved in the Dashboard.
+// subscription_update is required: checkout returns 409 for active Pro users
+// and points them at "Manage billing" — the portal must therefore be able to
+// switch them between monthly and annual.
+const portalFeatures = {
+  customer_update: { enabled: true, allowed_updates: ["email", "address"] },
+  invoice_history: { enabled: true },
+  payment_method_update: { enabled: true },
+  subscription_cancel: { enabled: true, mode: "at_period_end" },
+  subscription_update: {
+    enabled: true,
+    default_allowed_updates: ["price"],
+    proration_behavior: "create_prorations",
+    products: [{ product: product.id, prices: [monthly.id, annual.id] }],
+  },
+};
 let portalConfig = (await stripe.billingPortal.configurations.list({ active: true, limit: 100 })).data
   .find((c) => c.metadata?.app === "dataspark");
 if (portalConfig) {
-  console.log(`✓ Portal configuration exists: ${portalConfig.id}`);
+  // Re-running upgrades an existing configuration to the current feature set
+  // (e.g. configs created before plan switching was enabled).
+  portalConfig = await stripe.billingPortal.configurations.update(portalConfig.id, {
+    features: portalFeatures,
+  });
+  console.log(`✓ Portal configuration updated: ${portalConfig.id}`);
 } else {
   portalConfig = await stripe.billingPortal.configurations.create({
     business_profile: { headline: "DataSpark — manage your Pro subscription" },
-    features: {
-      customer_update: { enabled: true, allowed_updates: ["email", "address"] },
-      invoice_history: { enabled: true },
-      payment_method_update: { enabled: true },
-      subscription_cancel: { enabled: true, mode: "at_period_end" },
-    },
+    features: portalFeatures,
     metadata: { app: "dataspark" },
   });
   console.log(`+ Created portal configuration: ${portalConfig.id}`);
