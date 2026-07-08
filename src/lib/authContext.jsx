@@ -45,7 +45,16 @@ export function AuthProvider({ children }) {
         setUser(null);
       });
 
-    const handleAuthEvent = async (event, session) => {
+    // Deferred handlers can pause on the MFA lookups below, so a SIGNED_IN
+    // handler could otherwise finish after a later SIGNED_OUT (e.g. from
+    // another tab) and resurrect the dead session. Each event takes a
+    // sequence number; a handler may only apply state while it is still the
+    // newest event.
+    let eventSeq = 0;
+
+    const handleAuthEvent = async (event, session, seq) => {
+      const stale = () => seq !== eventSeq;
+
       if (event === "PASSWORD_RECOVERY") {
         setSession(session);
         setUser(session?.user ?? null);
@@ -58,8 +67,10 @@ export function AuthProvider({ children }) {
         // Check whether MFA is required before granting access
         try {
           const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+          if (stale()) return;
           if (aal?.nextLevel === "aal2" && aal?.currentLevel !== "aal2") {
             const { data: factors } = await supabase.auth.mfa.listFactors();
+            if (stale()) return;
             const totp = factors?.totp?.[0];
             if (totp) {
               setMfaFactorId(totp.id);
@@ -74,6 +85,7 @@ export function AuthProvider({ children }) {
         } catch {
           // MFA check failed — fall through and grant access
         }
+        if (stale()) return;
         setSession(session);
         setUser(session.user);
         setIsAuthOpen(false);
@@ -97,7 +109,8 @@ export function AuthProvider({ children }) {
     // that lock — the platform then hangs on "Loading…" after sign-in or
     // checkout redirects. Deferring to a macrotask releases the lock first.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setTimeout(() => { handleAuthEvent(event, session); }, 0);
+      const seq = ++eventSeq;
+      setTimeout(() => { handleAuthEvent(event, session, seq); }, 0);
     });
 
     return () => subscription.unsubscribe();
