@@ -10,6 +10,14 @@ async function authHeader() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// Distinguishes "the API isn't there" (SPA HTML came back — server not
+// serving api/ routes) from a real error the server described.
+function describeFailure(res, data, fallback) {
+  if (data.message) return data.message;
+  if (data.error) return `${fallback} (${data.error})`;
+  return `${fallback} — the server returned an unexpected response (HTTP ${res.status}). If this is a deployment, check that the Stripe environment variables are set on Vercel.`;
+}
+
 // interval: "monthly" | "annual"
 export async function startCheckout(interval = "monthly") {
   const headers = { "Content-Type": "application/json", ...(await authHeader()) };
@@ -20,7 +28,7 @@ export async function startCheckout(interval = "monthly") {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.url) {
-    throw new Error(data.message || "Could not start checkout. Please try again.");
+    throw new Error(describeFailure(res, data, "Could not start checkout"));
   }
   window.location.href = data.url;
 }
@@ -30,7 +38,7 @@ export async function openBillingPortal() {
   const res = await fetch("/api/stripe/portal", { method: "POST", headers });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.url) {
-    throw new Error(data.message || "Could not open billing portal.");
+    throw new Error(describeFailure(res, data, "Could not open billing portal"));
   }
   window.location.href = data.url;
 }

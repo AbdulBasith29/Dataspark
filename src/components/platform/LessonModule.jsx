@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Check, MessageCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { DS, dsGlassCard } from "../../lib/ds-platform-tokens.js";
 import { renderInlineMarkdown } from "../../lib/inline-markdown.jsx";
 import { SimpleMarkdown } from "../../lib/simple-markdown.jsx";
@@ -10,6 +10,7 @@ import AsyncActionButton from "../AsyncActionButton.jsx";
 import ConfidenceMeter from "./ConfidenceMeter.jsx";
 import IntentLessonIntro from "./IntentLessonIntro.jsx";
 import { buildDrillPrompt, recordCheckErrors } from "../../lib/adaptive-drills.js";
+import { getSupabaseBrowserClient } from "../../lib/supabaseClient.js";
 import {
   LVS_EVENT_NAMES,
   buildConfidenceMetadata,
@@ -65,7 +66,7 @@ function buildDecisionArtifact({ graph, branchPath, clickedTargets, graphChoices
   };
 }
 
-function DecisionArtifactCard({ graph, branchPath, clickedTargets, graphChoices, lessonTitle, accent, lessonId, courseId }) {
+function DecisionArtifactCard({ graph, branchPath, clickedTargets, graphChoices, lessonTitle, accent, lessonId }) {
   const artifact = buildDecisionArtifact({ graph, branchPath, clickedTargets, graphChoices, lessonTitle });
   const artifactJson = JSON.stringify(artifact, null, 2);
   const filename = `${(lessonTitle || "dataspark").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}-decision-artifact.json`;
@@ -73,20 +74,47 @@ function DecisionArtifactCard({ graph, branchPath, clickedTargets, graphChoices,
   const navigate = useNavigate();
   const isCapstone = lessonId === "sql-capstone-01";
   const [certName, setCertName] = useState("");
+  const [certBusy, setCertBusy] = useState(false);
+  const [certError, setCertError] = useState("");
 
-  const handleGetCertificate = () => {
+  // Certificates are issued server-side (api/certificates) so the credential
+  // id is verifiable — nothing about the cert is encoded in the URL.
+  const handleGetCertificate = async () => {
     const name = certName.trim();
-    if (!name) return;
-    const certData = {
-      id: btoa(`${lessonId}-${Date.now()}`).slice(0, 16),
-      name,
-      title: "StreamCore Analytics Challenge",
-      course: courseId || "sql",
-      date: new Date().toISOString(),
-      dimensions: artifact.performanceMatrix.map(row => ({ label: row.dimension, result: row.result })),
-    };
-    const encoded = btoa(JSON.stringify(certData));
-    navigate(`/certificate/${encoded}`);
+    if (!name || certBusy) return;
+    setCertBusy(true);
+    setCertError("");
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setCertError("Sign in to claim your certificate.");
+        return;
+      }
+      // The issue route requires the capstone to be marked complete.
+      await supabase
+        .from("lesson_progress")
+        .upsert({ user_id: session.user.id, lesson_id: lessonId, status: "done" }, { onConflict: "user_id,lesson_id" });
+      const res = await fetch("/api/certificates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({
+          lessonId,
+          name,
+          dimensions: artifact.performanceMatrix.map(row => ({ label: row.dimension, result: row.result })),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.id) {
+        setCertError(data.message || "Could not issue the certificate. Please try again.");
+        return;
+      }
+      navigate(`/certificate/${data.id}`);
+    } catch {
+      setCertError("Could not issue the certificate. Check your connection and try again.");
+    } finally {
+      setCertBusy(false);
+    }
   };
 
   const handleDownload = () => {
@@ -204,24 +232,29 @@ function DecisionArtifactCard({ graph, branchPath, clickedTargets, graphChoices,
           <button
             type="button"
             onClick={handleGetCertificate}
-            disabled={!certName.trim()}
+            disabled={!certName.trim() || certBusy}
             style={{
-              background: certName.trim() ? "#F59E0B" : "rgba(245,158,11,0.2)",
+              background: certName.trim() && !certBusy ? "#F59E0B" : "rgba(245,158,11,0.2)",
               border: "none",
               borderRadius: DS.radiusSm,
               padding: "13px 18px",
-              color: certName.trim() ? "#000" : DS.dim,
+              color: certName.trim() && !certBusy ? "#000" : DS.dim,
               fontSize: 14,
               fontWeight: 800,
-              cursor: certName.trim() ? "pointer" : "default",
+              cursor: certName.trim() && !certBusy ? "pointer" : "default",
               fontFamily: "var(--ds-sans), sans-serif",
               minHeight: 44,
               width: "100%",
               transition: "background 0.2s",
             }}
           >
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>Get my certificate <ArrowRight size={13} /></span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              {certBusy ? "Issuing…" : "Get my certificate"} <ArrowRight size={13} />
+            </span>
           </button>
+          {certError && (
+            <div style={{ fontSize: 12, color: "#FCA5A5", fontFamily: "var(--ds-mono), monospace" }}>{certError}</div>
+          )}
         </div>
       )}
     </div>

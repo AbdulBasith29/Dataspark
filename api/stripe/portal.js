@@ -34,7 +34,12 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
 
   const secretKey = process.env.STRIPE_SECRET_KEY;
-  if (!secretKey) return res.status(500).json({ error: "missing_stripe_key" });
+  if (!secretKey) {
+    return res.status(500).json({
+      error: "missing_stripe_key",
+      message: "Payments aren't configured on this deployment yet (STRIPE_SECRET_KEY is not set).",
+    });
+  }
 
   const user = await getUser(req);
   if (!user) return res.status(401).json({ error: "auth_required" });
@@ -56,6 +61,11 @@ export default async function handler(req, res) {
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
       return_url: `${origin}/platform`,
+      // Optional: pin the configuration created by scripts/stripe-launch-setup.mjs
+      // so the portal works even if no default was ever saved in the Dashboard.
+      ...(process.env.STRIPE_PORTAL_CONFIG_ID
+        ? { configuration: process.env.STRIPE_PORTAL_CONFIG_ID }
+        : {}),
     });
     return res.status(200).json({ url: session.url });
   } catch (err) {

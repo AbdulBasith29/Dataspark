@@ -1367,6 +1367,7 @@ export default function DataSparkPlatform() {
   const [chatbotCourse, setChatbotCourse] = useState(null);
   const [chatbotSeed, setChatbotSeed] = useState("");
   const [progress, setProgress] = useState({});
+  const [questionProgress, setQuestionProgress] = useState({}); // question_id → best score
   const [courseTab, setCourseTab] = useState("learn");
   const [diffFilter, setDiffFilter] = useState("All");
   const [evalLoading, setEvalLoading] = useState(false);
@@ -1376,18 +1377,20 @@ export default function DataSparkPlatform() {
   const { user, isPro, refreshPlan } = useAuth();
   const navigate = useNavigate();
 
-  // Hydrate completed-lesson checkmarks from Supabase on login.
+  // Hydrate completed-lesson checkmarks and practice-question scores from
+  // Supabase on login.
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
     (async () => {
       const supabase = getSupabaseBrowserClient();
-      const { data } = await supabase
-        .from("lesson_progress")
-        .select("lesson_id")
-        .eq("user_id", user.id);
-      if (cancelled || !data) return;
-      setProgress((p) => ({ ...p, ...Object.fromEntries(data.map((r) => [r.lesson_id, "done"])) }));
+      const [{ data: lessons }, { data: questions }] = await Promise.all([
+        supabase.from("lesson_progress").select("lesson_id").eq("user_id", user.id),
+        supabase.from("question_progress").select("question_id, score").eq("user_id", user.id),
+      ]);
+      if (cancelled) return;
+      if (lessons) setProgress((p) => ({ ...p, ...Object.fromEntries(lessons.map((r) => [r.lesson_id, "done"])) }));
+      if (questions) setQuestionProgress((p) => ({ ...p, ...Object.fromEntries(questions.map((r) => [r.question_id, r.score])) }));
     })();
     return () => { cancelled = true; };
   }, [user]);
@@ -1480,12 +1483,26 @@ export default function DataSparkPlatform() {
         return;
       }
       setEvalResult(data);
+      // Persist the attempt — keep the best score per question.
+      const score = typeof data?.score === "number" ? Math.round(data.score) : null;
+      const prevBest = questionProgress[activeQuestion.id];
+      const best = prevBest == null || (score != null && score > prevBest) ? score : prevBest;
+      setQuestionProgress((p) => ({ ...p, [activeQuestion.id]: best }));
+      if (user) {
+        getSupabaseBrowserClient()
+          .from("question_progress")
+          .upsert(
+            { user_id: user.id, question_id: activeQuestion.id, score: best, completed_at: new Date().toISOString() },
+            { onConflict: "user_id,question_id" }
+          )
+          .then(() => {});
+      }
     } catch {
       setEvalError("Could not reach the evaluator. Check your connection or try again.");
     } finally {
       setEvalLoading(false);
     }
-  }, [activeQuestion]);
+  }, [activeQuestion, user, questionProgress]);
 
   const diffBadge = (d) => {
     const c = { Easy: DS.grn, Medium: "#F59E0B", Hard: "#EF4444" };
@@ -1776,13 +1793,16 @@ export default function DataSparkPlatform() {
 
         {courseTab === "practice" && (
           <div>
-            <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}>
               {["All", "Easy", "Medium", "Hard"].map(d => (
                 <button key={d} type="button" onClick={() => setDiffFilter(d)} style={{
                   background: diffFilter === d ? `${c.color}18` : "transparent", border: `1px solid ${diffFilter === d ? `${c.color}35` : DS.border}`,
                   borderRadius: 8, padding: "6px 12px", color: diffFilter === d ? DS.t1 : DS.dim, fontSize: 12, cursor: "pointer", fontFamily: "var(--ds-mono), monospace", fontWeight: 600,
                 }}>{d}</button>
               ))}
+              <span style={{ marginLeft: "auto", fontSize: 11.5, color: DS.t3, fontFamily: "var(--ds-mono), monospace" }}>
+                {c.questions.filter(q => questionProgress[q.id] != null).length} / {c.questions.length} completed
+              </span>
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -1801,12 +1821,22 @@ export default function DataSparkPlatform() {
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
                     <div>
-                      <div style={{ fontSize: 15, fontWeight: 600, color: DS.t1, marginBottom: 6 }}>{q.title}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+                        {questionProgress[q.id] != null && (
+                          <span aria-label="completed" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 17, height: 17, borderRadius: "50%", background: `${DS.grn}22`, border: `1px solid ${DS.grn}55`, color: DS.grn, flexShrink: 0 }}>
+                            <Check size={11} strokeWidth={3} />
+                          </span>
+                        )}
+                        <span style={{ fontSize: 15, fontWeight: 600, color: DS.t1 }}>{q.title}</span>
+                      </div>
                       <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                         {(q.tags || []).map(t => <span key={t} style={{ fontSize: 11, padding: "2px 7px", borderRadius: 6, background: "rgba(255,255,255,0.04)", color: DS.t3, fontFamily: "var(--ds-mono), monospace", border: `1px solid ${DS.border}` }}>{t}</span>)}
                       </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                      {questionProgress[q.id] != null && (
+                        <span style={{ fontSize: 11, fontWeight: 700, color: DS.grn, fontFamily: "var(--ds-mono), monospace" }}>{questionProgress[q.id]}%</span>
+                      )}
                       <span style={{ fontSize: 11, color: DS.t3, fontFamily: "var(--ds-mono), monospace" }}>{q.type === "code" ? "Coding" : "Open-ended"}</span>
                       {diffBadge(q.difficulty)}
                     </div>

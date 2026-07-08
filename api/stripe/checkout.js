@@ -35,7 +35,12 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "method_not_allowed" });
 
   const secretKey = process.env.STRIPE_SECRET_KEY;
-  if (!secretKey) return res.status(500).json({ error: "missing_stripe_key" });
+  if (!secretKey) {
+    return res.status(500).json({
+      error: "missing_stripe_key",
+      message: "Payments aren't configured on this deployment yet (STRIPE_SECRET_KEY is not set).",
+    });
+  }
 
   const user = await getUser(req);
   if (!user) return res.status(401).json({ error: "auth_required", message: "Sign in to upgrade." });
@@ -50,16 +55,24 @@ export default async function handler(req, res) {
   const stripe = new Stripe(secretKey);
   const origin = req.headers.origin || `https://${req.headers.host}`;
 
-  // Reuse an existing Stripe customer for this user if we have one.
+  // Reuse an existing Stripe customer for this user if we have one, and
+  // refuse to open a second checkout for someone who is already on Pro —
+  // that would create a second subscription and double-bill them.
   const supabase = getSupabaseAdmin();
   let customerId = null;
   if (supabase) {
     const { data } = await supabase
       .from("user_subscriptions")
-      .select("stripe_customer_id")
+      .select("stripe_customer_id, plan, status")
       .eq("user_id", user.id)
       .maybeSingle();
     customerId = data?.stripe_customer_id || null;
+    if (data?.plan === "pro" && ["active", "trialing"].includes(data?.status)) {
+      return res.status(409).json({
+        error: "already_subscribed",
+        message: "You're already on Pro. Use “Manage billing” to change your plan.",
+      });
+    }
   }
 
   try {

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Check, Circle, ChevronRight, MessageCircle } from "lucide-react";
 import { DS, dsGlassCard } from "../../lib/ds-platform-tokens.js";
 import { SimpleMarkdown } from "../../lib/simple-markdown.jsx";
+import SqlRunner from "./SqlRunner.jsx";
 
 const DIFF_COLORS = {
   Easy: { bg: "rgba(52,211,153,0.12)", text: "#34D399", border: "rgba(52,211,153,0.25)" },
@@ -170,10 +171,6 @@ export default function PracticeQuestion({
   const [submitted, setSubmitted] = useState(false);
   const [activeTab, setActiveTab] = useState("answer");
   const [hintsOpen, setHintsOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== "undefined" ? window.innerWidth < 768 : false,
-  );
-
   const accent = courseAccent || DS.indB;
 
   if (!question) return null;
@@ -551,15 +548,18 @@ export default function PracticeQuestion({
                 flexDirection: "column",
                 padding: "16px 20px 20px",
                 minHeight: 0,
+                overflowY: "auto",
               }}
             >
               <textarea
                 value={userAnswer}
                 onChange={(e) => setUserAnswer(e.target.value)}
                 placeholder={
-                  question.type === "code"
-                    ? "Write your code here…"
-                    : "Write your answer — explain your reasoning, tradeoffs, and approach…"
+                  question.runnable
+                    ? "Write PostgreSQL here, then Run it against real tables…"
+                    : question.type === "code"
+                      ? "Write your code here…"
+                      : "Write your answer — explain your reasoning, tradeoffs, and approach…"
                 }
                 disabled={submitted}
                 spellCheck={question.type !== "code"}
@@ -585,6 +585,15 @@ export default function PracticeQuestion({
                   caretColor: accent,
                 }}
               />
+
+              {question.runnable && (
+                <SqlRunner
+                  sql={userAnswer}
+                  modelAnswer={question.modelAnswer}
+                  runnerTables={question.runnerTables}
+                  accent={accent}
+                />
+              )}
 
               <SpinnerButton
                 onClick={handleSubmit}

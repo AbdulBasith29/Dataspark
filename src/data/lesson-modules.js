@@ -459,47 +459,64 @@ Watch the clip, then run this 10-minute audit on one class from your code:
       "Detect Liskov-style contract breaks early.",
       "Choose composition when behavior variants multiply.",
     ],
-    learnMarkdown: `## Outcomes
+    learnMarkdown: `## Inheritance is a contract, not a code-sharing trick
 
-- Model reusable behavior without creating fragile subclass trees.
-- Explain polymorphism as contract compatibility, not syntax trivia.
-- Refactor inheritance misuse into composition patterns.
+\`class Child(Parent)\` makes two promises: Child **is-a** Parent, and any code written against Parent keeps working when handed a Child. The second promise — the **Liskov Substitution Principle** — is what interviewers actually test, because it's the one that breaks in production.
 
-## Core model
+\`\`\`python
+class Report:
+    def export(self, path: str) -> str:   # returns the written file path
+        ...
 
-Inheritance is a **substitutability promise**. If a subclass cannot be used wherever the base class is expected, your abstraction is broken.
+class S3Report(Report):
+    def export(self, path: str) -> None:  # returns None, uploads instead
+        ...
+\`\`\`
 
-## Anti-pattern drill: Inheritance for code reuse only
+Every caller doing \`open(report.export(p))\` now crashes — but only when an \`S3Report\` shows up at runtime. LSP violations hide because the *type checker is satisfied*; it's the behavioral contract (return meaning, accepted inputs, raised exceptions, side effects) that broke.
 
-### Bad
+**Contract-break smells to name in an interview:** a subclass that raises \`NotImplementedError\` for an inherited method; narrows accepted inputs ("like Parent, but not for negative amounts"); silently no-ops; or needs \`isinstance\` checks in *callers* to work.
 
-Teams subclass a base class just to reuse utility methods, then override core behavior with different preconditions.
+## Polymorphism: one call site, many behaviors
 
-### Failure modes
+\`\`\`python
+def total_area(shapes: list[Shape]) -> float:
+    return sum(s.area() for s in shapes)     # no isinstance, no if/elif
+\`\`\`
 
-- Base APIs become ambiguous.
-- Callers rely on behavior that silently changes per subclass.
-- New subclasses require defensive branching everywhere.
+Python gives you this two ways: inheritance from a shared base, or **duck typing** (anything with \`.area()\` works). The \`if isinstance(x, Circle): ... elif isinstance(x, Square): ...\` ladder is the anti-pattern this replaces — every new shape edits every ladder; with polymorphism, new behavior arrives as a new class and no call site changes.
 
-### Refactor target
+Use \`abc.ABC\` with \`@abstractmethod\` when you want instantiation-time enforcement of the interface; use \`typing.Protocol\` when you want duck typing that a static checker can still verify (structural typing — no inheritance required).
 
-- Extract shared utilities into collaborators.
-- Keep base interface narrow and explicit.
-- Use composition (${MD_CODE_TICK}Strategy${MD_CODE_TICK}, policy objects) for behavior variants.
+## Composition: the default you should reach for first
 
-## Production scenario
+Inheritance hard-codes *one* axis of variation at class-definition time. Behaviors that vary independently multiply subclasses combinatorially:
 
-A pricing pipeline uses ${MD_CODE_TICK}BasePricer.compute(order)${MD_CODE_TICK}; one subclass expects net price, another gross price. Results diverge silently across markets.
+\`\`\`python
+class CsvS3RetryingExporter(Exporter): ...   # 3 formats × 3 destinations × 2 retry policies = 18 classes
+\`\`\`
 
-Fix by introducing explicit pricing policies and normalized input contracts.
+Composition injects the varying parts as collaborators:
+
+\`\`\`python
+class Exporter:
+    def __init__(self, formatter, storage, retry):
+        self.formatter, self.storage, self.retry = formatter, storage, retry
+    def export(self, data):
+        return self.retry(lambda: self.storage.write(self.formatter(data)))
+\`\`\`
+
+18 classes become 3 + 3 + 2 small ones, each testable with a fake in isolation, swappable at *runtime*.
+
+**Decision rule:** inherit when there's a stable is-a contract and subclasses only *extend* behavior (Template Method); compose when behaviors vary independently, come from a framework you don't control, or you're inheriting just to reuse code. "Favor composition over inheritance" is the expected soundbite — knowing *why* (combinatorial explosion, LSP risk, test isolation) is what scores.
 
 ## Interview framing
 
-High-signal answers compare inheritance vs composition with maintainability, discoverability, and contract safety tradeoffs.`,
+Asked "inheritance vs composition," anchor on a concrete failure: the subclass that broke a caller's assumption (LSP), or the class named \`PdfEmailRetryingReport\`. Asked to review code with \`isinstance\` ladders, propose polymorphism. Mention \`Protocol\` — it signals you know modern Python, not just Java-shaped OOP.`,
     video: PYTHON_VIDEO_FALLBACKS["py-o2"],
-    videoFallbackMarkdown: `## Guided deep dive
+    videoFallbackMarkdown: `## Deep dive: MRO and super() in multiple inheritance
 
-After the clip, sketch one inheritance tree from memory and annotate where contracts differ. Then redesign one branch using composition.`,
+Python linearizes multiple inheritance with the **C3 MRO** (\`Cls.__mro__\` shows it). \`super()\` doesn't mean "my parent" — it means "the *next class in the MRO*," which is what makes cooperative multiple inheritance (mixins) work: every class in the chain calls \`super().__init__(**kwargs)\` and the MRO threads the calls exactly once each. Practical guidance interviewers accept: keep mixins stateless and single-purpose, always forward \`**kwargs\`, and if you find yourself drawing the diamond to reason about your own code, that's the signal to flatten the hierarchy into composition.`,
     tryGuidance: "In the interactive, predict dispatch path and then state whether the chosen path preserves the base contract.",
     relatedPractice: [
       { label: "Hunt a Liskov violation", prompt: "Given this subclass tree, find one method where a subclass strengthens preconditions or weakens postconditions, then rewrite the caller to show how the substitutability promise breaks." },
@@ -780,47 +797,68 @@ After the clip, sketch one inheritance tree from memory and annotate where contr
       "Avoid operator overloads that surprise readers.",
       "Define equality/hash/order contracts that remain consistent.",
     ],
-    learnMarkdown: `## Outcomes
+    learnMarkdown: `## Dunders are how objects join the language
 
-- Use dunder protocols intentionally rather than decoratively.
-- Avoid semantic traps in equality, hashing, and ordering.
-- Make custom objects safe for dict/set usage and debugging.
+Dunder ("double underscore") methods let your objects plug into Python's built-in syntax: \`len(x)\` calls \`x.__len__()\`, \`a == b\` calls \`a.__eq__(b)\`, \`a + b\` calls \`a.__add__(b)\`. The design bar: after overloading, the expression must mean what any Python reader assumes. \`money_a + money_b\` is obvious; \`config_a + config_b\` meaning "deep-merge with right precedence" is a trap you shipped.
 
-## Core model
+## __repr__ first, always
 
-Dunder methods are **protocol contracts**. Overloading should preserve user expectations from built-in types.
+\`\`\`python
+class Money:
+    def __repr__(self):          # unambiguous, for developers/logs — aim for eval()-able
+        return f"Money({self.amount!r}, {self.currency!r})"
+    def __str__(self):           # readable, for end users
+        return f"{self.amount:.2f} {self.currency}"
+\`\`\`
 
-## Anti-pattern drill: Clever but misleading operators
+Every class you write deserves a \`__repr__\` — it's the difference between \`<Money object at 0x7f...>\` and a debuggable log line. Cheap interview point, real production value.
 
-### Bad
+## The __eq__ / __hash__ contract
 
-${MD_CODE_TICK}__add__${MD_CODE_TICK} mutates left operand or triggers I/O; ${MD_CODE_TICK}__eq__${MD_CODE_TICK} compares one field while ${MD_CODE_TICK}__hash__${MD_CODE_TICK} uses another.
+The rule Python holds you to: **objects that compare equal must have equal hashes.**
 
-### Failure modes
+\`\`\`python
+class Money:
+    def __eq__(self, other):
+        if not isinstance(other, Money):
+            return NotImplemented          # let Python try other.__eq__ — don't raise, don't return False blindly
+        return (self.amount, self.currency) == (other.amount, other.currency)
+    def __hash__(self):
+        return hash((self.amount, self.currency))
+\`\`\`
 
-- Bugs in caches/sets due to unstable hashing semantics.
-- Non-obvious side effects during arithmetic-looking code.
-- Impossible debugging when ${MD_CODE_TICK}repr${MD_CODE_TICK} is vague.
+The gotchas interviewers fish for:
 
-### Refactor target
+- Defining \`__eq__\` **silently sets \`__hash__\` to None** — your objects stop working in sets and as dict keys unless you define \`__hash__\` too.
+- Hash must be computed from the **same fields** as equality, and those fields must be immutable — mutate a key's field after inserting into a dict and the object is lost in the wrong bucket.
+- Return \`NotImplemented\` (not \`False\`, not raise) for foreign types; Python then tries the reflected operation.
 
-- Keep operators pure and side-effect free.
-- Keep ${MD_CODE_TICK}__eq__${MD_CODE_TICK} and ${MD_CODE_TICK}__hash__${MD_CODE_TICK} consistent.
-- Implement informative \`__repr__\` for debugging and logs.
+## Ordering and arithmetic without 6 methods
 
-## Production scenario
+\`\`\`python
+from functools import total_ordering
 
-A feature key object is used as dict key. Equality says two keys match, but hash differs because timestamp included in hash only. Cache miss rates spike.
+@total_ordering
+class Version:
+    def __eq__(self, other): ...
+    def __lt__(self, other): ...          # total_ordering derives <=, >, >=
+\`\`\`
 
-Fix by aligning equality/hash fields and adding property-based tests.
+For arithmetic, implement \`__add__\`, return **a new object** (immutability keeps \`+\` surprise-free), and return \`NotImplemented\` for types you don't handle — that's what makes \`3 * money\` able to fall back to \`money.__rmul__(3)\`.
+
+## Containers and the free behaviors
+
+\`__len__\` + \`__getitem__\` make your object sliceable, iterable, and \`in\`-testable — Python derives iteration from integer indexing. Add \`__contains__\` only when membership can be answered faster than a scan.
+
+**And know when to stop:** \`dataclasses.dataclass(eq=True, order=True, frozen=True)\` generates correct \`__eq__\`, ordering, and hash-compatible behavior from the field list. Writing them by hand when a dataclass suffices is itself a red flag; overloading \`&\`/\`|\`/\`<<\` for domain "cleverness" is another.
 
 ## Interview framing
 
-Mature answers emphasize predictability, protocol consistency, and testing invariants over syntactic cleverness.`,
+The high-frequency question is exactly "you added \`__eq__\` and now the object can't go in a set — why?" Answer: implicit \`__hash__ = None\`; fix by hashing the same immutable fields. Follow with \`NotImplemented\` semantics and you've covered what this question is really screening for.`,
     video: PYTHON_VIDEO_FALLBACKS["py-o3"],
-    videoFallbackMarkdown: `## Guided deep dive
+    videoFallbackMarkdown: `## Deep dive: NotImplemented and the reflected protocol
 
-Watch the clip and then implement \`__repr__\`, ${MD_CODE_TICK}__eq__${MD_CODE_TICK}, and ${MD_CODE_TICK}__hash__${MD_CODE_TICK} for one toy class. Add tests proving equality/hash consistency.`,
+\`a + b\` runs a small protocol: Python calls \`a.__add__(b)\`; if that returns \`NotImplemented\`, it calls \`b.__radd__(a)\`; only if both refuse does it raise \`TypeError\`. This is why returning \`NotImplemented\` (a value) instead of raising \`NotImplementedError\` (an exception — different thing, common interview trip-wire) matters: it keeps your type composable with types you've never heard of. Same machinery powers \`==\`: \`NotImplemented\` from \`__eq__\` makes Python try the reflected compare, then fall back to identity. Bonus: \`sum(money_list)\` needs \`__radd__\` handling \`0 + Money\`, the classic reason \`sum()\` on custom types "mysteriously" fails.`,
     tryGuidance: "Use the interactive to compare expected vs observed behavior after overloaded operations. Flag any semantic surprise as a design bug.",
     knowledgeCheck: [
       { question: "What must remain consistent for dict/set keys?", options: ["Objects considered equal must produce equal hashes", "Hash can change after insertion", "Only repr matters"], correctIndex: 0, explanation: "Hash/equality consistency is required for hash-table correctness." },
@@ -1833,27 +1871,76 @@ Finish with a short note: what improved, why it improved, and where memory owner
   "py-d2": {
     durationLabel: MODULE_TIME_LABEL,
     outcomes: ["Use explicit indexing to avoid chained-assignment ambiguity.","Track dtype/null drift after each transform stage.","Build auditable DataFrame pipelines with clear contracts."],
-    learnMarkdown: `## Outcomes
+    learnMarkdown: `## The two objects everything else is built on
 
-- Apply explicit row/column selection with predictable mutation semantics.
-- Detect dtype drift before it corrupts downstream logic.
-- Treat row-count, schema, and null-rate checks as first-class QA.
+A **Series** is a 1-D array with an index; a **DataFrame** is a dict of Series sharing one index. Almost every pandas bug traces back to forgetting that operations **align on the index**, not on position:
 
-## Core approach
+\`\`\`python
+a = pd.Series([1, 2, 3], index=[0, 1, 2])
+b = pd.Series([10, 20, 30], index=[2, 1, 0])
+a + b        # 31, 22, 13 — aligned by index label, NOT by position
+\`\`\`
 
-Pandas code fails silently when intent is implicit. Keep transforms staged: ingest, validate schema, normalize types, apply feature logic, then QA output.
+If labels don't overlap, you get NaN — silently. Alignment is a feature for joins and a trap for arithmetic.
 
-Prefer .loc / .iloc with clear targets. Avoid ambiguous chained updates. After key steps, verify dtypes, null rates, and row counts so semantic errors are caught early.
+## .loc, .iloc, and the chained-assignment trap
+
+| Accessor | Selects by | Example |
+|----------|-----------|---------|
+| \`.loc[rows, cols]\` | **labels** | \`df.loc[df.age > 30, "salary"]\` |
+| \`.iloc[rows, cols]\` | **positions** | \`df.iloc[:5, 0:2]\` |
+| \`df[...][...]\` chained | ambiguous | **don't** |
+
+The classic interview probe is \`SettingWithCopyWarning\`:
+
+\`\`\`python
+df[df.age > 30]["salary"] = 0        # BROKEN: may write to a temporary copy
+df.loc[df.age > 30, "salary"] = 0    # CORRECT: one explicit indexing operation
+\`\`\`
+
+Chained indexing runs as *two* operations — the first may return a copy, so the assignment can vanish. One \`.loc\` call with both the row mask and column is atomic and unambiguous. Under pandas 3.x copy-on-write semantics, chained assignment **never** works, so the explicit form isn't style — it's correctness.
+
+## Dtype and null drift
+
+Transforms quietly rewrite dtypes, and dtypes decide what operations mean:
+
+- An int column that gains a NaN becomes **float64** (NaN is a float) — IDs like \`1043\` turn into \`1043.0\`, then \`"1043.0"\` when exported.
+- A numeric column with one stray \`"N/A"\` string loads as **object**, and \`.sum()\` concatenates or throws instead of adding.
+- Dates that fail parsing stay object — comparisons then sort lexically ("2024-11" < "2024-2").
+
+Track drift after each stage instead of discovering it at the end:
+
+\`\`\`python
+def audit(df, stage):
+    print(stage, df.shape, dict(df.dtypes.astype(str)), df.isna().sum().sum(), "nulls")
+    return df
+\`\`\`
+
+## Auditable pipelines with .pipe()
+
+Interviewers care less about syntax than whether your transforms are **inspectable**. Chain named steps and assert contracts between them:
+
+\`\`\`python
+result = (
+    raw
+    .pipe(parse_dates)        # each step: DataFrame in, DataFrame out
+    .pipe(audit, "parsed")
+    .pipe(drop_test_accounts)
+    .pipe(add_revenue_cols)
+    .pipe(audit, "final")
+)
+assert result.customer_id.notna().all(), "null IDs after join"
+\`\`\`
+
+Each step is unit-testable, each boundary is observable, and the audit lines localize exactly where nulls or dtype changes crept in — that's what "auditable DataFrame pipeline" means in an interview answer.
 
 ## Interview framing
 
-Strong answers explain reliability controls, not just API memory: schema assertions, null policy, and post-transform checks.`,
+When asked "what's the difference between loc and iloc," strong candidates go beyond labels-vs-positions: they mention chained assignment, copy-on-write, and index alignment — the *reasons* the distinction matters in production code. If asked to debug "my assignment didn't stick," say chained indexing immediately.`,
     video: { youtubeId: "vmEHCJofslg", title: "Pandas DataFrames Tutorial", channel: "freeCodeCamp.org", startSeconds: 0 },
-    videoFallbackMarkdown: `## Deep dive fallback
+    videoFallbackMarkdown: `## Deep dive: views, copies, and copy-on-write
 
-Load a messy CSV, snapshot dtypes/nulls/row count, perform one filter and one explicit .loc assignment, normalize one column type, then re-snapshot.
-
-Close by writing a mini data contract: required columns, expected dtype families, and null thresholds.`,
+Historically pandas sometimes returned a **view** (shared memory) and sometimes a **copy** depending on memory layout — which is why chained assignment *sometimes* worked, the worst kind of bug. Pandas 3.x adopts **copy-on-write**: every derived object behaves like a copy, lazily materialized only when either side is mutated. Consequences worth saying in an interview: chained assignment now never mutates the parent; \`.loc\` assignment on the object you own always works; and defensive \`.copy()\` calls are mostly unnecessary overhead. Index alignment still governs every binary operation, so \`df["a"] + other["a"]\` can silently produce NaN for unmatched labels — check \`df.index.equals(other.index)\` when in doubt.`,
     tryGuidance: "Before each interactive step, predict row count and dtype/null changes. After execution, explain any mismatch as a contract violation or expected behavior.",
     relatedPractice: [
       { label: "Kill the chained assignment", prompt: "Rewrite this chained-assignment update into an explicit .loc[mask, col] = value form, then explain what mutation ambiguity the original code risked." },
@@ -2086,25 +2173,70 @@ Close by writing a mini data contract: required columns, expected dtype families
   "py-d3": {
     durationLabel: MODULE_TIME_LABEL,
     outcomes: ["Define data grain before groupby/merge/pivot operations.","Prevent join fan-out and aggregate inflation.","Validate reshaped outputs with reconciliation checks."],
-    learnMarkdown: `## Outcomes
+    learnMarkdown: `## Grain first, code second
 
-- State table grain clearly before transformation.
-- Merge datasets without accidental duplication.
-- Use pivots for communication while preserving reconciled totals.
+The **grain** of a table is what one row represents: one order, one order *line*, one customer *per month*. Every groupby, merge, and pivot either preserves or changes the grain — and every classic aggregation bug is a grain mistake. Before writing code, say the grain out loud: "orders is one row per order; payments is one row per payment *attempt*, so joining on order_id fans out."
 
-## Grain-first workflow
+## GroupBy: split → apply → combine
 
-Most groupby/merge bugs come from unclear grain. Ask: what does one row represent now, and what should it represent after this step?
+\`\`\`python
+df.groupby("segment")["revenue"].agg(["sum", "mean", "count"])
+\`\`\`
 
-Before merges, check key uniqueness and record pre-join row counts. After merges, compare row counts and null deltas. For groupby, choose aggregates that reflect business meaning, then name output columns accordingly.
+The three apply flavors interviewers test:
+
+| Method | Returns | Use when |
+|--------|---------|----------|
+| \`.agg("sum")\` | one row **per group** | collapsing to group grain |
+| \`.transform("sum")\` | one value **per original row** | adding group stats as a column (e.g. % of segment total) |
+| \`.apply(func)\` | whatever func returns | last resort — slow, shape-ambiguous |
+
+\`transform\` is the one that separates candidates: "compute each order's share of its customer's total" is one line — \`df.revenue / df.groupby("customer_id").revenue.transform("sum")\` — no merge required.
+
+## Merge: where fan-out is born
+
+A join multiplies rows whenever the key isn't unique on the "one" side you assumed:
+
+\`\`\`python
+orders.merge(payments, on="order_id")   # 3 payment attempts → order counted 3×
+\`\`\`
+
+Sum revenue after that join and revenue inflates ~3×. Defenses that mark you as senior:
+
+\`\`\`python
+orders.merge(payments, on="order_id",
+             validate="1:m",        # raises if orders has duplicate order_id
+             indicator=True)        # adds _merge: left_only/right_only/both
+\`\`\`
+
+- \`validate=\` turns silent fan-out into a loud error.
+- \`indicator=True\` shows which rows failed to match (the \`how="left"\` NaN mystery).
+- Deduplicate or pre-aggregate the many-side to the join grain *before* joining when you only need totals.
+
+## Pivot and melt: reshaping the grain
+
+- \`pivot_table(index=, columns=, values=, aggfunc=)\` — wide from long; **aggregates** duplicates (default \`mean\` — a silent gotcha; be explicit).
+- \`pivot()\` — pure reshape; **raises** on duplicate index/column pairs. Failing here is a diagnostic gift: your grain isn't what you thought.
+- \`melt()\` — wide back to long, the tidy shape groupby wants.
+
+## Reconciliation: prove the reshape didn't lie
+
+After any grain-changing operation, check an invariant that must survive it:
+
+\`\`\`python
+assert orders.revenue.sum() == by_segment.revenue.sum()   # totals preserved
+assert merged.shape[0] == orders.shape[0]                 # 1:m left join kept row count... did it?
+\`\`\`
+
+That second assert failing IS the fan-out detector. Senior answers always mention a before/after reconciliation number, not just "I joined the tables."
 
 ## Interview framing
 
-Discuss a QA checklist: uniqueness assertions, row-count deltas, and reconciliation totals before trusting metrics.`,
+Given a "revenue doubled after my join" bug, the expected diagnosis path is: state both tables' grains → check key uniqueness (\`df.order_id.is_unique\`) → use \`validate=\` → pre-aggregate the many side. Naming \`transform\` for window-style calculations and being explicit about \`pivot_table\`'s default aggfunc are the other two signals graders listen for.`,
     video: { youtubeId: "txMdrV1Ut64", title: "Pandas GroupBy, Merge, and Pivot", channel: "Data School", startSeconds: 0 },
-    videoFallbackMarkdown: `## Deep dive fallback
+    videoFallbackMarkdown: `## Deep dive: choosing the join grain deliberately
 
-Create two toy tables with duplicate keys, predict merge row count, run merge, fix fan-out via dedupe/pre-agg policy, then group and pivot results while reconciling totals.`,
+Fan-out isn't always a bug — sometimes the fanned-out grain is what you want (per-payment analysis), and the mistake is aggregating order-level fields afterward. The discipline: after a join, columns from the "one" side are **repeated**, so they can be grouped by but never summed. If you need order revenue and payment counts in one table, aggregate payments to order grain first (\`payments.groupby("order_id").agg(attempts=("id","count"))\`), then 1:1 join — every downstream sum stays truthful. In pandas, \`merge(validate="1:1")\` after pre-aggregation encodes the contract in code, which reviewers and interviewers both love.`,
     tryGuidance: "In the interactive, say the grain out loud at every stage (e.g., one row per customer-day), then verify whether joins/groupings changed it as predicted.",
     relatedPractice: [
       { label: "Reproduce a join fan-out", prompt: "Build two toy tables with non-unique join keys, predict the post-merge row count, run the merge to confirm the fan-out, then fix it with a dedupe or pre-aggregation policy." },
@@ -2339,25 +2471,45 @@ Create two toy tables with duplicate keys, predict merge row count, run merge, f
   "py-d4": {
     durationLabel: MODULE_TIME_LABEL,
     outcomes: ["Classify missingness sources and pick policy intentionally.","Measure metric impact of drop/fill/impute choices.","Document null assumptions as data-contract decisions."],
-    learnMarkdown: `## Outcomes
+    learnMarkdown: `## Nulls are semantic, not cosmetic
 
-- Distinguish missing-at-source from missing-after-transform.
-- Choose null policy by business meaning, not convenience.
-- Quantify downstream impact and monitor null behavior over time.
+A null can mean *unknown* (user skipped the field), *inapplicable* (refund_date on an unrefunded order), *not yet arrived* (late-landing events), or *pipeline failure* (a join that missed). The same \`NaN\` glyph, four different correct treatments. Filling refund_date with the median date is not "cleaning" — it's inventing refunds.
 
-## Nulls are semantic, not cosmetic
+## The three missingness mechanisms
 
-A null can mean unknown, inapplicable, delayed ingestion, or pipeline failure. Treating all nulls as zero often rewrites business meaning.
+| Mechanism | Meaning | Example | Safe default |
+|-----------|---------|---------|--------------|
+| **MCAR** — completely at random | missingness unrelated to anything | sensor drops 2% of readings randomly | drop or simple impute |
+| **MAR** — at random given observables | missingness explained by *other* columns | new-city users lack credit scores | impute *within* groups, or model with indicators |
+| **MNAR** — not at random | missingness depends on the missing value itself | high earners skip the income question | no imputation fixes it — model the missingness, collect better data |
 
-Use a decision loop: identify cause, determine whether missingness is informative, choose policy (drop/fill/impute/indicator), then compare KPI deltas before vs after.
+The interview trap: "just impute the mean" assumes MCAR. Under MNAR, mean-imputing income *biases the mean toward the middle* and destroys the very signal (rich people hide income) the analysis needed.
+
+## How pandas represents missing — and why it bites
+
+- \`np.nan\` is a **float** — an int column with one null becomes float64.
+- \`NaN != NaN\`, so \`df[df.x == np.nan]\` matches nothing; use \`df.x.isna()\`.
+- \`None\`, \`np.nan\`, \`pd.NaT\` (datetimes), and \`pd.NA\` (nullable dtypes) coexist; \`isna()\` catches all of them.
+- Nulls silently vanish from \`groupby\` keys and from \`.mean()\` (skipna=True default) — your aggregates can be computed on a *biased subset* without any warning.
+
+## The policy decision loop
+
+1. **Quantify**: \`df.isna().mean()\` per column; null *rates by segment* (\`df.assign(m=df.score.isna()).groupby("cohort").m.mean()\`) — a per-group spike screams MAR.
+2. **Diagnose the cause**: at source, or created by *your* transform? (A left join that misses is missingness you manufactured — fix the join, don't impute.)
+3. **Choose per column**: drop rows (only if MCAR and few), drop column (mostly-null, no signal), constant/zero fill (only when null genuinely means zero — e.g. no purchases), group-wise impute (MAR), or **keep null + add an indicator column** (\`score_missing = df.score.isna()\`) so models can learn from missingness itself.
+4. **Measure impact**: recompute the headline KPI under each policy. If AOV moves 4% between drop and impute, the *choice* is a business decision — document it.
+
+## Monitor it like a contract
+
+Null handling isn't one-time. Alert when a column's null rate shifts (e.g. >2σ from trailing mean): a jump usually means an upstream schema change, not new user behavior. Freezing your assumptions as checks (\`assert df.user_id.notna().all()\`) turns tomorrow's silent corruption into today's loud failure.
 
 ## Interview framing
 
-Mature answers discuss bias, explainability, and monitoring thresholds — not one universal imputation rule.`,
+Mature answers name the mechanism (MCAR/MAR/MNAR), tie the policy to it, quantify the KPI delta, and mention indicator columns and monitoring. "I always impute the median" is the answer graders are listening to reject.`,
     video: { youtubeId: "f9vYq2xFAm8", title: "Handling Missing Data in Pandas", channel: "Data School", startSeconds: 0 },
-    videoFallbackMarkdown: `## Deep dive fallback
+    videoFallbackMarkdown: `## Deep dive: imputation and leakage
 
-Profile null rates by column and segment, apply three policies on one important field (drop, statistical fill, domain sentinel), recompute a KPI under each, then justify one monitored policy choice.`,
+Two production rules that interviews probe. First, **fit imputers on training data only** — computing a fill value from the full dataset leaks test-set statistics into training (\`SimpleImputer\` inside an sklearn \`Pipeline\` handles this; a global \`df.fillna(df.mean())\` before the split does not). Second, prefer **model-visible missingness** over invisible repair: tree ensembles handle an explicit indicator + arbitrary fill gracefully, and learning "income_missing → higher default risk" is often more predictive than any imputed income value. Multiple imputation (MICE) exists for when uncertainty in the fill must propagate to your confidence intervals — name it, don't hand-wave it.`,
     tryGuidance: "Use each interactive branch as a policy fork: predict row-count, null-rate, and downstream metric impact before selecting a strategy.",
     relatedPractice: [
       { label: "Compare null policies on a KPI", prompt: "Pick one important field, apply drop / statistical fill / domain sentinel separately, recompute the same KPI under each, and justify which policy you would monitor in production and why." },

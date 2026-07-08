@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { DS } from "../lib/ds-platform-tokens.js";
 
@@ -8,34 +9,59 @@ const COURSE_COLORS = {
   ml: { accent: "#0EA5E9", soft: "rgba(14,165,233,0.12)", border: "rgba(14,165,233,0.3)", label: "Machine Learning" },
 };
 
-function decodeCert(certId) {
-  try {
-    return JSON.parse(atob(certId));
-  } catch {
-    return null;
-  }
-}
-
 function handlePrint() {
   window.print();
 }
 
 export default function CertificatePage() {
   const { certId } = useParams();
-  const cert = decodeCert(certId);
+  const [state, setState] = useState({ loading: true, cert: null });
 
-  if (!cert) {
+  // Credentials are stored server-side and verified by id — nothing about
+  // the certificate lives in the URL itself.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/certificates?id=${encodeURIComponent(certId)}`);
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled) setState({ loading: false, cert: res.ok ? data.certificate : null });
+      } catch {
+        if (!cancelled) setState({ loading: false, cert: null });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [certId]);
+
+  if (state.loading) {
+    return (
+      <div style={{ minHeight: "100vh", background: DS.bg, color: DS.t3, display: "grid", placeItems: "center", fontFamily: "var(--ds-mono), monospace", fontSize: 13 }}>
+        Verifying credential…
+      </div>
+    );
+  }
+
+  const raw = state.cert;
+  if (!raw) {
     return (
       <div style={{ minHeight: "100vh", background: DS.bg, color: DS.t2, display: "grid", placeItems: "center", padding: 24, fontFamily: "var(--ds-sans), sans-serif" }}>
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
-          <p style={{ color: DS.t3, marginBottom: 20 }}>This certificate link is invalid or corrupted.</p>
+          <p style={{ color: DS.t3, marginBottom: 20 }}>This credential could not be verified — the link is invalid or the certificate does not exist.</p>
           <Link to="/platform" style={{ color: DS.ind, textDecoration: "none", fontSize: 14 }}>← Back to platform</Link>
         </div>
       </div>
     );
   }
 
+  const cert = {
+    id: raw.id,
+    name: raw.recipient_name,
+    title: raw.title,
+    course: raw.course_id,
+    date: raw.issued_at,
+    dimensions: raw.dimensions,
+  };
   const theme = COURSE_COLORS[cert.course] || COURSE_COLORS.sql;
   const issueDate = new Date(cert.date);
   const monthName = issueDate.toLocaleString("default", { month: "long" });
@@ -180,7 +206,7 @@ export default function CertificatePage() {
         </div>
 
         <p className="no-print" style={{ marginTop: 20, fontSize: 12, color: DS.dim, textAlign: "center", fontFamily: "var(--ds-mono), monospace" }}>
-          Share this URL to verify your credential · {window.location.href}
+          ✓ Verified credential — anyone with this URL sees the server-issued record · {window.location.href}
         </p>
       </div>
     </>
