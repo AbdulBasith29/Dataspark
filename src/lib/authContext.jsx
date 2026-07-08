@@ -33,13 +33,19 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
 
-    // Restore session on mount
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-    });
+    // Restore session on mount. Never leave `user` undefined on failure —
+    // that pins ProtectedRoute's spinner forever.
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+      })
+      .catch(() => {
+        setSession(null);
+        setUser(null);
+      });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const handleAuthEvent = async (event, session) => {
       if (event === "PASSWORD_RECOVERY") {
         setSession(session);
         setUser(session?.user ?? null);
@@ -84,6 +90,14 @@ export function AuthProvider({ children }) {
       // TOKEN_REFRESHED, USER_UPDATED, etc.
       setSession(session);
       setUser(session?.user ?? null);
+    };
+
+    // Supabase holds an internal auth lock while this callback runs. Awaiting
+    // other supabase.auth.* calls (the MFA check above) inside it deadlocks
+    // that lock — the platform then hangs on "Loading…" after sign-in or
+    // checkout redirects. Deferring to a macrotask releases the lock first.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setTimeout(() => { handleAuthEvent(event, session); }, 0);
     });
 
     return () => subscription.unsubscribe();
