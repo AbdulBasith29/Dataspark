@@ -8,9 +8,8 @@ import {
   degradedEvaluation,
   unavailableEvaluation,
 } from "./_evaluation-schema.js";
+import { ANTHROPIC_MODEL, GEMINI_MODEL } from "./_models.js";
 
-const DEFAULT_MODEL = "claude-sonnet-4-20250514";
-const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -64,7 +63,7 @@ async function callAnthropic(apiKey, { system, userContent }) {
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: DEFAULT_MODEL,
+      model: ANTHROPIC_MODEL,
       max_tokens: MAX_TOKENS,
       system,
       messages: [{ role: "user", content: userContent }],
@@ -105,7 +104,7 @@ async function callAnthropic(apiKey, { system, userContent }) {
 /** Gemini path: JSON mode with an explicit responseSchema. */
 async function callGemini(apiKey, { system, userContent }) {
   const upstream = await fetch(
-    `${GEMINI_API_URL}/${DEFAULT_GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    `${GEMINI_API_URL}/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },

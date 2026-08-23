@@ -1,7 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
+import { ANTHROPIC_MODEL, GEMINI_MODEL } from "./_models.js";
 
-const DEFAULT_MODEL = "claude-sonnet-4-20250514";
-const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
@@ -174,7 +173,7 @@ export default async function handler(req, res) {
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: model || DEFAULT_MODEL,
+          model: model || ANTHROPIC_MODEL,
           max_tokens: typeof max_tokens === "number" ? max_tokens : 800,
           system,
           messages,
@@ -199,7 +198,7 @@ export default async function handler(req, res) {
 
     // Gemini fallback has no streaming wired up — emit the full reply as a single chunk
     // so the client's streaming reader handles both providers the same way.
-    const geminiModel = typeof model === "string" && model.startsWith("gemini-") ? model : DEFAULT_GEMINI_MODEL;
+    const geminiModel = typeof model === "string" && model.startsWith("gemini-") ? model : GEMINI_MODEL;
     const upstream = await fetch(
       `${GEMINI_API_URL}/${geminiModel}:generateContent?key=${encodeURIComponent(geminiApiKey)}`,
       {

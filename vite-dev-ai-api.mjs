@@ -6,8 +6,8 @@
  * via vite-dev-vercel-api.mjs, so the evaluation contract can't drift between
  * dev and prod. This file previously kept a second copy that already had.
  */
-const DEFAULT_MODEL = "claude-sonnet-4-20250514";
-const DEFAULT_GEMINI_MODEL = "gemini-flash-latest";
+import { ANTHROPIC_MODEL, GEMINI_MODEL } from "./api/ai/_models.js";
+
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const GEMINI_API_URL =
   "https://generativelanguage.googleapis.com/v1beta/models";
@@ -105,7 +105,7 @@ export function devAiApiPlugin({ anthropicApiKey = "", geminiApiKey = "" } = {})
                   "anthropic-version": "2023-06-01",
                 },
                 body: JSON.stringify({
-                  model: model || DEFAULT_MODEL,
+                  model: model || ANTHROPIC_MODEL,
                   max_tokens: typeof max_tokens === "number" ? max_tokens : 800,
                   system,
                   messages,
@@ -126,7 +126,7 @@ export function devAiApiPlugin({ anthropicApiKey = "", geminiApiKey = "" } = {})
             const geminiModel =
               typeof model === "string" && model.startsWith("gemini-")
                 ? model
-                : DEFAULT_GEMINI_MODEL;
+                : GEMINI_MODEL;
             const upstream = await fetch(
               `${GEMINI_API_URL}/${geminiModel}:generateContent?key=${encodeURIComponent(
                 geminiApiKey
