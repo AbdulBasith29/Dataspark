@@ -12,7 +12,8 @@
     "lint:verbose": "eslint . --debug",
     "validate:interview-graphs": "node scripts/validate-interview-graphs.mjs",
     "lint:engine": "eslint src/components/platform/LessonModule.jsx src/lib/simple-markdown.jsx",
-    "verify:models": "node scripts/verify-ai-models.mjs"
+    "verify:models": "node scripts/verify-ai-models.mjs",
+    "eval:tutor": "node scripts/eval-tutor.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.3",

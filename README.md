@@ -52,6 +52,29 @@ Full schema, API routes, and migration plan in [`docs/TECH-STACK.md`](docs/TECH-
 
 ---
 
+## Deploy Checklist
+
+**An env var change is not live until you redeploy.** Vercel bakes environment
+variables in at build time, so editing one in the dashboard changes nothing for
+the running deployment. Change a var → trigger a redeploy → verify. This has
+bitten us twice (the Stripe webhook secret, then the AI keys); assume it will
+again.
+
+Also worth confirming on any deploy that touches billing or AI:
+
+| Change | Verify with |
+|--------|-------------|
+| AI model ID or `ANTHROPIC_API_KEY` | `npm run verify:models -- --url https://<deployment>` |
+| Tutor prompt, schema, or model | `npm run eval:tutor -- --baseline evals/baseline.json` |
+| Stripe keys or webhook secret | Send a test event from the Stripe dashboard; expect a 200 |
+| Any `SITE_URL` change | Watch for `www` vs apex — Stripe does not follow redirects |
+
+Model IDs live in [`api/ai/_models.js`](api/ai/_models.js) and are overridable
+per environment via `ANTHROPIC_MODEL` / `GEMINI_MODEL`, so rolling forward off a
+retired model does not require a code change.
+
+---
+
 ## Project Structure
 
 ```
