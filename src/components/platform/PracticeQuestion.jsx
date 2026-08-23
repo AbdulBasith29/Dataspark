@@ -158,6 +158,209 @@ function RubricList({ evalResult, question }) {
   return null;
 }
 
+const VERDICT_STYLES = {
+  correct: { label: "Correct", bg: "rgba(52,211,153,0.12)", text: "#34D399", border: "rgba(52,211,153,0.28)" },
+  partial: { label: "Partial", bg: "rgba(251,191,36,0.12)", text: "#FBBF24", border: "rgba(251,191,36,0.28)" },
+  incorrect: { label: "Incorrect", bg: "rgba(248,113,113,0.12)", text: "#F87171", border: "rgba(248,113,113,0.28)" },
+};
+
+/**
+ * Renders the structured evaluation from /api/ai/evaluate as a progress
+ * indicator. `degraded` responses carry prose but no score, so the meter and
+ * verdict are dropped rather than shown as a misleading zero.
+ */
+function ScoreReport({ evalResult, question, accent }) {
+  const hasScore = typeof evalResult.score === "number";
+  const verdict = VERDICT_STYLES[evalResult.verdict] || null;
+  const meterColor = verdict?.text || accent;
+  const gaps = Array.isArray(evalResult.gaps) ? evalResult.gaps : [];
+  const explanation = evalResult.explanation || evalResult.feedback;
+
+  return (
+    <>
+      {hasScore ? (
+        <>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              gap: 10,
+              marginBottom: 10,
+              flexWrap: "wrap",
+            }}
+          >
+            <span
+              style={{
+                fontSize: 42,
+                fontWeight: 900,
+                color: DS.t1,
+                lineHeight: 1,
+                fontFamily: "var(--ds-mono), monospace",
+              }}
+            >
+              {evalResult.score}
+            </span>
+            <span
+              style={{
+                color: DS.t3,
+                fontFamily: "var(--ds-mono), monospace",
+                fontSize: 13,
+              }}
+            >
+              {evalResult.totalScore}
+            </span>
+            {verdict && (
+              <span
+                style={{
+                  marginLeft: "auto",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  padding: "3px 10px",
+                  borderRadius: 20,
+                  background: verdict.bg,
+                  color: verdict.text,
+                  border: `1px solid ${verdict.border}`,
+                  fontFamily: "var(--ds-mono), monospace",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                {verdict.label}
+              </span>
+            )}
+          </div>
+          <div
+            role="progressbar"
+            aria-valuenow={evalResult.score}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="Answer score"
+            style={{
+              height: 6,
+              borderRadius: 999,
+              background: "rgba(255,255,255,0.06)",
+              overflow: "hidden",
+              marginBottom: 14,
+            }}
+          >
+            <div
+              style={{
+                width: `${evalResult.score}%`,
+                height: "100%",
+                borderRadius: 999,
+                background: meterColor,
+                boxShadow: `0 0 12px ${meterColor}66`,
+                transition: "width 0.5s ease",
+              }}
+            />
+          </div>
+        </>
+      ) : (
+        <div
+          style={{
+            fontSize: 11,
+            color: DS.t3,
+            fontFamily: "var(--ds-mono), monospace",
+            marginBottom: 12,
+          }}
+        >
+          Unscored — feedback only
+        </div>
+      )}
+
+      {explanation && (
+        <p
+          style={{
+            fontSize: 13,
+            color: DS.t2,
+            lineHeight: 1.65,
+            margin: "0 0 14px",
+            fontFamily: "var(--ds-sans), sans-serif",
+          }}
+        >
+          {explanation}
+        </p>
+      )}
+
+      {gaps.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: DS.t3,
+              fontFamily: "var(--ds-mono), monospace",
+              letterSpacing: "0.12em",
+              marginBottom: 8,
+              textTransform: "uppercase",
+            }}
+          >
+            Gaps to close
+          </div>
+          <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 5 }}>
+            {gaps.map((gap, i) => (
+              <li
+                key={i}
+                style={{
+                  fontSize: 12.5,
+                  color: DS.t2,
+                  lineHeight: 1.5,
+                  fontFamily: "var(--ds-sans), sans-serif",
+                  display: "flex",
+                  gap: 9,
+                  alignItems: "flex-start",
+                }}
+              >
+                <span
+                  style={{
+                    flexShrink: 0,
+                    width: 5,
+                    height: 5,
+                    borderRadius: "50%",
+                    background: "#FBBF24",
+                    marginTop: 7,
+                  }}
+                />
+                <span>{gap}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {evalResult.follow_up_hint && (
+        <div
+          style={{
+            display: "flex",
+            gap: 9,
+            alignItems: "flex-start",
+            padding: "10px 12px",
+            borderRadius: DS.radiusSm,
+            background: `${accent}0F`,
+            border: `1px solid ${accent}30`,
+            marginBottom: 14,
+          }}
+        >
+          <span style={{ color: accent, flexShrink: 0, marginTop: 1 }}>
+            <MessageCircle size={13} />
+          </span>
+          <span
+            style={{
+              fontSize: 12.5,
+              color: DS.t2,
+              lineHeight: 1.55,
+              fontFamily: "var(--ds-sans), sans-serif",
+            }}
+          >
+            {evalResult.follow_up_hint}
+          </span>
+        </div>
+      )}
+
+      <RubricList evalResult={evalResult} question={question} />
+    </>
+  );
+}
+
 export default function PracticeQuestion({
   question,
   courseAccent,
@@ -385,50 +588,7 @@ export default function PracticeQuestion({
                 >
                   AI Scorecard
                 </div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "baseline",
-                    gap: 10,
-                    marginBottom: 12,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 42,
-                      fontWeight: 900,
-                      color: DS.t1,
-                      lineHeight: 1,
-                      fontFamily: "var(--ds-mono), monospace",
-                    }}
-                  >
-                    {Math.round(evalResult.score)}
-                  </span>
-                  <span
-                    style={{
-                      color: DS.t3,
-                      fontFamily: "var(--ds-mono), monospace",
-                      fontSize: 13,
-                    }}
-                  >
-                    {evalResult.totalScore}
-                  </span>
-                </div>
-                {evalResult.feedback && (
-                  <p
-                    style={{
-                      fontSize: 13,
-                      color: DS.t2,
-                      lineHeight: 1.65,
-                      margin: "0 0 14px",
-                      fontFamily: "var(--ds-sans), sans-serif",
-                    }}
-                  >
-                    {evalResult.feedback}
-                  </p>
-                )}
-                <RubricList evalResult={evalResult} question={question} />
+                <ScoreReport evalResult={evalResult} question={question} accent={accent} />
               </div>
             </div>
           )}

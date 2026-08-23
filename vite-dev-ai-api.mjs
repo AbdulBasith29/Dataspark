@@ -1,6 +1,10 @@
 /**
- * Dev-only handlers so `npm run dev` can serve /api/ai/* without Vercel.
+ * Dev-only handler so `npm run dev` can serve /api/ai/chat without Vercel.
  * Uses ANTHROPIC_API_KEY or GEMINI_API_KEY from .env (loaded in vite.config).
+ *
+ * /api/ai/evaluate is deliberately NOT here — it runs the real api/ai/evaluate.js
+ * via vite-dev-vercel-api.mjs, so the evaluation contract can't drift between
+ * dev and prod. This file previously kept a second copy that already had.
  */
 const DEFAULT_MODEL = "claude-sonnet-4-20250514";
 const DEFAULT_GEMINI_MODEL = "gemini-flash-latest";
@@ -28,53 +32,6 @@ function readJsonBody(req) {
     });
     req.on("error", reject);
   });
-}
-
-function fallbackEvaluation(rubric = []) {
-  const rubricScores = rubric.map((criterion) => ({
-    criterion,
-    met: false,
-    confidence: "low",
-  }));
-  return {
-    score: 0,
-    totalScore: "Needs Work",
-    rubricScores,
-    feedback:
-      "AI evaluation is temporarily unavailable. Review the rubric and compare against the model answer.",
-  };
-}
-
-function buildEvaluationPrompt(questionPrompt, userAnswer, rubric) {
-  const rubricText = rubric.map((r, i) => `${i + 1}. ${r}`).join("\n");
-  return [
-    "Evaluate this answer against the rubric.",
-    "",
-    "QUESTION:",
-    questionPrompt,
-    "",
-    "RUBRIC:",
-    rubricText,
-    "",
-    "ANSWER:",
-    userAnswer,
-  ].join("\n");
-}
-
-function parseEvaluationJson(rawText) {
-  try {
-    return JSON.parse(rawText);
-  } catch {
-    return null;
-  }
-}
-
-function isValidEvaluation(parsed) {
-  return (
-    typeof parsed?.score === "number" &&
-    Array.isArray(parsed?.rubricScores) &&
-    typeof parsed?.feedback === "string"
-  );
 }
 
 function extractAnthropicText(data) {
@@ -202,108 +159,6 @@ export function devAiApiPlugin({ anthropicApiKey = "", geminiApiKey = "" } = {})
             sendJson(res, 200, { text: extractGeminiText(data) });
           } catch {
             sendJson(res, 500, { error: "chat_request_failed" });
-          }
-          return;
-        }
-
-        if (req.method === "POST" && url === "/api/ai/evaluate") {
-          let body;
-          try {
-            body = await readJsonBody(req);
-          } catch {
-            sendJson(res, 400, { error: "invalid_json" });
-            return;
-          }
-          const { questionPrompt, userAnswer, rubric } = body || {};
-          if (!questionPrompt || !userAnswer || !Array.isArray(rubric)) {
-            sendJson(res, 400, { error: "invalid_payload" });
-            return;
-          }
-          if (!anthropicApiKey && !geminiApiKey) {
-            sendJson(res, 200, fallbackEvaluation(rubric));
-            return;
-          }
-          const system = [
-            "You are a strict data-science interview evaluator.",
-            "Return JSON only. No markdown. No prose outside JSON.",
-            'Schema: {"score": number, "totalScore": string, "rubricScores":[{"criterion": string, "met": boolean, "confidence": "low"|"medium"|"high"}], "feedback": string}',
-            "Score is 0-100 and should reflect rubric coverage and reasoning quality.",
-          ].join(" ");
-          const userContent = buildEvaluationPrompt(
-            questionPrompt,
-            userAnswer,
-            rubric
-          );
-          try {
-            if (anthropicApiKey) {
-              const upstream = await fetch(ANTHROPIC_API_URL, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "x-api-key": anthropicApiKey,
-                  "anthropic-version": "2023-06-01",
-                },
-                body: JSON.stringify({
-                  model: DEFAULT_MODEL,
-                  max_tokens: 700,
-                  system,
-                  messages: [{ role: "user", content: userContent }],
-                }),
-              });
-              const data = await upstream.json();
-              if (!upstream.ok) {
-                sendJson(res, 200, fallbackEvaluation(rubric));
-                return;
-              }
-              const rawText =
-                data?.content?.map((block) => block?.text || "").join("") || "";
-              const parsed = parseEvaluationJson(rawText);
-              if (!isValidEvaluation(parsed)) {
-                sendJson(res, 200, fallbackEvaluation(rubric));
-                return;
-              }
-              sendJson(res, 200, parsed);
-              return;
-            }
-
-            const upstream = await fetch(
-              `${GEMINI_API_URL}/${DEFAULT_GEMINI_MODEL}:generateContent?key=${encodeURIComponent(
-                geminiApiKey
-              )}`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  systemInstruction: {
-                    parts: [{ text: system }],
-                  },
-                  contents: [{ role: "user", parts: [{ text: userContent }] }],
-                  generationConfig: {
-                    maxOutputTokens: 700,
-                    responseMimeType: "application/json",
-                  },
-                }),
-              }
-            );
-            const data = await upstream.json();
-            if (!upstream.ok) {
-              sendJson(res, 200, fallbackEvaluation(rubric));
-              return;
-            }
-            const rawText =
-              data?.candidates?.[0]?.content?.parts
-                ?.map((part) => part?.text || "")
-                .join("") || "";
-            const parsed = parseEvaluationJson(rawText);
-            if (!isValidEvaluation(parsed)) {
-              sendJson(res, 200, fallbackEvaluation(rubric));
-              return;
-            }
-            sendJson(res, 200, parsed);
-          } catch {
-            sendJson(res, 200, fallbackEvaluation(rubric));
           }
           return;
         }

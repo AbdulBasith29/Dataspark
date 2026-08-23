@@ -12,6 +12,8 @@ const ROUTES = {
   "/api/stripe/portal": "api/stripe/portal.js",
   "/api/stripe/webhook": "api/stripe/webhook.js",
   "/api/certificates": "api/certificates/index.js",
+  // Served by the real handler so dev and prod share one evaluation contract.
+  "/api/ai/evaluate": "api/ai/evaluate.js",
 };
 
 // The Stripe webhook verifies a signature over the raw stream — never
