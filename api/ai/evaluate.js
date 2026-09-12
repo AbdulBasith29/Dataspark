@@ -80,7 +80,7 @@ export default async function handler(req, res) {
   const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
   const geminiApiKey = process.env.GEMINI_API_KEY;
   if (!anthropicApiKey && !geminiApiKey) {
-    return res.status(200).json(fallbackEvaluation(rubric));
+    return res.status(503).json({ error: "missing_ai_key", message: "AI evaluation is temporarily unavailable." });
   }
 
   const system = [

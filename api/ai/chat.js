@@ -74,22 +74,30 @@ async function authenticateRequest(req) {
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
   if (!token) return { userId: null, error: { status: 401, body: { error: "auth_required", message: "Sign in to use the AI tutor." } } };
 
-  const supabase = getSupabaseAdmin();
+  let supabase;
+  try {
+    supabase = getSupabaseAdmin();
+  } catch {
+    // Invalid configuration must not bypass identity verification either.
+  }
   if (!supabase) {
-    // No service role key — skip auth (dev fallback, not for production)
-    return { userId: "anonymous", error: null };
+    return { userId: null, error: { status: 503, body: { error: "supabase_not_configured", message: "The AI tutor is temporarily unavailable." } } };
   }
 
-  const { data: { user }, error } = await supabase.auth.getUser(token);
+  let result;
+  try {
+    result = await supabase.auth.getUser(token);
+  } catch {
+    return { userId: null, error: { status: 503, body: { error: "auth_unavailable", message: "The AI tutor is temporarily unavailable." } } };
+  }
+  const { data: { user }, error } = result;
   if (error || !user) return { userId: null, error: { status: 401, body: { error: "invalid_token", message: "Session expired. Please sign in again." } } };
   return { userId: user.id, error: null };
 }
 
 // Looks up the user's plan to pick their daily message allowance.
 async function getDailyLimit(userId) {
-  if (userId === "anonymous") return PRO_DAILY_LIMIT;
   const supabase = getSupabaseAdmin();
-  if (!supabase) return PRO_DAILY_LIMIT;
   const { data } = await supabase
     .from("user_subscriptions")
     .select("plan, status")
@@ -101,10 +109,7 @@ async function getDailyLimit(userId) {
 
 // Returns { count, limited } after incrementing usage by 1
 async function checkAndIncrementUsage(userId, dailyLimit) {
-  if (userId === "anonymous") return { count: 1, limited: false };
-
   const supabase = getSupabaseAdmin();
-  if (!supabase) return { count: 1, limited: false };
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -136,7 +141,7 @@ export default async function handler(req, res) {
   const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
   const geminiApiKey = process.env.GEMINI_API_KEY;
   if (!anthropicApiKey && !geminiApiKey) {
-    return res.status(500).json({ error: "missing_ai_key", details: "Set ANTHROPIC_API_KEY or GEMINI_API_KEY" });
+    return res.status(503).json({ error: "missing_ai_key", message: "The AI tutor is temporarily unavailable." });
   }
 
   // ── Auth ──
