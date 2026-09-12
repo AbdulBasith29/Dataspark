@@ -120,7 +120,7 @@ export function devAiApiPlugin({ anthropicApiKey = "", geminiApiKey = "" } = {})
 
         if (req.method === "POST" && url === "/api/ai/chat") {
           if (!anthropicApiKey && !geminiApiKey) {
-            sendJson(res, 500, {
+            sendJson(res, 503, {
               error: "missing_ai_key",
               details: "Set ANTHROPIC_API_KEY or GEMINI_API_KEY",
             });
@@ -220,7 +220,7 @@ export function devAiApiPlugin({ anthropicApiKey = "", geminiApiKey = "" } = {})
             return;
           }
           if (!anthropicApiKey && !geminiApiKey) {
-            sendJson(res, 200, fallbackEvaluation(rubric));
+            sendJson(res, 503, { error: "missing_ai_key", message: "AI evaluation is temporarily unavailable." });
             return;
           }
           const system = [

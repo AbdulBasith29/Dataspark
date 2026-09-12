@@ -15,8 +15,13 @@ export default defineConfig(({ mode }) => {
       // Stripe + certificate routes in dev, same handlers as production.
       devVercelApiPlugin(env),
     ],
-    // Expose both VITE_* (Vite default) and SUPABASE_* (per deployment docs) to client code.
-    envPrefix: ["VITE_", "SUPABASE_"],
+    // Only VITE_* is public by convention. Preserve the two documented legacy
+    // aliases explicitly; a SUPABASE_ prefix would also expose service-role keys.
+    envPrefix: "VITE_",
+    define: {
+      "import.meta.env.SUPABASE_URL": JSON.stringify(env.SUPABASE_URL || ""),
+      "import.meta.env.SUPABASE_ANON_KEY": JSON.stringify(env.SUPABASE_ANON_KEY || ""),
+    },
     // PGlite ships its own WASM assets — pre-bundling breaks their URLs in dev.
     optimizeDeps: { exclude: ["@electric-sql/pglite"] },
   };
