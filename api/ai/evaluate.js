@@ -1,3 +1,4 @@
+import { isValidEvaluation, EVALUATION_UNAVAILABLE } from "../../src/lib/evaluation-contract.js";
 const DEFAULT_MODEL = "claude-sonnet-4-20250514";
 const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
@@ -10,20 +11,6 @@ function cors(res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
-function fallbackEvaluation(rubric = []) {
-  const rubricScores = rubric.map((criterion) => ({
-    criterion,
-    met: false,
-    confidence: "low",
-  }));
-  return {
-    score: 0,
-    totalScore: "Needs Work",
-    rubricScores,
-    feedback:
-      "AI evaluation is temporarily unavailable. Review the rubric and compare against the model answer.",
-  };
-}
 
 function buildEvaluationPrompt(questionPrompt, userAnswer, rubric) {
   const rubricText = rubric.map((r, i) => `${i + 1}. ${r}`).join("\n");
@@ -54,13 +41,6 @@ function parseEvaluationJson(rawText) {
   }
 }
 
-function isValidEvaluation(parsed) {
-  return (
-    typeof parsed?.score === "number" &&
-    Array.isArray(parsed?.rubricScores) &&
-    typeof parsed?.feedback === "string"
-  );
-}
 
 export default async function handler(req, res) {
   cors(res);
@@ -80,7 +60,7 @@ export default async function handler(req, res) {
   const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
   const geminiApiKey = process.env.GEMINI_API_KEY;
   if (!anthropicApiKey && !geminiApiKey) {
-    return res.status(200).json(fallbackEvaluation(rubric));
+    return res.status(503).json(EVALUATION_UNAVAILABLE);
   }
 
   const system = [
@@ -96,6 +76,7 @@ export default async function handler(req, res) {
     if (anthropicApiKey) {
       const upstream = await fetch(ANTHROPIC_API_URL, {
         method: "POST",
+        signal: AbortSignal.timeout(25000),
         headers: {
           "Content-Type": "application/json",
           "x-api-key": anthropicApiKey,
@@ -111,14 +92,14 @@ export default async function handler(req, res) {
 
       const data = await upstream.json();
       if (!upstream.ok) {
-        return res.status(200).json(fallbackEvaluation(rubric));
+        return res.status(503).json(EVALUATION_UNAVAILABLE);
       }
 
       const rawText =
         data?.content?.map((block) => block?.text || "").join("") || "";
       const parsed = parseEvaluationJson(rawText);
       if (!isValidEvaluation(parsed)) {
-        return res.status(200).json(fallbackEvaluation(rubric));
+        return res.status(503).json(EVALUATION_UNAVAILABLE);
       }
       return res.status(200).json(parsed);
     }
@@ -129,6 +110,7 @@ export default async function handler(req, res) {
       )}`,
       {
         method: "POST",
+        signal: AbortSignal.timeout(25000),
         headers: {
           "Content-Type": "application/json",
         },
@@ -146,7 +128,7 @@ export default async function handler(req, res) {
     );
     const data = await upstream.json();
     if (!upstream.ok) {
-      return res.status(200).json(fallbackEvaluation(rubric));
+      return res.status(503).json(EVALUATION_UNAVAILABLE);
     }
     // Filter out thinking tokens (thought:true parts) before joining text.
     const rawText =
@@ -156,10 +138,10 @@ export default async function handler(req, res) {
         .join("") || "";
     const parsed = parseEvaluationJson(rawText);
     if (!isValidEvaluation(parsed)) {
-      return res.status(200).json(fallbackEvaluation(rubric));
+      return res.status(503).json(EVALUATION_UNAVAILABLE);
     }
     return res.status(200).json(parsed);
   } catch {
-    return res.status(200).json(fallbackEvaluation(rubric));
+    return res.status(503).json(EVALUATION_UNAVAILABLE);
   }
 }

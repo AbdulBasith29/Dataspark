@@ -137,6 +137,8 @@ import SentimentAnalysisViz from "../visualizations/SentimentAnalysisViz.jsx";
 import VizLabShell from "../components/platform/VizLabShell.jsx";
 import LessonModule from "../components/platform/LessonModule.jsx";
 import PracticeQuestion from "../components/platform/PracticeQuestion.jsx";
+import SqlTrainingLab from "../components/platform/SqlTrainingLab.jsx";
+import { savePracticeScore } from "../lib/practice-attempt.js";
 import { getResolvedLessonModule, auditPythonLessonIntegrity, PYTHON_CLUSTER_MILESTONES } from "../data/lesson-modules.js";
 import { PYTHON_QUESTIONS } from "../data/questions-python.js";
 import { STATISTICS_QUESTIONS } from "../data/questions-statistics.js";
@@ -1373,8 +1375,12 @@ export default function DataSparkPlatform() {
   const [evalLoading, setEvalLoading] = useState(false);
   const [evalError, setEvalError] = useState(null);
   const [evalResult, setEvalResult] = useState(null);
+  const trainingSessions = useRef(new Map());
   const { intent, setIntent } = useLearnerIntent();
   const { user, isPro, refreshPlan } = useAuth();
+  const trainingUser = useRef(user?.id);
+  trainingUser.current = user?.id;
+  useEffect(() => { trainingSessions.current.clear(); }, [user?.id]);
   const navigate = useNavigate();
 
   // Hydrate completed-lesson checkmarks and practice-question scores from
@@ -1905,7 +1911,17 @@ export default function DataSparkPlatform() {
       <div style={{ padding: "0 clamp(8px, 2vw, 16px)" }}>
         <button type="button" onClick={() => { setCourseTab("practice"); setView("course"); }} style={{ background: "none", border: "none", color: DS.t3, fontSize: 12, cursor: "pointer", padding: "16px 0 8px", fontFamily: "var(--ds-mono), monospace", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 5 }}><ArrowLeft size={14} /> Back to practice</button>
 
-        <PracticeQuestion
+        {q.id === "sqq3" ? <SqlTrainingLab
+          key={user?.id || "anonymous"}
+          question={q}
+          session={trainingSessions.current.get(user?.id)}
+          retainSession={(attempt) => trainingSessions.current.set(user?.id, attempt)}
+          onSave={async (score) => {
+            const best = await savePracticeScore(getSupabaseBrowserClient(), user?.id, q.id, score);
+            if (trainingUser.current === user?.id) setQuestionProgress(previous => ({ ...previous, [q.id]: best }));
+          }}
+          onAskTutor={(prompt) => { setChatbotSeed(prompt); setChatbotCourse(activeCourse); }}
+        /> : <PracticeQuestion
           question={q}
           courseAccent={activeCourse.color}
           onSubmit={submitPracticeAnswer}
@@ -1913,7 +1929,7 @@ export default function DataSparkPlatform() {
           evalResult={evalResult}
           evalError={evalError}
           onAskTutor={() => setChatbotCourse(activeCourse)}
-        />
+        />}
       </div>
     );
   };
