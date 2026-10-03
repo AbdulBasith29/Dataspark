@@ -1,3 +1,4 @@
+import { isValidEvaluation, EVALUATION_UNAVAILABLE } from "./src/lib/evaluation-contract.js";
 /**
  * Dev-only handlers so `npm run dev` can serve /api/ai/* without Vercel.
  * Uses ANTHROPIC_API_KEY or GEMINI_API_KEY from .env (loaded in vite.config).
@@ -30,20 +31,6 @@ function readJsonBody(req) {
   });
 }
 
-function fallbackEvaluation(rubric = []) {
-  const rubricScores = rubric.map((criterion) => ({
-    criterion,
-    met: false,
-    confidence: "low",
-  }));
-  return {
-    score: 0,
-    totalScore: "Needs Work",
-    rubricScores,
-    feedback:
-      "AI evaluation is temporarily unavailable. Review the rubric and compare against the model answer.",
-  };
-}
 
 function buildEvaluationPrompt(questionPrompt, userAnswer, rubric) {
   const rubricText = rubric.map((r, i) => `${i + 1}. ${r}`).join("\n");
@@ -69,13 +56,6 @@ function parseEvaluationJson(rawText) {
   }
 }
 
-function isValidEvaluation(parsed) {
-  return (
-    typeof parsed?.score === "number" &&
-    Array.isArray(parsed?.rubricScores) &&
-    typeof parsed?.feedback === "string"
-  );
-}
 
 function extractAnthropicText(data) {
   return (
@@ -220,7 +200,7 @@ export function devAiApiPlugin({ anthropicApiKey = "", geminiApiKey = "" } = {})
             return;
           }
           if (!anthropicApiKey && !geminiApiKey) {
-            sendJson(res, 200, fallbackEvaluation(rubric));
+            sendJson(res, 503, EVALUATION_UNAVAILABLE);
             return;
           }
           const system = [
@@ -252,14 +232,14 @@ export function devAiApiPlugin({ anthropicApiKey = "", geminiApiKey = "" } = {})
               });
               const data = await upstream.json();
               if (!upstream.ok) {
-                sendJson(res, 200, fallbackEvaluation(rubric));
+                sendJson(res, 503, EVALUATION_UNAVAILABLE);
                 return;
               }
               const rawText =
                 data?.content?.map((block) => block?.text || "").join("") || "";
               const parsed = parseEvaluationJson(rawText);
               if (!isValidEvaluation(parsed)) {
-                sendJson(res, 200, fallbackEvaluation(rubric));
+                sendJson(res, 503, EVALUATION_UNAVAILABLE);
                 return;
               }
               sendJson(res, 200, parsed);
@@ -289,7 +269,7 @@ export function devAiApiPlugin({ anthropicApiKey = "", geminiApiKey = "" } = {})
             );
             const data = await upstream.json();
             if (!upstream.ok) {
-              sendJson(res, 200, fallbackEvaluation(rubric));
+              sendJson(res, 503, EVALUATION_UNAVAILABLE);
               return;
             }
             const rawText =
@@ -298,12 +278,12 @@ export function devAiApiPlugin({ anthropicApiKey = "", geminiApiKey = "" } = {})
                 .join("") || "";
             const parsed = parseEvaluationJson(rawText);
             if (!isValidEvaluation(parsed)) {
-              sendJson(res, 200, fallbackEvaluation(rubric));
+              sendJson(res, 503, EVALUATION_UNAVAILABLE);
               return;
             }
             sendJson(res, 200, parsed);
           } catch {
-            sendJson(res, 200, fallbackEvaluation(rubric));
+            sendJson(res, 503, EVALUATION_UNAVAILABLE);
           }
           return;
         }
