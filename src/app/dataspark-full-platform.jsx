@@ -1362,6 +1362,7 @@ function rubricForPracticeQuestion(q) {
 }
 
 export default function DataSparkPlatform() {
+  const [navigationOpen, setNavigationOpen] = useState(false);
   const [view, setView] = useState("home");
   const [activeCourse, setActiveCourse] = useState(null);
   const [activeLesson, setActiveLesson] = useState(null);
@@ -1949,9 +1950,19 @@ export default function DataSparkPlatform() {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 3px; }
         input[type="range"] { height: 4px; }
-        @media (max-width: 640px) {
+        .ds-mobile-menu { display: none; }
+        .ds-nav-links { display: contents; }
+        @media (max-width: 700px) {
+          .ds-nav-brand { width: 100%; flex-wrap: wrap; }
+          .ds-mobile-menu { display: block; margin-left: auto; }
+          .ds-nav-links, .ds-nav-right, .ds-nav-account { display: none !important; }
+          .ds-nav--open .ds-nav-links { display: flex !important; width: 100%; gap: 12px; }
+          .ds-nav--open .ds-nav-right { display: flex !important; flex-wrap: wrap; overflow-x: visible !important; }
+          .ds-nav--open .ds-nav-account { display: block !important; }
           .ds-nav { flex-wrap: wrap !important; padding: 8px 16px 6px !important; gap: 6px !important; }
           .ds-nav-right { max-width: 100% !important; width: 100%; padding-bottom: 4px; }
+        }
+        @media (max-width: 640px) {
           .ds-g2 { grid-template-columns: 1fr !important; }
           .ds-g3 { grid-template-columns: 1fr !important; }
           .ds-artifact-row { grid-template-columns: 1fr !important; }
@@ -1965,7 +1976,7 @@ export default function DataSparkPlatform() {
         <div style={{ position: "absolute", width: 480, height: 480, borderRadius: "50%", background: "radial-gradient(circle, rgba(52,211,153,0.05) 0%, transparent 70%)", bottom: "0%", right: "-8%" }} />
       </div>
 
-      <nav className="ds-nav" style={{
+      <nav aria-label="Platform navigation" data-platform-header className={"ds-nav" + (navigationOpen ? " ds-nav--open" : "")} onKeyDown={event => { if (event.key === "Escape" && navigationOpen) { setNavigationOpen(false); event.currentTarget.querySelector(".ds-mobile-menu")?.focus(); } }} style={{
         borderBottom: `1px solid ${DS.border}`,
         padding: "12px clamp(16px, 3vw, 28px)",
         display: "flex",
@@ -1980,7 +1991,7 @@ export default function DataSparkPlatform() {
         zIndex: 100,
       }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+        <div className="ds-nav-brand" style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
           <div
             onClick={() => { setView("home"); setActiveCourse(null); }}
             style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", flexShrink: 0 }}
@@ -1988,6 +1999,8 @@ export default function DataSparkPlatform() {
             <PlatformLogo />
             <span style={{ fontSize: 17, fontWeight: 800, color: DS.t1, letterSpacing: "-0.02em", whiteSpace: "nowrap" }}>DataSpark</span>
           </div>
+          <button className="ds-mobile-menu" type="button" aria-expanded={navigationOpen} aria-controls="platform-links platform-courses platform-account" onClick={() => setNavigationOpen(open => !open)} style={{ minHeight: 44, padding: "8px 12px", background: DS.surface2, border: `1px solid ${DS.border}`, borderRadius: 8, color: DS.t1, font: "inherit", fontSize: 13, cursor: "pointer" }}>{navigationOpen ? "Close menu" : "Menu"}</button>
+          <div id="platform-links" className="ds-nav-links" onClick={() => setNavigationOpen(false)}>
           <Link
             to="/"
             style={{
@@ -2020,14 +2033,15 @@ export default function DataSparkPlatform() {
           >
             Insights
           </Link>
+          </div>
         </div>
 
-        <div className="ds-nav-right" style={{ display: "flex", gap: 4, overflowX: "auto", maxWidth: "min(68vw, 520px)", paddingBottom: 2 }}>
+        <div id="platform-courses" className="ds-nav-right" style={{ display: "flex", gap: 4, overflowX: "auto", maxWidth: "min(68vw, 520px)", paddingBottom: 2 }}>
           {CURRICULUM.slice(0, 6).map(c => (
             <button
               key={c.id}
               type="button"
-              onClick={() => { setActiveCourse(c); setView("course"); setCourseTab("learn"); }}
+              onClick={() => { setActiveCourse(c); setView("course"); setCourseTab("learn"); setNavigationOpen(false); }}
               style={{
                 background: activeCourse?.id === c.id ? `${c.color}18` : "transparent",
                 border: `1px solid ${activeCourse?.id === c.id ? `${c.color}35` : "transparent"}`,
@@ -2051,7 +2065,7 @@ export default function DataSparkPlatform() {
           ))}
         </div>
 
-        <UserMenu />
+        <div id="platform-account" className="ds-nav-account"><UserMenu /></div>
       </nav>
 
       <main style={{ paddingBottom: 72, position: "relative", zIndex: 1 }}>

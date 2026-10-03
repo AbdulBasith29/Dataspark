@@ -1,5 +1,13 @@
 # SQL training lab: scope and verification
 
+## October 3 mobile polish follow-up
+
+- Platform navigation at widths up to 700px now collapses behind an accessible Menu button, retaining the original logo. Opening it reveals Home, Insights, wrapped course buttons and the existing account menu. Course selection and Escape close it. Desktop navigation and the original 640px content-grid breakpoint remain intact.
+- Lab supporting text now uses the existing brighter `DS.t2` colour at 14px. The editor has an associated, non-spoiling starting instruction.
+- View changes focus without automatic scrolling, then position the section below the measured platform header with room for the view tabs.
+- Eight regression tests and the production build pass; lab-component lint passes. Existing build warnings remain.
+- **NOT VERIFIED:** browser appearance and interaction for this follow-up. Browser security rejected reopening the local preview. Earlier browser results below apply to the previous commit only. Check 315/360/390/430px widths, menu open/close and keyboard access, Brief/Work/Feedback transitions, and desktop layout before merging. Live AI, account persistence and native-device checks remain outstanding.
+
 ## Scope
 
 The `sqq3` question, Funnel Conversion by City, uses `SqlTrainingLab.jsx` inside the existing platform navigation. Existing DataSpark logo, wordmark, shared typography and design tokens are unchanged. Other question screens remain on `PracticeQuestion`.

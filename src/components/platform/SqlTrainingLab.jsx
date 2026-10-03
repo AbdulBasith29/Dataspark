@@ -9,7 +9,7 @@ const EMPTY = { draft: "", submission: null, assessment: null, evidence: null, s
 const S = {
   label: { fontFamily: "var(--ds-mono), monospace", fontSize: 12, color: DS.ind, letterSpacing: ".08em", marginBottom: 12 },
   heading: { fontSize: 19, fontWeight: 700, marginBottom: 16 },
-  muted: { color: DS.t3, fontSize: 13, lineHeight: 1.7 },
+  muted: { color: DS.t2, fontSize: 14, lineHeight: 1.7 },
   panel: { background: DS.cardGlass, border: "1px solid " + DS.border, borderRadius: DS.radiusMd, padding: 16 },
   button: { minHeight: 44, padding: "10px 14px", border: "1px solid " + DS.border, borderRadius: DS.radiusSm, background: DS.surface2, color: DS.t1, cursor: "pointer", font: "inherit", fontSize: 13 },
   row: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" },
@@ -103,7 +103,16 @@ export default function SqlTrainingLab({ question, session, retainSession, onSav
 
   function showView(next, focusId) {
     setView(next);
-    if (phone || focusId) requestAnimationFrame(() => document.getElementById(focusId || "training-" + next)?.focus());
+    if (phone || focusId) requestAnimationFrame(() => {
+      const target = document.getElementById(focusId || "training-" + next);
+      const section = document.getElementById("training-" + next);
+      target?.focus({ preventScroll: true });
+      if (section) {
+        const headerHeight = document.querySelector("[data-platform-header]")?.getBoundingClientRect().height || 0;
+        const tabsHeight = document.getElementById("training-views")?.getBoundingClientRect().height || 0;
+        window.scrollTo({ top: Math.max(0, window.scrollY + section.getBoundingClientRect().top - headerHeight - tabsHeight - 32), behavior: "instant" });
+      }
+    });
   }
 
   const assessment = attempt.assessment;
@@ -118,7 +127,7 @@ export default function SqlTrainingLab({ question, session, retainSession, onSav
         <span style={{ display: phone ? "block" : "inline", color: DS.ind, marginRight: phone ? 0 : 16, marginBottom: 6 }}>{String(index + 1).padStart(2, "0")}</span>{step}
       </li>)}
     </ol>}
-    {phone && <nav aria-label="Attempt views" style={{ ...S.row, marginBottom: 24, borderBottom: "1px solid " + DS.border }}>
+    {phone && <nav id="training-views" aria-label="Attempt views" style={{ ...S.row, marginBottom: 24, borderBottom: "1px solid " + DS.border }}>
       {["brief", "work", "feedback"].map(tab => <button key={tab} type="button" aria-pressed={view === tab} onClick={() => showView(tab)} style={{ ...S.button, flex: 1, background: "transparent", border: 0, borderRadius: 0, borderBottom: view === tab ? "2px solid " + DS.ind : "2px solid transparent", textTransform: "capitalize" }}>{tab}</button>)}
     </nav>}
     <div style={{ display: phone ? "block" : "grid", gridTemplateColumns: compact ? "minmax(210px,1fr) minmax(0,2fr)" : "minmax(220px,.85fr) minmax(0,1.8fr) minmax(260px,1fr)", gap: 28, alignItems: "start" }}>
@@ -133,10 +142,11 @@ export default function SqlTrainingLab({ question, session, retainSession, onSav
       </section>
       <section id="training-work" tabIndex={-1} hidden={phone && view !== "work"} style={{ minWidth: 0 }}>
         <p style={S.label}>02 / YOUR QUERY</p><h2 style={S.heading}>{assessment ? "Revise with a reason." : "Build your query."}</h2>
+        <p id="training-query-guidance" style={{ ...S.muted, marginBottom: 16 }}>Start by exploring the columns in funnel_events. Run a small query to understand the data, then build towards the brief.</p>
         {phone && <div style={{ marginBottom: 12 }}><Action onClick={() => showView("brief")}>Schema & hints → Brief</Action></div>}
         <div style={{ border: "1px solid " + DS.border, borderRadius: DS.radiusMd, background: DS.bgElev, overflow: "hidden" }}>
           <div style={{ ...S.row, justifyContent: "space-between", padding: 12, borderBottom: "1px solid " + DS.border, ...S.muted }}><label htmlFor="training-query">attempt.sql</label><span>PostgreSQL</span></div>
-          <textarea id="training-query" aria-label="SQL query" spellCheck={false} autoCapitalize="off" autoCorrect="off" value={attempt.draft}
+          <textarea id="training-query" aria-label="SQL query" aria-describedby="training-query-guidance" spellCheck={false} autoCapitalize="off" autoCorrect="off" value={attempt.draft}
             onChange={event => { setAttempt(previous => ({ ...previous, draft: event.target.value })); setRecap(false); }}
             placeholder="Write your query using funnel_events…"
             style={{ display: "block", width: "100%", minHeight: phone ? 240 : 300, resize: "vertical", padding: 16, background: DS.bgElev, color: DS.t1, border: 0, font: (phone ? "16px" : "14px") + "/1.8 var(--ds-mono), monospace", whiteSpace: phone ? "pre-wrap" : "pre", overflowWrap: phone ? "anywhere" : "normal" }} />
